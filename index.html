@@ -86,7 +86,12 @@
             // Configuraciones y Modos
             const [appMode, setAppMode] = useState(() => localStorage.getItem('drone_app_mode') || 'piloto'); // piloto | admin
             const [settingsOpen, setSettingsOpen] = useState(false);
-            const [apiKeys, setApiKeys] = useState(() => JSON.parse(localStorage.getItem('drone_api_keys')) || { gemini: "", firebase: "" });
+            
+            // LLAVES PREDEFINIDAS: Ya están integradas y listas para usar
+            const [apiKeys, setApiKeys] = useState({
+                gemini: "AQ.Ab8RN6Lu-oSyr3Qw9R-iO4Gpr95uBBgpsMT1nJ7Ivdu1w2M5sA",
+                firebase: `{\n  "apiKey": "AIzaSyDXjwv133-dIKyprCktTUkjx_adAz1DHaY",\n  "authDomain": "control-vuelos.firebaseapp.com",\n  "projectId": "control-vuelos",\n  "storageBucket": "control-vuelos.firebasestorage.app",\n  "messagingSenderId": "756032981781",\n  "appId": "1:756032981781:web:451641e72abe3692c0771c"\n}`
+            });
             
             // Nube y UI
             const [isCloudActive, setIsCloudActive] = useState(false);
@@ -315,24 +320,30 @@
                 try {
                     const base64Data = await new Promise((resolve) => {
                         const reader = new FileReader();
-                        reader.onloadend = () => resolve(reader.result.split(',')[1]);
+                        reader.onloadend = () => {
+                             // Extraer solo la parte base64 (remover "data:image/png;base64,")
+                            const base64String = reader.result.split(',')[1];
+                            resolve(base64String);
+                        };
                         reader.readAsDataURL(file);
                     });
 
+                    // Modificamos el endpoint para no forzar json en la url, lo haremos en body
                     const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKeys.gemini}`;
                     
                     const prompt = `
                     Eres un sistema experto de despacho de drones analizando una captura de la app meteorológica.
-                    Hora actual de la captura: ${currentHourInt}:00. La primera fila de la tabla corresponde a esta hora.
+                    Hora actual de la captura: ${currentHourInt}:00. La primera fila de la tabla (donde dice AHORA) corresponde a esta hora.
                     Las filas subsecuentes incrementan de 1 en 1 hora (ej: fila 2 es ${currentHourInt + 1}:00).
 
                     REGLAS DE PELIGRO:
-                    - Si el texto dice "Ráfagas fuertes", "Extremo", ">40", ">50", ">60", "13 30m" o está en bloque ROJO/NARANJA, el windGust es 45 (Peligro).
-                    - Si dice "Apto para volar", windGust es 25.
+                    - Si el texto dice "Ráfagas fuertes", "Ráfagas >50m", "Extremo", ">40", ">50", ">60", "13 30m", "14 60m", "12 60m" o está en bloque ROJO o NARANJA, el windGust es 45 (Peligro).
+                    - Si el texto dice "Vientos fuertes >30m, Ráfagas fuertes", el windGust es 45 (Peligro).
+                    - Si dice "Apto para volar" o está en bloque AZUL CLARO, windGust es 25.
                     
                     Tu única tarea es devolver un objeto JSON estricto con un arreglo llamado "forecast" de 24 objetos.
                     Para las horas no visibles en la foto, asigna windGust 25.
-                    Formato exacto esperado (sin markdown, solo JSON puro):
+                    Formato exacto esperado (solo JSON, NADA MÁS):
                     {
                       "forecast": [
                         {"hour": 0, "windGust": 25},
@@ -343,23 +354,39 @@
 
                     const response = await fetch(apiUrl, {
                         method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
+                        headers: { 
+                            'Content-Type': 'application/json' 
+                        },
                         body: JSON.stringify({
                             contents: [{
                                 parts: [
                                     { text: prompt },
-                                    { inlineData: { mimeType: "image/png", data: base64Data } }
+                                    { 
+                                        inlineData: { 
+                                            mimeType: file.type || "image/png", 
+                                            data: base64Data 
+                                        } 
+                                    }
                                 ]
                             }],
-                            generationConfig: { responseMimeType: "application/json" }
+                            generationConfig: {
+                                responseMimeType: "application/json"
+                            }
                         })
                     });
 
                     const result = await response.json();
                     
+                    if (!response.ok) {
+                        console.error("Gemini API Error Response:", result);
+                        throw new Error(`Error API: ${result.error?.message || response.statusText}`);
+                    }
+                    
                     if (result.candidates && result.candidates[0]?.content?.parts[0]?.text) {
                         const jsonText = result.candidates[0].content.parts[0].text;
-                        const parsedData = JSON.parse(jsonText);
+                        // Gemini a veces devuelve el json dentro de bloques markdown ```json ... ``` a pesar de pedir responseMimeType
+                        const cleanJsonText = jsonText.replace(/```json\n?|```/g, '').trim();
+                        const parsedData = JSON.parse(cleanJsonText);
                         
                         let newForecast = [...forecast];
                         parsedData.forecast.forEach(item => {
@@ -380,19 +407,26 @@
                         setScanStatus("¡Análisis Inteligente Exitoso!");
                         setTimeout(() => setShowScanner(false), 2000);
                     } else {
-                        throw new Error("Respuesta inválida de IA");
+                        throw new Error("Respuesta inválida de IA o incompleta");
                     }
                 } catch (err) {
-                    console.error("Error IA:", err);
+                    console.error("Error IA detallado:", err);
                     setScanStatus("Error. Verificando resiliencia...");
                     // Fail-safe: Si falla la IA, apagar la alarma para no bloquear al piloto
                     const fallbackDate = currentTime.toDateString();
                     setLastScanDate(fallbackDate);
                     updateData({ lastScanDate: fallbackDate });
-                    setModal({ isOpen: true, title: "Error Visual IA", message: "Hubo un error procesando la imagen. Se ha apagado la alarma para permitirte continuar operaciones.", type: "warning" });
+                    setModal({ 
+                        isOpen: true, 
+                        title: "Error Visual IA", 
+                        message: `Hubo un error procesando la imagen. Detalle: ${err.message}. Se ha apagado la alarma para permitirte continuar operaciones.`, 
+                        type: "warning" 
+                    });
                     setTimeout(() => setShowScanner(false), 2000);
                 } finally {
                     setIsScanning(false);
+                    // Reset input para permitir volver a subir el mismo archivo si es necesario
+                    e.target.value = null;
                 }
             };
 
@@ -416,9 +450,8 @@
                 const fd = new FormData(e.target);
                 const keys = { gemini: fd.get('gemini'), firebase: fd.get('firebase') };
                 setApiKeys(keys);
-                localStorage.setItem('drone_api_keys', JSON.stringify(keys));
                 setSettingsOpen(false);
-                setModal({ isOpen: true, title: "Configuración Guardada", message: "Las credenciales del servidor y de la IA han sido actualizadas.", type: "success" });
+                setModal({ isOpen: true, title: "Configuración Guardada", message: "Las credenciales han sido actualizadas temporalmente.", type: "success" });
             };
 
             const toggleMode = () => {
@@ -468,8 +501,8 @@
                                         <textarea name="firebase" defaultValue={apiKeys.firebase} rows="4" className="w-full bg-slate-900 border border-slate-700 rounded-xl p-2 text-xs text-white focus:border-indigo-500 outline-none font-mono" placeholder='{"apiKey": "...", "projectId": "..."}'></textarea>
                                     </div>
                                     <div className="flex gap-3 pt-2">
-                                        <button type="button" onClick={() => setSettingsOpen(false)} className="flex-1 py-2 bg-slate-800 text-white rounded-xl font-bold text-sm">Cancelar</button>
-                                        <button type="submit" className="flex-1 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-bold text-sm shadow-[0_0_15px_rgba(79,70,229,0.4)]">Guardar y Conectar</button>
+                                        <button type="button" onClick={() => setSettingsOpen(false)} className="flex-1 py-2 bg-slate-800 text-white rounded-xl font-bold text-sm">Cerrar</button>
+                                        <button type="submit" className="flex-1 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-bold text-sm shadow-[0_0_15px_rgba(79,70,229,0.4)]">Guardar Local</button>
                                     </div>
                                 </form>
                             </div>
