@@ -34,7 +34,6 @@
     </style>
 </head>
 <body class="min-h-screen relative overflow-x-hidden">
-    <!-- Fondo decorativo -->
     <div class="fixed top-0 left-0 w-full h-full overflow-hidden -z-10 pointer-events-none">
         <div class="absolute top-[-10%] left-[-10%] w-96 h-96 bg-indigo-600/20 rounded-full blur-[100px]"></div>
         <div class="absolute bottom-[-10%] right-[-10%] w-96 h-96 bg-cyan-600/20 rounded-full blur-[100px]"></div>
@@ -97,8 +96,6 @@
             const [isCloudActive, setIsCloudActive] = useState(false);
             const [dbRef, setDbRef] = useState(null);
             const [isScanning, setIsScanning] = useState(false);
-            const [scanStatus, setScanStatus] = useState("");
-            const [showScanner, setShowScanner] = useState(false);
             const [audioUnlocked, setAudioUnlocked] = useState(false);
             
             // Modal state
@@ -311,17 +308,17 @@
                 
                 if (!apiKeys.gemini) {
                     setModal({ isOpen: true, title: "Falta API Key", message: "Ve a configuración e ingresa tu API Key de Gemini para usar el escáner de Inteligencia Artificial.", type: "warning" });
+                    e.target.value = null; // Reiniciar input
                     return;
                 }
 
                 setIsScanning(true);
-                setScanStatus("IA procesando matriz de colores y horarios...");
                 
                 try {
                     const base64Data = await new Promise((resolve) => {
                         const reader = new FileReader();
                         reader.onloadend = () => {
-                             // Extraer solo la parte base64 de manera segura
+                             // Extraer solo la parte base64 de manera segura (quita el header data:image/png;base64,)
                             const result = reader.result;
                             const base64String = result.includes(',') ? result.split(',')[1] : result;
                             resolve(base64String);
@@ -337,8 +334,8 @@
                     Las filas subsecuentes incrementan de 1 en 1 hora (ej: fila 2 es ${currentHourInt + 1}:00).
 
                     REGLAS DE PELIGRO (ESTRICTAS Y EXACTAS):
-                    - Si el texto dice "Ráfagas fuertes", "Ráfagas >50m", "Extremo", ">40", ">50", ">60", "13 30m", "14 60m", "12 60m", "Extremo UV" o está en un bloque de color ROJO o NARANJA, el windGust es 45 (Peligro).
-                    - Si el texto dice "Vientos fuertes >30m, Ráfagas fuertes" o similar, el windGust es 45 (Peligro).
+                    - Si el texto dice "Ráfagas fuertes", "Ráfagas >50m", "Extremo", ">40", ">50", ">60", "13 30m", "14 60m", "12 60m", "Extremo UV 13", "Extremo UV 15", "Vientos fuertes >30m", "Vientos >40m" o está en un bloque de color ROJO o NARANJA, el windGust es 45 (Peligro).
+                    - Si el texto dice "Vientos fuertes >30m, Ráfagas fuertes" o "Vientos >40m, Ráfagas fuertes", el windGust es 45 (Peligro).
                     - Si dice "Apto para volar" o está en bloque AZUL CLARO, el windGust es 25 (Seguro).
                     
                     Tu única tarea es devolver un objeto JSON estricto con un arreglo llamado "forecast" de 24 objetos.
@@ -378,13 +375,11 @@
                     const result = await response.json();
                     
                     if (!response.ok) {
-                        console.error("Gemini API Error Response:", result);
                         throw new Error(`Error API: ${result.error?.message || response.statusText}`);
                     }
                     
                     if (result.candidates && result.candidates[0]?.content?.parts[0]?.text) {
                         const jsonText = result.candidates[0].content.parts[0].text;
-                        // Limpiar formato markdown si existe
                         const cleanJsonText = jsonText.replace(/```json\n?|```/g, '').trim();
                         const parsedData = JSON.parse(cleanJsonText);
                         
@@ -404,14 +399,12 @@
                         setLastScanDate(newScanDate);
                         
                         updateData({ forecast: newForecast, lastScanDate: newScanDate });
-                        setScanStatus("¡Análisis Inteligente Exitoso!");
-                        setTimeout(() => setShowScanner(false), 2000);
+                        setModal({ isOpen: true, title: "¡Análisis Inteligente Exitoso!", message: "El clima ha sido escaneado y el plan de vuelo fue actualizado.", type: "success" });
                     } else {
                         throw new Error("Respuesta inválida de IA o incompleta");
                     }
                 } catch (err) {
                     console.error("Error IA detallado:", err);
-                    setScanStatus("Error. Verificando resiliencia...");
                     // Fail-safe: Si falla la IA, apagar la alarma para no bloquear al piloto
                     const fallbackDate = currentTime.toDateString();
                     setLastScanDate(fallbackDate);
@@ -422,10 +415,9 @@
                         message: `Hubo un error procesando la imagen. Detalle: ${err.message}. Se ha apagado la alarma para permitirte continuar operaciones.`, 
                         type: "warning" 
                     });
-                    setTimeout(() => setShowScanner(false), 2000);
                 } finally {
                     setIsScanning(false);
-                    // Reset input para permitir volver a subir el mismo archivo si es necesario y desbloquear el input
+                    // Reset input para permitir volver a subir el mismo archivo si es necesario
                     e.target.value = null;
                 }
             };
@@ -443,6 +435,8 @@
                 const updatedLogs = [newLog, ...flights].sort((a,b) => b.id - a.id);
                 setFlights(updatedLogs);
                 updateData({ flights: updatedLogs });
+                
+                setModal({ isOpen: true, title: "¡Despegue Registrado!", message: `Vuelo de las ${flightTime} registrado exitosamente en la bitácora.`, type: "success" });
             };
 
             const handleSaveSettings = (e) => {
@@ -501,7 +495,7 @@
                                         <textarea name="firebase" defaultValue={apiKeys.firebase} rows="4" className="w-full bg-slate-900 border border-slate-700 rounded-xl p-2 text-xs text-white focus:border-indigo-500 outline-none font-mono" placeholder='{"apiKey": "...", "projectId": "..."}'></textarea>
                                     </div>
                                     <div className="flex gap-3 pt-2">
-                                        <button type="button" onClick={() => setSettingsOpen(false)} className="flex-1 py-2 bg-slate-800 text-white rounded-xl font-bold text-sm">Cerrar</button>
+                                        <button type="button" onClick={() => setSettingsOpen(false)} className="flex-1 py-2 bg-slate-800 text-white rounded-xl font-bold text-sm">Cancelar</button>
                                         <button type="submit" className="flex-1 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-bold text-sm shadow-[0_0_15px_rgba(79,70,229,0.4)]">Guardar y Conectar</button>
                                     </div>
                                 </form>
@@ -523,30 +517,23 @@
                                         {currentTime.toLocaleTimeString('en-US', { hour12: false })}
                                     </div>
                                 </div>
-                                <button onClick={() => setShowScanner(!showScanner)} className={`flex flex-col items-center justify-center p-3 rounded-2xl transition border ${needsScanUI ? 'bg-rose-600 border-rose-400 shadow-[0_0_20px_rgba(225,29,72,0.4)] animate-pulse' : 'bg-indigo-600/20 border-indigo-500/30 hover:bg-indigo-600/40'}`}>
-                                    <span className="text-2xl mb-1">📸</span>
-                                    <span className={`text-[10px] font-black uppercase text-center ${needsScanUI ? 'text-white' : 'text-indigo-300'}`}>{needsScanUI ? 'URGE CLIMA' : 'Escanear IA'}</span>
+                                <input 
+                                    type="file" 
+                                    id="file-upload-input"
+                                    accept="image/*" 
+                                    onChange={handleImageUpload} 
+                                    className="hidden" 
+                                />
+                                <button 
+                                    onClick={() => document.getElementById('file-upload-input').click()} 
+                                    disabled={isScanning}
+                                    className={`flex flex-col items-center justify-center p-3 rounded-2xl transition border ${isScanning ? 'bg-indigo-900/50 border-indigo-400 animate-pulse' : needsScanUI ? 'bg-rose-600 border-rose-400 shadow-[0_0_20px_rgba(225,29,72,0.4)] animate-pulse' : 'bg-indigo-600/20 border-indigo-500/30 hover:bg-indigo-600/40 cursor-pointer'}`}>
+                                    <span className="text-2xl mb-1">{isScanning ? '⏳' : '📸'}</span>
+                                    <span className={`text-[10px] font-black uppercase text-center ${needsScanUI || isScanning ? 'text-white' : 'text-indigo-300'}`}>
+                                        {isScanning ? 'Analizando...' : needsScanUI ? 'URGE CLIMA' : 'Escanear IA'}
+                                    </span>
                                 </button>
                             </div>
-
-                            {/* IA SCANNER COMPONENT */}
-                            {showScanner && (
-                                <div className="glass p-5 rounded-3xl border border-indigo-500/30 shadow-[0_0_20px_rgba(79,70,229,0.15)] animate-fade-in">
-                                    <h3 className="text-sm font-bold text-indigo-300 mb-2 flex items-center gap-2">
-                                        <span className="text-lg">🤖</span> Gemini Vision API
-                                    </h3>
-                                    <p className="text-[11px] text-slate-400 mb-4">La Inteligencia Artificial leerá los colores y textos ignorando fondos borrosos. 100% Precisión.</p>
-                                    
-                                    <input type="file" accept="image/*" onChange={handleImageUpload} className="block w-full text-sm text-slate-400 file:mr-4 file:py-2.5 file:px-5 file:rounded-xl file:border-0 file:text-xs file:font-black file:bg-indigo-600 file:text-white hover:file:bg-indigo-500 file:transition-colors mb-4 bg-slate-900 rounded-xl border border-indigo-500/30 cursor-pointer" />
-                                    
-                                    {isScanning && (
-                                        <div className="flex items-center gap-3 bg-indigo-900/50 p-3 rounded-xl border border-indigo-500/30">
-                                            <div className="w-5 h-5 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin"></div>
-                                            <p className="text-xs font-bold text-indigo-200">{scanStatus}</p>
-                                        </div>
-                                    )}
-                                </div>
-                            )}
 
                             {/* PLAN MAESTRO */}
                             <div className="glass rounded-3xl overflow-hidden border border-slate-800">
@@ -571,6 +558,26 @@
                                             </div>
                                         )
                                     })}
+                                </div>
+                            </div>
+                            
+                            {/* BITÁCORA DEL PILOTO */}
+                            <div className="glass rounded-3xl p-4 border border-slate-800 mb-6">
+                                <h3 className="text-[11px] font-black tracking-widest text-slate-400 uppercase mb-3 flex items-center justify-between">
+                                    <span>✅ Bitácora de Hoy (Piloto)</span>
+                                    <span className="bg-indigo-600 text-white px-2 py-0.5 rounded-full text-[10px]">{todayFlightsTotal.length} / 13</span>
+                                </h3>
+                                <div className="space-y-2">
+                                    {todayFlightsTotal.length === 0 ? (
+                                        <div className="text-center py-4 text-xs text-slate-500 font-medium bg-slate-900/50 rounded-xl">Aún no has registrado vuelos hoy.</div>
+                                    ) : (
+                                        todayFlightsTotal.map((f, i) => (
+                                            <div key={i} className="flex justify-between items-center p-2.5 rounded-xl bg-slate-800/40 border border-slate-700/50">
+                                                <span className="text-white font-bold text-sm">Despegue: {f.time}</span>
+                                                <span className="text-xs font-bold text-emerald-400 bg-emerald-950/50 px-2 py-1 rounded-md border border-emerald-900/50 block">{f.wind} km/h</span>
+                                            </div>
+                                        ))
+                                    )}
                                 </div>
                             </div>
                             
