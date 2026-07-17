@@ -13,7 +13,7 @@
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800;900&display=swap');
         body {
             font-family: 'Inter', sans-serif;
-            background-color: #030712;
+            background-color: #030712; /* Fondo muy oscuro clásico */
             color: white;
             user-select: none;
             -webkit-tap-highlight-color: transparent;
@@ -37,10 +37,8 @@
     <script type="text/babel">
         const { useState, useEffect } = React;
 
-        // AQUÍ ESTÁ TU LLAVE EXACTA (El sistema ya no la rechazará)
-        const DEFAULT_KEYS = {
-            gemini: "AQ.Ab8RN6KWJWZZY1CNMokGPUWlUo6yRrqr7EAHIRxZrtNEYWglxg",
-        };
+        // AQUÍ ESTÁ TU LLAVE EXACTA (El sistema ya no la rechazará nunca)
+        const DEFAULT_GEMINI_KEY = "AQ.Ab8RN6KWJWZZY1CNMokGPUWlUo6yRrqr7EAHIRxZrtNEYWglxg";
 
         const App = () => {
             const [currentTime, setCurrentTime] = useState(new Date());
@@ -52,29 +50,33 @@
             const [showBreakdown, setShowBreakdown] = useState(false);
             const [showMasterPlan, setShowMasterPlan] = useState(false);
             
+            // Estado para la llave (Usando la tuya por defecto)
             const [showKeyWarning, setShowKeyWarning] = useState(false);
             const [tempNewKey, setTempNewKey] = useState("");
-            const [activeGeminiKey, setActiveGeminiKey] = useState(DEFAULT_KEYS.gemini);
+            const [activeGeminiKey, setActiveGeminiKey] = useState(DEFAULT_GEMINI_KEY);
 
             useEffect(() => {
                 const timer = setInterval(() => setCurrentTime(new Date()), 1000);
-                const savedData = localStorage.getItem('dispatcherDataFinal');
+                
+                // CAMBIO CLAVE: Cambiamos el nombre a dispatcherDataV3 para ignorar la memoria caché corrupta
+                const savedData = localStorage.getItem('dispatcherDataV3');
                 if(savedData) {
                     try {
                         const parsed = JSON.parse(savedData);
                         if(parsed.flights) setFlights(parsed.flights);
                         if(parsed.forecast) setForecast(parsed.forecast);
                         if(parsed.geminiKey) setActiveGeminiKey(parsed.geminiKey);
-                    } catch(e) {}
+                    } catch(e) {
+                        console.log("Reiniciando memoria local.");
+                    }
                 }
                 return () => clearInterval(timer);
             }, []);
 
             useEffect(() => {
-                localStorage.setItem('dispatcherDataFinal', JSON.stringify({ flights, forecast, geminiKey: activeGeminiKey }));
+                localStorage.setItem('dispatcherDataV3', JSON.stringify({ flights, forecast, geminiKey: activeGeminiKey }));
             }, [flights, forecast, activeGeminiKey]);
 
-            // Variables de turno
             const currentHourInt = currentTime.getHours();
             const isDayShift = currentHourInt >= 7 && currentHourInt < 19;
             const activeShift = isDayShift ? "Turno Diurno" : "Turno Nocturno";
@@ -93,7 +95,7 @@
                 const file = eventTarget.files[0];
                 if (!file) return;
 
-                // REGLA CORREGIDA: Ya no exige 'AIza', solo valida que no esté vacío.
+                // YA NO HAY REGLA DE "AIza". Solo verifica que no esté vacío.
                 if (!activeGeminiKey || activeGeminiKey.trim() === "") {
                     setShowKeyWarning(true);
                     eventTarget.value = '';
@@ -114,7 +116,7 @@
                         reader.readAsDataURL(file);
                     });
 
-                    // Usamos gemini-1.5-flash (El más estable para imágenes)
+                    // Usamos gemini-1.5-flash (Estable y compatible con llaves AQ.)
                     const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${activeGeminiKey}`;
                     
                     const prompt = `
@@ -194,28 +196,28 @@
             };
 
             const saveNewKey = () => {
-                // REGLA CORREGIDA: Guarda cualquier llave válida que pegues
+                // Guarda CUALQUIER llave de más de 10 letras. Sin reglas raras.
                 if(tempNewKey.trim().length > 10) {
                     setActiveGeminiKey(tempNewKey.trim());
                     setShowKeyWarning(false);
                     setModal({ isOpen: true, title: "Llave Guardada", message: "Llave actualizada. Intenta escanear la foto de nuevo.", type: "success" });
                 } else {
-                    alert("Error: La llave parece ser muy corta o inválida.");
+                    setModal({ isOpen: true, title: "Error", message: "La llave parece ser muy corta.", type: "error" });
                 }
             }
 
             return (
-                <div className="min-h-screen bg-[#030712] text-white p-3 font-sans pb-24">
-                    <div className="max-w-md mx-auto space-y-4">
+                <div className="min-h-screen bg-[#060b14] text-white p-3 font-sans pb-24">
+                    <div className="max-w-md mx-auto space-y-4 mt-2">
                         
                         {/* TARJETA 1: TURNO ACTIVO (Diseño Clásico Exacto) */}
-                        <div className="bg-[#0f172a] border border-[#1e293b] rounded-2xl p-5 shadow-lg flex flex-col justify-between">
+                        <div className="bg-[#111827] border border-[#1f2937] rounded-2xl p-5 shadow-lg flex flex-col justify-between">
                             <div className="flex justify-between items-start mb-3">
                                 <div>
-                                    <span className="font-black tracking-wider text-[10px] text-[#3b82f6] uppercase">TURNO ACTIVO</span>
-                                    <h2 className="text-2xl font-black text-slate-200">{activeShift}</h2>
+                                    <span className="font-black tracking-wider text-[11px] text-[#3b82f6] uppercase">TURNO ACTIVO</span>
+                                    <h2 className="text-2xl font-black text-slate-200 mt-1">{activeShift}</h2>
                                 </div>
-                                <span className="font-mono font-bold bg-black/40 border border-[#1e293b] px-3 py-1.5 rounded-md text-xs text-slate-300">
+                                <span className="font-mono font-bold bg-black/50 border border-[#374151] px-3 py-1.5 rounded-md text-xs text-slate-300">
                                     {currentTime.toLocaleTimeString('en-US', { hour12: false })}
                                 </span>
                             </div>
@@ -226,7 +228,7 @@
                                     <span className="text-[10px]">(Incluye +3 heredados)</span>
                                 </p>
                                 
-                                <label className={`flex items-center justify-center px-4 py-2.5 rounded-lg font-bold text-xs transition cursor-pointer border ${isScanning ? 'bg-indigo-900 border-indigo-500 text-indigo-300 pointer-events-none' : 'bg-[#4f46e5] hover:bg-[#4338ca] border-indigo-500 text-white shadow-[0_0_15px_rgba(79,70,229,0.2)]'}`}>
+                                <label className={`flex items-center justify-center px-4 py-2.5 rounded-lg font-bold text-xs transition cursor-pointer border ${isScanning ? 'bg-indigo-900 border-indigo-500 text-indigo-300 pointer-events-none' : 'bg-[#4f46e5] hover:bg-[#4338ca] border-[#6366f1] text-white shadow-[0_0_15px_rgba(79,70,229,0.2)]'}`}>
                                     <input type="file" accept="image/*" onChange={handleImageUpload} className="hidden" disabled={isScanning} />
                                     <span>{isScanning ? '⏳ Analizando...' : '📸 Escanear OK to Fly'}</span>
                                 </label>
@@ -237,7 +239,7 @@
                         <div className={`rounded-2xl p-4 border flex items-center gap-3 transition-colors shadow-lg ${isOperable ? 'bg-[#064e3b] border-[#047857]' : 'bg-[#7f1d1d] border-[#b91c1c]'}`}>
                             <div className={`w-3.5 h-3.5 rounded-full animate-pulse ${isOperable ? 'bg-[#34d399]' : 'bg-red-400'}`}></div>
                             <div>
-                                <div className={`font-black tracking-widest text-[10px] uppercase ${isOperable ? 'text-[#6ee7b7]' : 'text-red-300'}`}>
+                                <div className={`font-black tracking-widest text-[11px] uppercase ${isOperable ? 'text-[#6ee7b7]' : 'text-red-300'}`}>
                                     ESTADO DE VUELO (120M):
                                 </div>
                                 <div className={`text-sm font-semibold mt-0.5 ${isOperable ? 'text-white' : 'text-red-100'}`}>
@@ -247,7 +249,7 @@
                         </div>
 
                         {/* TARJETA 3: CONTADOR CENTRAL GIGANTE */}
-                        <div className="bg-[#0f172a] border border-[#1e293b] rounded-2xl p-6 flex flex-col items-center shadow-lg relative overflow-hidden">
+                        <div className="bg-[#111827] border border-[#1f2937] rounded-2xl p-6 flex flex-col items-center shadow-lg relative overflow-hidden">
                             <div className="text-slate-400 font-bold tracking-widest text-xs mb-2">VUELOS DEL TURNO</div>
                             <div className="text-7xl font-black mb-2 flex items-baseline">
                                 <span className="text-white">{shiftFlights.length}</span>
@@ -256,9 +258,9 @@
                             </div>
                             <div className="text-[10px] text-slate-500 font-semibold tracking-wide uppercase mb-6">66CW+8Q Parque Industrial Jis Park, Pue.</div>
                             
-                            <div className="w-full h-px bg-[#1e293b] mb-4"></div>
+                            <div className="w-full h-px bg-[#1f2937] mb-5"></div>
                             
-                            <div className="w-full flex justify-between items-center bg-[#050b14] p-3 rounded-xl border border-[#1e293b]">
+                            <div className="w-full flex justify-between items-center bg-[#030712] p-3 rounded-xl border border-[#1f2937]">
                                 <span className="font-black text-xs tracking-widest text-[#06b6d4] flex items-center gap-2">
                                     <span className="text-lg">📊</span> GLOBAL DEL DÍA
                                 </span>
@@ -269,7 +271,7 @@
                         </div>
 
                         {/* TARJETA 4: BITÁCORA DE VUELOS */}
-                        <div className="bg-[#0f172a] border border-[#1e293b] rounded-2xl p-4 shadow-lg">
+                        <div className="bg-[#111827] border border-[#1f2937] rounded-2xl p-4 shadow-lg">
                             <div className="flex justify-between items-center mb-4">
                                 <div className="font-bold tracking-widest text-[11px] text-slate-300 flex items-center gap-2">
                                     <span>📖</span> BITÁCORA DE VUELOS
@@ -281,12 +283,12 @@
                             
                             <div className="space-y-2">
                                 {shiftFlights.length === 0 ? (
-                                    <div className="bg-[#050b14] text-slate-500 text-xs text-center py-5 rounded-xl font-medium border border-[#1e293b]">
+                                    <div className="bg-[#030712] text-slate-500 text-xs text-center py-5 rounded-xl font-medium border border-[#1f2937]">
                                         Sin vuelos registrados en este turno.
                                     </div>
                                 ) : (
                                     shiftFlights.map((f, i) => (
-                                        <div key={i} className="flex justify-between items-center bg-[#050b14] p-3 rounded-xl border border-[#1e293b]">
+                                        <div key={i} className="flex justify-between items-center bg-[#030712] p-3 rounded-xl border border-[#1f2937]">
                                             <div className="flex items-center gap-3">
                                                 <div className="w-1.5 h-1.5 rounded-full bg-[#3b82f6]"></div>
                                                 <span className="text-white font-bold text-sm">Despegue {f.time}</span>
@@ -299,21 +301,21 @@
                         </div>
 
                         {/* BOTONES INFERIORES */}
-                        <button onClick={() => setShowMasterPlan(true)} className="w-full bg-[#0f172a] text-slate-300 font-bold py-3.5 rounded-xl border border-[#1e293b] transition text-sm flex justify-center items-center gap-2 shadow-lg">
+                        <button onClick={() => setShowMasterPlan(true)} className="w-full bg-[#111827] text-slate-300 font-bold py-3.5 rounded-xl border border-[#1f2937] transition text-sm flex justify-center items-center gap-2 shadow-lg hover:bg-[#1f2937]">
                             <span>🗓️</span> Ver Plan Maestro Diario (24h)
                         </button>
 
-                        <button onClick={() => handleLogFlight(false)} className="w-full bg-[#10b981] hover:bg-[#059669] text-black font-black py-5 rounded-2xl text-lg flex justify-center items-center gap-2 shadow-[0_0_20px_rgba(16,185,129,0.3)] transform active:scale-95 my-4">
+                        <button onClick={() => handleLogFlight(false)} className="w-full bg-[#10b981] hover:bg-[#059669] text-black font-black py-5 rounded-2xl text-lg flex justify-center items-center gap-2 shadow-[0_0_20px_rgba(16,185,129,0.3)] transform active:scale-95 my-4 border border-[#059669]">
                             ⚡ ¡VOLAR AHORA! (REGISTRAR)
                         </button>
 
-                        <button onClick={() => setShowBreakdown(!showBreakdown)} className="w-full bg-[#0f172a] text-slate-400 font-bold py-3 rounded-xl border border-[#1e293b] text-sm transition">
+                        <button onClick={() => setShowBreakdown(!showBreakdown)} className="w-full bg-[#030712] text-slate-400 font-bold py-3 rounded-xl border border-[#1f2937] text-sm transition hover:text-white">
                             {showBreakdown ? '▲ Ocultar Desglose OK to Fly' : '▼ Ver Desglose OK to Fly'}
                         </button>
 
                         {/* TABLA DE DESGLOSE */}
                         {showBreakdown && (
-                            <div className="bg-[#0f172a] border border-[#1e293b] rounded-xl p-3 animate-fade-in mt-2">
+                            <div className="bg-[#111827] border border-[#1f2937] rounded-xl p-3 animate-fade-in mt-2">
                                 <div className="grid grid-cols-4 gap-2">
                                     {forecast.map((p, i) => (
                                         <div key={i} className={`p-2 rounded-lg text-center flex flex-col items-center justify-center border ${p.windGust < 45 ? 'bg-[#064e3b]/40 border-[#047857]' : 'bg-[#7f1d1d]/40 border-[#b91c1c]'}`}>
@@ -326,10 +328,10 @@
                         )}
                     </div>
 
-                    {/* MODAL ESTÁNDAR */}
+                    {/* MODAL ESTÁNDAR (Nunca mostrará la alerta molesta de 'AIza') */}
                     {modal && (
                         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
-                            <div className="bg-[#0f172a] border border-[#1e293b] rounded-2xl p-6 max-w-sm w-full text-center shadow-2xl">
+                            <div className="bg-[#111827] border border-[#1f2937] rounded-2xl p-6 max-w-sm w-full text-center shadow-2xl">
                                 <div className="text-4xl mb-4">{modal.type === 'error' ? '❌' : modal.type === 'warning' ? '⚠️' : '✅'}</div>
                                 <h3 className="text-lg font-black text-white mb-2">{modal.title}</h3>
                                 <p className="text-sm text-slate-400 mb-6">{modal.message}</p>
@@ -340,13 +342,13 @@
                         </div>
                     )}
                     
-                    {/* MODAL PARA ACTUALIZAR LLAVE MANUALMENTE (Por si acaso) */}
+                    {/* MODAL PARA ACTUALIZAR LLAVE MANUALMENTE (Por si en el futuro cambias de llave) */}
                     {showKeyWarning && (
                         <div className="fixed inset-0 bg-black/90 flex items-center justify-center z-[60] p-4">
                             <div className="bg-[#4c0519] border border-[#e11d48] rounded-2xl p-6 max-w-sm w-full shadow-2xl">
                                 <h3 className="text-lg font-black text-[#fda4af] mb-2 flex items-center gap-2"><span>⚠️</span> LLAVE RECHAZADA</h3>
                                 <p className="text-sm text-rose-200 mb-4 font-medium leading-relaxed">
-                                    Google rechazó la API Key actual. Por favor pega una nueva válida desde Google AI Studio.
+                                    Google rechazó la API Key actual o ha caducado. Por favor pega tu nueva llave desde AI Studio (Acepta 'AIza' y 'AQ.').
                                 </p>
                                 <input 
                                     type="text" 
@@ -370,14 +372,14 @@
                     {/* PLAN MAESTRO */}
                     {showMasterPlan && (
                         <div className="fixed inset-0 bg-black/90 flex items-center justify-center z-50 p-4">
-                            <div className="bg-[#0f172a] border border-[#1e293b] rounded-2xl p-6 max-w-md w-full h-[80vh] flex flex-col">
+                            <div className="bg-[#111827] border border-[#1f2937] rounded-2xl p-6 max-w-md w-full h-[80vh] flex flex-col">
                                 <div className="flex justify-between items-center mb-5">
                                     <h3 className="text-lg font-black text-white flex items-center gap-2"><span>🗓️</span> Plan Maestro 24h</h3>
                                     <button onClick={() => setShowMasterPlan(false)} className="text-slate-500 hover:text-white font-bold text-2xl">&times;</button>
                                 </div>
                                 <div className="overflow-y-auto flex-1 pr-2 space-y-2">
                                     {forecast.map((f, i) => (
-                                        <div key={i} className="flex justify-between items-center p-3 rounded-xl bg-[#050b14] border border-[#1e293b]">
+                                        <div key={i} className="flex justify-between items-center p-3 rounded-xl bg-[#030712] border border-[#1f2937]">
                                             <span className="font-mono font-bold text-slate-300">{f.time}</span>
                                             <span className={`text-[11px] font-black px-2.5 py-1 rounded-lg ${f.windGust < 45 ? 'bg-[#064e3b]/50 text-[#34d399]' : 'bg-[#7f1d1d]/50 text-red-400'}`}>
                                                 {f.windGust} km/h - {f.condition}
