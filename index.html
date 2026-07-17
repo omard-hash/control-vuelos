@@ -15,7 +15,7 @@
     <!-- Babel para JSX -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
-    <!-- Firebase SDK (Módulos Compat) para fácil integración en un archivo -->
+    <!-- Firebase SDK (Módulos Compat) -->
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
 
@@ -28,8 +28,6 @@
         ::-webkit-scrollbar-track { background: #020617; }
         ::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
         ::-webkit-scrollbar-thumb:hover { background: #475569; }
-        
-        /* Glassmorphism utils */
         .glass { background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.05); }
     </style>
 </head>
@@ -51,15 +49,9 @@
             condition: "Apto para volar (Base)"
         }));
 
-        // Componente UI para Mensajes
         const Modal = ({ isOpen, title, message, onClose, type = "info" }) => {
             if (!isOpen) return null;
-            const colors = {
-                error: "bg-rose-500",
-                success: "bg-emerald-500",
-                info: "bg-blue-500",
-                warning: "bg-amber-500"
-            };
+            const colors = { error: "bg-rose-500", success: "bg-emerald-500", info: "bg-blue-500", warning: "bg-amber-500" };
             return (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
                     <div className="bg-[#0f172a] border border-slate-700 rounded-2xl w-full max-w-sm overflow-hidden shadow-2xl">
@@ -81,24 +73,19 @@
             const [flights, setFlights] = useState(() => JSON.parse(localStorage.getItem('drone_flights_pro')) || []);
             const [forecast, setForecast] = useState(() => JSON.parse(localStorage.getItem('drone_forecast_pro')) || DEFAULT_FORECAST);
             const [lastScanDate, setLastScanDate] = useState(() => localStorage.getItem('drone_scan_date_pro') || "");
-            
-            // Configuraciones y Modos
-            const [appMode, setAppMode] = useState(() => localStorage.getItem('drone_app_mode') || 'piloto'); // piloto | admin
+            const [appMode, setAppMode] = useState(() => localStorage.getItem('drone_app_mode') || 'piloto');
             const [settingsOpen, setSettingsOpen] = useState(false);
             
-            // LLAVES PREDEFINIDAS INCORPORADAS: No se necesita configurar nada manual
+            // LLAVES PREDEFINIDAS INCORPORADAS
             const [apiKeys, setApiKeys] = useState({
                 gemini: "AQ.Ab8RN6Lu-oSyr3Qw9R-iO4Gpr95uBBgpsMT1nJ7Ivdu1w2M5sA",
                 firebase: `{\n  "apiKey": "AIzaSyDXjwv133-dIKyprCktTUkjx_adAz1DHaY",\n  "authDomain": "control-vuelos.firebaseapp.com",\n  "projectId": "control-vuelos",\n  "storageBucket": "control-vuelos.firebasestorage.app",\n  "messagingSenderId": "756032981781",\n  "appId": "1:756032981781:web:451641e72abe3692c0771c"\n}`
             });
             
-            // Nube y UI
             const [isCloudActive, setIsCloudActive] = useState(false);
             const [dbRef, setDbRef] = useState(null);
             const [isScanning, setIsScanning] = useState(false);
             const [audioUnlocked, setAudioUnlocked] = useState(false);
-            
-            // Modal state
             const [modal, setModal] = useState({ isOpen: false, title: "", message: "", type: "info" });
 
             const currentHourInt = currentTime.getHours();
@@ -115,9 +102,7 @@
                     setIsCloudActive(false);
                     return;
                 }
-
                 try {
-                    // Prevenir inicialización múltiple
                     if (!firebase.apps.length) {
                         const fbConfig = JSON.parse(apiKeys.firebase);
                         firebase.initializeApp(fbConfig);
@@ -126,30 +111,19 @@
                     const docRef = db.collection('drone_data').doc('master_log');
                     setDbRef(docRef);
 
-                    // Escuchar cambios en vivo
                     const unsubscribe = docRef.onSnapshot((doc) => {
                         setIsCloudActive(true);
                         if (doc.exists) {
                             const data = doc.data();
-                            if (data.flights) {
-                                setFlights(data.flights);
-                                localStorage.setItem('drone_flights_pro', JSON.stringify(data.flights));
-                            }
-                            if (data.forecast) {
-                                setForecast(data.forecast);
-                                localStorage.setItem('drone_forecast_pro', JSON.stringify(data.forecast));
-                            }
-                            if (data.lastScanDate) {
-                                setLastScanDate(data.lastScanDate);
-                                localStorage.setItem('drone_scan_date_pro', data.lastScanDate);
-                            }
+                            if (data.flights) { setFlights(data.flights); localStorage.setItem('drone_flights_pro', JSON.stringify(data.flights)); }
+                            if (data.forecast) { setForecast(data.forecast); localStorage.setItem('drone_forecast_pro', JSON.stringify(data.forecast)); }
+                            if (data.lastScanDate) { setLastScanDate(data.lastScanDate); localStorage.setItem('drone_scan_date_pro', data.lastScanDate); }
                         }
                     }, (error) => {
                         console.error("Firebase Auth Error:", error);
                         setIsCloudActive(false);
                         setModal({ isOpen: true, title: "Error de Conexión", message: "Revisa la configuración de Firebase. Operando en Modo Local seguro.", type: "error" });
                     });
-
                     return () => unsubscribe();
                 } catch (e) {
                     console.error("Firebase Init Error:", e);
@@ -158,18 +132,13 @@
             }, [apiKeys.firebase]);
 
             const updateData = async (newData) => {
-                // Guardar local siempre
                 if (newData.flights) localStorage.setItem('drone_flights_pro', JSON.stringify(newData.flights));
                 if (newData.forecast) localStorage.setItem('drone_forecast_pro', JSON.stringify(newData.forecast));
                 if (newData.lastScanDate) localStorage.setItem('drone_scan_date_pro', newData.lastScanDate);
 
-                // Guardar en nube si está disponible
                 if (isCloudActive && dbRef) {
-                    try {
-                        await dbRef.set(newData, { merge: true });
-                    } catch (e) {
-                        console.warn("No se pudo sincronizar a la nube:", e);
-                    }
+                    try { await dbRef.set(newData, { merge: true }); } 
+                    catch (e) { console.warn("No se pudo sincronizar a la nube:", e); }
                 }
             };
 
@@ -183,7 +152,6 @@
                 window.speechSynthesis.speak(utterance);
             }, [audioUnlocked]);
 
-            // Desbloqueo de audio por interacción
             useEffect(() => {
                 const unlockAudio = () => {
                     if (!audioUnlocked) {
@@ -204,7 +172,6 @@
             const generateDailyPlan = useCallback(() => {
                 let plan = [];
                 let scheduledHours = new Set();
-                
                 const todayFlights = flights.filter(f => new Date(f.timestamp).toDateString() === todayStr);
 
                 const addForced = (h, m, name) => {
@@ -233,18 +200,12 @@
                     for (let h = currentHourInt; h <= 23 && dynamicNeeded > 0; h++) {
                         let wind = forecast[h]?.windGust || 0;
                         if (!scheduledHours.has(h) && wind <= MAX_WIND) {
-                            plan.push({
-                                hour: h, min: 0,
-                                time: `${h.toString().padStart(2,'0')}:00`,
-                                type: "Vuelo Dinámico", isForced: false,
-                                wind: wind, isPermitted: true, isPast: false
-                            });
+                            plan.push({ hour: h, min: 0, time: `${h.toString().padStart(2,'0')}:00`, type: "Vuelo Dinámico", isForced: false, wind: wind, isPermitted: true, isPast: false });
                             scheduledHours.add(h);
                             dynamicNeeded--;
                         }
                     }
                 }
-
                 return plan.sort((a, b) => a.hour === b.hour ? a.min - b.min : a.hour - b.hour);
             }, [flights, forecast, currentHourInt, currentMinInt, todayStr]);
 
@@ -254,34 +215,25 @@
                 const timer = setInterval(() => {
                     const now = new Date();
                     setCurrentTime(now);
-                    
                     if (!audioUnlocked) return;
-
                     const nowSec = now.getSeconds();
                     const nowMin = now.getMinutes();
                     const nowHour = now.getHours();
 
-                    // Aviso silencioso 12:01 AM (cada 5 min)
                     const needsScanToday = lastScanDate !== todayStr;
                     const isAfter1201 = (nowHour === 0 && nowMin >= 1) || (nowHour > 0 && nowHour < 19);
                     if (needsScanToday && isAfter1201 && nowSec === 0 && nowMin % 5 === 0) {
                         speak("Atención. Es necesario escanear la captura del clima del nuevo día.");
                     }
 
-                    // Junta 7:50 AM
-                    if (nowHour === 7 && nowMin === 50 && nowSec === 0) {
-                        speak("Atención piloto. Faltan diez minutos para la reunión matutina.");
-                    }
+                    if (nowHour === 7 && nowMin === 50 && nowSec === 0) speak("Atención piloto. Faltan diez minutos para la reunión matutina.");
 
-                    // Avisos de vuelo (10, 5 y 0 mins)
                     if (nowSec === 0) {
                         masterPlan.forEach(flight => {
                             let h = flight.hour, m = flight.min;
-
                             let h10 = h, m10 = m - 10;
                             if (m10 < 0) { m10 += 60; h10 -= 1; }
                             if (h10 < 0) h10 = 23;
-
                             let h5 = h, m5 = m - 5;
                             if (m5 < 0) { m5 += 60; h5 -= 1; }
                             if (h5 < 0) h5 = 23;
@@ -318,7 +270,6 @@
                     const base64Data = await new Promise((resolve, reject) => {
                         const reader = new FileReader();
                         reader.onloadend = () => {
-                             // Extraer solo la parte base64 pura (quita el prefijo data:image/png;base64,)
                             const result = reader.result;
                             const base64String = result.includes(',') ? result.split(',')[1] : result;
                             resolve(base64String);
@@ -329,59 +280,41 @@
 
                     const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKeys.gemini}`;
                     
-                    // Prompt mejorado y adaptado a tu captura específica
                     const prompt = `
                     Eres un sistema experto de despacho de drones analizando una captura de la app meteorológica "Ok To Fly".
                     Hora actual de la captura: ${currentHourInt}:00. La primera fila de la tabla (donde dice AHORA) corresponde a esta hora.
-                    Las filas subsecuentes incrementan de 1 en 1 hora (ej: fila 2 es ${currentHourInt + 1}:00).
+                    Las filas subsecuentes incrementan de 1 en 1 hora.
 
                     REGLAS DE PELIGRO (ESTRICTAS Y EXACTAS BASADAS EN LOS TEXTOS DE LA IMAGEN):
                     - Asigna windGust = 45 (Peligro/Bloqueado) si lees CUALQUIERA de estos textos o similares en la fila: 
-                        "Ráfagas >50m", "14 60m", "12 60m", "13 30m", "Ráfagas fuertes", "Vientos >40m", "Extremo UV", "Vientos fuertes >30m"
+                        "Ráfagas >50m", "14 60m", "12 60m", "13 30m", "Ráfagas fuertes", "Vientos >40m", "Extremo UV", "Vientos fuertes >30m", "Extremo UV 13", "Extremo UV 15"
                     - Si la celda horaria (el fondo de la hora) es Roja (Red) o Naranja (Orange), asigna windGust = 45.
                     - Asigna windGust = 25 (Apto/Seguro) si lees:
                         "Apto para volar", o si la celda es de color Azul (Blue).
                     
                     Tu única tarea es devolver un objeto JSON estricto con un arreglo llamado "forecast" de 24 objetos.
                     Para las horas no visibles en la foto, asigna windGust 25.
-                    Formato exacto esperado (solo JSON, sin backticks ni markdown):
+                    Formato exacto esperado (solo JSON):
                     {
                       "forecast": [
                         {"hour": 0, "windGust": 25},
-                        {"hour": 1, "windGust": 25},
-                        ...24 items...
+                        {"hour": 1, "windGust": 25}
                       ]
                     }
                     `;
 
                     const response = await fetch(apiUrl, {
                         method: 'POST',
-                        headers: { 
-                            'Content-Type': 'application/json' 
-                        },
+                        headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
-                            contents: [{
-                                parts: [
-                                    { text: prompt },
-                                    { 
-                                        inlineData: { 
-                                            mimeType: file.type || "image/png", 
-                                            data: base64Data 
-                                        } 
-                                    }
-                                ]
-                            }],
-                            generationConfig: {
-                                responseMimeType: "application/json"
-                            }
+                            contents: [{ parts: [{ text: prompt }, { inlineData: { mimeType: file.type || "image/png", data: base64Data } }] }],
+                            generationConfig: { responseMimeType: "application/json" }
                         })
                     });
 
                     const result = await response.json();
                     
-                    if (!response.ok) {
-                        throw new Error(`Error API: ${result.error?.message || response.statusText}`);
-                    }
+                    if (!response.ok) throw new Error(`Error API: ${result.error?.message || response.statusText}`);
                     
                     if (result.candidates && result.candidates[0]?.content?.parts[0]?.text) {
                         const jsonText = result.candidates[0].content.parts[0].text;
@@ -413,34 +346,22 @@
                     const fallbackDate = currentTime.toDateString();
                     setLastScanDate(fallbackDate);
                     updateData({ lastScanDate: fallbackDate });
-                    setModal({ 
-                        isOpen: true, 
-                        title: "Error Visual IA", 
-                        message: `Hubo un error procesando la imagen. Detalle: ${err.message}. Se ha apagado la alarma temporalmente.`, 
-                        type: "warning" 
-                    });
+                    setModal({ isOpen: true, title: "Error Visual IA", message: `Hubo un error procesando la imagen. Detalle: ${err.message}. Se ha apagado la alarma temporalmente.`, type: "warning" });
                 } finally {
                     setIsScanning(false);
-                    // Reset input para permitir volver a subir el mismo archivo si se desea reintentar
-                    e.target.value = null;
+                    e.target.value = null; // Permite volver a subir la misma foto
                 }
             };
 
             const handleLogFlight = () => {
                 const flightTime = currentTime.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
                 const newLog = {
-                    id: Date.now(),
-                    time: flightTime,
-                    timestamp: currentTime.toISOString(),
-                    shift: activeShift,
-                    wind: currentWind
+                    id: Date.now(), time: flightTime, timestamp: currentTime.toISOString(), shift: activeShift, wind: currentWind
                 };
-                
                 const updatedLogs = [newLog, ...flights].sort((a,b) => b.id - a.id);
                 setFlights(updatedLogs);
                 updateData({ flights: updatedLogs });
-                
-                setModal({ isOpen: true, title: "¡Despegue Registrado!", message: `Vuelo de las ${flightTime} registrado exitosamente en la bitácora.`, type: "success" });
+                setModal({ isOpen: true, title: "¡Despegue Registrado!", message: `Vuelo de las ${flightTime} registrado exitosamente.`, type: "success" });
             };
 
             const handleSaveSettings = (e) => {
@@ -478,9 +399,7 @@
                             <button onClick={toggleMode} className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 transition border border-slate-700 text-xs font-bold text-white flex items-center gap-1">
                                 {appMode === 'piloto' ? '🧑‍✈️ Piloto' : '👨‍💻 Admin'}
                             </button>
-                            <button onClick={() => setSettingsOpen(true)} className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 transition border border-slate-700 text-white">
-                                ⚙️
-                            </button>
+                            <button onClick={() => setSettingsOpen(true)} className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 transition border border-slate-700 text-white">⚙️</button>
                         </div>
                     </div>
 
@@ -491,16 +410,16 @@
                                 <h3 className="text-lg font-black text-white mb-4 border-b border-slate-700 pb-2">Configuración del Servidor</h3>
                                 <form onSubmit={handleSaveSettings} className="space-y-4">
                                     <div>
-                                        <label className="block text-xs font-bold text-slate-400 mb-1">Google Gemini API Key (Visión IA)</label>
-                                        <input type="password" name="gemini" defaultValue={apiKeys.gemini} className="w-full bg-slate-900 border border-slate-700 rounded-xl p-2 text-sm text-white focus:border-indigo-500 outline-none" placeholder="AIzaSy..." />
+                                        <label className="block text-xs font-bold text-slate-400 mb-1">Google Gemini API Key</label>
+                                        <input type="password" name="gemini" defaultValue={apiKeys.gemini} className="w-full bg-slate-900 border border-slate-700 rounded-xl p-2 text-sm text-white outline-none" />
                                     </div>
                                     <div>
                                         <label className="block text-xs font-bold text-slate-400 mb-1">Firebase Config (JSON)</label>
-                                        <textarea name="firebase" defaultValue={apiKeys.firebase} rows="6" className="w-full bg-slate-900 border border-slate-700 rounded-xl p-2 text-xs text-white focus:border-indigo-500 outline-none font-mono"></textarea>
+                                        <textarea name="firebase" defaultValue={apiKeys.firebase} rows="6" className="w-full bg-slate-900 border border-slate-700 rounded-xl p-2 text-xs text-white outline-none font-mono"></textarea>
                                     </div>
                                     <div className="flex gap-3 pt-2">
                                         <button type="button" onClick={() => setSettingsOpen(false)} className="flex-1 py-2 bg-slate-800 text-white rounded-xl font-bold text-sm">Cancelar</button>
-                                        <button type="submit" className="flex-1 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-bold text-sm shadow-[0_0_15px_rgba(79,70,229,0.4)]">Guardar y Conectar</button>
+                                        <button type="submit" className="flex-1 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-bold text-sm">Guardar y Conectar</button>
                                     </div>
                                 </form>
                             </div>
@@ -521,13 +440,7 @@
                                         {currentTime.toLocaleTimeString('en-US', { hour12: false })}
                                     </div>
                                 </div>
-                                <input 
-                                    type="file" 
-                                    id="file-upload-input"
-                                    accept="image/*" 
-                                    onChange={handleImageUpload} 
-                                    className="hidden" 
-                                />
+                                <input type="file" id="file-upload-input" accept="image/*" onChange={handleImageUpload} className="hidden" />
                                 <button 
                                     onClick={() => document.getElementById('file-upload-input').click()} 
                                     disabled={isScanning}
@@ -585,7 +498,7 @@
                                 </div>
                             </div>
                             
-                            {/* ACTION BUTTON (FIXED BOTTOM) */}
+                            {/* ACTION BUTTON */}
                             <div className="fixed bottom-0 left-0 w-full p-4 bg-gradient-to-t from-[#020617] via-[#020617] to-transparent flex justify-center pointer-events-none z-40">
                                 <button 
                                     onClick={handleLogFlight}
@@ -607,11 +520,10 @@
                         </div>
                     )}
 
-                    {/* VISTA ADMINISTRADOR (DASHBOARD) */}
+                    {/* VISTA ADMINISTRADOR */}
                     {appMode === 'admin' && (
                         <div className="space-y-4 animate-fade-in">
                             <div className="glass p-6 rounded-3xl text-center border border-indigo-500/30 shadow-[0_0_30px_rgba(79,70,229,0.1)] relative overflow-hidden">
-                                <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-5"></div>
                                 <h3 className="text-[10px] font-black tracking-widest text-slate-400 uppercase mb-2">Rendimiento Operativo (Hoy)</h3>
                                 <div className="flex justify-center items-baseline gap-2 mb-4">
                                     <span className="text-7xl font-black text-white drop-shadow-lg">{todayFlightsTotal.length}</span>
@@ -621,15 +533,9 @@
                                 <div className="w-full bg-slate-900 rounded-full h-3 overflow-hidden border border-slate-800">
                                     <div className="h-full bg-gradient-to-r from-indigo-600 to-cyan-500 transition-all duration-1000 ease-out" style={{ width: `${Math.min(100, (todayFlightsTotal.length / 13) * 100)}%` }}></div>
                                 </div>
-                                <p className="text-xs text-slate-400 mt-4 font-medium">
-                                    {todayFlightsTotal.length >= 13 ? "✅ Meta diaria alcanzada" : `Faltan ${13 - todayFlightsTotal.length} vuelos para la meta`}
-                                </p>
                             </div>
-
                             <div className="glass rounded-3xl p-4 border border-slate-800">
-                                <h3 className="text-[11px] font-black tracking-widest text-slate-400 uppercase mb-4 flex items-center gap-2">
-                                    <span>📡</span> Bitácora en Vivo
-                                </h3>
+                                <h3 className="text-[11px] font-black tracking-widest text-slate-400 uppercase mb-4 flex items-center gap-2"><span>📡</span> Bitácora en Vivo</h3>
                                 <div className="space-y-2">
                                     {flights.length === 0 ? (
                                         <div className="text-center py-6 text-sm text-slate-500 font-medium bg-slate-900/50 rounded-2xl">No hay vuelos registrados aún.</div>
