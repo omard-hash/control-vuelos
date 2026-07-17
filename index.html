@@ -86,7 +86,9 @@
             
             const currentWindData = forecast[currentHourInt] || { windGust: 0 };
             const currentWind = currentWindData.windGust;
-            const isOperable = currentWind < 45;
+            
+            const isOperable = currentWind <= 43;
+            const isCaution = currentWind === 43;
 
             const handleImageUpload = async (e) => {
                 const eventTarget = e.target;
@@ -116,12 +118,19 @@
                     });
 
                     const promptText = `
-                Analiza esta imagen del clima. Hora actual: ${currentHourInt}:00.
-                Si ves celdas rojas/naranjas o textos como "Ráfagas >50m", "14 60m", "Extremo UV": pon windGust 45.
-                Si es azul o dice "Apto para volar": pon windGust 25.
-                Devuelve SOLO ESTE JSON EXACTO: { "forecast": [{"hour": 0, "windGust": 25}, ...] }
-                Para horas no visibles, pon windGust: 25.
-                `;
+                    Actúa como un auditor estricto de seguridad aérea. Analiza esta tabla de "OK TO FLY". Hora actual: ${currentHourInt}:00.
+                    Extrae la condición exacta del viento a 120m de altura para cada hora visible basándote estrictamente en el TEXTO y los NÚMEROS.
+
+                    REGLAS DE AUDITORÍA:
+                    1. Lee el texto de cada fila. Busca datos específicos de altura, ej: "14 120m" significa ráfagas de 14 m/s a 120 metros de altura.
+                    2. Si la velocidad está en m/s, DEBES CONVERTIRLA a km/h multiplicando por 3.6 (Ejemplo: 14 m/s * 3.6 = 50.4 km/h, redondea a 50).
+                    3. Si el texto dice textualmente "Apto para volar", el viento es seguro. Asigna windGust: 25.
+                    4. Si el texto dice "Ráfagas fuertes" pero no despliega el número exacto, por regla de auditoría asume 45 km/h (peligro) o 43 km/h (precaución) según el contexto de advertencia.
+                    5. Mapea la hora AM/PM al formato de 24 horas (ej. 4:00pm = 16, 5:00pm = 17).
+
+                    Devuelve SOLO ESTE JSON EXACTO (sin marcas de formato markdown): { "forecast": [{"hour": 0, "windGust": 25}, ...] }
+                    Para horas no visibles en la imagen, pon windGust: 25.
+                    `;
 
                 // Initialize the official SDK client
                 const ai = new GoogleGenAI({ apiKey: currentKey });
@@ -158,10 +167,11 @@
                     let newForecast = [...forecast];
                     parsedData.forecast.forEach(item => {
                         if (item.hour >= 0 && item.hour <= 23) {
+                            let conditionText = item.windGust > 43 ? "Ráfagas Peligrosas" : (item.windGust === 43 ? "Vuelo con Precaución" : "Apto para volar");
                             newForecast[item.hour] = {
                                 time: `${item.hour.toString().padStart(2, '0')}:00`,
                                 windGust: item.windGust,
-                                condition: item.windGust >= 45 ? "Ráfagas Peligrosas" : "Apto para volar"
+                                condition: conditionText
                             };
                         }
                     });
@@ -252,14 +262,14 @@
                         </div>
 
                         {/* TARJETA 2: ESTADO DE VUELO */}
-                        <div className={`rounded-2xl p-4 border flex items-center gap-3 transition-colors shadow-lg ${isOperable ? 'bg-[#064e3b] border-[#047857]' : 'bg-[#7f1d1d] border-[#b91c1c]'}`}>
-                            <div className={`w-3.5 h-3.5 rounded-full animate-pulse ${isOperable ? 'bg-[#34d399]' : 'bg-red-400'}`}></div>
+                        <div className={`rounded-2xl p-4 border flex items-center gap-3 transition-colors shadow-lg ${isOperable ? (isCaution ? 'bg-[#78350f] border-[#b45309]' : 'bg-[#064e3b] border-[#047857]') : 'bg-[#7f1d1d] border-[#b91c1c]'}`}>
+                            <div className={`w-3.5 h-3.5 rounded-full animate-pulse ${isOperable ? (isCaution ? 'bg-[#fbbf24]' : 'bg-[#34d399]') : 'bg-red-400'}`}></div>
                             <div>
-                                <div className={`font-black tracking-widest text-[11px] uppercase ${isOperable ? 'text-[#6ee7b7]' : 'text-red-300'}`}>
+                                <div className={`font-black tracking-widest text-[11px] uppercase ${isOperable ? (isCaution ? 'text-[#fcd34d]' : 'text-[#6ee7b7]') : 'text-red-300'}`}>
                                     ESTADO DE VUELO (120M):
                                 </div>
                                 <div className={`text-sm font-semibold mt-0.5 ${isOperable ? 'text-white' : 'text-red-100'}`}>
-                                    {isOperable ? 'OPERABLE' : 'BLOQUEADO'} (Viento actual: {currentWind} km/h - {isOperable ? 'Permitido' : 'Peligro'})
+                                    {isOperable ? (isCaution ? 'PRECAUCIÓN' : 'OPERABLE') : 'BLOQUEADO'} (Viento actual: {currentWind} km/h - {isOperable ? (isCaution ? 'Precaución' : 'Permitido') : 'Peligro'})
                                 </div>
                             </div>
                         </div>
@@ -325,23 +335,27 @@
                         </button>
 
                         <button onClick={() => setShowBreakdown(!showBreakdown)} className="w-full bg-[#020617] text-slate-400 font-bold py-3 rounded-xl border border-[#1e293b] text-sm transition hover:text-white">
-                            {showBreakdown ? '▲ Ocultar Desglose OK to Fly' : '▼ Ver Desglose OK to Fly'}
-                        </button>
+                        {showBreakdown ? '▲ Ocultar Desglose OK to Fly' : '▼ Ver Desglose OK to Fly'}
+                    </button>
 
-                        {showBreakdown && (
-                            <div className="bg-[#0f172a] border border-[#1e293b] rounded-xl p-3 mt-2">
-                                <div className="grid grid-cols-4 gap-2">
-                                    {forecast.map((p, i) => (
-                                        <div key={i} className={`p-2 rounded-lg text-center flex flex-col items-center justify-center border ${p.windGust < 45 ? 'bg-[#064e3b]/40 border-[#047857]' : 'bg-[#7f1d1d]/40 border-[#b91c1c]'}`}>
+                    {showBreakdown && (
+                        <div className="bg-[#0f172a] border border-[#1e293b] rounded-xl p-3 mt-2">
+                            <div className="grid grid-cols-4 gap-2">
+                                {forecast.map((p, i) => {
+                                    let bgStyle = p.windGust > 43 ? 'bg-[#7f1d1d]/40 border-[#b91c1c]' : (p.windGust === 43 ? 'bg-[#78350f]/40 border-[#b45309]' : 'bg-[#064e3b]/40 border-[#047857]');
+                                    let textStyle = p.windGust > 43 ? 'text-red-400' : (p.windGust === 43 ? 'text-[#fbbf24]' : 'text-[#34d399]');
+                                    return (
+                                        <div key={i} className={`p-2 rounded-lg text-center flex flex-col items-center justify-center border ${bgStyle}`}>
                                             <span className="text-white font-mono text-[10px] mb-1">{p.time}</span>
-                                            <span className={`text-[10px] font-black ${p.windGust < 45 ? 'text-[#34d399]' : 'text-red-400'}`}>{p.windGust}k</span>
+                                            <span className={`text-[10px] font-black ${textStyle}`}>{p.windGust}k</span>
                                         </div>
-                                    ))}
-                                </div>
+                                    )
+                                })}
                             </div>
-                        )}
-                        
-                        {/* ZONA DE CONFIGURACIÓN DE LLAVE */}
+                        </div>
+                    )}
+                    
+                    {/* ZONA DE CONFIGURACIÓN DE LLAVE */}
                         <div className="mt-8 text-center pb-8 border-t border-[#1e293b] pt-4">
                             <button onClick={() => setShowConfig(true)} className="text-slate-400 hover:text-white text-xs font-bold transition flex items-center justify-center gap-1 w-full">
                                 ⚙️ Configurar API Key (IA)
@@ -399,14 +413,17 @@
                                     <button onClick={() => setShowMasterPlan(false)} className="text-slate-500 hover:text-white font-bold text-2xl transition">&times;</button>
                                 </div>
                                 <div className="overflow-y-auto flex-1 pr-2 space-y-2">
-                                    {forecast.map((f, i) => (
-                                        <div key={i} className="flex justify-between items-center p-3 rounded-xl bg-[#020617] border border-[#1e293b]">
-                                            <span className="font-mono font-bold text-slate-300">{f.time}</span>
-                                            <span className={`text-[11px] font-black px-2.5 py-1 rounded-lg ${f.windGust < 45 ? 'bg-[#064e3b]/50 text-[#34d399]' : 'bg-[#7f1d1d]/50 text-red-400'}`}>
-                                                {f.windGust} km/h - {f.condition}
-                                            </span>
-                                        </div>
-                                    ))}
+                                    {forecast.map((f, i) => {
+                                        let badgeStyle = f.windGust > 43 ? 'bg-[#7f1d1d]/50 text-red-400' : (f.windGust === 43 ? 'bg-[#78350f]/50 text-[#fbbf24]' : 'bg-[#064e3b]/50 text-[#34d399]');
+                                        return (
+                                            <div key={i} className="flex justify-between items-center p-3 rounded-xl bg-[#020617] border border-[#1e293b]">
+                                                <span className="font-mono font-bold text-slate-300">{f.time}</span>
+                                                <span className={`text-[11px] font-black px-2.5 py-1 rounded-lg ${badgeStyle}`}>
+                                                    {f.windGust} km/h - {f.condition}
+                                                </span>
+                                            </div>
+                                        )
+                                    })}
                                 </div>
                             </div>
                         </div>
