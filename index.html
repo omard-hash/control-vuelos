@@ -13,19 +13,10 @@
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800;900&display=swap');
         body {
             font-family: 'Inter', sans-serif;
-            background-color: #020617; /* Fondo súper oscuro clásico */
+            background-color: #020617; /* Fondo súper oscuro */
             color: white;
             user-select: none;
             -webkit-tap-highlight-color: transparent;
-        }
-        ::-webkit-scrollbar { width: 6px; height: 6px; }
-        ::-webkit-scrollbar-track { background: #0f172a; }
-        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
-        
-        .animate-fade-in { animation: fadeIn 0.3s ease-in-out; }
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(-5px); }
-            to { opacity: 1; transform: translateY(0); }
         }
     </style>
 </head>
@@ -46,15 +37,15 @@
             const [showMasterPlan, setShowMasterPlan] = useState(false);
             const [showConfig, setShowConfig] = useState(false);
             
-            // Llave en blanco para obligar a usar el botón de configuración
+            // Llave en blanco por defecto para forzar la configuración limpia
             const [activeGeminiKey, setActiveGeminiKey] = useState("");
             const [tempNewKey, setTempNewKey] = useState("");
 
             useEffect(() => {
                 const timer = setInterval(() => setCurrentTime(new Date()), 1000);
                 
-                // V6: Nueva memoria para forzar borrado de errores anteriores
-                const savedData = localStorage.getItem('dispatcherDataV6');
+                // V10: Nueva memoria para forzar el borrado de todo lo anterior
+                const savedData = localStorage.getItem('dispatcherDataV10');
                 if(savedData) {
                     try {
                         const parsed = JSON.parse(savedData);
@@ -69,7 +60,7 @@
             }, []);
 
             useEffect(() => {
-                localStorage.setItem('dispatcherDataV6', JSON.stringify({ flights, forecast, geminiKey: activeGeminiKey }));
+                localStorage.setItem('dispatcherDataV10', JSON.stringify({ flights, forecast, geminiKey: activeGeminiKey }));
             }, [flights, forecast, activeGeminiKey]);
 
             const currentHourInt = currentTime.getHours();
@@ -92,8 +83,9 @@
 
                 const currentKey = activeGeminiKey.trim();
 
+                // Validación de llave vacía
                 if (!currentKey) {
-                    setModal({ isOpen: true, title: "Llave Vacía", message: "No hay llave configurada. Toca '⚙️ Configurar API Key' abajo.", type: "error" });
+                    setModal({ isOpen: true, title: "Llave Vacía", message: "No has configurado tu API Key. Toca el engranaje abajo para pegarla.", type: "error" });
                     eventTarget.value = '';
                     return;
                 }
@@ -120,8 +112,9 @@
                 Para horas no visibles, pon windGust: 25.
                 `;
 
-                // AQUI ESTA LA MAGIA: Usamos gemini-1.5-pro, el modelo que no falla.
+                // Usamos el modelo PRO que es el más seguro
                 const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key=${currentKey}`;
+                
                 const response = await fetch(apiUrl, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -133,7 +126,7 @@
 
                 if (!response.ok) {
                      const errorData = await response.json();
-                     throw new Error(errorData.error?.message || "Error desconocido de Google");
+                     throw new Error(errorData.error?.message || "Error de Google Cloud");
                 }
 
                 const result = await response.json();
@@ -156,15 +149,16 @@
                         });
 
                         setForecast(newForecast);
-                        setModal({ isOpen: true, title: "Análisis Exitoso ✅", message: "Clima actualizado correctamente por la IA.", type: "success" });
+                        setModal({ isOpen: true, title: "✅ Escaneo Exitoso", message: "Clima actualizado correctamente por la IA.", type: "success" });
                     } else {
                         throw new Error("La IA no devolvió el formato esperado.");
                     }
                 } catch (err) {
+                    // SI FALLA, MUESTRA EL ERROR REAL DE GOOGLE, NO VENTANAS ROJAS INVENTADAS
                     setModal({ 
                         isOpen: true, 
-                        title: "Error de Servidor Google 🛑", 
-                        message: `Google respondió con este error:\n\n${err.message}\n\nRevisa que tu llave sea la correcta y tenga permisos.`, 
+                        title: "Error de Servidor Google", 
+                        message: `Google respondió:\n\n${err.message}\n\nRevisa que tu llave empiece con AIza y tenga permisos.`, 
                         type: "error" 
                     });
                 } finally {
@@ -193,12 +187,12 @@
             };
 
             const saveNewKey = () => {
-                if(tempNewKey.trim().length > 5) {
+                if(tempNewKey.trim().length > 10) {
                     setActiveGeminiKey(tempNewKey.trim());
                     setShowConfig(false);
-                    setModal({ isOpen: true, title: "Llave Guardada", message: "La llave ha sido actualizada. ¡Intenta escanear ahora!", type: "success" });
+                    setModal({ isOpen: true, title: "Llave Guardada", message: "La llave ha sido guardada. ¡Intenta escanear ahora!", type: "success" });
                 } else {
-                    setModal({ isOpen: true, title: "Error", message: "La llave parece ser muy corta o inválida.", type: "error" });
+                    setModal({ isOpen: true, title: "Error", message: "La llave es muy corta, debe empezar con AIza.", type: "error" });
                 }
             }
 
@@ -297,7 +291,6 @@
                             </div>
                         </div>
 
-                        {}
                         <button onClick={() => setShowMasterPlan(true)} className="w-full bg-[#0f172a] text-slate-300 font-bold py-3.5 rounded-xl border border-[#1e293b] transition text-sm flex justify-center items-center gap-2 shadow-lg hover:bg-[#1e293b]">
                             <span>🗓️</span> Ver Plan Maestro Diario (24h)
                         </button>
@@ -311,7 +304,7 @@
                         </button>
 
                         {showBreakdown && (
-                            <div className="bg-[#0f172a] border border-[#1e293b] rounded-xl p-3 animate-fade-in mt-2">
+                            <div className="bg-[#0f172a] border border-[#1e293b] rounded-xl p-3 mt-2">
                                 <div className="grid grid-cols-4 gap-2">
                                     {forecast.map((p, i) => (
                                         <div key={i} className={`p-2 rounded-lg text-center flex flex-col items-center justify-center border ${p.windGust < 45 ? 'bg-[#064e3b]/40 border-[#047857]' : 'bg-[#7f1d1d]/40 border-[#b91c1c]'}`}>
@@ -323,7 +316,7 @@
                             </div>
                         )}
                         
-                        {/* ZONA DE CONFIGURACIÓN DE LLAVE INFERIOR */}
+                        {/* ZONA DE CONFIGURACIÓN DE LLAVE */}
                         <div className="mt-8 text-center pb-8 border-t border-[#1e293b] pt-4">
                             <button onClick={() => setShowConfig(true)} className="text-slate-400 hover:text-white text-xs font-bold transition flex items-center justify-center gap-1 w-full">
                                 ⚙️ Configurar API Key (IA)
@@ -331,7 +324,7 @@
                         </div>
                     </div>
 
-                    {}
+                    {/* MODAL GENÉRICO DE ERRORES / ÉXITO */}
                     {modal && (
                         <div className="fixed inset-0 bg-black/90 flex items-center justify-center z-50 p-4">
                             <div className="bg-[#0f172a] border border-[#1e293b] rounded-2xl p-6 max-w-sm w-full text-center shadow-2xl">
@@ -345,6 +338,7 @@
                         </div>
                     )}
 
+                    {/* MODAL DE CONFIGURACIÓN (NUEVO DISEÑO LIMPIO) */}
                     {showConfig && (
                         <div className="fixed inset-0 bg-black/95 flex items-center justify-center z-50 p-4">
                             <div className="bg-[#0f172a] border border-[#1e293b] rounded-2xl p-6 max-w-md w-full shadow-2xl">
@@ -355,7 +349,7 @@
                                     type="text" 
                                     value={tempNewKey}
                                     onChange={(e) => setTempNewKey(e.target.value)}
-                                    placeholder="Pega tu llave aquí..." 
+                                    placeholder="Pega tu llave que empieza con AIza..." 
                                     className="w-full bg-[#020617] border border-[#3b82f6] rounded-xl p-3 text-white text-sm mb-4 focus:outline-none focus:ring-2 focus:ring-[#3b82f6] font-mono"
                                 />
                                 
@@ -371,6 +365,7 @@
                         </div>
                     )}
                     
+                    {/* MODAL DEL PLAN MAESTRO */}
                     {showMasterPlan && (
                         <div className="fixed inset-0 bg-black/95 flex items-center justify-center z-50 p-4">
                             <div className="bg-[#0f172a] border border-[#1e293b] rounded-2xl p-6 max-w-md w-full h-[80vh] flex flex-col shadow-2xl">
