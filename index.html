@@ -51,7 +51,7 @@
             condition: "Apto para volar (Base)"
         }));
 
-        // Componente UI para Mensajes (Reemplaza a alert/confirm)
+        // Componente UI para Mensajes
         const Modal = ({ isOpen, title, message, onClose, type = "info" }) => {
             if (!isOpen) return null;
             const colors = {
@@ -86,7 +86,7 @@
             const [appMode, setAppMode] = useState(() => localStorage.getItem('drone_app_mode') || 'piloto'); // piloto | admin
             const [settingsOpen, setSettingsOpen] = useState(false);
             
-            // LLAVES PREDEFINIDAS: Ya están integradas y listas para usar
+            // LLAVES PREDEFINIDAS INCORPORADAS: No se necesita configurar nada manual
             const [apiKeys, setApiKeys] = useState({
                 gemini: "AQ.Ab8RN6Lu-oSyr3Qw9R-iO4Gpr95uBBgpsMT1nJ7Ivdu1w2M5sA",
                 firebase: `{\n  "apiKey": "AIzaSyDXjwv133-dIKyprCktTUkjx_adAz1DHaY",\n  "authDomain": "control-vuelos.firebaseapp.com",\n  "projectId": "control-vuelos",\n  "storageBucket": "control-vuelos.firebasestorage.app",\n  "messagingSenderId": "756032981781",\n  "appId": "1:756032981781:web:451641e72abe3692c0771c"\n}`
@@ -307,43 +307,48 @@
                 if (!file) return;
                 
                 if (!apiKeys.gemini) {
-                    setModal({ isOpen: true, title: "Falta API Key", message: "Ve a configuración e ingresa tu API Key de Gemini para usar el escáner de Inteligencia Artificial.", type: "warning" });
-                    e.target.value = null; // Reiniciar input
+                    setModal({ isOpen: true, title: "Falta API Key", message: "La API Key de Gemini no está configurada.", type: "warning" });
+                    e.target.value = null;
                     return;
                 }
 
                 setIsScanning(true);
                 
                 try {
-                    const base64Data = await new Promise((resolve) => {
+                    const base64Data = await new Promise((resolve, reject) => {
                         const reader = new FileReader();
                         reader.onloadend = () => {
-                             // Extraer solo la parte base64 de manera segura (quita el header data:image/png;base64,)
+                             // Extraer solo la parte base64 de manera segura, eliminando el prefijo
                             const result = reader.result;
                             const base64String = result.includes(',') ? result.split(',')[1] : result;
                             resolve(base64String);
                         };
+                        reader.onerror = reject;
                         reader.readAsDataURL(file);
                     });
 
                     const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKeys.gemini}`;
                     
+                    // Prompt súper específico basado en tu imagen de Ok To Fly
                     const prompt = `
                     Eres un sistema experto de despacho de drones analizando una captura de la app meteorológica "Ok To Fly".
                     Hora actual de la captura: ${currentHourInt}:00. La primera fila de la tabla (donde dice AHORA) corresponde a esta hora.
                     Las filas subsecuentes incrementan de 1 en 1 hora (ej: fila 2 es ${currentHourInt + 1}:00).
 
-                    REGLAS DE PELIGRO (ESTRICTAS Y EXACTAS):
-                    - Si el texto dice "Ráfagas fuertes", "Ráfagas >50m", "Extremo", ">40", ">50", ">60", "13 30m", "14 60m", "12 60m", "Extremo UV 13", "Extremo UV 15", "Vientos fuertes >30m", "Vientos >40m" o está en un bloque de color ROJO o NARANJA, el windGust es 45 (Peligro).
-                    - Si el texto dice "Vientos fuertes >30m, Ráfagas fuertes" o "Vientos >40m, Ráfagas fuertes", el windGust es 45 (Peligro).
-                    - Si dice "Apto para volar" o está en bloque AZUL CLARO, el windGust es 25 (Seguro).
+                    REGLAS DE PELIGRO (ESTRICTAS Y EXACTAS BASADAS EN LOS TEXTOS DE LA IMAGEN):
+                    - Asigna windGust = 45 (Peligro/Bloqueado) si lees CUALQUIERA de estos textos o similares: 
+                        "Ráfagas >50m", "14 60m", "12 60m", "Ráfagas fuertes >40m", "Ráfagas fuertes", "Vientos >40m, Ráfagas fuertes, Extremo UV 13", "Vientos, Ráfagas fuertes, Extremo UV 15", "Vientos fuertes >30m, Ráfagas fuertes", "Vientos >20m, Ráfagas fuertes", "Vientos >40m, Ráfagas fuertes", "Ráfagas fuertes >80m", "Extremo UV"
+                    - Si la celda está pintada de Rojo (Red) o Naranja (Orange), asigna windGust = 45.
+                    - Asigna windGust = 25 (Apto/Seguro) si lees:
+                        "Apto para volar", o si la celda es de color Azul (Blue).
                     
                     Tu única tarea es devolver un objeto JSON estricto con un arreglo llamado "forecast" de 24 objetos.
                     Para las horas no visibles en la foto, asigna windGust 25.
-                    Formato exacto esperado (solo JSON, NADA MÁS):
+                    Formato exacto esperado (solo JSON, sin backticks ni markdown):
                     {
                       "forecast": [
                         {"hour": 0, "windGust": 25},
+                        {"hour": 1, "windGust": 25},
                         ...24 items...
                       ]
                     }
@@ -405,19 +410,18 @@
                     }
                 } catch (err) {
                     console.error("Error IA detallado:", err);
-                    // Fail-safe: Si falla la IA, apagar la alarma para no bloquear al piloto
                     const fallbackDate = currentTime.toDateString();
                     setLastScanDate(fallbackDate);
                     updateData({ lastScanDate: fallbackDate });
                     setModal({ 
                         isOpen: true, 
                         title: "Error Visual IA", 
-                        message: `Hubo un error procesando la imagen. Detalle: ${err.message}. Se ha apagado la alarma para permitirte continuar operaciones.`, 
+                        message: `Hubo un error procesando la imagen. Detalle: ${err.message}. Se ha apagado la alarma temporalmente.`, 
                         type: "warning" 
                     });
                 } finally {
                     setIsScanning(false);
-                    // Reset input para permitir volver a subir el mismo archivo si es necesario
+                    // Reset input para permitir volver a subir el mismo archivo si se desea reintentar
                     e.target.value = null;
                 }
             };
@@ -491,8 +495,8 @@
                                         <input type="password" name="gemini" defaultValue={apiKeys.gemini} className="w-full bg-slate-900 border border-slate-700 rounded-xl p-2 text-sm text-white focus:border-indigo-500 outline-none" placeholder="AIzaSy..." />
                                     </div>
                                     <div>
-                                        <label className="block text-xs font-bold text-slate-400 mb-1">Firebase Config (JSON - Opcional para nube)</label>
-                                        <textarea name="firebase" defaultValue={apiKeys.firebase} rows="4" className="w-full bg-slate-900 border border-slate-700 rounded-xl p-2 text-xs text-white focus:border-indigo-500 outline-none font-mono" placeholder='{"apiKey": "...", "projectId": "..."}'></textarea>
+                                        <label className="block text-xs font-bold text-slate-400 mb-1">Firebase Config (JSON)</label>
+                                        <textarea name="firebase" defaultValue={apiKeys.firebase} rows="4" className="w-full bg-slate-900 border border-slate-700 rounded-xl p-2 text-xs text-white focus:border-indigo-500 outline-none font-mono"></textarea>
                                     </div>
                                     <div className="flex gap-3 pt-2">
                                         <button type="button" onClick={() => setSettingsOpen(false)} className="flex-1 py-2 bg-slate-800 text-white rounded-xl font-bold text-sm">Cancelar</button>
@@ -506,7 +510,7 @@
                     {/* VISTA PILOTO */}
                     {appMode === 'piloto' && (
                         <div className="space-y-5 animate-fade-in">
-                            {/* STATUS PANEL */}
+                            {/* STATUS PANEL & SCANNER */}
                             <div className="glass p-5 rounded-3xl relative overflow-hidden flex justify-between items-center">
                                 <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/10 rounded-full blur-3xl"></div>
                                 <div>
@@ -527,7 +531,7 @@
                                 <button 
                                     onClick={() => document.getElementById('file-upload-input').click()} 
                                     disabled={isScanning}
-                                    className={`flex flex-col items-center justify-center p-3 rounded-2xl transition border ${isScanning ? 'bg-indigo-900/50 border-indigo-400 animate-pulse' : needsScanUI ? 'bg-rose-600 border-rose-400 shadow-[0_0_20px_rgba(225,29,72,0.4)] animate-pulse' : 'bg-indigo-600/20 border-indigo-500/30 hover:bg-indigo-600/40 cursor-pointer'}`}>
+                                    className={`flex flex-col items-center justify-center p-3 rounded-2xl transition border cursor-pointer ${isScanning ? 'bg-indigo-900/50 border-indigo-400 animate-pulse' : needsScanUI ? 'bg-rose-600 border-rose-400 shadow-[0_0_20px_rgba(225,29,72,0.4)] animate-pulse' : 'bg-indigo-600/20 border-indigo-500/30 hover:bg-indigo-600/40'}`}>
                                     <span className="text-2xl mb-1">{isScanning ? '⏳' : '📸'}</span>
                                     <span className={`text-[10px] font-black uppercase text-center ${needsScanUI || isScanning ? 'text-white' : 'text-indigo-300'}`}>
                                         {isScanning ? 'Analizando...' : needsScanUI ? 'URGE CLIMA' : 'Escanear IA'}
