@@ -9,21 +9,34 @@
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     
+    <!-- Load the official Google Gen AI SDK -->
+    <script type="importmap">
+      {
+        "imports": {
+          "@google/genai": "https://esm.run/@google/genai"
+        }
+      }
+    </script>
+    
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800;900&display=swap');
         body {
             font-family: 'Inter', sans-serif;
-            background-color: #020617; /* Fondo súper oscuro */
+            background-color: #020617; 
             color: white;
             user-select: none;
             -webkit-tap-highlight-color: transparent;
         }
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: #0f172a; }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
     </style>
 </head>
 <body>
     <div id="root"></div>
 
-    <script type="text/babel">
+    <script type="text/babel" data-type="module">
+        import { GoogleGenAI } from '@google/genai';
         const { useState, useEffect } = React;
 
         const App = () => {
@@ -37,15 +50,14 @@
             const [showMasterPlan, setShowMasterPlan] = useState(false);
             const [showConfig, setShowConfig] = useState(false);
             
-            // Llave en blanco por defecto para forzar la configuración limpia
             const [activeGeminiKey, setActiveGeminiKey] = useState("");
             const [tempNewKey, setTempNewKey] = useState("");
 
             useEffect(() => {
                 const timer = setInterval(() => setCurrentTime(new Date()), 1000);
                 
-                // V10: Nueva memoria para forzar el borrado de todo lo anterior
-                const savedData = localStorage.getItem('dispatcherDataV10');
+                // New storage key to force cache clear
+                const savedData = localStorage.getItem('dispatcherDataV12');
                 if(savedData) {
                     try {
                         const parsed = JSON.parse(savedData);
@@ -60,7 +72,7 @@
             }, []);
 
             useEffect(() => {
-                localStorage.setItem('dispatcherDataV10', JSON.stringify({ flights, forecast, geminiKey: activeGeminiKey }));
+                localStorage.setItem('dispatcherDataV12', JSON.stringify({ flights, forecast, geminiKey: activeGeminiKey }));
             }, [flights, forecast, activeGeminiKey]);
 
             const currentHourInt = currentTime.getHours();
@@ -81,9 +93,8 @@
                 const file = eventTarget.files[0];
                 if (!file) return;
 
-                const currentKey = activeGeminiKey.trim();
+                let currentKey = activeGeminiKey.trim();
 
-                // Validación de llave vacía
                 if (!currentKey) {
                     setModal({ isOpen: true, title: "Llave Vacía", message: "No has configurado tu API Key. Toca el engranaje abajo para pegarla.", type: "error" });
                     eventTarget.value = '';
@@ -112,53 +123,59 @@
                 Para horas no visibles, pon windGust: 25.
                 `;
 
-                // Usamos el modelo PRO que es el más seguro
-                const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key=${currentKey}`;
-                
-                const response = await fetch(apiUrl, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        contents: [{ parts: [{ text: prompt }, { inlineData: { mimeType: file.type || "image/png", data: base64Data } }] }],
-                        generationConfig: { responseMimeType: "application/json" }
-                    })
+                // Initialize the official SDK client
+                const ai = new GoogleGenAI({ apiKey: currentKey });
+
+                // Call the API using the SDK
+                const response = await ai.models.generateContent({
+                    model: 'gemini-1.5-pro',
+                    contents: [
+                        prompt,
+                        {
+                            inlineData: {
+                                data: base64Data,
+                                mimeType: file.type || "image/png"
+                            }
+                        }
+                    ],
+                    config: {
+                        responseMimeType: "application/json"
+                    }
                 });
 
-                if (!response.ok) {
-                     const errorData = await response.json();
-                     throw new Error(errorData.error?.message || "Error de Google Cloud");
+                const jsonText = response.text;
+                
+                if (jsonText) {
+                    const jsonMatch = jsonText.match(/\{[\s\S]*\}/);
+                    const cleanJsonText = jsonMatch ? jsonMatch[0] : jsonText.replace(/```json\n?|```/g, '').trim();
+                    const parsedData = JSON.parse(cleanJsonText);
+                    
+                    let newForecast = [...forecast];
+                    parsedData.forecast.forEach(item => {
+                        if (item.hour >= 0 && item.hour <= 23) {
+                            newForecast[item.hour] = {
+                                time: `${item.hour.toString().padStart(2, '0')}:00`,
+                                windGust: item.windGust,
+                                condition: item.windGust >= 45 ? "Ráfagas Peligrosas" : "Apto para volar"
+                            };
+                        }
+                    });
+
+                    setForecast(newForecast);
+                    setModal({ isOpen: true, title: "✅ Escaneo Exitoso", message: "Clima actualizado correctamente por la IA.", type: "success" });
+                } else {
+                    throw new Error("La IA no devolvió el formato esperado.");
                 }
 
-                const result = await response.json();
-                
-                if (result.candidates && result.candidates[0]?.content?.parts[0]?.text) {
-                        const jsonText = result.candidates[0].content.parts[0].text;
-                        const jsonMatch = jsonText.match(/\{[\s\S]*\}/);
-                        const cleanJsonText = jsonMatch ? jsonMatch[0] : jsonText.replace(/```json\n?|```/g, '').trim();
-                        const parsedData = JSON.parse(cleanJsonText);
-                        
-                        let newForecast = [...forecast];
-                        parsedData.forecast.forEach(item => {
-                            if (item.hour >= 0 && item.hour <= 23) {
-                                newForecast[item.hour] = {
-                                    time: `${item.hour.toString().padStart(2, '0')}:00`,
-                                    windGust: item.windGust,
-                                    condition: item.windGust >= 45 ? "Ráfagas Peligrosas" : "Apto para volar"
-                                };
-                            }
-                        });
-
-                        setForecast(newForecast);
-                        setModal({ isOpen: true, title: "✅ Escaneo Exitoso", message: "Clima actualizado correctamente por la IA.", type: "success" });
-                    } else {
-                        throw new Error("La IA no devolvió el formato esperado.");
-                    }
                 } catch (err) {
-                    // SI FALLA, MUESTRA EL ERROR REAL DE GOOGLE, NO VENTANAS ROJAS INVENTADAS
+                    let errorMessage = err.message;
+                    if(err.status === 401 || errorMessage.includes('invalid authentication credentials')) {
+                        errorMessage = "Google rechazó la API Key. El SDK no pudo autenticar la llave AQ.";
+                    }
                     setModal({ 
                         isOpen: true, 
-                        title: "Error de Servidor Google", 
-                        message: `Google respondió:\n\n${err.message}\n\nRevisa que tu llave empiece con AIza y tenga permisos.`, 
+                        title: "Error de Servidor 🔴", 
+                        message: `Detalle:\n\n${errorMessage}`, 
                         type: "error" 
                     });
                 } finally {
@@ -192,7 +209,7 @@
                     setShowConfig(false);
                     setModal({ isOpen: true, title: "Llave Guardada", message: "La llave ha sido guardada. ¡Intenta escanear ahora!", type: "success" });
                 } else {
-                    setModal({ isOpen: true, title: "Error", message: "La llave es muy corta, debe empezar con AIza.", type: "error" });
+                    setModal({ isOpen: true, title: "Error", message: "La llave es muy corta.", type: "error" });
                 }
             }
 
@@ -338,18 +355,18 @@
                         </div>
                     )}
 
-                    {/* MODAL DE CONFIGURACIÓN (NUEVO DISEÑO LIMPIO) */}
+                    {/* MODAL DE CONFIGURACIÓN */}
                     {showConfig && (
                         <div className="fixed inset-0 bg-black/95 flex items-center justify-center z-50 p-4">
                             <div className="bg-[#0f172a] border border-[#1e293b] rounded-2xl p-6 max-w-md w-full shadow-2xl">
                                 <h3 className="text-lg font-black text-white mb-2 text-center">🔑 Configurar API Key</h3>
-                                <p className="text-xs text-slate-400 mb-4 text-center">Pega aquí la llave que generaste en Google AI Studio.</p>
+                                <p className="text-xs text-slate-400 mb-4 text-center">Pega aquí la llave de Google AI Studio (Acepta llaves AQ. y AIza).</p>
                                 
                                 <input 
                                     type="text" 
                                     value={tempNewKey}
                                     onChange={(e) => setTempNewKey(e.target.value)}
-                                    placeholder="Pega tu llave que empieza con AIza..." 
+                                    placeholder="Pega tu llave aquí..." 
                                     className="w-full bg-[#020617] border border-[#3b82f6] rounded-xl p-3 text-white text-sm mb-4 focus:outline-none focus:ring-2 focus:ring-[#3b82f6] font-mono"
                                 />
                                 
@@ -390,6 +407,7 @@
             );
         };
 
+        // Initialize React App
         const root = ReactDOM.createRoot(document.getElementById('root'));
         root.render(<App />);
     </script>
