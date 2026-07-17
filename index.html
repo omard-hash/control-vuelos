@@ -56,8 +56,8 @@
             useEffect(() => {
                 const timer = setInterval(() => setCurrentTime(new Date()), 1000);
                 
-                // New storage key to force cache clear
-                const savedData = localStorage.getItem('dispatcherDataSDKFinal');
+                // FORCE CACHE CLEAR WITH NEW MEMORY KEY
+                const savedData = localStorage.getItem('dispatcherDataV2026');
                 if(savedData) {
                     try {
                         const parsed = JSON.parse(savedData);
@@ -72,7 +72,7 @@
             }, []);
 
             useEffect(() => {
-                localStorage.setItem('dispatcherDataSDKFinal', JSON.stringify({ flights, forecast, geminiKey: activeGeminiKey }));
+                localStorage.setItem('dispatcherDataV2026', JSON.stringify({ flights, forecast, geminiKey: activeGeminiKey }));
             }, [flights, forecast, activeGeminiKey]);
 
             const currentHourInt = currentTime.getHours();
@@ -123,12 +123,12 @@
                 Para horas no visibles, pon windGust: 25.
                 `;
 
-                // Initialize the official SDK client - Native support for AQ. keys
+                // Initialize the official SDK client
                 const ai = new GoogleGenAI({ apiKey: currentKey });
 
-                // Call the API using the exact structure required by the new SDK
+                // Use the latest 2026 model that supports AQ. keys and new accounts
                 const response = await ai.models.generateContent({
-                    model: 'gemini-2.5-pro',
+                    model: 'gemini-3.5-flash',
                     contents: [
                         {
                             role: 'user',
@@ -167,7 +167,7 @@
                     });
 
                     setForecast(newForecast);
-                    setModal({ isOpen: true, title: "✅ Escaneo Exitoso", message: "Clima actualizado correctamente por la IA.", type: "success" });
+                    setModal({ isOpen: true, title: "✅ Escaneo Exitoso", message: "Clima actualizado correctamente por Gemini 3.5 Flash.", type: "success" });
                 } else {
                     throw new Error("La IA no devolvió el formato esperado.");
                 }
@@ -216,8 +216,14 @@
             }
 
             return (
-                <div className="min-h-screen bg-[#020617] text-white p-3 font-sans pb-24">
-                    <div className="max-w-md mx-auto space-y-4 mt-2">
+                <div className="min-h-screen bg-[#020617] text-white p-3 font-sans pb-24 relative">
+                    
+                    {/* INDICADOR DE VERSIÓN PARA ASEGURAR QUE SE ACTUALIZÓ LA CACHÉ */}
+                    <div className="absolute top-2 left-3 text-[10px] font-mono text-[#3b82f6] font-black z-10">
+                        v2026.3.5
+                    </div>
+
+                    <div className="max-w-md mx-auto space-y-4 mt-6">
                         
                         {/* TARJETA 1: TURNO ACTIVO */}
                         <div className="bg-[#0f172a] border border-[#1e293b] rounded-2xl p-5 shadow-lg flex flex-col justify-between">
@@ -280,7 +286,6 @@
                             </div>
                         </div>
 
-                        {}
                         {/* TARJETA 4: BITÁCORA DE VUELOS */}
                         <div className="bg-[#0f172a] border border-[#1e293b] rounded-2xl p-4 shadow-lg">
                             <div className="flex justify-between items-center mb-4">
@@ -311,7 +316,6 @@
                             </div>
                         </div>
 
-                        {}
                         <button onClick={() => setShowMasterPlan(true)} className="w-full bg-[#0f172a] text-slate-300 font-bold py-3.5 rounded-xl border border-[#1e293b] transition text-sm flex justify-center items-center gap-2 shadow-lg hover:bg-[#1e293b]">
                             <span>🗓️</span> Ver Plan Maestro Diario (24h)
                         </button>
@@ -337,7 +341,6 @@
                             </div>
                         )}
                         
-                        {}
                         {/* ZONA DE CONFIGURACIÓN DE LLAVE */}
                         <div className="mt-8 text-center pb-8 border-t border-[#1e293b] pt-4">
                             <button onClick={() => setShowConfig(true)} className="text-slate-400 hover:text-white text-xs font-bold transition flex items-center justify-center gap-1 w-full">
@@ -346,7 +349,6 @@
                         </div>
                     </div>
 
-                    {}
                     {/* MODAL GENÉRICO DE ERRORES / ÉXITO */}
                     {modal && (
                         <div className="fixed inset-0 bg-black/90 flex items-center justify-center z-50 p-4">
@@ -366,13 +368,13 @@
                         <div className="fixed inset-0 bg-black/95 flex items-center justify-center z-50 p-4">
                             <div className="bg-[#0f172a] border border-[#1e293b] rounded-2xl p-6 max-w-md w-full shadow-2xl">
                                 <h3 className="text-lg font-black text-white mb-2 text-center">🔑 Configurar API Key</h3>
-                                <p className="text-xs text-slate-400 mb-4 text-center">Pega tu llave de Google AI Studio (Acepta llaves AQ. y AIza).</p>
+                                <p className="text-xs text-slate-400 mb-4 text-center">Pega tu llave que empieza con AQ.</p>
                                 
                                 <input 
                                     type="text" 
                                     value={tempNewKey}
                                     onChange={(e) => setTempNewKey(e.target.value)}
-                                    placeholder="Pega tu llave aquí..." 
+                                    placeholder="AQ.Ab8RN..." 
                                     className="w-full bg-[#020617] border border-[#3b82f6] rounded-xl p-3 text-white text-sm mb-4 focus:outline-none focus:ring-2 focus:ring-[#3b82f6] font-mono"
                                 />
                                 
@@ -413,7 +415,6 @@
             );
         };
 
-        // Initialize React App
         const root = ReactDOM.createRoot(document.getElementById('root'));
         root.render(<App />);
     </script>
