@@ -76,10 +76,10 @@
             const [appMode, setAppMode] = useState(() => localStorage.getItem('drone_app_mode') || 'piloto');
             const [settingsOpen, setSettingsOpen] = useState(false);
             
-            // LLAVES PREDEFINIDAS INCORPORADAS
+            // LLAVES PREDEFINIDAS INCORPORADAS - NUNCA MAS SE PIDEN
             const [apiKeys, setApiKeys] = useState({
                 gemini: "AQ.Ab8RN6Lu-oSyr3Qw9R-iO4Gpr95uBBgpsMT1nJ7Ivdu1w2M5sA",
-                firebase: `{\n  "apiKey": "AIzaSyDXjwv133-dIKyprCktTUkjx_adAz1DHaY",\n  "authDomain": "control-vuelos.firebaseapp.com",\n  "projectId": "control-vuelos",\n  "storageBucket": "control-vuelos.firebasestorage.app",\n  "messagingSenderId": "756032981781",\n  "appId": "1:756032981781:web:451641e72abe3692c0771c"\n}`
+                firebase: `{\n  "apiKey": "AIzaSyDXjwv133-dIKyprCktTUkjx_adAz1DhAY",\n  "authDomain": "control-vuelos.firebaseapp.com",\n  "projectId": "control-vuelos",\n  "storageBucket": "control-vuelos.firebasestorage.app",\n  "messagingSenderId": "756032981781",\n  "appId": "1:756032981781:web:451641e72abe3692c0771c"\n}`
             });
             
             const [isCloudActive, setIsCloudActive] = useState(false);
@@ -255,18 +255,20 @@
             }, [lastScanDate, audioUnlocked, masterPlan, speak, todayStr]);
 
             const handleImageUpload = async (e) => {
-                const file = e.target.files[0];
+                const eventTarget = e.target;
+                const file = eventTarget.files[0];
                 if (!file) return;
                 
                 if (!apiKeys.gemini) {
                     setModal({ isOpen: true, title: "Falta API Key", message: "La API Key de Gemini no está configurada.", type: "warning" });
-                    e.target.value = null;
+                    eventTarget.value = '';
                     return;
                 }
 
                 setIsScanning(true);
                 
                 try {
+                    // Limpieza segura de Base64
                     const base64Data = await new Promise((resolve, reject) => {
                         const reader = new FileReader();
                         reader.onloadend = () => {
@@ -286,8 +288,8 @@
                     Las filas subsecuentes incrementan de 1 en 1 hora.
 
                     REGLAS DE PELIGRO (ESTRICTAS Y EXACTAS BASADAS EN LOS TEXTOS DE LA IMAGEN):
-                    - Asigna windGust = 45 (Peligro/Bloqueado) si lees CUALQUIERA de estos textos o similares en la fila: 
-                        "Ráfagas >50m", "14 60m", "12 60m", "13 30m", "Ráfagas fuertes", "Vientos >40m", "Extremo UV", "Vientos fuertes >30m", "Extremo UV 13", "Extremo UV 15"
+                    - Asigna windGust = 45 (Peligro/Bloqueado) si lees CUALQUIERA de estos textos exactos o similares: 
+                        "Ráfagas >50m", "14 60m", "12 60m", "13 30m", "Ráfagas fuertes", "Vientos >40m", "Extremo UV", "Vientos fuertes >30m", "Extremo UV 13", "Extremo UV 15", "Vientos fuertes >30m, Ráfagas fuertes"
                     - Si la celda horaria (el fondo de la hora) es Roja (Red) o Naranja (Orange), asigna windGust = 45.
                     - Asigna windGust = 25 (Apto/Seguro) si lees:
                         "Apto para volar", o si la celda es de color Azul (Blue).
@@ -318,7 +320,11 @@
                     
                     if (result.candidates && result.candidates[0]?.content?.parts[0]?.text) {
                         const jsonText = result.candidates[0].content.parts[0].text;
-                        const cleanJsonText = jsonText.replace(/```json\n?|```/g, '').trim();
+                        
+                        // Extracción de JSON a prueba de fallos absolutos
+                        const jsonMatch = jsonText.match(/\{[\s\S]*\}/);
+                        const cleanJsonText = jsonMatch ? jsonMatch[0] : jsonText.replace(/```json\n?|```/g, '').trim();
+                        
                         const parsedData = JSON.parse(cleanJsonText);
                         
                         let newForecast = [...forecast];
@@ -349,7 +355,8 @@
                     setModal({ isOpen: true, title: "Error Visual IA", message: `Hubo un error procesando la imagen. Detalle: ${err.message}. Se ha apagado la alarma temporalmente.`, type: "warning" });
                 } finally {
                     setIsScanning(false);
-                    e.target.value = null; // Permite volver a subir la misma foto
+                    // IMPORTANTE: Limpia el input para permitir subir la misma foto otra vez si hubo error
+                    eventTarget.value = ''; 
                 }
             };
 
@@ -410,11 +417,11 @@
                                 <h3 className="text-lg font-black text-white mb-4 border-b border-slate-700 pb-2">Configuración del Servidor</h3>
                                 <form onSubmit={handleSaveSettings} className="space-y-4">
                                     <div>
-                                        <label className="block text-xs font-bold text-slate-400 mb-1">Google Gemini API Key</label>
+                                        <label className="block text-xs font-bold text-slate-400 mb-1">Google Gemini API Key (Visión IA)</label>
                                         <input type="password" name="gemini" defaultValue={apiKeys.gemini} className="w-full bg-slate-900 border border-slate-700 rounded-xl p-2 text-sm text-white outline-none" />
                                     </div>
                                     <div>
-                                        <label className="block text-xs font-bold text-slate-400 mb-1">Firebase Config (JSON)</label>
+                                        <label className="block text-xs font-bold text-slate-400 mb-1">Firebase Config (JSON - Opcional para nube)</label>
                                         <textarea name="firebase" defaultValue={apiKeys.firebase} rows="6" className="w-full bg-slate-900 border border-slate-700 rounded-xl p-2 text-xs text-white outline-none font-mono"></textarea>
                                     </div>
                                     <div className="flex gap-3 pt-2">
@@ -440,16 +447,19 @@
                                         {currentTime.toLocaleTimeString('en-US', { hour12: false })}
                                     </div>
                                 </div>
-                                <input type="file" id="file-upload-input" accept="image/*" onChange={handleImageUpload} className="hidden" />
-                                <button 
-                                    onClick={() => document.getElementById('file-upload-input').click()} 
-                                    disabled={isScanning}
-                                    className={`flex flex-col items-center justify-center p-3 rounded-2xl transition border cursor-pointer ${isScanning ? 'bg-indigo-900/50 border-indigo-400 animate-pulse' : needsScanUI ? 'bg-rose-600 border-rose-400 shadow-[0_0_20px_rgba(225,29,72,0.4)] animate-pulse' : 'bg-indigo-600/20 border-indigo-500/30 hover:bg-indigo-600/40'}`}>
+                                <label className={`flex flex-col items-center justify-center p-3 rounded-2xl transition border cursor-pointer ${isScanning ? 'bg-indigo-900/50 border-indigo-400 animate-pulse pointer-events-none' : needsScanUI ? 'bg-rose-600 border-rose-400 shadow-[0_0_20px_rgba(225,29,72,0.4)] animate-pulse' : 'bg-indigo-600/20 border-indigo-500/30 hover:bg-indigo-600/40'}`}>
+                                    <input 
+                                        type="file" 
+                                        accept="image/*" 
+                                        onChange={handleImageUpload} 
+                                        className="hidden" 
+                                        disabled={isScanning}
+                                    />
                                     <span className="text-2xl mb-1">{isScanning ? '⏳' : '📸'}</span>
                                     <span className={`text-[10px] font-black uppercase text-center ${needsScanUI || isScanning ? 'text-white' : 'text-indigo-300'}`}>
                                         {isScanning ? 'Analizando...' : needsScanUI ? 'URGE CLIMA' : 'Escanear IA'}
                                     </span>
-                                </button>
+                                </label>
                             </div>
 
                             {/* PLAN MAESTRO */}
@@ -478,10 +488,11 @@
                                 </div>
                             </div>
                             
-                            {/* BITÁCORA DEL PILOTO */}
+                            {/* BITÁCORA DEL PILOTO - MUESTRA VUELOS REALIZADOS */}
                             <div className="glass rounded-3xl p-4 border border-slate-800 mb-6">
                                 <h3 className="text-[11px] font-black tracking-widest text-slate-400 uppercase mb-3 flex items-center justify-between">
                                     <span>✅ Bitácora de Hoy (Piloto)</span>
+                                    {/* CONTADOR DE VUELOS */}
                                     <span className="bg-indigo-600 text-white px-2 py-0.5 rounded-full text-[10px]">{todayFlightsTotal.length} / 13</span>
                                 </h3>
                                 <div className="space-y-2">
