@@ -57,7 +57,7 @@
                 const timer = setInterval(() => setCurrentTime(new Date()), 1000);
                 
                 // New storage key to force cache clear
-                const savedData = localStorage.getItem('dispatcherDataV12');
+                const savedData = localStorage.getItem('dispatcherDataSDKFinal');
                 if(savedData) {
                     try {
                         const parsed = JSON.parse(savedData);
@@ -72,7 +72,7 @@
             }, []);
 
             useEffect(() => {
-                localStorage.setItem('dispatcherDataV12', JSON.stringify({ flights, forecast, geminiKey: activeGeminiKey }));
+                localStorage.setItem('dispatcherDataSDKFinal', JSON.stringify({ flights, forecast, geminiKey: activeGeminiKey }));
             }, [flights, forecast, activeGeminiKey]);
 
             const currentHourInt = currentTime.getHours();
@@ -115,7 +115,7 @@
                         reader.readAsDataURL(file);
                     });
 
-                    const prompt = `
+                    const promptText = `
                 Analiza esta imagen del clima. Hora actual: ${currentHourInt}:00.
                 Si ves celdas rojas/naranjas o textos como "Ráfagas >50m", "14 60m", "Extremo UV": pon windGust 45.
                 Si es azul o dice "Apto para volar": pon windGust 25.
@@ -123,19 +123,24 @@
                 Para horas no visibles, pon windGust: 25.
                 `;
 
-                // Initialize the official SDK client
+                // Initialize the official SDK client - Native support for AQ. keys
                 const ai = new GoogleGenAI({ apiKey: currentKey });
 
-                // Call the API using the SDK
+                // Call the API using the exact structure required by the new SDK
                 const response = await ai.models.generateContent({
                     model: 'gemini-1.5-pro',
                     contents: [
-                        prompt,
                         {
-                            inlineData: {
-                                data: base64Data,
-                                mimeType: file.type || "image/png"
-                            }
+                            role: 'user',
+                            parts: [
+                                { text: promptText },
+                                {
+                                    inlineData: {
+                                        data: base64Data,
+                                        mimeType: file.type || "image/png"
+                                    }
+                                }
+                            ]
                         }
                     ],
                     config: {
@@ -168,10 +173,7 @@
                 }
 
                 } catch (err) {
-                    let errorMessage = err.message;
-                    if(err.status === 401 || errorMessage.includes('invalid authentication credentials')) {
-                        errorMessage = "Google rechazó la API Key. El SDK no pudo autenticar la llave AQ.";
-                    }
+                    let errorMessage = err.message || JSON.stringify(err);
                     setModal({ 
                         isOpen: true, 
                         title: "Error de Servidor 🔴", 
@@ -278,6 +280,7 @@
                             </div>
                         </div>
 
+                        {}
                         {/* TARJETA 4: BITÁCORA DE VUELOS */}
                         <div className="bg-[#0f172a] border border-[#1e293b] rounded-2xl p-4 shadow-lg">
                             <div className="flex justify-between items-center mb-4">
@@ -308,6 +311,7 @@
                             </div>
                         </div>
 
+                        {}
                         <button onClick={() => setShowMasterPlan(true)} className="w-full bg-[#0f172a] text-slate-300 font-bold py-3.5 rounded-xl border border-[#1e293b] transition text-sm flex justify-center items-center gap-2 shadow-lg hover:bg-[#1e293b]">
                             <span>🗓️</span> Ver Plan Maestro Diario (24h)
                         </button>
@@ -333,6 +337,7 @@
                             </div>
                         )}
                         
+                        {}
                         {/* ZONA DE CONFIGURACIÓN DE LLAVE */}
                         <div className="mt-8 text-center pb-8 border-t border-[#1e293b] pt-4">
                             <button onClick={() => setShowConfig(true)} className="text-slate-400 hover:text-white text-xs font-bold transition flex items-center justify-center gap-1 w-full">
@@ -341,6 +346,7 @@
                         </div>
                     </div>
 
+                    {}
                     {/* MODAL GENÉRICO DE ERRORES / ÉXITO */}
                     {modal && (
                         <div className="fixed inset-0 bg-black/90 flex items-center justify-center z-50 p-4">
@@ -360,7 +366,7 @@
                         <div className="fixed inset-0 bg-black/95 flex items-center justify-center z-50 p-4">
                             <div className="bg-[#0f172a] border border-[#1e293b] rounded-2xl p-6 max-w-md w-full shadow-2xl">
                                 <h3 className="text-lg font-black text-white mb-2 text-center">🔑 Configurar API Key</h3>
-                                <p className="text-xs text-slate-400 mb-4 text-center">Pega aquí la llave de Google AI Studio (Acepta llaves AQ. y AIza).</p>
+                                <p className="text-xs text-slate-400 mb-4 text-center">Pega tu llave de Google AI Studio (Acepta llaves AQ. y AIza).</p>
                                 
                                 <input 
                                     type="text" 
