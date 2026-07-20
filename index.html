@@ -1,439 +1,112 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Dispatcher Pro</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    
-    <!-- Load the official Google Gen AI SDK -->
-    <script type="importmap">
-      {
-        "imports": {
-          "@google/genai": "https://esm.run/@google/genai"
-        }
-      }
-    </script>
-    
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800;900&display=swap');
-        body {
-            font-family: 'Inter', sans-serif;
-            background-color: #020617; 
-            color: white;
-            user-select: none;
-            -webkit-tap-highlight-color: transparent;
-        }
-        ::-webkit-scrollbar { width: 6px; }
-        ::-webkit-scrollbar-track { background: #0f172a; }
-        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
-    </style>
-</head>
-<body>
-    <div id="root"></div>
-
-    <script type="text/babel" data-type="module">
-        import { GoogleGenAI } from '@google/genai';
-        const { useState, useEffect } = React;
-
-        const App = () => {
-            const [currentTime, setCurrentTime] = useState(new Date());
-            const [flights, setFlights] = useState([]);
-            const [forecast, setForecast] = useState(Array(24).fill({ time: '00:00', windGust: 25, condition: 'Apto para volar' }));
-            const [isScanning, setIsScanning] = useState(false);
-            const [modal, setModal] = useState(null);
+<!-- ... existing code ... -->
+            const isDanger = currentWind > 43;
             
-            const [showBreakdown, setShowBreakdown] = useState(false);
-            const [showMasterPlan, setShowMasterPlan] = useState(false);
-            const [showConfig, setShowConfig] = useState(false);
-            
-            const [activeGeminiKey, setActiveGeminiKey] = useState("");
-            const [tempNewKey, setTempNewKey] = useState("");
+            const isMeetingTime = currentHourInt === 7 && currentMinInt >= 45;
 
-            useEffect(() => {
-                const timer = setInterval(() => setCurrentTime(new Date()), 1000);
+            const generateIntelligentSchedule = (currentForecast, currentFlights) => {
+                let schedule = [];
                 
-                // FORCE CACHE CLEAR WITH NEW MEMORY KEY
-                const savedData = localStorage.getItem('dispatcherDataV2026');
-                if(savedData) {
-                    try {
-                        const parsed = JSON.parse(savedData);
-                        if(parsed.flights) setFlights(parsed.flights);
-                        if(parsed.forecast) setForecast(parsed.forecast);
-                        if(parsed.geminiKey) setActiveGeminiKey(parsed.geminiKey);
-                    } catch(e) {
-                        console.log("Reiniciando memoria local.");
+                const toMins = (timeStr) => {
+                    let [h, m] = timeStr.split(':').map(Number);
+                    return h * 60 + m;
+                };
+
+                // 1. AUDITORÍA DE CLIMA: ¿Cuántas horas de suspensión hay en cada turno?
+                let dayBlocked = 0;
+                for(let i=7; i<=18; i++) { if(currentForecast[i]?.windGust > 43) dayBlocked++; }
+                
+                let nightBlocked = 0;
+                for(let i=19; i<=23; i++) { if(currentForecast[i]?.windGust > 43) nightBlocked++; }
+                for(let i=0; i<=6; i++) { if(currentForecast[i]?.windGust > 43) nightBlocked++; }
+
+                // REGLA DE ORO: Si hay 6+ horas perdidas, activar Algoritmo de Compresión (50 mins). 
+                // Si el día está despejado, usar separación relajada (80 mins).
+                const daySpacing = dayBlocked >= 6 ? 50 : 80;
+                const nightSpacing = nightBlocked >= 6 ? 50 : 80;
+
+                const canAddFlight = (proposedTimeMins, requiredSpacing) => {
+                    for (let f of schedule) {
+                        let fMins = toMins(f.time);
+                        let diff = Math.abs(fMins - proposedTimeMins);
+                        if (diff > 12 * 60) diff = 24 * 60 - diff; // Ajuste para cruce de medianoche
+                        if (diff < requiredSpacing) return false; 
                     }
-                }
-                return () => clearInterval(timer);
-            }, []);
+                    return true;
+                };
 
-            useEffect(() => {
-                localStorage.setItem('dispatcherDataV2026', JSON.stringify({ flights, forecast, geminiKey: activeGeminiKey }));
-            }, [flights, forecast, activeGeminiKey]);
+                // 2. VUELOS FORZOSOS (Piedras angulares del itinerario)
+                schedule.push({ time: "08:20", type: "Forzoso (Post-Junta)", shift: "Turno Diurno", fixed: true });
+                schedule.push({ time: "14:00", type: "Forzoso (Cambio)", shift: "Turno Diurno", fixed: true });
+                schedule.push({ time: "17:00", type: "Forzoso", shift: "Turno Diurno", fixed: true });
+                schedule.push({ time: "21:30", type: "Forzoso", shift: "Turno Nocturno", fixed: true });
 
-            const currentHourInt = currentTime.getHours();
-            const isDayShift = currentHourInt >= 7 && currentHourInt < 19;
-            const activeShift = isDayShift ? "Turno Diurno" : "Turno Nocturno";
-            const shiftTarget = isDayShift ? 8 : 5;
-            
-            const todayStr = currentTime.toDateString();
-            const shiftFlights = flights.filter(f => f.shift === activeShift && new Date(f.timestamp).toDateString() === todayStr);
-            const todayFlights = flights.filter(f => new Date(f.timestamp).toDateString() === todayStr);
-            
-            const currentWindData = forecast[currentHourInt] || { windGust: 0 };
-            const currentWind = currentWindData.windGust;
-            
-            const isOperable = currentWind <= 43;
-            const isCaution = currentWind === 43;
-
-            const handleImageUpload = async (e) => {
-                const eventTarget = e.target;
-                const file = eventTarget.files[0];
-                if (!file) return;
-
-                let currentKey = activeGeminiKey.trim();
-
-                if (!currentKey) {
-                    setModal({ isOpen: true, title: "Llave Vacía", message: "No has configurado tu API Key. Toca el engranaje abajo para pegarla.", type: "error" });
-                    eventTarget.value = '';
-                    return;
-                }
-
-                setIsScanning(true);
-                
-                try {
-                    const base64Data = await new Promise((resolve, reject) => {
-                        const reader = new FileReader();
-                        reader.onloadend = () => {
-                            const result = reader.result;
-                            const base64String = result.includes(',') ? result.split(',')[1] : result;
-                            resolve(base64String);
-                        };
-                        reader.onerror = reject;
-                        reader.readAsDataURL(file);
-                    });
-
-                    const promptText = `
-                    Actúa como un auditor estricto de seguridad aérea. Analiza esta tabla de "OK TO FLY". Hora actual: ${currentHourInt}:00.
-                    Extrae la condición exacta del viento a 120m de altura para cada hora visible basándote estrictamente en el TEXTO y los NÚMEROS.
-
-                    REGLAS DE AUDITORÍA:
-                    1. Lee el texto de cada fila. Busca datos específicos de altura, ej: "14 120m" significa ráfagas de 14 m/s a 120 metros de altura.
-                    2. Si la velocidad está en m/s, DEBES CONVERTIRLA a km/h multiplicando por 3.6 (Ejemplo: 14 m/s * 3.6 = 50.4 km/h, redondea a 50).
-                    3. Si el texto dice textualmente "Apto para volar", el viento es seguro. Asigna windGust: 25.
-                    4. Si el texto dice "Ráfagas fuertes" pero no despliega el número exacto, por regla de auditoría asume 45 km/h (peligro) o 43 km/h (precaución) según el contexto de advertencia.
-                    5. Mapea la hora AM/PM al formato de 24 horas (ej. 4:00pm = 16, 5:00pm = 17).
-
-                    Devuelve SOLO ESTE JSON EXACTO (sin marcas de formato markdown): { "forecast": [{"hour": 0, "windGust": 25}, ...] }
-                    Para horas no visibles en la imagen, pon windGust: 25.
-                    `;
-
-                // Initialize the official SDK client
-                const ai = new GoogleGenAI({ apiKey: currentKey });
-
-                // Use the latest 2026 model that supports AQ. keys and new accounts
-                const response = await ai.models.generateContent({
-                    model: 'gemini-3.5-flash',
-                    contents: [
-                        {
-                            role: 'user',
-                            parts: [
-                                { text: promptText },
-                                {
-                                    inlineData: {
-                                        data: base64Data,
-                                        mimeType: file.type || "image/png"
-                                    }
-                                }
-                            ]
+                // 3. RELLENAR DIURNOS (Meta: 7) - Escanea el día cada 10 minutos
+                let dayAdded = 3; 
+                for(let h=7; h<=18 && dayAdded < 7; h++) {
+                    if(currentForecast[h]?.windGust > 43) continue; // Si la hora está suspendida, saltarla
+                    for(let m=0; m<=50 && dayAdded < 7; m+=10) {
+                        // Respetar estricto bloqueo por junta
+                        if(h===7 && m>=40) continue; 
+                        if(h===8 && m<20) continue;
+                        
+                        let mins = h * 60 + m;
+                        if(canAddFlight(mins, daySpacing)) {
+                            let timeStr = `${h.toString().padStart(2,'0')}:${m.toString().padStart(2,'0')}`;
+                            schedule.push({ time: timeStr, type: dayBlocked >= 6 ? "Dinámico (Compresión 50m)" : "Dinámico", shift: "Turno Diurno", fixed: false });
+                            dayAdded++;
                         }
-                    ],
-                    config: {
-                        responseMimeType: "application/json"
                     }
+                }
+
+                // Cálculo de vuelos a heredar a la noche si el día estuvo terrible
+                let inheritedToNight = 7 - dayAdded; 
+
+                // 4. RELLENAR NOCTURNOS Bloque 1 (19:00 - 23:59) Meta: 2 + heredados
+                let eveningTarget = 2 + inheritedToNight; 
+                let nightAdded1 = 1; // Llevamos el forzoso de las 21:30
+                
+                for(let h=19; h<=23 && nightAdded1 < eveningTarget; h++) {
+                    if(currentForecast[h]?.windGust > 43) continue;
+                    for(let m=0; m<=50 && nightAdded1 < eveningTarget; m+=10) {
+                        let mins = h * 60 + m;
+                        if(canAddFlight(mins, nightSpacing)) {
+                            let timeStr = `${h.toString().padStart(2,'0')}:${m.toString().padStart(2,'0')}`;
+                            schedule.push({ time: timeStr, type: nightBlocked >= 6 ? "Dinámico (Compresión 50m)" : "Dinámico", shift: "Turno Nocturno", fixed: false });
+                            nightAdded1++;
+                        }
+                    }
+                }
+
+                // 5. RELLENAR MADRUGADA (00:00 - 06:59) Meta: 4 vuelos
+                let nightAdded2 = 0;
+                for(let h=0; h<=6 && nightAdded2 < 4; h++) {
+                    if(currentForecast[h]?.windGust > 43) continue;
+                    for(let m=0; m<=50 && nightAdded2 < 4; m+=10) {
+                        let mins = h * 60 + m;
+                        if(canAddFlight(mins, nightSpacing)) {
+                            let timeStr = `${h.toString().padStart(2,'0')}:${m.toString().padStart(2,'0')}`;
+                            schedule.push({ time: timeStr, type: nightBlocked >= 6 ? "Dinámico (Compresión 50m)" : "Dinámico", shift: "Turno Nocturno", fixed: false });
+                            nightAdded2++;
+                        }
+                    }
+                }
+
+                // 6. ORDENAR CRONOLÓGICAMENTE (Día Operativo 07:00 a 06:59)
+                schedule.sort((a, b) => {
+                    let ah = parseInt(a.time.split(':')[0]);
+                    let am = parseInt(a.time.split(':')[1]);
+                    let bh = parseInt(b.time.split(':')[0]);
+                    let bm = parseInt(b.time.split(':')[1]);
+                    if(ah < 7) ah += 24; 
+                    if(bh < 7) bh += 24;
+                    return (ah * 60 + am) - (bh * 60 + bm);
                 });
 
-                const jsonText = response.text;
-                
-                if (jsonText) {
-                    const jsonMatch = jsonText.match(/\{[\s\S]*\}/);
-                    const cleanJsonText = jsonMatch ? jsonMatch[0] : jsonText.replace(/```json\n?|```/g, '').trim();
-                    const parsedData = JSON.parse(cleanJsonText);
-                    
-                    let newForecast = [...forecast];
-                    parsedData.forecast.forEach(item => {
-                        if (item.hour >= 0 && item.hour <= 23) {
-                            let conditionText = item.windGust > 43 ? "Ráfagas Peligrosas" : (item.windGust === 43 ? "Vuelo con Precaución" : "Apto para volar");
-                            newForecast[item.hour] = {
-                                time: `${item.hour.toString().padStart(2, '0')}:00`,
-                                windGust: item.windGust,
-                                condition: conditionText
-                            };
-                        }
-                    });
-
-                    setForecast(newForecast);
-                    setModal({ isOpen: true, title: "✅ Escaneo Exitoso", message: "Clima actualizado correctamente por Gemini 3.5 Flash.", type: "success" });
-                } else {
-                    throw new Error("La IA no devolvió el formato esperado.");
-                }
-
-                } catch (err) {
-                    let errorMessage = err.message || JSON.stringify(err);
-                    setModal({ 
-                        isOpen: true, 
-                        title: "Error de Servidor 🔴", 
-                        message: `Detalle:\n\n${errorMessage}`, 
-                        type: "error" 
-                    });
-                } finally {
-                    setIsScanning(false);
-                    eventTarget.value = ''; 
-                }
+                setFlightItinerary(schedule);
             };
 
-            const handleLogFlight = (isPast = false) => {
-                const now = new Date();
-                const flightDate = isPast ? new Date(now.getTime() - 30*60000) : now;
-                const flightTime = flightDate.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-                
-                const newLog = {
-                    id: Date.now(),
-                    time: flightTime,
-                    timestamp: flightDate.toISOString(),
-                    shift: activeShift,
-                    wind: currentWind
-                };
-                
-                setFlights(prev => [newLog, ...prev].sort((a,b) => b.id - a.id));
-                if(!isPast) {
-                    setModal({ isOpen: true, title: "¡Despegue Registrado!", message: `Vuelo de las ${flightTime} guardado.`, type: "success" });
-                }
-            };
+            const speak = (text) => {
+<!-- ... existing code ... -->
+```
 
-            const saveNewKey = () => {
-                if(tempNewKey.trim().length > 10) {
-                    setActiveGeminiKey(tempNewKey.trim());
-                    setShowConfig(false);
-                    setModal({ isOpen: true, title: "Llave Guardada", message: "La llave ha sido guardada. ¡Intenta escanear ahora!", type: "success" });
-                } else {
-                    setModal({ isOpen: true, title: "Error", message: "La llave es muy corta.", type: "error" });
-                }
-            }
-
-            return (
-                <div className="min-h-screen bg-[#020617] text-white p-3 font-sans pb-24 relative">
-                    
-                    {/* INDICADOR DE VERSIÓN PARA ASEGURAR QUE SE ACTUALIZÓ LA CACHÉ */}
-                    <div className="absolute top-2 left-3 text-[10px] font-mono text-[#3b82f6] font-black z-10">
-                        v2026.3.5
-                    </div>
-
-                    <div className="max-w-md mx-auto space-y-4 mt-6">
-                        
-                        {/* TARJETA 1: TURNO ACTIVO */}
-                        <div className="bg-[#0f172a] border border-[#1e293b] rounded-2xl p-5 shadow-lg flex flex-col justify-between">
-                            <div className="flex justify-between items-start mb-3">
-                                <div>
-                                    <span className="font-black tracking-wider text-[11px] text-[#3b82f6] uppercase">TURNO ACTIVO</span>
-                                    <h2 className="text-2xl font-black text-slate-200 mt-1">{activeShift}</h2>
-                                </div>
-                                <span className="font-mono font-bold bg-black/50 border border-[#374151] px-3 py-1.5 rounded-md text-xs text-slate-300 shadow-inner">
-                                    {currentTime.toLocaleTimeString('en-US', { hour12: false })}
-                                </span>
-                            </div>
-                            
-                            <div className="flex justify-between items-end mt-2">
-                                <p className="text-xs text-slate-400 w-1/2">
-                                    Meta del turno: <span className="text-white font-bold">{shiftTarget} vuelos</span> <br/>
-                                    <span className="text-[10px]">(Incluye +3 heredados)</span>
-                                </p>
-                                
-                                <label className={`flex flex-col items-center justify-center px-4 py-2 rounded-lg font-bold text-[11px] transition cursor-pointer border ${isScanning ? 'bg-indigo-900 border-indigo-500 text-indigo-300 pointer-events-none' : 'bg-[#4f46e5] hover:bg-[#4338ca] border-[#6366f1] text-white shadow-[0_0_15px_rgba(79,70,229,0.3)]'}`}>
-                                    <input type="file" accept="image/*" onChange={handleImageUpload} className="hidden" disabled={isScanning} />
-                                    <span className="text-lg mb-0.5">📸</span>
-                                    <span>{isScanning ? 'Analizando...' : 'Escanear OK to Fly'}</span>
-                                </label>
-                            </div>
-                        </div>
-
-                        {/* TARJETA 2: ESTADO DE VUELO */}
-                        <div className={`rounded-2xl p-4 border flex items-center gap-3 transition-colors shadow-lg ${isOperable ? (isCaution ? 'bg-[#78350f] border-[#b45309]' : 'bg-[#064e3b] border-[#047857]') : 'bg-[#7f1d1d] border-[#b91c1c]'}`}>
-                            <div className={`w-3.5 h-3.5 rounded-full animate-pulse ${isOperable ? (isCaution ? 'bg-[#fbbf24]' : 'bg-[#34d399]') : 'bg-red-400'}`}></div>
-                            <div>
-                                <div className={`font-black tracking-widest text-[11px] uppercase ${isOperable ? (isCaution ? 'text-[#fcd34d]' : 'text-[#6ee7b7]') : 'text-red-300'}`}>
-                                    ESTADO DE VUELO (120M):
-                                </div>
-                                <div className={`text-sm font-semibold mt-0.5 ${isOperable ? 'text-white' : 'text-red-100'}`}>
-                                    {isOperable ? (isCaution ? 'PRECAUCIÓN' : 'OPERABLE') : 'BLOQUEADO'} (Viento actual: {currentWind} km/h - {isOperable ? (isCaution ? 'Precaución' : 'Permitido') : 'Peligro'})
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* TARJETA 3: CONTADOR CENTRAL GIGANTE */}
-                        <div className="bg-[#0f172a] border border-[#1e293b] rounded-2xl p-6 flex flex-col items-center shadow-lg relative overflow-hidden">
-                            <div className="text-slate-400 font-bold tracking-widest text-xs mb-2">VUELOS DEL TURNO</div>
-                            <div className="text-7xl font-black mb-2 flex items-baseline">
-                                <span className="text-white">{shiftFlights.length}</span>
-                                <span className="text-slate-600 text-5xl mx-3">/</span>
-                                <span className="text-[#3b82f6]">{shiftTarget}</span>
-                            </div>
-                            <div className="text-[10px] text-slate-500 font-bold tracking-wider uppercase mb-6">66CW+8Q Parque Industrial Jis Park, Pue.</div>
-                            
-                            <div className="w-full h-px bg-[#1e293b] mb-5"></div>
-                            
-                            <div className="w-full flex justify-between items-center bg-[#020617] p-3 rounded-xl border border-[#1e293b]">
-                                <span className="font-black text-xs tracking-widest text-[#06b6d4] flex items-center gap-2">
-                                    <span className="text-lg">📊</span> GLOBAL DEL DÍA
-                                </span>
-                                <span className="bg-[#06b6d4] text-black font-black px-3 py-1.5 rounded-md text-sm shadow-[0_0_10px_rgba(6,182,212,0.4)]">
-                                    {todayFlights.length} VUELOS
-                                </span>
-                            </div>
-                        </div>
-
-                        {/* TARJETA 4: BITÁCORA DE VUELOS */}
-                        <div className="bg-[#0f172a] border border-[#1e293b] rounded-2xl p-4 shadow-lg">
-                            <div className="flex justify-between items-center mb-4">
-                                <div className="font-bold tracking-widest text-[11px] text-slate-300 flex items-center gap-2 uppercase">
-                                    <span>📖</span> BITÁCORA DE VUELOS
-                                </div>
-                                <button onClick={() => handleLogFlight(true)} className="bg-[#6366f1] hover:bg-[#4f46e5] text-white text-[10px] font-bold px-3 py-1.5 rounded-lg transition">
-                                    + Añadir Pasado
-                                </button>
-                            </div>
-                            
-                            <div className="space-y-2">
-                                {shiftFlights.length === 0 ? (
-                                    <div className="bg-[#020617] text-slate-500 text-xs text-center py-5 rounded-xl font-medium border border-[#1e293b]">
-                                        Sin vuelos registrados en este turno.
-                                    </div>
-                                ) : (
-                                    shiftFlights.map((f, i) => (
-                                        <div key={i} className="flex justify-between items-center bg-[#020617] p-3 rounded-xl border border-[#1e293b]">
-                                            <div className="flex items-center gap-3">
-                                                <div className="w-1.5 h-1.5 rounded-full bg-[#3b82f6]"></div>
-                                                <span className="text-white font-bold text-sm">Despegue {f.time}</span>
-                                            </div>
-                                            <span className="text-xs font-bold text-slate-400 bg-slate-800/50 px-2 py-1 rounded">{f.wind} km/h</span>
-                                        </div>
-                                    ))
-                                )}
-                            </div>
-                        </div>
-
-                        <button onClick={() => setShowMasterPlan(true)} className="w-full bg-[#0f172a] text-slate-300 font-bold py-3.5 rounded-xl border border-[#1e293b] transition text-sm flex justify-center items-center gap-2 shadow-lg hover:bg-[#1e293b]">
-                            <span>🗓️</span> Ver Plan Maestro Diario (24h)
-                        </button>
-
-                        <button onClick={() => handleLogFlight(false)} className="w-full bg-[#10b981] hover:bg-[#059669] text-black font-black py-5 rounded-2xl text-lg flex justify-center items-center gap-2 shadow-[0_0_20px_rgba(16,185,129,0.3)] transform active:scale-95 my-4 border border-[#059669]">
-                            ⚡ ¡VOLAR AHORA! (REGISTRAR)
-                        </button>
-
-                        <button onClick={() => setShowBreakdown(!showBreakdown)} className="w-full bg-[#020617] text-slate-400 font-bold py-3 rounded-xl border border-[#1e293b] text-sm transition hover:text-white">
-                        {showBreakdown ? '▲ Ocultar Desglose OK to Fly' : '▼ Ver Desglose OK to Fly'}
-                    </button>
-
-                    {showBreakdown && (
-                        <div className="bg-[#0f172a] border border-[#1e293b] rounded-xl p-3 mt-2">
-                            <div className="grid grid-cols-4 gap-2">
-                                {forecast.map((p, i) => {
-                                    let bgStyle = p.windGust > 43 ? 'bg-[#7f1d1d]/40 border-[#b91c1c]' : (p.windGust === 43 ? 'bg-[#78350f]/40 border-[#b45309]' : 'bg-[#064e3b]/40 border-[#047857]');
-                                    let textStyle = p.windGust > 43 ? 'text-red-400' : (p.windGust === 43 ? 'text-[#fbbf24]' : 'text-[#34d399]');
-                                    return (
-                                        <div key={i} className={`p-2 rounded-lg text-center flex flex-col items-center justify-center border ${bgStyle}`}>
-                                            <span className="text-white font-mono text-[10px] mb-1">{p.time}</span>
-                                            <span className={`text-[10px] font-black ${textStyle}`}>{p.windGust}k</span>
-                                        </div>
-                                    )
-                                })}
-                            </div>
-                        </div>
-                    )}
-                    
-                    {/* ZONA DE CONFIGURACIÓN DE LLAVE */}
-                        <div className="mt-8 text-center pb-8 border-t border-[#1e293b] pt-4">
-                            <button onClick={() => setShowConfig(true)} className="text-slate-400 hover:text-white text-xs font-bold transition flex items-center justify-center gap-1 w-full">
-                                ⚙️ Configurar API Key (IA)
-                            </button>
-                        </div>
-                    </div>
-
-                    {/* MODAL GENÉRICO DE ERRORES / ÉXITO */}
-                    {modal && (
-                        <div className="fixed inset-0 bg-black/90 flex items-center justify-center z-50 p-4">
-                            <div className="bg-[#0f172a] border border-[#1e293b] rounded-2xl p-6 max-w-sm w-full text-center shadow-2xl">
-                                <div className="text-4xl mb-4">{modal.type === 'error' ? '❌' : modal.type === 'warning' ? '⚠️' : '✅'}</div>
-                                <h3 className="text-lg font-black text-white mb-2">{modal.title}</h3>
-                                <p className="text-sm text-slate-300 mb-6 whitespace-pre-wrap font-mono bg-black/50 p-3 rounded-lg overflow-auto max-h-48 text-left break-words">{modal.message}</p>
-                                <button onClick={() => setModal(null)} className="w-full bg-[#3b82f6] hover:bg-[#2563eb] text-white font-bold py-3 rounded-xl transition shadow-lg">
-                                    Entendido
-                                </button>
-                            </div>
-                        </div>
-                    )}
-
-                    {/* MODAL DE CONFIGURACIÓN */}
-                    {showConfig && (
-                        <div className="fixed inset-0 bg-black/95 flex items-center justify-center z-50 p-4">
-                            <div className="bg-[#0f172a] border border-[#1e293b] rounded-2xl p-6 max-w-md w-full shadow-2xl">
-                                <h3 className="text-lg font-black text-white mb-2 text-center">🔑 Configurar API Key</h3>
-                                <p className="text-xs text-slate-400 mb-4 text-center">Pega tu llave que empieza con AQ.</p>
-                                
-                                <input 
-                                    type="text" 
-                                    value={tempNewKey}
-                                    onChange={(e) => setTempNewKey(e.target.value)}
-                                    placeholder="AQ.Ab8RN..." 
-                                    className="w-full bg-[#020617] border border-[#3b82f6] rounded-xl p-3 text-white text-sm mb-4 focus:outline-none focus:ring-2 focus:ring-[#3b82f6] font-mono"
-                                />
-                                
-                                <div className="flex gap-2">
-                                    <button onClick={() => setShowConfig(false)} className="w-1/3 bg-[#1e293b] hover:bg-[#334155] text-white font-bold py-3 rounded-xl transition text-sm">
-                                        Cancelar
-                                    </button>
-                                    <button onClick={saveNewKey} className="w-2/3 bg-[#3b82f6] hover:bg-[#2563eb] text-white font-bold py-3 rounded-xl transition text-sm shadow-lg">
-                                        Guardar Llave
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    )}
-                    
-                    {/* MODAL DEL PLAN MAESTRO */}
-                    {showMasterPlan && (
-                        <div className="fixed inset-0 bg-black/95 flex items-center justify-center z-50 p-4">
-                            <div className="bg-[#0f172a] border border-[#1e293b] rounded-2xl p-6 max-w-md w-full h-[80vh] flex flex-col shadow-2xl">
-                                <div className="flex justify-between items-center mb-5">
-                                    <h3 className="text-lg font-black text-white flex items-center gap-2"><span>🗓️</span> Plan Maestro 24h</h3>
-                                    <button onClick={() => setShowMasterPlan(false)} className="text-slate-500 hover:text-white font-bold text-2xl transition">&times;</button>
-                                </div>
-                                <div className="overflow-y-auto flex-1 pr-2 space-y-2">
-                                    {forecast.map((f, i) => {
-                                        let badgeStyle = f.windGust > 43 ? 'bg-[#7f1d1d]/50 text-red-400' : (f.windGust === 43 ? 'bg-[#78350f]/50 text-[#fbbf24]' : 'bg-[#064e3b]/50 text-[#34d399]');
-                                        return (
-                                            <div key={i} className="flex justify-between items-center p-3 rounded-xl bg-[#020617] border border-[#1e293b]">
-                                                <span className="font-mono font-bold text-slate-300">{f.time}</span>
-                                                <span className={`text-[11px] font-black px-2.5 py-1 rounded-lg ${badgeStyle}`}>
-                                                    {f.windGust} km/h - {f.condition}
-                                                </span>
-                                            </div>
-                                        )
-                                    })}
-                                </div>
-                            </div>
-                        </div>
-                    )}
-                </div>
-            );
-        };
-
-        const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(<App />);
-    </script>
-</body>
-</html>
+Guarda el cambio y recarga la página. Tu IA ahora tiene **pensamiento táctico**. Evaluará el daño general del día antes de decidir a qué ritmo debe organizar los despegues para no perder un solo vuelo posible. ¡Espectacular!
