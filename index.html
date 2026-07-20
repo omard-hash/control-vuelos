@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dispatcher Pro (v2026.3.5)</title>
+    
     <script src="https://cdn.tailwindcss.com"></script>
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -28,7 +29,6 @@
         const { useState, useEffect, useRef } = React;
 
         const App = () => {
-            // Forzamos un nuevo nombre de caché para que no choque con configuraciones viejas
             const [data, setData] = useState(() => {
                 const saved = localStorage.getItem('dispatcherData_v2026_3_5');
                 return saved ? JSON.parse(saved) : { flights: [], apiSettings: { apiKey: '', model: 'gemini-3.5-flash' } };
@@ -121,7 +121,6 @@
                     return true;
                 };
 
-                // Vuelos Forzosos
                 schedule.push({ time: "08:20", type: "Forzoso (Post-Junta)", shift: "Turno Diurno", fixed: true });
                 schedule.push({ time: "14:00", type: "Forzoso (Cambio)", shift: "Turno Diurno", fixed: true });
                 schedule.push({ time: "17:00", type: "Forzoso", shift: "Turno Diurno", fixed: true });
@@ -185,7 +184,7 @@
                 speak("Análisis completado. Plan táctico generado organizando el día operativo.");
             };
 
-            const analyzeImage = async (base64Image) => {
+            const analyzeImage = async (base64Image, retryCount = 0) => {
                 if (!data.apiSettings.apiKey) {
                     setModal({ isOpen: true, title: "Falta API Key", message: "Configura tu API Key de Google en el botón inferior.", type: "error" });
                     setIsScanning(false);
@@ -202,12 +201,12 @@
                       {"time": "15:00", "windGust": 45}
                     ]
                     2. "time" debe ser formato de 24 horas.
-                    3. "windGust" DEBE ser un número entero.
-                    4. Si ves un detalle abierto que dice "A 120m 38 km/h" (o algo parecido a 120m), extrae ese número (38).
+                    3. "windGust" DEBE ser un número entero. (Solo el número).
+                    4. Si ves un detalle abierto que dice "A 120m 38 km/h", extrae SOLO ese número (38). ¡NO MULTIPLIQUES NADA POR 3.6!
                     5. Si dice explícitamente "Ráfagas fuertes >40m", asigna 45. Si dice ">80m", asigna 85.
                     6. Si ves valores como "12 90m", asigna 45 (ya que excede límites).
                     7. Si dice "Apto para volar", asigna 25.
-                    8. JAMÁS multipliques nada. Solo extrae o asigna los valores fijos de arriba.
+                    8. JAMÁS multipliques nada ni hagas conversiones. Tu única tarea es extraer los números tal cual los ves.
                 `;
 
                 try {
@@ -227,7 +226,17 @@
 
                     if (!response.ok) {
                         const errorData = await response.json();
-                        throw new Error(errorData.error ? errorData.error.message : JSON.stringify(errorData));
+                        if (errorData.error && (errorData.error.code === 503 || errorData.error.code === 429) && retryCount < 2) {
+                             console.warn("Servidor ocupado, reintentando automáticamente...", retryCount + 1);
+                             await new Promise(resolve => setTimeout(resolve, 2000));
+                             return analyzeImage(base64Image, retryCount + 1);
+                        }
+                        
+                        let errorMessage = errorData.error ? errorData.error.message : JSON.stringify(errorData);
+                        if (errorMessage.includes("high demand") || errorData.error?.code === 503) {
+                            errorMessage = "Los servidores de Google están experimentando alta demanda. Por favor, intenta de nuevo en un par de minutos.";
+                        }
+                        throw new Error(errorMessage);
                     }
 
                     const responseData = await response.json();
@@ -247,7 +256,6 @@
                     }
                     
                     const forecastDict = {};
-                    
                     parsedData.forEach(item => {
                         if(!item.time || item.windGust === undefined) return;
                         let hour = parseInt(item.time.split(':')[0]);
@@ -259,10 +267,9 @@
                     
                 } catch (error) {
                     console.error("Error capturado:", error);
-                    setModal({ isOpen: true, title: "Error Visual IA", message: "Error de Servidor: " + error.message, type: "error" });
+                    setModal({ isOpen: true, title: "Error del Servidor Google", message: error.message, type: "error" });
                 } finally {
                     setIsScanning(false);
-                    // Reset input so the same file can be uploaded again
                     if (fileInputRef.current) fileInputRef.current.value = '';
                 }
             };
@@ -316,7 +323,7 @@
             const currentWind = forecastData[currentHourInt] ? forecastData[currentHourInt].windGust : 0;
             const isDanger = currentWind > 43; 
             const isWarning = currentWind === 43; 
-            // Bloqueo estricto de Junta 07:45 a 08:19
+            
             const isMeetingTime = (currentHourInt === 7 && currentMinInt >= 45) || (currentHourInt === 8 && currentMinInt < 20);
             
             const getOperativeDayStart = () => {
@@ -331,7 +338,6 @@
 
             return (
                 <div className="pb-24">
-                    {/* BARRA SUPERIOR */}
                     <div className="fixed top-0 w-full bg-[#020617]/90 backdrop-blur-md border-b border-slate-800 p-3 z-30 flex justify-between items-center">
                         <div className="flex items-center gap-3">
                             <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center shadow-[0_0_15px_rgba(79,70,229,0.5)]">
@@ -350,7 +356,7 @@
                     </div>
 
                     <div className="max-w-md mx-auto pt-20 px-4">
-                        {/* PANEL PRINCIPAL */}
+                        {}
                         <div className="glass p-5 rounded-3xl relative overflow-hidden flex justify-between items-center mb-6">
                             <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/10 rounded-full blur-3xl"></div>
                             <div>
@@ -373,7 +379,7 @@
                             </button>
                         </div>
 
-                        {/* ESTADO ACTUAL DEL VIENTO */}
+                        {}
                         <div className={`mb-6 p-4 rounded-3xl border ${isMeetingTime ? 'bg-amber-950/40 border-amber-500/50' : needsScanUI ? 'bg-slate-900 border-slate-800' : isDanger ? 'bg-rose-950/40 border-rose-500/50' : isWarning ? 'bg-orange-950/40 border-orange-500/50' : 'bg-emerald-950/40 border-emerald-500/50'}`}>
                             <div className="flex items-center gap-3">
                                 <div className={`w-3 h-3 rounded-full animate-ping ${isMeetingTime ? 'bg-amber-500' : needsScanUI ? 'bg-slate-600' : isDanger ? 'bg-rose-500' : isWarning ? 'bg-orange-500' : 'bg-emerald-500'}`}></div>
@@ -386,7 +392,7 @@
                             </div>
                         </div>
 
-                        {/* META OPERATIVA 13 VUELOS */}
+                        {}
                         <div className="glass rounded-3xl p-6 text-center border border-slate-800 mb-6 relative overflow-hidden">
                             <div className="absolute top-0 left-0 w-full h-1 bg-slate-800">
                                 <div className="h-full bg-indigo-500 transition-all duration-500" style={{width: `${Math.min((todayFlightsTotal.length / 13) * 100, 100)}%`}}></div>
@@ -401,7 +407,7 @@
                             )}
                         </div>
 
-                        {/* ITINERARIO */}
+                        {}
                         {flightItinerary.length > 0 && (
                             <div className="glass rounded-3xl p-4 border border-slate-800 mb-6">
                                 <h3 className="text-[11px] font-black tracking-widest text-indigo-400 uppercase mb-3 flex items-center justify-between">
@@ -438,7 +444,7 @@
                             </div>
                         )}
 
-                        {/* BTN CONF */}
+                        {}
                         <div className="flex justify-center pb-8">
                             <button onClick={() => setModal({ isOpen: true, title: "Configuración del Sistema", isSettings: true })} className="text-xs text-slate-500 hover:text-white flex items-center gap-1 transition">
                                 ⚙️ Configurar API Key y Motor IA
@@ -447,7 +453,6 @@
                     </div>
 
                     {}
-                    {/* BOTÓN REGISTRAR DESPEGUE */}
                     <div className="fixed bottom-0 left-0 w-full p-4 bg-gradient-to-t from-[#020617] via-[#020617] to-transparent flex justify-center z-40 pointer-events-none">
                         <button 
                             onClick={handleLogFlight}
@@ -457,7 +462,7 @@
                         </button>
                     </div>
 
-                    {/* MODALES */}
+                    {}
                     {modal.isOpen && (
                         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
                             <div className="glass-panel w-full max-w-sm rounded-3xl overflow-hidden border border-slate-700 p-6 animate-in fade-in zoom-in duration-200">
@@ -472,13 +477,13 @@
                                         <div>
                                             <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Motor Táctico de IA</label>
                                             <select name="model" defaultValue={data.apiSettings.model} className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-indigo-500 text-sm">
-                                                <option value="gemini-3.5-flash">Gemini 3.5 Flash (Más Nuevo y Rápido)</option>
-                                                <option value="gemini-2.5-flash">Gemini 2.5 Flash (Más Seguro/Estable)</option>
+                                                <option value="gemini-3.5-flash">Gemini 3.5 Flash (Recomendado)</option>
+                                                <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
                                             </select>
                                         </div>
                                         <div className="flex gap-3 mt-6">
                                             <button type="button" onClick={() => setModal({ isOpen: false })} className="flex-1 py-3 rounded-xl font-bold text-slate-300 bg-slate-800 hover:bg-slate-700 transition">Cancelar</button>
-                                            <button type="submit" className="flex-1 py-3 rounded-xl font-bold text-white bg-indigo-600 hover:bg-indigo-500 transition shadow-[0_0_15px_rgba(79,70,229,0.4)]">Guardar y Limpiar</button>
+                                            <button type="submit" className="flex-1 py-3 rounded-xl font-bold text-white bg-indigo-600 hover:bg-indigo-500 transition shadow-[0_0_15px_rgba(79,70,229,0.4)]">Guardar</button>
                                         </div>
                                     </form>
                                 ) : (
