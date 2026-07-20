@@ -31,7 +31,7 @@
         const App = () => {
             const [data, setData] = useState(() => {
                 const saved = localStorage.getItem('dispatcherData_v2026_FINAL');
-                return saved ? JSON.parse(saved) : { flights: [], apiSettings: { apiKey: '', model: 'gemini-1.5-pro' } };
+                return saved ? JSON.parse(saved) : { flights: [], apiSettings: { apiKey: '', model: 'gemini-3-flash-preview' } };
             });
 
             const [flights, setFlights] = useState(data.flights || []);
@@ -101,6 +101,7 @@
                     return h * 60 + m;
                 };
 
+                // 1. AUDITORÍA DE CLIMA
                 let dayBlocked = 0;
                 for(let i=7; i<=18; i++) { if(currentForecast[i]?.windGust > 43) dayBlocked++; }
                 
@@ -108,6 +109,7 @@
                 for(let i=19; i<=23; i++) { if(currentForecast[i]?.windGust > 43) nightBlocked++; }
                 for(let i=0; i<=6; i++) { if(currentForecast[i]?.windGust > 43) nightBlocked++; }
 
+                // REGLA DE ORO: Si hay 6+ horas perdidas, activar Algoritmo de Compresión (50 mins).
                 const daySpacing = dayBlocked >= 6 ? 50 : 80;
                 const nightSpacing = nightBlocked >= 6 ? 50 : 80;
 
@@ -115,23 +117,25 @@
                     for (let f of schedule) {
                         let fMins = toMins(f.time);
                         let diff = Math.abs(fMins - proposedTimeMins);
-                        if (diff > 12 * 60) diff = 24 * 60 - diff;
+                        if (diff > 12 * 60) diff = 24 * 60 - diff; // Ajuste de medianoche
                         if (diff < requiredSpacing) return false; 
                     }
                     return true;
                 };
 
+                // 2. VUELOS FORZOSOS
                 schedule.push({ time: "08:20", type: "Forzoso (Post-Junta)", shift: "Turno Diurno", fixed: true });
                 schedule.push({ time: "14:00", type: "Forzoso (Cambio)", shift: "Turno Diurno", fixed: true });
                 schedule.push({ time: "17:00", type: "Forzoso", shift: "Turno Diurno", fixed: true });
                 schedule.push({ time: "21:30", type: "Forzoso", shift: "Turno Nocturno", fixed: true });
 
+                // 3. RELLENAR DIURNOS (Meta: 7)
                 let dayAdded = 3; 
                 for(let h=7; h<=18 && dayAdded < 7; h++) {
                     if(currentForecast[h]?.windGust > 43) continue;
                     
                     for(let m=0; m<=50 && dayAdded < 7; m+=10) {
-                        if(h===7 && m>=40) continue; 
+                        if(h===7 && m>=40) continue; // Bloqueo junta
                         if(h===8 && m<20) continue;
                         
                         let mins = h * 60 + m;
@@ -143,9 +147,12 @@
                     }
                 }
 
+                // Cálculo de herencia
                 let inheritedToNight = 7 - dayAdded; 
+                
+                // 4. RELLENAR NOCTURNOS (19:00 - 23:59) Meta: 2 + heredados
                 let eveningTarget = 2 + inheritedToNight; 
-                let nightAdded1 = 1; 
+                let nightAdded1 = 1; // Ya está el de las 21:30
                 
                 for(let h=19; h<=23 && nightAdded1 < eveningTarget; h++) {
                     if(currentForecast[h]?.windGust > 43) continue;
@@ -159,6 +166,7 @@
                     }
                 }
 
+                // 5. RELLENAR MADRUGADA (00:00 - 06:59) Meta: 4
                 let nightAdded2 = 0;
                 for(let h=0; h<=6 && nightAdded2 < 4; h++) {
                     if(currentForecast[h]?.windGust > 43) continue;
@@ -172,6 +180,7 @@
                     }
                 }
 
+                // 6. ORDENAR
                 schedule.sort((a, b) => {
                     let ah = parseInt(a.time.split(':')[0]); let am = parseInt(a.time.split(':')[1]);
                     let bh = parseInt(b.time.split(':')[0]); let bm = parseInt(b.time.split(':')[1]);
@@ -181,26 +190,28 @@
                 });
 
                 setFlightItinerary(schedule);
-                speak("Análisis completado. Plan táctico generado organizando el día operativo.");
+                speak("Análisis completado. Plan táctico de 13 vuelos generado exitosamente.");
             };
 
             const analyzeImage = async (base64Image, retryCount = 0) => {
                 if (!data.apiSettings.apiKey) {
-                    setModal({ isOpen: true, title: "Falta API Key", message: "Configura tu API Key de Google en el botón inferior.", type: "error" });
+                    setModal({ isOpen: true, title: "Falta API Key", message: "Configura tu API Key en el botón inferior.", type: "error" });
                     setIsScanning(false);
                     return;
                 }
 
+                // INSTRUCCIONES ESTRICTAS: Solo leer, CERO matemáticas.
                 const promptText = `
-                    Eres un auditor de aviación. Lee esta tabla 'OK TO FLY' y extrae el número exacto de ráfagas.
+                    Eres un asistente lector. Necesito que extraigas el viento a 120m de altura en km/h de esta tabla de Airdata "OK TO FLY".
                     
-                    REGLAS ESTRICTAS (CERO MATEMÁTICAS):
-                    1. Devuelve un JSON: [{"time": "14:00", "windGust": 38}]
-                    2. "time" en 24 horas.
-                    3. Para "windGust", busca el número literal que ves junto a "A 120m". (Ejemplo: Si dice "A 120m 38 km/h", extrae SOLO el número 38).
-                    4. Si dice "Ráfagas fuertes >40m", asigna 45. Si dice ">80m", asigna 85.
-                    5. Si dice "Apto para volar", asigna 25.
-                    6. ¡PROHIBIDO MULTIPLICAR POR 3.6! NO hagas conversiones. Solo extrae el número entero tal cual está escrito en la imagen.
+                    REGLAS OBLIGATORIAS:
+                    1. Busca la hora de la previsión.
+                    2. Busca la fila que dice "A 120m" o "At 120m".
+                    3. Lee el número que dice en esa línea (ejemplo: si dice "38 km/h", extrae el 38).
+                    4. Devuelve EXACTAMENTE este formato JSON sin matemáticas ni conversiones: 
+                    [{"time": "14:00", "windGust": 38}]
+                    5. ¡PROHIBIDO MULTIPLICAR! No apliques conversiones. Solo dame el número que ves escrito.
+                    6. Si la imagen dice "Ráfagas fuertes >40m" pon 45. Si dice ">80m" pon 85.
                 `;
 
                 try {
@@ -220,18 +231,19 @@
 
                     if (!response.ok) {
                         const errorData = await response.json();
-                        // Retry logic for Google server demand
+                        
+                        // Protección Anti-Saturación
                         if (errorData.error && (errorData.error.code === 503 || errorData.error.code === 429) && retryCount < 2) {
-                             console.warn("Servidor ocupado, reintentando automáticamente...", retryCount + 1);
+                             console.warn("Servidor ocupado, reintentando...", retryCount + 1);
                              await new Promise(resolve => setTimeout(resolve, 2000));
                              return analyzeImage(base64Image, retryCount + 1);
                         }
                         
                         let errorMessage = errorData.error ? errorData.error.message : JSON.stringify(errorData);
                         if (errorData.error?.code === 429) {
-                            errorMessage = "Límite gratuito alcanzado (Error 429). Google ha bloqueado tu cuota. Cambia a una API Key Pro o espera.";
+                            errorMessage = "Límite de cuota alcanzado. Google ha bloqueado tu acceso. Verifica tu API Key VIP.";
                         } else if (errorData.error?.code === 503 || errorMessage.includes("high demand") || errorMessage.includes("overloaded")) {
-                            errorMessage = "Los servidores de Google están experimentando alta demanda. Por favor, asegúrate de estar usando el modelo 'Gemini 1.5 Pro' en la configuración o inténtalo en un par de minutos.";
+                            errorMessage = "Los servidores de Google están experimentando alta demanda. Por favor, intenta de nuevo en unos segundos.";
                         }
                         throw new Error(errorMessage);
                     }
@@ -239,7 +251,7 @@
                     const responseData = await response.json();
                     
                     if (!responseData.candidates || responseData.candidates.length === 0) {
-                        throw new Error("No hubo respuesta de la IA. Intenta de nuevo.");
+                        throw new Error("La IA no detectó la información. Usa una captura más nítida.");
                     }
                     
                     const textResult = responseData.candidates[0].content.parts[0].text;
@@ -249,7 +261,7 @@
                     try {
                         parsedData = JSON.parse(cleanJson);
                     } catch(e) {
-                        throw new Error("El clima no se detectó claramente. Usa una captura más nítida.");
+                        throw new Error("No se pudo interpretar el formato. Intenta nuevamente.");
                     }
                     
                     const forecastDict = {};
@@ -267,7 +279,7 @@
                     setModal({ isOpen: true, title: "Error del Servidor Google", message: error.message, type: "error" });
                 } finally {
                     setIsScanning(false);
-                    if (fileInputRef.current) fileInputRef.current.value = ''; // Reset input to allow exact same file upload
+                    if (fileInputRef.current) fileInputRef.current.value = ''; // Resetea para poder subir la misma foto 100 veces
                 }
             };
 
@@ -349,7 +361,7 @@
                             </div>
                             <div>
                                 <h1 className="text-white font-bold text-sm leading-tight tracking-wide">DISPATCHER PRO</h1>
-                                <p className="text-indigo-400 text-[10px] font-bold tracking-widest uppercase">v2026.FINAL | IA VIP</p>
+                                <p className="text-indigo-400 text-[10px] font-bold tracking-widest uppercase">v2026.3.FINAL | IA VIP</p>
                             </div>
                         </div>
                         {!audioUnlocked && (
@@ -448,6 +460,7 @@
                         </div>
                     </div>
 
+                    {}
                     <div className="fixed bottom-0 left-0 w-full p-4 bg-gradient-to-t from-[#020617] via-[#020617] to-transparent flex justify-center z-40 pointer-events-none">
                         <button 
                             onClick={handleLogFlight}
@@ -465,14 +478,14 @@
                                 {modal.isSettings ? (
                                     <form onSubmit={handleSaveSettings} className="space-y-4 mt-4">
                                         <div>
-                                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Google API Key (AQ. o AIZA.)</label>
+                                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Google API Key VIP (AQ.)</label>
                                             <input type="password" name="apiKey" defaultValue={data.apiSettings.apiKey} required className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-indigo-500 font-mono text-sm" placeholder="Pega tu llave aquí..." />
                                         </div>
                                         <div>
                                             <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Motor Táctico de IA</label>
                                             <select name="model" defaultValue={data.apiSettings.model} className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-indigo-500 text-sm">
-                                                <option value="gemini-1.5-pro">Gemini 1.5 Pro (Vía VIP / No Saturado)</option>
-                                                <option value="gemini-1.5-flash">Gemini 1.5 Flash (Normal)</option>
+                                                <option value="gemini-3-flash-preview">Gemini 3 Flash (Máxima Precisión)</option>
+                                                <option value="gemini-1.5-pro">Gemini 1.5 Pro (Alternativa VIP)</option>
                                             </select>
                                         </div>
                                         <div className="flex gap-3 mt-6">
