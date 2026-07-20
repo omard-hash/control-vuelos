@@ -193,16 +193,21 @@
                 }
 
                 const promptText = `
-                    Extrae los datos de la tabla de clima de esta imagen.
-                    Devuelve ÚNICAMENTE un arreglo JSON plano, sin formato markdown.
-                    Estructura exacta:
+                    Eres un auditor de aviación estricto. Analiza esta tabla de clima de 'OK TO FLY' y extrae la velocidad MÁXIMA de ráfagas (wind gusts) en km/h para cada hora visible.
+                    
+                    REGLAS DE ANÁLISIS (SIN HACER MATEMÁTICAS):
+                    1. Devuelve ÚNICAMENTE un JSON plano con esta estructura exacta:
                     [
-                      {"time": "16:00", "texto": "Vientos fuertes >30m"},
-                      {"time": "20:00", "texto": "Ráfagas fuertes >80m, 14 120m"},
-                      {"time": "22:00", "texto": "Apto para volar"}
+                      {"time": "14:00", "windGust": 38},
+                      {"time": "15:00", "windGust": 45}
                     ]
-                    1. Usa formato de 24 horas.
-                    2. Copia el texto descriptivo del clima exactamente como aparece en la tabla para cada hora.
+                    2. "time" debe ser formato de 24 horas.
+                    3. "windGust" DEBE ser un número entero.
+                    4. Si ves un detalle abierto que dice "A 120m 38 km/h" (o algo parecido a 120m), extrae ese número (38).
+                    5. Si dice explícitamente "Ráfagas fuertes >40m", asigna 45. Si dice ">80m", asigna 85.
+                    6. Si ves valores como "12 90m", asigna 45 (ya que excede límites).
+                    7. Si dice "Apto para volar", asigna 25.
+                    8. JAMÁS multipliques nada. Solo extrae o asigna los valores fijos de arriba.
                 `;
 
                 try {
@@ -244,25 +249,9 @@
                     const forecastDict = {};
                     
                     parsedData.forEach(item => {
-                        if(!item.time || !item.texto) return;
-                        
+                        if(!item.time || item.windGust === undefined) return;
                         let hour = parseInt(item.time.split(':')[0]);
-                        let statusText = item.texto.toLowerCase();
-                        let windKm = 25; 
-                        
-                        if (statusText.includes("apto para volar")) {
-                            windKm = 25;
-                        } else {
-                            const match = statusText.match(/(\d+)\s*(120m|90m|60m|30m|10m|m\b)/);
-                            if (match) {
-                                let metrosPorSegundo = parseInt(match[1]); 
-                                windKm = Math.round(metrosPorSegundo * 3.6); 
-                            } else {
-                                windKm = 45; 
-                            }
-                        }
-                        
-                        forecastDict[hour] = { windGust: windKm };
+                        forecastDict[hour] = { windGust: parseInt(item.windGust) };
                     });
                     
                     setForecastData(forecastDict);
@@ -270,10 +259,11 @@
                     
                 } catch (error) {
                     console.error("Error capturado:", error);
-                    setModal({ isOpen: true, title: "Error del Servidor Google", message: error.message, type: "error" });
+                    setModal({ isOpen: true, title: "Error Visual IA", message: "Error de Servidor: " + error.message, type: "error" });
                 } finally {
                     setIsScanning(false);
-                    if (fileInputRef.current) fileInputRef.current.value = ''; // Limpia el input para no trabarse
+                    // Reset input so the same file can be uploaded again
+                    if (fileInputRef.current) fileInputRef.current.value = '';
                 }
             };
 
@@ -416,7 +406,7 @@
                             <div className="glass rounded-3xl p-4 border border-slate-800 mb-6">
                                 <h3 className="text-[11px] font-black tracking-widest text-indigo-400 uppercase mb-3 flex items-center justify-between">
                                     <span>🤖 Plan Maestro (24h)</span>
-                                    <span className="bg-indigo-600 text-white px-2 py-0.5 rounded-full text-[10px]">{flightItinerary.length} Vuelos generados</span>
+                                    <span className="bg-indigo-600 text-white px-2 py-0.5 rounded-full text-[10px]">{flightItinerary.length} Vuelos calculados</span>
                                 </h3>
                                 <div className="space-y-2 max-h-60 overflow-y-auto pr-2">
                                     {flightItinerary.map((f, i) => {
@@ -448,6 +438,7 @@
                             </div>
                         )}
 
+                        {/* BTN CONF */}
                         <div className="flex justify-center pb-8">
                             <button onClick={() => setModal({ isOpen: true, title: "Configuración del Sistema", isSettings: true })} className="text-xs text-slate-500 hover:text-white flex items-center gap-1 transition">
                                 ⚙️ Configurar API Key y Motor IA
@@ -455,6 +446,7 @@
                         </div>
                     </div>
 
+                    {}
                     {/* BOTÓN REGISTRAR DESPEGUE */}
                     <div className="fixed bottom-0 left-0 w-full p-4 bg-gradient-to-t from-[#020617] via-[#020617] to-transparent flex justify-center z-40 pointer-events-none">
                         <button 
@@ -465,7 +457,7 @@
                         </button>
                     </div>
 
-                    {}
+                    {/* MODALES */}
                     {modal.isOpen && (
                         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
                             <div className="glass-panel w-full max-w-sm rounded-3xl overflow-hidden border border-slate-700 p-6 animate-in fade-in zoom-in duration-200">
@@ -481,7 +473,7 @@
                                             <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Motor Táctico de IA</label>
                                             <select name="model" defaultValue={data.apiSettings.model} className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-indigo-500 text-sm">
                                                 <option value="gemini-3.5-flash">Gemini 3.5 Flash (Más Nuevo y Rápido)</option>
-                                                <option value="gemini-3.1-flash-lite">Gemini 3.1 Flash Lite (Estable)</option>
+                                                <option value="gemini-2.5-flash">Gemini 2.5 Flash (Más Seguro/Estable)</option>
                                             </select>
                                         </div>
                                         <div className="flex gap-3 mt-6">
