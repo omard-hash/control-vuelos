@@ -4,12 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dispatcher Pro (v2026.FINAL)</title>
-    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- React & ReactDOM -->
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-    <!-- Babel para JSX -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     
     <style>
@@ -33,8 +30,8 @@
         const App = () => {
             // Forzamos una nueva base de datos para borrar memorias viejas corrompidas
             const [data, setData] = useState(() => {
-                const saved = localStorage.getItem('dispatcherDataVFinal_OK');
-                return saved ? JSON.parse(saved) : { flights: [], apiSettings: { apiKey: '', model: 'gemini-2.5-flash' } };
+                const saved = localStorage.getItem('dispatcherData_v2026_FINAL_V3');
+                return saved ? JSON.parse(saved) : { flights: [], apiSettings: { apiKey: '', model: 'gemini-3-flash-preview' } };
             });
 
             const [flights, setFlights] = useState(data.flights || []);
@@ -50,7 +47,7 @@
             const updateData = (newData) => {
                 const merged = { ...data, ...newData };
                 setData(merged);
-                localStorage.setItem('dispatcherDataVFinal_OK', JSON.stringify(merged));
+                localStorage.setItem('dispatcherData_v2026_FINAL_V3', JSON.stringify(merged));
             };
 
             const unlockAudio = () => {
@@ -83,13 +80,15 @@
                     if (now.getSeconds() === 0) {
                         const timeStr = `${now.getHours().toString().padStart(2,'0')}:${now.getMinutes().toString().padStart(2,'0')}`;
                         
+                        // Bloqueo de junta obligatoria
                         if (timeStr === "07:45") {
                             speak("Atención piloto. Es hora de aterrizar. Junta obligatoria en cinco minutos.");
                         }
 
+                        // Anuncio de vuelos programados
                         const currentFlight = flightItinerary.find(f => f.time === timeStr);
                         if (currentFlight) {
-                            speak(`Atención. Vuelo programado para las ${timeStr}. Tipo de vuelo: ${currentFlight.type}. Viento verificado.`);
+                            speak(`Atención. Vuelo programado para las ${timeStr}. Tipo de vuelo: ${currentFlight.type}.`);
                         }
                     }
                 }, 1000);
@@ -98,13 +97,12 @@
 
             const generateIntelligentSchedule = (currentForecast, currentFlights) => {
                 let schedule = [];
-                
                 const toMins = (timeStr) => {
                     let [h, m] = timeStr.split(':').map(Number);
                     return h * 60 + m;
                 };
 
-                // AUDITORÍA DE CLIMA
+                // 1. AUDITORÍA DE CLIMA: ¿Cuántas horas de suspensión hay en cada turno?
                 let dayBlocked = 0;
                 for(let i=7; i<=18; i++) { if(currentForecast[i]?.windGust > 43) dayBlocked++; }
                 
@@ -112,7 +110,8 @@
                 for(let i=19; i<=23; i++) { if(currentForecast[i]?.windGust > 43) nightBlocked++; }
                 for(let i=0; i<=6; i++) { if(currentForecast[i]?.windGust > 43) nightBlocked++; }
 
-                // REGLA DE COMPRESIÓN (Si se pierden 6h, comprimir a 50m)
+                // REGLA DE ORO: Si hay 6+ horas perdidas, activar Algoritmo de Compresión (50 mins). 
+                // Si el día está despejado, usar separación relajada (80 mins).
                 const daySpacing = dayBlocked >= 6 ? 50 : 80;
                 const nightSpacing = nightBlocked >= 6 ? 50 : 80;
 
@@ -120,41 +119,43 @@
                     for (let f of schedule) {
                         let fMins = toMins(f.time);
                         let diff = Math.abs(fMins - proposedTimeMins);
-                        if (diff > 12 * 60) diff = 24 * 60 - diff; // Medianoche
+                        if (diff > 12 * 60) diff = 24 * 60 - diff; // Ajuste para cruce de medianoche
                         if (diff < requiredSpacing) return false; 
                     }
                     return true;
                 };
 
-                // VUELOS FORZOSOS
+                // 2. VUELOS FORZOSOS (Piedras angulares del itinerario)
                 schedule.push({ time: "08:20", type: "Forzoso (Post-Junta)", shift: "Turno Diurno", fixed: true });
                 schedule.push({ time: "14:00", type: "Forzoso (Cambio)", shift: "Turno Diurno", fixed: true });
                 schedule.push({ time: "17:00", type: "Forzoso", shift: "Turno Diurno", fixed: true });
                 schedule.push({ time: "21:30", type: "Forzoso", shift: "Turno Nocturno", fixed: true });
 
-                // RELLENAR DIURNOS (Meta: 7 vuelos totales)
+                // 3. RELLENAR DIURNOS (Meta: 7) - Escanea el día cada 10 minutos
                 let dayAdded = 3; 
                 for(let h=7; h<=18 && dayAdded < 7; h++) {
-                    if(currentForecast[h]?.windGust > 43) continue; 
+                    if(currentForecast[h]?.windGust > 43) continue; // Si la hora está suspendida, saltarla
+                    
                     for(let m=0; m<=50 && dayAdded < 7; m+=10) {
-                        if(h===7 && m>=40) continue; // Bloqueo junta
+                        // Respetar estricto bloqueo por junta
+                        if(h===7 && m>=40) continue; 
                         if(h===8 && m<20) continue;
                         
                         let mins = h * 60 + m;
                         if(canAddFlight(mins, daySpacing)) {
                             let timeStr = `${h.toString().padStart(2,'0')}:${m.toString().padStart(2,'0')}`;
-                            schedule.push({ time: timeStr, type: dayBlocked >= 6 ? "Dinámico (Comp. 50m)" : "Dinámico", shift: "Turno Diurno", fixed: false });
+                            schedule.push({ time: timeStr, type: dayBlocked >= 6 ? "Dinámico (Compresión 50m)" : "Dinámico", shift: "Turno Diurno", fixed: false });
                             dayAdded++;
                         }
                     }
                 }
 
-                // HERENCIA A LA NOCHE
+                // Cálculo de vuelos a heredar a la noche si el día estuvo terrible
                 let inheritedToNight = 7 - dayAdded; 
 
-                // NOCTURNOS Bloque 1 (19:00 - 23:59) Meta: 2 + heredados
+                // 4. RELLENAR NOCTURNOS Bloque 1 (19:00 - 23:59) Meta: 2 + heredados
                 let eveningTarget = 2 + inheritedToNight; 
-                let nightAdded1 = 1; // Ya llevamos el de las 21:30
+                let nightAdded1 = 1; // Llevamos el forzoso de las 21:30
                 
                 for(let h=19; h<=23 && nightAdded1 < eveningTarget; h++) {
                     if(currentForecast[h]?.windGust > 43) continue;
@@ -162,13 +163,13 @@
                         let mins = h * 60 + m;
                         if(canAddFlight(mins, nightSpacing)) {
                             let timeStr = `${h.toString().padStart(2,'0')}:${m.toString().padStart(2,'0')}`;
-                            schedule.push({ time: timeStr, type: nightBlocked >= 6 ? "Dinámico (Comp. 50m)" : "Dinámico", shift: "Turno Nocturno", fixed: false });
+                            schedule.push({ time: timeStr, type: nightBlocked >= 6 ? "Dinámico (Compresión 50m)" : "Dinámico", shift: "Turno Nocturno", fixed: false });
                             nightAdded1++;
                         }
                     }
                 }
 
-                // NOCTURNOS Bloque 2 (00:00 - 06:59) Meta: 4
+                // 5. RELLENAR MADRUGADA (00:00 - 06:59) Meta: 4 vuelos
                 let nightAdded2 = 0;
                 for(let h=0; h<=6 && nightAdded2 < 4; h++) {
                     if(currentForecast[h]?.windGust > 43) continue;
@@ -176,13 +177,13 @@
                         let mins = h * 60 + m;
                         if(canAddFlight(mins, nightSpacing)) {
                             let timeStr = `${h.toString().padStart(2,'0')}:${m.toString().padStart(2,'0')}`;
-                            schedule.push({ time: timeStr, type: nightBlocked >= 6 ? "Dinámico (Comp. 50m)" : "Dinámico", shift: "Turno Nocturno", fixed: false });
+                            schedule.push({ time: timeStr, type: nightBlocked >= 6 ? "Dinámico (Compresión 50m)" : "Dinámico", shift: "Turno Nocturno", fixed: false });
                             nightAdded2++;
                         }
                     }
                 }
 
-                // ORDENAR (Día Operativo 07:00 a 06:59)
+                // 6. ORDENAR CRONOLÓGICAMENTE (Día Operativo 07:00 a 06:59)
                 schedule.sort((a, b) => {
                     let ah = parseInt(a.time.split(':')[0]); let am = parseInt(a.time.split(':')[1]);
                     let bh = parseInt(b.time.split(':')[0]); let bm = parseInt(b.time.split(':')[1]);
@@ -202,7 +203,7 @@
                     return;
                 }
 
-                // IA SOLO COMO LECTOR OCULAR
+                // INSTRUCCIÓN HÍBRIDA: La IA solo lee texto, JS hace la matemática
                 const promptText = `
                     Extrae los datos de la tabla de clima de esta imagen.
                     Devuelve ÚNICAMENTE un arreglo JSON plano, sin formato markdown ni explicaciones.
@@ -228,7 +229,7 @@
                                     { inline_data: { mime_type: "image/jpeg", data: base64Image.split(',')[1] } }
                                 ]
                             }],
-                            generationConfig: { response_mime_type: "application/json" }
+                            generationConfig: { responseMimeType: "application/json" }
                         })
                     });
 
@@ -238,6 +239,11 @@
                     }
 
                     const responseData = await response.json();
+                    
+                    if (!responseData.candidates || responseData.candidates.length === 0) {
+                        throw new Error("La IA no devolvió resultados. Intenta tomar una captura más clara.");
+                    }
+                    
                     const textResult = responseData.candidates[0].content.parts[0].text;
                     const cleanJson = textResult.replace(/```json/g, '').replace(/```/g, '').trim();
                     
@@ -245,12 +251,12 @@
                     try {
                         parsedData = JSON.parse(cleanJson);
                     } catch(e) {
-                        throw new Error("La IA no pudo formatear los datos. Asegúrate de tomar una buena captura de la tabla.");
+                        throw new Error("Error procesando los datos visuales de la IA. Intenta subir de nuevo.");
                     }
                     
                     const forecastDict = {};
                     
-                    // JAVASCRIPT HACE LAS MATEMÁTICAS EXACTAS (Para auditoría)
+                    // JAVASCRIPT HACE LAS MATEMÁTICAS EXACTAS (Para auditoría infalible)
                     parsedData.forEach(item => {
                         if(!item.time || !item.texto) return;
                         
@@ -261,25 +267,25 @@
                         if (statusText.includes("apto para volar")) {
                             windKm = 25;
                         } else {
-                            // Buscar patrón como "14 120m"
+                            // Buscar patrón como "14 120m" (m/s)
                             const match = statusText.match(/(\d+)\s*(120m|90m|60m|30m|10m|m\b)/);
                             if (match) {
                                 let metrosPorSegundo = parseInt(match[1]); // Extrae el "14"
-                                windKm = Math.round(metrosPorSegundo * 3.6); // Multiplica por 3.6
+                                windKm = Math.round(metrosPorSegundo * 3.6); // Multiplica por 3.6 para km/h reales
                             } else {
-                                windKm = 45; // Peligro si no hay número claro
+                                windKm = 45; // Peligro si no hay número claro pero hay ráfagas
                             }
                         }
                         
-                        // isPermitted ahora incluye exactamente 43
-                        forecastDict[hour] = { windGust: windKm, isPermitted: windKm <= 43 };
+                        forecastDict[hour] = { windGust: windKm };
                     });
                     
                     setForecastData(forecastDict);
                     generateIntelligentSchedule(forecastDict, flights);
-                    setModal({ isOpen: true, title: "Análisis Táctico Completado", message: "Clima extraído y convertido a km/h exitosamente.", type: "success" });
+                    
                 } catch (error) {
-                    setModal({ isOpen: true, title: "Error de Servidor", message: error.message, type: "error" });
+                    console.error("Error capturado:", error);
+                    setModal({ isOpen: true, title: "Error Visual IA", message: `Ocurrió un error en la nube: ${error.message}`, type: "error" });
                 } finally {
                     setIsScanning(false);
                 }
@@ -291,7 +297,11 @@
 
                 setIsScanning(true);
                 const reader = new FileReader();
-                reader.onloadend = () => analyzeImage(reader.result);
+                reader.onloadend = () => {
+                    analyzeImage(reader.result);
+                    // IMPORTANTE: Limpia el input para permitir subir la misma foto otra vez sin congelarse
+                    e.target.value = ''; 
+                };
                 reader.readAsDataURL(file);
             };
 
@@ -313,7 +323,6 @@
                 updateData({ flights: updatedLogs });
                 
                 speak(`Vuelo registrado exitosamente a las ${flightTime}.`);
-                setModal({ isOpen: true, title: "¡Despegue Registrado!", message: `Vuelo de las ${flightTime} registrado.`, type: "success" });
             };
 
             const handleSaveSettings = (e) => {
@@ -330,11 +339,11 @@
 
             const currentHourInt = currentTime.getHours();
             const currentWind = forecastData[currentHourInt] ? forecastData[currentHourInt].windGust : 0;
-            const isDanger = currentWind > 43;
-            const isWarning = currentWind === 43;
+            const isDanger = currentWind > 43; // Mayor a 43: Bloqueo Rojo
+            const isWarning = currentWind === 43; // Igual a 43: Precaución Naranja
             const isMeetingTime = currentHourInt === 7 && currentTime.getMinutes() >= 45;
             
-            // Cálculos del Día Operativo
+            // Cálculos del Día Operativo (13 Vuelos totales)
             const getOperativeDayStart = () => {
                 const d = new Date(currentTime);
                 if (d.getHours() < 7) d.setDate(d.getDate() - 1);
@@ -384,10 +393,10 @@
                             <button 
                                 onClick={() => document.getElementById('file-upload-input').click()} 
                                 disabled={isScanning}
-                                className={`flex flex-col items-center justify-center p-3 rounded-2xl transition border ${isScanning ? 'bg-indigo-900/50 border-indigo-400 animate-pulse' : needsScanUI ? 'bg-rose-600 border-rose-400 shadow-[0_0_20px_rgba(225,29,72,0.4)] animate-pulse' : 'bg-indigo-600/20 border-indigo-500/30 hover:bg-indigo-600/40'}`}>
+                                className={`flex flex-col items-center justify-center p-3 rounded-2xl transition border z-10 relative ${isScanning ? 'bg-indigo-900/50 border-indigo-400 animate-pulse' : needsScanUI ? 'bg-rose-600 border-rose-400 shadow-[0_0_20px_rgba(225,29,72,0.4)] animate-pulse' : 'bg-indigo-600/20 border-indigo-500/30 hover:bg-indigo-600/40'}`}>
                                 <span className="text-2xl mb-1">{isScanning ? '⏳' : '📸'}</span>
                                 <span className={`text-[10px] font-black uppercase text-center ${needsScanUI || isScanning ? 'text-white' : 'text-indigo-300'}`}>
-                                    {isScanning ? 'Analizando...' : needsScanUI ? 'URGE CLIMA' : 'Escanear OK to Fly'}
+                                    {isScanning ? 'Analizando...' : needsScanUI ? 'URGE CLIMA' : 'Escanear IA'}
                                 </span>
                             </button>
                         </div>
@@ -420,7 +429,6 @@
                             )}
                         </div>
 
-                        {}
                         {/* PLAN MAESTRO GENERADO */}
                         {flightItinerary.length > 0 && (
                             <div className="glass rounded-3xl p-4 border border-slate-800 mb-6">
@@ -448,7 +456,7 @@
                                                         <span className={windDanger ? 'text-rose-400' : windWarning ? 'text-orange-400' : 'text-emerald-400'}>
                                                             {windDanger ? '❌ Bloqueado' : windWarning ? '⚠️ Precaución' : '✅ Libre'}
                                                         </span>
-                                                        <span className="text-slate-500">({wInfo.windGust} km/h estim.)</span>
+                                                        <span className="text-slate-500">({wInfo.windGust} km/h est.)</span>
                                                     </div>
                                                 )}
                                             </div>
@@ -493,7 +501,7 @@
                         </button>
                     </div>
 
-                    {/* MODALES */}
+                    {}
                     {modal.isOpen && (
                         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
                             <div className="glass-panel w-full max-w-sm rounded-3xl overflow-hidden border border-slate-700 p-6 animate-in fade-in zoom-in duration-200">
@@ -502,14 +510,15 @@
                                 {modal.isSettings ? (
                                     <form onSubmit={handleSaveSettings} className="space-y-4 mt-4">
                                         <div>
-                                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Google API Key (AQ. o AIza.)</label>
+                                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Google API Key (AQ.)</label>
                                             <input type="password" name="apiKey" defaultValue={data.apiSettings.apiKey} required className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-indigo-500 font-mono text-sm" placeholder="Pega tu llave aquí..." />
                                         </div>
                                         <div>
                                             <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Motor Táctico de IA</label>
                                             <select name="model" defaultValue={data.apiSettings.model} className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-indigo-500 text-sm">
-                                                <option value="gemini-2.5-flash">Gemini 2.5 Flash (Más Seguro/Estable)</option>
-                                                <option value="gemini-2.5-pro">Gemini 2.5 Pro (Avanzado)</option>
+                                                <option value="gemini-3-flash-preview">Gemini 3 Flash Preview (Recomendado)</option>
+                                                <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
+                                                <option value="gemini-1.5-pro">Gemini 1.5 Pro</option>
                                             </select>
                                         </div>
                                         <div className="flex gap-3 mt-6">
