@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dispatcher Pro (v2026.FINAL)</title>
+    <title>Dispatcher Pro (v2026.G3)</title>
     
     <script src="https://cdn.tailwindcss.com"></script>
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
@@ -29,8 +29,9 @@
         const { useState, useEffect, useRef } = React;
 
         const App = () => {
+            // CAMBIO CLAVE: Nueva bóveda de memoria "dispatcherData_v2026_G3" para forzar el borrado del 1.5
             const [data, setData] = useState(() => {
-                const saved = localStorage.getItem('dispatcherData_v2026_FINAL');
+                const saved = localStorage.getItem('dispatcherData_v2026_G3');
                 return saved ? JSON.parse(saved) : { flights: [], apiSettings: { apiKey: '', model: 'gemini-3-flash-preview' } };
             });
 
@@ -48,7 +49,7 @@
             const updateData = (newData) => {
                 const merged = { ...data, ...newData };
                 setData(merged);
-                localStorage.setItem('dispatcherData_v2026_FINAL', JSON.stringify(merged));
+                localStorage.setItem('dispatcherData_v2026_G3', JSON.stringify(merged));
             };
 
             const unlockAudio = () => {
@@ -101,7 +102,7 @@
                     return h * 60 + m;
                 };
 
-                // 1. AUDITORÍA DE CLIMA
+                // 1. AUDITORÍA DE CLIMA (Conteo de horas bloqueadas)
                 let dayBlocked = 0;
                 for(let i=7; i<=18; i++) { if(currentForecast[i]?.windGust > 43) dayBlocked++; }
                 
@@ -109,7 +110,7 @@
                 for(let i=19; i<=23; i++) { if(currentForecast[i]?.windGust > 43) nightBlocked++; }
                 for(let i=0; i<=6; i++) { if(currentForecast[i]?.windGust > 43) nightBlocked++; }
 
-                // REGLA DE ORO: Si hay 6+ horas perdidas, activar Algoritmo de Compresión (50 mins).
+                // REGLA DE COMPRESIÓN: 6+ horas perdidas = 50 mins. Menos de 6 = 80 mins.
                 const daySpacing = dayBlocked >= 6 ? 50 : 80;
                 const nightSpacing = nightBlocked >= 6 ? 50 : 80;
 
@@ -117,7 +118,7 @@
                     for (let f of schedule) {
                         let fMins = toMins(f.time);
                         let diff = Math.abs(fMins - proposedTimeMins);
-                        if (diff > 12 * 60) diff = 24 * 60 - diff; // Ajuste de medianoche
+                        if (diff > 12 * 60) diff = 24 * 60 - diff;
                         if (diff < requiredSpacing) return false; 
                     }
                     return true;
@@ -135,7 +136,7 @@
                     if(currentForecast[h]?.windGust > 43) continue;
                     
                     for(let m=0; m<=50 && dayAdded < 7; m+=10) {
-                        if(h===7 && m>=40) continue; // Bloqueo junta
+                        if(h===7 && m>=40) continue; 
                         if(h===8 && m<20) continue;
                         
                         let mins = h * 60 + m;
@@ -147,12 +148,11 @@
                     }
                 }
 
-                // Cálculo de herencia
                 let inheritedToNight = 7 - dayAdded; 
                 
-                // 4. RELLENAR NOCTURNOS (19:00 - 23:59) Meta: 2 + heredados
+                // 4. RELLENAR NOCTURNOS (19:00 - 23:59)
                 let eveningTarget = 2 + inheritedToNight; 
-                let nightAdded1 = 1; // Ya está el de las 21:30
+                let nightAdded1 = 1; 
                 
                 for(let h=19; h<=23 && nightAdded1 < eveningTarget; h++) {
                     if(currentForecast[h]?.windGust > 43) continue;
@@ -166,7 +166,7 @@
                     }
                 }
 
-                // 5. RELLENAR MADRUGADA (00:00 - 06:59) Meta: 4
+                // 5. RELLENAR MADRUGADA (00:00 - 06:59)
                 let nightAdded2 = 0;
                 for(let h=0; h<=6 && nightAdded2 < 4; h++) {
                     if(currentForecast[h]?.windGust > 43) continue;
@@ -180,7 +180,7 @@
                     }
                 }
 
-                // 6. ORDENAR
+                // 6. ORDENAR CRONOLÓGICAMENTE
                 schedule.sort((a, b) => {
                     let ah = parseInt(a.time.split(':')[0]); let am = parseInt(a.time.split(':')[1]);
                     let bh = parseInt(b.time.split(':')[0]); let bm = parseInt(b.time.split(':')[1]);
@@ -195,22 +195,22 @@
 
             const analyzeImage = async (base64Image, retryCount = 0) => {
                 if (!data.apiSettings.apiKey) {
-                    setModal({ isOpen: true, title: "Falta API Key", message: "Configura tu API Key en el botón inferior.", type: "error" });
+                    setModal({ isOpen: true, title: "Falta API Key", message: "Configura tu API Key VIP en el botón inferior.", type: "error" });
                     setIsScanning(false);
                     return;
                 }
 
-                // INSTRUCCIONES ESTRICTAS: Solo leer, CERO matemáticas.
+                // INSTRUCCIONES ESTRICTAS: SOLO LECTURA, PROHIBIDO MULTIPLICAR.
                 const promptText = `
-                    Eres un asistente lector. Necesito que extraigas el viento a 120m de altura en km/h de esta tabla de Airdata "OK TO FLY".
+                    Eres un asistente lector de pantallas. Tu único trabajo es buscar el número exacto de velocidad de ráfaga a 120m de altura en esta tabla de Airdata.
                     
-                    REGLAS OBLIGATORIAS:
-                    1. Busca la hora de la previsión.
-                    2. Busca la fila que dice "A 120m" o "At 120m".
-                    3. Lee el número que dice en esa línea (ejemplo: si dice "38 km/h", extrae el 38).
-                    4. Devuelve EXACTAMENTE este formato JSON sin matemáticas ni conversiones: 
+                    REGLAS INQUEBRANTABLES:
+                    1. NO HAGAS NINGUNA OPERACIÓN MATEMÁTICA. PROHIBIDO MULTIPLICAR.
+                    2. Busca la hora de la previsión (ej. 2:00pm o 14:00).
+                    3. Busca la fila que dice "A 120m" o "At 120m".
+                    4. Lee el número de la velocidad en km/h que está escrito ahí (Ejemplo: Si dice "38 km/h", extrae el 38. NO lo conviertas, NO lo multipliques).
+                    5. Devuelve EXACTAMENTE este formato JSON: 
                     [{"time": "14:00", "windGust": 38}]
-                    5. ¡PROHIBIDO MULTIPLICAR! No apliques conversiones. Solo dame el número que ves escrito.
                     6. Si la imagen dice "Ráfagas fuertes >40m" pon 45. Si dice ">80m" pon 85.
                 `;
 
@@ -232,18 +232,18 @@
                     if (!response.ok) {
                         const errorData = await response.json();
                         
-                        // Protección Anti-Saturación
+                        // Sistema Anti-Saturación: Reintenta silenciosamente 2 veces si hay pico de demanda
                         if (errorData.error && (errorData.error.code === 503 || errorData.error.code === 429) && retryCount < 2) {
-                             console.warn("Servidor ocupado, reintentando...", retryCount + 1);
+                             console.warn("Google saturado. Reintento oculto:", retryCount + 1);
                              await new Promise(resolve => setTimeout(resolve, 2000));
                              return analyzeImage(base64Image, retryCount + 1);
                         }
                         
                         let errorMessage = errorData.error ? errorData.error.message : JSON.stringify(errorData);
                         if (errorData.error?.code === 429) {
-                            errorMessage = "Límite de cuota alcanzado. Google ha bloqueado tu acceso. Verifica tu API Key VIP.";
-                        } else if (errorData.error?.code === 503 || errorMessage.includes("high demand") || errorMessage.includes("overloaded")) {
-                            errorMessage = "Los servidores de Google están experimentando alta demanda. Por favor, intenta de nuevo en unos segundos.";
+                            errorMessage = "Límite de cuota alcanzado. Asegúrate de usar la llave API VIP.";
+                        } else if (errorData.error?.code === 503 || errorMessage.includes("high demand")) {
+                            errorMessage = "Los servidores de Google están experimentando un pico de demanda. Por favor, intenta de nuevo en un minuto.";
                         }
                         throw new Error(errorMessage);
                     }
@@ -251,7 +251,7 @@
                     const responseData = await response.json();
                     
                     if (!responseData.candidates || responseData.candidates.length === 0) {
-                        throw new Error("La IA no detectó la información. Usa una captura más nítida.");
+                        throw new Error("La IA no detectó la información. Usa una captura más clara con los datos a 120m abiertos.");
                     }
                     
                     const textResult = responseData.candidates[0].content.parts[0].text;
@@ -261,14 +261,14 @@
                     try {
                         parsedData = JSON.parse(cleanJson);
                     } catch(e) {
-                        throw new Error("No se pudo interpretar el formato. Intenta nuevamente.");
+                        throw new Error("No se pudo interpretar el formato de Google. Intenta nuevamente.");
                     }
                     
                     const forecastDict = {};
                     parsedData.forEach(item => {
                         if(!item.time || item.windGust === undefined) return;
                         let hour = parseInt(item.time.split(':')[0]);
-                        forecastDict[hour] = { windGust: parseInt(item.windGust) };
+                        forecastDict[hour] = { windGust: parseInt(item.windGust) }; // El número extraído limpio, sin matemáticas.
                     });
                     
                     setForecastData(forecastDict);
@@ -276,10 +276,11 @@
                     
                 } catch (error) {
                     console.error("Error capturado:", error);
-                    setModal({ isOpen: true, title: "Error del Servidor Google", message: error.message, type: "error" });
+                    setModal({ isOpen: true, title: "Error del Servidor", message: error.message, type: "error" });
                 } finally {
                     setIsScanning(false);
-                    if (fileInputRef.current) fileInputRef.current.value = ''; // Resetea para poder subir la misma foto 100 veces
+                    // IMPORTANTE: Limpia la memoria del input file para poder subir la misma foto 100 veces seguidas
+                    if (fileInputRef.current) fileInputRef.current.value = ''; 
                 }
             };
 
@@ -329,7 +330,6 @@
 
             const triggerFileInput = () => {
                 if (fileInputRef.current) {
-                    fileInputRef.current.value = '';
                     fileInputRef.current.click();
                 }
             };
@@ -354,6 +354,7 @@
 
             return (
                 <div className="pb-24">
+                    {/* Header */}
                     <div className="fixed top-0 w-full bg-[#020617]/90 backdrop-blur-md border-b border-slate-800 p-3 z-30 flex justify-between items-center">
                         <div className="flex items-center gap-3">
                             <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center shadow-[0_0_15px_rgba(79,70,229,0.5)]">
@@ -361,7 +362,7 @@
                             </div>
                             <div>
                                 <h1 className="text-white font-bold text-sm leading-tight tracking-wide">DISPATCHER PRO</h1>
-                                <p className="text-indigo-400 text-[10px] font-bold tracking-widest uppercase">v2026.3.FINAL | IA VIP</p>
+                                <p className="text-indigo-400 text-[10px] font-bold tracking-widest uppercase">v2026.G3 | GEMINI 3 FLASH</p>
                             </div>
                         </div>
                         {!audioUnlocked && (
@@ -372,6 +373,7 @@
                     </div>
 
                     <div className="max-w-md mx-auto pt-20 px-4">
+                        {/* Time Panel */}
                         <div className="glass p-5 rounded-3xl relative overflow-hidden flex justify-between items-center mb-6">
                             <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/10 rounded-full blur-3xl"></div>
                             <div>
@@ -394,6 +396,7 @@
                             </button>
                         </div>
 
+                        {/* Status Panel */}
                         <div className={`mb-6 p-4 rounded-3xl border ${isMeetingTime ? 'bg-amber-950/40 border-amber-500/50' : needsScanUI ? 'bg-slate-900 border-slate-800' : isDanger ? 'bg-rose-950/40 border-rose-500/50' : isWarning ? 'bg-orange-950/40 border-orange-500/50' : 'bg-emerald-950/40 border-emerald-500/50'}`}>
                             <div className="flex items-center gap-3">
                                 <div className={`w-3 h-3 rounded-full animate-ping ${isMeetingTime ? 'bg-amber-500' : needsScanUI ? 'bg-slate-600' : isDanger ? 'bg-rose-500' : isWarning ? 'bg-orange-500' : 'bg-emerald-500'}`}></div>
@@ -406,6 +409,7 @@
                             </div>
                         </div>
 
+                        {/* Progress Panel */}
                         <div className="glass rounded-3xl p-6 text-center border border-slate-800 mb-6 relative overflow-hidden">
                             <div className="absolute top-0 left-0 w-full h-1 bg-slate-800">
                                 <div className="h-full bg-indigo-500 transition-all duration-500" style={{width: `${Math.min((todayFlightsTotal.length / 13) * 100, 100)}%`}}></div>
@@ -417,6 +421,7 @@
                             </div>
                         </div>
 
+                        {/* Master Plan */}
                         {flightItinerary.length > 0 && (
                             <div className="glass rounded-3xl p-4 border border-slate-800 mb-6">
                                 <h3 className="text-[11px] font-black tracking-widest text-indigo-400 uppercase mb-3 flex items-center justify-between">
@@ -455,12 +460,12 @@
 
                         <div className="flex justify-center pb-8">
                             <button onClick={() => setModal({ isOpen: true, title: "Configuración del Sistema", isSettings: true })} className="text-xs text-slate-500 hover:text-white flex items-center gap-1 transition">
-                                ⚙️ Configurar API Key y Motor IA
+                                ⚙️ Configurar API Key VIP
                             </button>
                         </div>
                     </div>
 
-                    {}
+                    {/* Bottom Action Button */}
                     <div className="fixed bottom-0 left-0 w-full p-4 bg-gradient-to-t from-[#020617] via-[#020617] to-transparent flex justify-center z-40 pointer-events-none">
                         <button 
                             onClick={handleLogFlight}
@@ -478,14 +483,14 @@
                                 {modal.isSettings ? (
                                     <form onSubmit={handleSaveSettings} className="space-y-4 mt-4">
                                         <div>
-                                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Google API Key VIP (AQ.)</label>
-                                            <input type="password" name="apiKey" defaultValue={data.apiSettings.apiKey} required className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-indigo-500 font-mono text-sm" placeholder="Pega tu llave aquí..." />
+                                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Google API Key VIP</label>
+                                            <input type="password" name="apiKey" defaultValue={data.apiSettings.apiKey} required className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-indigo-500 font-mono text-sm" placeholder="Empieza con AQ..." />
                                         </div>
                                         <div>
                                             <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Motor Táctico de IA</label>
                                             <select name="model" defaultValue={data.apiSettings.model} className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-indigo-500 text-sm">
                                                 <option value="gemini-3-flash-preview">Gemini 3 Flash (Máxima Precisión)</option>
-                                                <option value="gemini-1.5-pro">Gemini 1.5 Pro (Alternativa VIP)</option>
+                                                <option value="gemini-1.5-pro">Gemini 1.5 Pro (Vía de Respaldo)</option>
                                             </select>
                                         </div>
                                         <div className="flex gap-3 mt-6">
