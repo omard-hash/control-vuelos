@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dispatcher Pro (v2026.G3_FINAL)</title>
+    <title>Dispatcher Pro (v2026.G3_FINAL_V4)</title>
     
     <script src="https://cdn.tailwindcss.com"></script>
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
@@ -30,14 +30,14 @@
 
         const App = () => {
             const [data, setData] = useState(() => {
-                const saved = localStorage.getItem('dispatcherData_v2026_G3_FINAL_V3');
+                const saved = localStorage.getItem('dispatcherData_v2026_G3_FINAL_V4');
                 return saved ? JSON.parse(saved) : { flights: [], apiSettings: { apiKey: '', model: 'gemini-3-flash-preview' } };
             });
 
             const [flights, setFlights] = useState(data.flights || []);
             const [activeShift, setActiveShift] = useState('Turno Diurno');
             const [currentTime, setCurrentTime] = useState(new Date());
-            const [modal, setModal] = useState({ isOpen: false, title: '', message: '', type: 'info', isSettings: false });
+            const [modal, setModal] = useState({ isOpen: false, title: '', message: '', type: 'info', isSettings: false, isManualLog: false });
             
             const [isScanning, setIsScanning] = useState(false);
             const [forecastData, setForecastData] = useState({});
@@ -48,7 +48,7 @@
             const updateData = (newData) => {
                 const merged = { ...data, ...newData };
                 setData(merged);
-                localStorage.setItem('dispatcherData_v2026_G3_FINAL_V3', JSON.stringify(merged));
+                localStorage.setItem('dispatcherData_v2026_G3_FINAL_V4', JSON.stringify(merged));
             };
 
             const unlockAudio = () => {
@@ -57,7 +57,6 @@
                 silentUtterance.volume = 0;
                 window.speechSynthesis.speak(silentUtterance);
                 setAudioUnlocked(true);
-                // Quitamos el espía una vez que se activa
                 window.removeEventListener('click', unlockAudio);
                 window.removeEventListener('touchstart', unlockAudio);
             };
@@ -91,21 +90,19 @@
                     const isDayShift = hour >= 7 && hour < 19;
                     setActiveShift(isDayShift ? 'Turno Diurno' : 'Turno Nocturno');
 
-                    // Evalúa las alertas cada vez que los segundos llegan a 0 (Una vez por minuto)
+                    // Alertas por minuto exacto
                     if (now.getSeconds() === 0) {
                         const timeStr = `${now.getHours().toString().padStart(2,'0')}:${now.getMinutes().toString().padStart(2,'0')}`;
                         
-                        // 1. ALERTA DE JUNTA A LAS 07:50 EXACTAS
+                        // 1. Alerta de junta
                         if (timeStr === "07:50") {
                             speak("Atención piloto. Es hora de aterrizar. Junta obligatoria en curso.");
                         }
 
-                        // 2. ALERTA PREDICTIVA: 10 MINUTOS ANTES DEL VUELO
-                        // Calcula qué hora será en exactamente 10 minutos
+                        // 2. Alerta predictiva 10 min
                         const futureDate = new Date(now.getTime() + 10 * 60000);
                         const futureTimeStr = `${futureDate.getHours().toString().padStart(2,'0')}:${futureDate.getMinutes().toString().padStart(2,'0')}`;
                         
-                        // Busca si hay un vuelo programado para esa hora futura
                         const upcomingFlight = flightItinerary.find(f => f.time === futureTimeStr);
                         if (upcomingFlight) {
                             speak(`Atención piloto. Prepárese. Faltan 10 minutos para su vuelo de las ${upcomingFlight.time}.`);
@@ -129,7 +126,6 @@
                 for(let i=19; i<=23; i++) { if(currentForecast[i]?.windGust > 43) nightBlocked++; }
                 for(let i=0; i<=6; i++) { if(currentForecast[i]?.windGust > 43) nightBlocked++; }
 
-                // Si se pierden 6+ horas, comprimir a 50 mins. Si no, separar a 80 mins.
                 const daySpacing = dayBlocked >= 6 ? 50 : 80;
                 const nightSpacing = nightBlocked >= 6 ? 50 : 80;
 
@@ -166,7 +162,6 @@
                 }
 
                 let inheritedToNight = 7 - dayAdded; 
-                
                 let eveningTarget = 2 + inheritedToNight; 
                 let nightAdded1 = 1; 
                 
@@ -214,7 +209,6 @@
                     return;
                 }
 
-                // Instrucciones Blindadas: SOLO LEER Y EXTRAER EL NÚMERO (Sin multiplicaciones locas)
                 const promptText = `
                     Eres un asistente lector de pantallas. Tu único trabajo es buscar el número de km/h a 120m de altura en esta tabla de Airdata.
                     
@@ -246,13 +240,11 @@
                     if (!response.ok) {
                         const errorData = await response.json();
                         
-                        // Protección Anti-Saturación: Reintenta silenciosamente 2 veces
                         if (errorData.error && (errorData.error.code === 503 || errorData.error.code === 429) && retryCount < 2) {
                              await new Promise(resolve => setTimeout(resolve, 2000));
                              return analyzeImage(base64Image, retryCount + 1);
                         }
                         
-                        // Mensaje claro si Google está colapsado y agotó reintentos
                         if (errorData.error && (errorData.error.code === 503 || errorData.error.code === 429)) {
                             throw new Error("Los servidores de Google están experimentando alta demanda. Por favor, intenta de nuevo en un par de minutos o cambia al modelo VIP.");
                         }
@@ -285,7 +277,6 @@
                     setModal({ isOpen: true, title: "Error del Servidor Google", message: error.message, type: "error" });
                 } finally {
                     setIsScanning(false);
-                    // IMPORTANTE: Limpia el botón para poder subir la misma foto 100 veces seguidas sin congelarse
                     if (fileInputRef.current) fileInputRef.current.value = ''; 
                 }
             };
@@ -331,7 +322,40 @@
                         model: formData.get('model') 
                     } 
                 });
-                setModal({ isOpen: false, title: '', message: '', type: 'info', isSettings: false });
+                setModal({ isOpen: false, title: '', message: '', type: 'info', isSettings: false, isManualLog: false });
+            };
+
+            const handleManualLogSubmit = (e) => {
+                e.preventDefault();
+                const formData = new FormData(e.target);
+                const timeStr = formData.get('timeStr');
+                const windNum = parseInt(formData.get('windNum')) || 0;
+                
+                const hour = parseInt(timeStr.split(':')[0]);
+                const shift = (hour >= 7 && hour < 19) ? 'Turno Diurno' : 'Turno Nocturno';
+
+                const newTimestamp = new Date();
+                newTimestamp.setHours(hour, parseInt(timeStr.split(':')[1]), 0, 0);
+                
+                if (hour < 7 && currentTime.getHours() >= 7) {
+                    // Si se registra vuelo de madrugada pero ya pasaron las 7am de hoy
+                    newTimestamp.setDate(newTimestamp.getDate() + 1);
+                }
+
+                const newLog = {
+                    id: Date.now(),
+                    time: timeStr,
+                    timestamp: newTimestamp.toISOString(),
+                    shift: shift,
+                    wind: windNum
+                };
+                
+                const updatedLogs = [newLog, ...flights].sort((a,b) => b.id - a.id);
+                setFlights(updatedLogs);
+                updateData({ flights: updatedLogs });
+                
+                setModal({ isOpen: false, title: '', message: '', type: 'info', isSettings: false, isManualLog: false });
+                speak(`Vuelo pasado registrado exitosamente a las ${timeStr}.`);
             };
 
             const triggerFileInput = () => {
@@ -344,7 +368,6 @@
             const isDanger = currentWind > 43; 
             const isWarning = currentWind === 43; 
             
-            // JUNTA VISUAL: Ahora desde las 7:50 am
             const isMeetingTime = (currentHourInt === 7 && currentMinInt >= 50) || (currentHourInt === 8 && currentMinInt < 20);
             
             const getOperativeDayStart = () => {
@@ -355,6 +378,11 @@
             };
             const operativeStart = getOperativeDayStart();
             const todayFlightsTotal = flights.filter(f => new Date(f.timestamp) >= operativeStart);
+            
+            // Contadores por turno
+            const dayFlightsCount = todayFlightsTotal.filter(f => f.shift === 'Turno Diurno').length;
+            const nightFlightsCount = todayFlightsTotal.filter(f => f.shift === 'Turno Nocturno').length;
+            
             const needsScanUI = Object.keys(forecastData).length === 0;
 
             return (
@@ -367,7 +395,7 @@
                             </div>
                             <div>
                                 <h1 className="text-white font-bold text-sm leading-tight tracking-wide">DISPATCHER PRO</h1>
-                                <p className="text-indigo-400 text-[10px] font-bold tracking-widest uppercase">v2026.G3_FINAL</p>
+                                <p className="text-indigo-400 text-[10px] font-bold tracking-widest uppercase">v2026.G3_FINAL_V4</p>
                             </div>
                         </div>
                     </div>
@@ -409,19 +437,40 @@
                             </div>
                         </div>
 
-                        {/* Progress Panel */}
+                        {/* Progress Panel (UPDATED WITH SHIFT COUNTERS) */}
                         <div className="glass rounded-3xl p-6 text-center border border-slate-800 mb-6 relative overflow-hidden">
                             <div className="absolute top-0 left-0 w-full h-1 bg-slate-800">
                                 <div className="h-full bg-indigo-500 transition-all duration-500" style={{width: `${Math.min((todayFlightsTotal.length / 13) * 100, 100)}%`}}></div>
                             </div>
-                            <p className="text-[10px] font-black tracking-widest text-slate-400 uppercase mb-2">Meta Operativa Global del Día</p>
-                            <div className="flex items-end justify-center gap-2">
+                            
+                            <div className="flex justify-between items-center mb-4">
+                                <p className="text-[10px] font-black tracking-widest text-slate-400 uppercase">Meta Operativa del Día</p>
+                                <button 
+                                    onClick={() => setModal({ isOpen: true, title: "Registrar Vuelo Pasado", isSettings: false, isManualLog: true })} 
+                                    className="text-[9px] font-bold uppercase tracking-wider bg-slate-800/80 hover:bg-slate-700 text-slate-300 py-1.5 px-3 rounded-lg border border-slate-700 transition">
+                                    + Añadir Pasado
+                                </button>
+                            </div>
+                            
+                            <div className="flex items-end justify-center gap-2 mb-4">
                                 <span className="text-5xl font-black text-indigo-400">{todayFlightsTotal.length}</span>
-                                <span className="text-2xl font-bold text-slate-600 mb-1">/ 13 Vuelos</span>
+                                <span className="text-2xl font-bold text-slate-600 mb-1">/ 13 Totales</span>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-3 mt-4 pt-4 border-t border-slate-800/50">
+                                <div className="bg-slate-900/50 rounded-xl p-2 border border-slate-800">
+                                    <p className="text-[10px] text-slate-400 font-bold uppercase mb-1">☀️ Diurno</p>
+                                    <p className="text-xl font-black text-amber-400">{dayFlightsCount}</p>
+                                </div>
+                                <div className="bg-slate-900/50 rounded-xl p-2 border border-slate-800">
+                                    <p className="text-[10px] text-slate-400 font-bold uppercase mb-1">🌙 Nocturno</p>
+                                    <p className="text-xl font-black text-blue-400">{nightFlightsCount}</p>
+                                </div>
                             </div>
                         </div>
 
                         {/* Master Plan */}
+                        {}
                         {flightItinerary.length > 0 && (
                             <div className="glass rounded-3xl p-4 border border-slate-800 mb-6">
                                 <h3 className="text-[11px] font-black tracking-widest text-indigo-400 uppercase mb-3 flex items-center justify-between">
@@ -459,7 +508,7 @@
                         )}
 
                         <div className="flex justify-center pb-8">
-                            <button onClick={() => setModal({ isOpen: true, title: "Configuración del Sistema", isSettings: true })} className="text-xs text-slate-500 hover:text-white flex items-center gap-1 transition">
+                            <button onClick={() => setModal({ isOpen: true, title: "Configuración del Sistema", isSettings: true, isManualLog: false })} className="text-xs text-slate-500 hover:text-white flex items-center gap-1 transition">
                                 ⚙️ Configurar API Key VIP
                             </button>
                         </div>
@@ -476,6 +525,7 @@
                     </div>
 
                     {/* Modals */}
+                    {}
                     {modal.isOpen && (
                         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
                             <div className="glass-panel w-full max-w-sm rounded-3xl overflow-hidden border border-slate-700 p-6 animate-in fade-in zoom-in duration-200">
@@ -497,6 +547,21 @@
                                         <div className="flex gap-3 mt-6">
                                             <button type="button" onClick={() => setModal({ isOpen: false })} className="flex-1 py-3 rounded-xl font-bold text-slate-300 bg-slate-800 hover:bg-slate-700 transition">Cancelar</button>
                                             <button type="submit" className="flex-1 py-3 rounded-xl font-bold text-white bg-indigo-600 hover:bg-indigo-500 transition shadow-[0_0_15px_rgba(79,70,229,0.4)]">Guardar</button>
+                                        </div>
+                                    </form>
+                                ) : modal.isManualLog ? (
+                                    <form onSubmit={handleManualLogSubmit} className="space-y-4 mt-4">
+                                        <div>
+                                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Hora Exacta del Despegue (HH:MM)</label>
+                                            <input type="time" name="timeStr" required className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-indigo-500 font-mono text-xl text-center" />
+                                        </div>
+                                        <div>
+                                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Viento (km/h) - Opcional</label>
+                                            <input type="number" name="windNum" min="0" defaultValue="0" className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-indigo-500 font-mono text-sm text-center" />
+                                        </div>
+                                        <div className="flex gap-3 mt-6">
+                                            <button type="button" onClick={() => setModal({ isOpen: false })} className="flex-1 py-3 rounded-xl font-bold text-slate-300 bg-slate-800 hover:bg-slate-700 transition">Cancelar</button>
+                                            <button type="submit" className="flex-1 py-3 rounded-xl font-bold text-white bg-emerald-600 hover:bg-emerald-500 transition shadow-[0_0_15px_rgba(16,185,129,0.4)]">Registrar</button>
                                         </div>
                                     </form>
                                 ) : (
