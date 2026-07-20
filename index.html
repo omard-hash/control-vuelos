@@ -53,11 +53,25 @@
             };
 
             const unlockAudio = () => {
+                if (audioUnlocked) return;
                 const silentUtterance = new SpeechSynthesisUtterance('');
                 silentUtterance.volume = 0;
                 window.speechSynthesis.speak(silentUtterance);
                 setAudioUnlocked(true);
+                // Quitamos el espía una vez que se activa
+                window.removeEventListener('click', unlockAudio);
+                window.removeEventListener('touchstart', unlockAudio);
             };
+
+            // TRUCO NINJA: Escuchar el primer toque en cualquier parte de la pantalla
+            useEffect(() => {
+                window.addEventListener('click', unlockAudio);
+                window.addEventListener('touchstart', unlockAudio);
+                return () => {
+                    window.removeEventListener('click', unlockAudio);
+                    window.removeEventListener('touchstart', unlockAudio);
+                };
+            }, [audioUnlocked]);
 
             const speak = (text) => {
                 if ('speechSynthesis' in window && audioUnlocked) {
@@ -353,11 +367,6 @@
                                 <p className="text-indigo-400 text-[10px] font-bold tracking-widest uppercase">v2026.G3_FINAL</p>
                             </div>
                         </div>
-                        {!audioUnlocked && (
-                            <button onClick={unlockAudio} className="text-xs bg-amber-500/20 text-amber-500 border border-amber-500/50 px-3 py-1.5 rounded-full font-bold animate-pulse">
-                                🔇 Activar Voz
-                            </button>
-                        )}
                     </div>
 
                     <div className="max-w-md mx-auto pt-20 px-4">
