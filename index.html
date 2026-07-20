@@ -2,8 +2,8 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dispatcher Pro (v2026.G3_FINAL_V7)</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Dispatcher Pro (v2026.G3_FINAL_V9)</title>
     
     <script src="https://cdn.tailwindcss.com"></script>
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
@@ -12,7 +12,7 @@
     
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800;900&display=swap');
-        body { font-family: 'Inter', sans-serif; background-color: #020617; color: #f8fafc; }
+        body { font-family: 'Inter', sans-serif; background-color: #020617; color: #f8fafc; overflow-x: hidden; }
         .glass { background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border: 1px solid rgba(255, 255, 255, 0.05); }
         .glass-panel { background: linear-gradient(145deg, rgba(30, 41, 59, 0.8) 0%, rgba(15, 23, 42, 0.9) 100%); box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5); }
         ::-webkit-scrollbar { width: 6px; }
@@ -30,16 +30,15 @@
 
         const App = () => {
             const [data, setData] = useState(() => {
-                // Forzamos V7 para reiniciar la memoria caché vieja en las PCs
-                const saved = localStorage.getItem('dispatcherData_v2026_G3_FINAL_V7');
+                // Pasamos a V9 para asegurar que la memoria esté fresca
+                const saved = localStorage.getItem('dispatcherData_v2026_G3_FINAL_V9');
                 
-                // TU API KEY VIP QUEMADA EN EL CÓDIGO
-                const miLlaveVIP = "AQ.Ab8RN6I_P1_ThEICNZvypFhxvrX6jK-zH74UdP6-3YUD3mHH6A"; 
+                // NO PONER LA LLAVE AQUÍ PARA EVITAR EL BLOQUEO DE GITHUB. 
+                // Se configura en el Engranaje de la app.
+                const miLlaveVIP = ""; 
                 
                 if (saved) {
-                    let parsed = JSON.parse(saved);
-                    parsed.apiSettings.apiKey = miLlaveVIP;
-                    return parsed;
+                    return JSON.parse(saved);
                 }
                 
                 return { flights: [], apiSettings: { apiKey: miLlaveVIP, model: 'gemini-3-flash-preview' } };
@@ -54,12 +53,14 @@
             const [forecastData, setForecastData] = useState({});
             const [flightItinerary, setFlightItinerary] = useState([]);
             const [audioUnlocked, setAudioUnlocked] = useState(false);
+            
             const fileInputRef = useRef(null);
+            const lastMinuteRef = useRef(null); // Memoria infalible para el reloj
 
             const updateData = (newData) => {
                 const merged = { ...data, ...newData };
                 setData(merged);
-                localStorage.setItem('dispatcherData_v2026_G3_FINAL_V7', JSON.stringify(merged));
+                localStorage.setItem('dispatcherData_v2026_G3_FINAL_V9', JSON.stringify(merged));
             };
 
             const unlockAudio = () => {
@@ -98,20 +99,22 @@
                     setCurrentTime(now);
                     
                     const hour = now.getHours();
+                    const minute = now.getMinutes();
                     const isDayShift = hour >= 7 && hour < 19;
                     setActiveShift(isDayShift ? 'Turno Diurno' : 'Turno Nocturno');
 
-                    // Alertas exactas
-                    if (now.getSeconds() === 0) {
-                        const timeStr = `${now.getHours().toString().padStart(2,'0')}:${now.getMinutes().toString().padStart(2,'0')}`;
+                    // Alertas infalibles: Detectan el cambio de minuto para no saltarse nada
+                    if (lastMinuteRef.current !== minute) {
+                        lastMinuteRef.current = minute;
+                        const timeStr = `${hour.toString().padStart(2,'0')}:${minute.toString().padStart(2,'0')}`;
                         
-                        // 1. Alarma de Junta a las 07:50 am
+                        // 1. Alarma de Junta a las 07:50 am exactas
                         if (timeStr === "07:50") {
                             speak("Atención piloto. Es hora de aterrizar. Junta obligatoria en curso.");
                         }
 
-                        // 2. Alarma de Clima Faltante (Cada 5 minutos: :00, :05, :10...)
-                        if (Object.keys(forecastData).length === 0 && now.getMinutes() % 5 === 0) {
+                        // 2. Alarma de Clima Faltante (Cada 5 minutos)
+                        if (Object.keys(forecastData).length === 0 && minute % 5 === 0) {
                             speak("Alerta de sistema. Es indispensable subir la captura del clima. Por favor, actualice la información meteorológica inmediatamente.");
                         }
 
@@ -122,6 +125,12 @@
                         const upcomingFlight = flightItinerary.find(f => f.time === futureTimeStr);
                         if (upcomingFlight) {
                             speak(`Atención piloto. Prepárese. Faltan 10 minutos para su vuelo de las ${upcomingFlight.time}.`);
+                        }
+
+                        // 4. NUEVA: Alarma a la HORA EXACTA del vuelo
+                        const currentFlight = flightItinerary.find(f => f.time === timeStr);
+                        if (currentFlight) {
+                            speak(`Atención. Es hora de su vuelo programado a las ${currentFlight.time}. Autorización de despegue concedida.`);
                         }
                     }
                 }, 1000);
@@ -225,7 +234,7 @@
                     return;
                 }
 
-                // NUEVO PROMPT ANTI-MATEMÁTICAS: SOLO LECTURA.
+                // PROMPT ANTI-MATEMÁTICAS: SOLO LECTURA.
                 const promptText = `
                     Eres un asistente lector de pantallas de alta precisión. Tu único trabajo es buscar el número de km/h a 120m de altura en esta tabla de Airdata "OK TO FLY".
                     
@@ -341,7 +350,7 @@
                 newTimestamp.setHours(hour, parseInt(timeStr.split(':')[1]), 0, 0);
                 
                 if (hour < 7 && currentTime.getHours() >= 7) {
-                    newTimestamp.setDate(newTimestamp.getDate() + 1);
+                    newTimestamp.setDate(newTimestamp.getDate() + 1); // Si es madrugada de ayer a hoy
                 }
 
                 const newLog = {
@@ -405,7 +414,7 @@
                             </div>
                             <div>
                                 <h1 className="text-white font-bold text-sm leading-tight tracking-wide">DISPATCHER PRO</h1>
-                                <p className="text-indigo-400 text-[10px] font-bold tracking-widest uppercase">v2026.G3_FINAL_V7</p>
+                                <p className="text-indigo-400 text-[10px] font-bold tracking-widest uppercase">v2026.G3_FINAL_V9</p>
                             </div>
                         </div>
                     </div>
@@ -418,6 +427,7 @@
                                 <p className="text-[10px] font-black tracking-widest text-indigo-400 uppercase mb-1">Turno en curso</p>
                                 <h2 className="text-2xl font-black text-white">{activeShift}</h2>
                                 <div className="mt-2 text-3xl font-mono font-bold text-white tracking-wider flex items-center gap-2">
+                                    {!audioUnlocked && <span className="text-xs animate-pulse text-amber-500 border border-amber-500/50 bg-amber-500/10 px-2 py-1 rounded">🔇 Toca la pantalla</span>}
                                     {currentTime.toLocaleTimeString('en-US', { hour12: false })}
                                 </div>
                             </div>
@@ -434,7 +444,6 @@
                             </button>
                         </div>
 
-                        {}
                         {/* Status Panel */}
                         <div className={`mb-6 p-4 rounded-3xl border ${isMeetingTime ? 'bg-amber-950/40 border-amber-500/50' : needsScanUI ? 'bg-slate-900 border-slate-800' : isDanger ? 'bg-rose-950/40 border-rose-500/50' : isWarning ? 'bg-orange-950/40 border-orange-500/50' : 'bg-emerald-950/40 border-emerald-500/50'}`}>
                             <div className="flex items-center gap-3">
@@ -448,7 +457,7 @@
                             </div>
                         </div>
 
-                        {/* Progress Panel con Contadores */}
+                        {/* Progress Panel con Contadores (Añadir Pasado) */}
                         <div className="glass rounded-3xl p-6 text-center border border-slate-800 mb-6 relative overflow-hidden">
                             <div className="absolute top-0 left-0 w-full h-1 bg-slate-800">
                                 <div className="h-full bg-indigo-500 transition-all duration-500" style={{width: `${Math.min((todayFlightsTotal.length / 13) * 100, 100)}%`}}></div>
@@ -458,7 +467,7 @@
                                 <p className="text-[10px] font-black tracking-widest text-slate-400 uppercase">Meta Operativa del Día</p>
                                 <button 
                                     onClick={() => { unlockAudio(); setModal({ isOpen: true, title: "Registrar Vuelo Pasado", isSettings: false, isManualLog: true }); }} 
-                                    className="text-[9px] font-bold uppercase tracking-wider bg-slate-800/80 hover:bg-slate-700 text-slate-300 py-1.5 px-3 rounded-lg border border-slate-700 transition">
+                                    className="text-[9px] font-bold uppercase tracking-wider bg-slate-800/80 hover:bg-slate-700 text-slate-300 py-1.5 px-3 rounded-lg border border-slate-700 transition shadow-sm">
                                     + Añadir Pasado
                                 </button>
                             </div>
@@ -469,18 +478,17 @@
                             </div>
 
                             <div className="grid grid-cols-2 gap-3 mt-4 pt-4 border-t border-slate-800/50">
-                                <div className="bg-slate-900/50 rounded-xl p-2 border border-slate-800">
-                                    <p className="text-[10px] text-slate-400 font-bold uppercase mb-1">☀️ Diurno</p>
+                                <div className="bg-slate-900/50 rounded-xl p-2 border border-slate-800 shadow-inner">
+                                    <p className="text-[10px] text-slate-400 font-bold uppercase mb-1 flex items-center justify-center gap-1">☀️ Diurno</p>
                                     <p className="text-xl font-black text-amber-400">{dayFlightsCount}</p>
                                 </div>
-                                <div className="bg-slate-900/50 rounded-xl p-2 border border-slate-800">
-                                    <p className="text-[10px] text-slate-400 font-bold uppercase mb-1">🌙 Nocturno</p>
+                                <div className="bg-slate-900/50 rounded-xl p-2 border border-slate-800 shadow-inner">
+                                    <p className="text-[10px] text-slate-400 font-bold uppercase mb-1 flex items-center justify-center gap-1">🌙 Nocturno</p>
                                     <p className="text-xl font-black text-blue-400">{nightFlightsCount}</p>
                                 </div>
                             </div>
                         </div>
 
-                        {}
                         {/* Master Plan */}
                         {flightItinerary.length > 0 && (
                             <div className="glass rounded-3xl p-4 border border-slate-800 mb-6">
@@ -545,7 +553,6 @@
                         </div>
                     </div>
 
-                    {}
                     {/* Bottom Action Button */}
                     <div className="fixed bottom-0 left-0 w-full p-4 bg-gradient-to-t from-[#020617] via-[#020617] to-transparent flex justify-center z-40 pointer-events-none">
                         <button 
@@ -556,7 +563,7 @@
                         </button>
                     </div>
 
-                    {/* Modals */}
+                    {/* Modals (Configuración / Log Manual / Info) */}
                     {modal.isOpen && (
                         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
                             <div className="glass-panel w-full max-w-sm rounded-3xl overflow-hidden border border-slate-700 p-6 animate-in fade-in zoom-in duration-200">
@@ -566,7 +573,7 @@
                                     <form onSubmit={handleSaveSettings} className="space-y-4 mt-4">
                                         <div>
                                             <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Google API Key (AQ. o AIZA.)</label>
-                                            <input type="password" name="apiKey" defaultValue={data.apiSettings.apiKey} required className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-indigo-500 font-mono text-sm" placeholder="Empieza con AQ..." />
+                                            <input type="password" name="apiKey" defaultValue={data.apiSettings.apiKey} required className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-indigo-500 font-mono text-sm" placeholder="Pégala aquí. Empieza con AQ..." />
                                         </div>
                                         <div>
                                             <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Motor Táctico de IA</label>
