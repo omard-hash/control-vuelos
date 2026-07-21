@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Dispatcher Pro (v2026.G3_FINAL_V9)</title>
+    <title>Dispatcher Pro (v2026.G3_FINAL_V11)</title>
     
     <script src="https://cdn.tailwindcss.com"></script>
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
@@ -15,6 +15,7 @@
         body { font-family: 'Inter', sans-serif; background-color: #020617; color: #f8fafc; overflow-x: hidden; }
         .glass { background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border: 1px solid rgba(255, 255, 255, 0.05); }
         .glass-panel { background: linear-gradient(145deg, rgba(30, 41, 59, 0.8) 0%, rgba(15, 23, 42, 0.9) 100%); box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5); }
+        .rain-glass { background: rgba(100, 0, 0, 0.8); backdrop-filter: blur(20px); border: 1px solid rgba(255, 0, 0, 0.3); }
         ::-webkit-scrollbar { width: 6px; }
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
@@ -26,22 +27,17 @@
     <div id="root"></div>
 
     <script type="text/babel">
-        const { useState, useEffect, useRef } = React;
+        const { useState, useEffect, useRef, useCallback } = React;
 
         const App = () => {
             const [data, setData] = useState(() => {
-                // Pasamos a V9 para asegurar que la memoria esté fresca
-                const saved = localStorage.getItem('dispatcherData_v2026_G3_FINAL_V9');
-                
-                // NO PONER LA LLAVE AQUÍ PARA EVITAR EL BLOQUEO DE GITHUB. 
-                // Se configura en el Engranaje de la app.
-                const miLlaveVIP = ""; 
+                const saved = localStorage.getItem('dispatcherData_v2026_G3_FINAL_V11');
                 
                 if (saved) {
                     return JSON.parse(saved);
                 }
                 
-                return { flights: [], apiSettings: { apiKey: miLlaveVIP, model: 'gemini-3-flash-preview' } };
+                return { flights: [], apiSettings: { apiKey: '', model: 'gemini-3-flash-preview' } };
             });
 
             const [flights, setFlights] = useState(data.flights || []);
@@ -53,34 +49,29 @@
             const [forecastData, setForecastData] = useState({});
             const [flightItinerary, setFlightItinerary] = useState([]);
             const [audioUnlocked, setAudioUnlocked] = useState(false);
+            const [isRaining, setIsRaining] = useState(false); // NUEVO: Estado de lluvia
             
             const fileInputRef = useRef(null);
-            const lastMinuteRef = useRef(null); // Memoria infalible para el reloj
+            const lastMinuteRef = useRef(null);
 
             const updateData = (newData) => {
                 const merged = { ...data, ...newData };
                 setData(merged);
-                localStorage.setItem('dispatcherData_v2026_G3_FINAL_V9', JSON.stringify(merged));
+                localStorage.setItem('dispatcherData_v2026_G3_FINAL_V11', JSON.stringify(merged));
             };
 
-            const unlockAudio = () => {
+            const unlockAudio = useCallback(() => {
                 if (audioUnlocked) return;
                 const silentUtterance = new SpeechSynthesisUtterance('');
                 silentUtterance.volume = 0;
                 window.speechSynthesis.speak(silentUtterance);
                 setAudioUnlocked(true);
-                window.removeEventListener('click', unlockAudio);
-                window.removeEventListener('touchstart', unlockAudio);
-            };
+            }, [audioUnlocked]);
 
             useEffect(() => {
-                window.addEventListener('click', unlockAudio);
-                window.addEventListener('touchstart', unlockAudio);
-                return () => {
-                    window.removeEventListener('click', unlockAudio);
-                    window.removeEventListener('touchstart', unlockAudio);
-                };
-            }, [audioUnlocked]);
+                window.addEventListener('click', unlockAudio, { once: true });
+                window.addEventListener('touchstart', unlockAudio, { once: true });
+            }, [unlockAudio]);
 
             const speak = (text) => {
                 if ('speechSynthesis' in window && audioUnlocked) {
@@ -93,6 +84,160 @@
                 }
             };
 
+            // Helpers para tiempo operativo
+            const getOperativeDayStart = (dateObj) => {
+                const d = new Date(dateObj);
+                if (d.getHours() < 7) d.setDate(d.getDate() - 1);
+                d.setHours(7, 0, 0, 0);
+                return d;
+            };
+
+            const toOpMins = (h, m) => {
+                let opH = h < 7 ? h + 24 : h;
+                return opH * 60 + m;
+            };
+
+            // EL RECALCULADOR INTELIGENTE DE EMERGENCIA
+            const generateIntelligentSchedule = useCallback((currentForecast, currentFlights, rainStatus = false) => {
+                if (rainStatus || Object.keys(currentForecast).length === 0) {
+                    setFlightItinerary([]); 
+                    return;
+                }
+
+                const now = new Date(); 
+                const operativeStart = getOperativeDayStart(now);
+                const nowOpMins = toOpMins(now.getHours(), now.getMinutes());
+                
+                // 1. Contar completados HOY
+                const completedToday = currentFlights.filter(f => new Date(f.timestamp) >= operativeStart);
+                let remainingTotal = 13 - completedToday.length;
+                
+                if (remainingTotal <= 0) {
+                    setFlightItinerary([]);
+                    speak("Meta de vuelos diarios completada.");
+                    return;
+                }
+
+                let schedule = [];
+                
+                // Helper para revisar distancias de seguridad (Con completados y planeados)
+                const canAdd = (opMins, requiredSpacing) => {
+                    for (let f of schedule) {
+                        let [fh, fm] = f.time.split(':').map(Number);
+                        if (Math.abs(toOpMins(fh, fm) - opMins) < requiredSpacing) return false;
+                    }
+                    for (let c of completedToday) {
+                        let [ch, cm] = c.time.split(':').map(Number);
+                        if (Math.abs(toOpMins(ch, cm) - opMins) < requiredSpacing) return false;
+                    }
+                    return true;
+                };
+
+                // 2. Filtrar Forzosos (Solo si están en el futuro y el clima lo permite)
+                // SI un forzoso se pierde por lluvia o tiempo, se suma automáticamente a los dinámicos.
+                const forcedTimes = ["06:00", "08:20", "14:00", "17:00", "21:30"];
+                
+                for (let timeStr of forcedTimes) {
+                    if (remainingTotal <= 0) break;
+                    let [h, m] = timeStr.split(':').map(Number);
+                    let opMins = toOpMins(h, m);
+                    
+                    // Solo planificar si es en el futuro (damos 15 mins de tolerancia para el pasado)
+                    if (opMins > nowOpMins - 15) {
+                        if (currentForecast[h]?.windGust <= 43) {
+                            schedule.push({ time: timeStr, type: "Forzoso", shift: (h>=7 && h<19)?"Turno Diurno":"Turno Nocturno", fixed: true });
+                            remainingTotal--;
+                        }
+                    }
+                }
+
+                // 3. Sistema Aleatorio para Dinámicos (Barajado Espacial)
+                if (remainingTotal > 0) {
+                    let possibleSlots = [];
+                    for (let h=0; h<24; h++) {
+                        let opH = h < 7 ? h + 24 : h;
+                        if (currentForecast[h]?.windGust > 43) continue; // Bloqueado por viento
+                        
+                        for (let m=0; m<=50; m+=10) {
+                            // Reglas de horario
+                            if(h===7 && m>=40) continue; 
+                            if(h===8 && m<20) continue;
+                            
+                            let opMins = opH * 60 + m;
+                            // Solo si es en el futuro (+10 mins para darte tiempo de preparar)
+                            if (opMins > nowOpMins + 10) {
+                                possibleSlots.push({ h, m, opMins });
+                            }
+                        }
+                    }
+
+                    // Magia: Barajamos los huecos al azar para que nunca sea la misma rutina
+                    possibleSlots.sort(() => Math.random() - 0.5);
+
+                    // Calculamos el espacio ideal de descanso dependiendo del tiempo que nos queda vs vuelos faltantes
+                    let availableFutureMins = (31 * 60) - nowOpMins; // 31 es las 7am del día siguiente
+                    let targetSpacing = Math.floor(availableFutureMins / (remainingTotal + 1));
+                    targetSpacing = Math.min(90, Math.max(40, targetSpacing)); // Entre 40 y 90 mins
+
+                    let addedDynamic = 0;
+                    
+                    // Intento 1: Acomodar respetando el espacio ideal
+                    for (let slot of possibleSlots) {
+                        if (addedDynamic >= remainingTotal) break;
+                        if (canAdd(slot.opMins, targetSpacing)) {
+                            let timeStr = `${slot.h.toString().padStart(2,'0')}:${slot.m.toString().padStart(2,'0')}`;
+                            schedule.push({ 
+                                time: timeStr, 
+                                type: "Dinámico", 
+                                shift: (slot.h>=7 && slot.h<19)?"Turno Diurno":"Turno Nocturno", 
+                                fixed: false 
+                            });
+                            addedDynamic++;
+                        }
+                    }
+
+                    // Intento 2 (Emergencia de lluvia): Si no cupieron, los comprimimos a 30 mins
+                    if (addedDynamic < remainingTotal) {
+                        for (let slot of possibleSlots) {
+                             if (addedDynamic >= remainingTotal) break;
+                             let timeStr = `${slot.h.toString().padStart(2,'0')}:${slot.m.toString().padStart(2,'0')}`;
+                             if (!schedule.find(s => s.time === timeStr)) {
+                                 if (canAdd(slot.opMins, 30)) {
+                                    schedule.push({ 
+                                        time: timeStr, 
+                                        type: "Dinámico (Comprimido)", 
+                                        shift: (slot.h>=7 && slot.h<19)?"Turno Diurno":"Turno Nocturno", 
+                                        fixed: false 
+                                    });
+                                    addedDynamic++;
+                                 }
+                             }
+                        }
+                    }
+                }
+
+                // Ordenamos cronológicamente
+                schedule.sort((a, b) => {
+                    let [ah, am] = a.time.split(':').map(Number);
+                    let [bh, bm] = b.time.split(':').map(Number);
+                    return toOpMins(ah, am) - toOpMins(bh, bm);
+                });
+
+                setFlightItinerary(schedule);
+                
+            }, []);
+
+            // Disparador de Reprogramación Manual
+            const forceRecalculate = () => {
+                if(Object.keys(forecastData).length > 0) {
+                    generateIntelligentSchedule(forecastData, flights, isRaining);
+                    speak("Analizando variables futuras. Plan maestro recalculado exitosamente.");
+                } else {
+                    setModal({ isOpen: true, title: "Falta Clima", message: "Escanea el clima antes de recalcular.", type: "error" });
+                }
+            };
+
+            // RELOJ MAESTRO
             useEffect(() => {
                 const timer = setInterval(() => {
                     const now = new Date();
@@ -103,138 +248,48 @@
                     const isDayShift = hour >= 7 && hour < 19;
                     setActiveShift(isDayShift ? 'Turno Diurno' : 'Turno Nocturno');
 
-                    // Alertas infalibles: Detectan el cambio de minuto para no saltarse nada
+                    // Lógica basada en el CAMBIO DE MINUTO (Infalible)
                     if (lastMinuteRef.current !== minute) {
                         lastMinuteRef.current = minute;
                         const timeStr = `${hour.toString().padStart(2,'0')}:${minute.toString().padStart(2,'0')}`;
                         
-                        // 1. Alarma de Junta a las 07:50 am exactas
+                        if (isRaining) return; // Si llueve, se silencia el sistema de alarmas.
+
+                        // 1. Alarma de Junta a las 07:50 am
                         if (timeStr === "07:50") {
                             speak("Atención piloto. Es hora de aterrizar. Junta obligatoria en curso.");
                         }
 
                         // 2. Alarma de Clima Faltante (Cada 5 minutos)
                         if (Object.keys(forecastData).length === 0 && minute % 5 === 0) {
-                            speak("Alerta de sistema. Es indispensable subir la captura del clima. Por favor, actualice la información meteorológica inmediatamente.");
+                            speak("Alerta. No hay datos meteorológicos. Suba la captura del clima.");
                         }
 
                         // 3. Alarma predictiva de Vuelo (10 min antes)
                         const futureDate = new Date(now.getTime() + 10 * 60000);
                         const futureTimeStr = `${futureDate.getHours().toString().padStart(2,'0')}:${futureDate.getMinutes().toString().padStart(2,'0')}`;
-                        
                         const upcomingFlight = flightItinerary.find(f => f.time === futureTimeStr);
                         if (upcomingFlight) {
                             speak(`Atención piloto. Prepárese. Faltan 10 minutos para su vuelo de las ${upcomingFlight.time}.`);
                         }
 
-                        // 4. NUEVA: Alarma a la HORA EXACTA del vuelo
+                        // 4. Alarma HORA EXACTA del vuelo
                         const currentFlight = flightItinerary.find(f => f.time === timeStr);
                         if (currentFlight) {
-                            speak(`Atención. Es hora de su vuelo programado a las ${currentFlight.time}. Autorización de despegue concedida.`);
+                            speak(`Atención. Es hora de su vuelo programado. Despegue autorizado.`);
                         }
                     }
                 }, 1000);
                 return () => clearInterval(timer);
-            }, [flightItinerary, audioUnlocked, forecastData]);
-
-            const generateIntelligentSchedule = (currentForecast, currentFlights) => {
-                let schedule = [];
-                const toMins = (timeStr) => {
-                    let [h, m] = timeStr.split(':').map(Number);
-                    return h * 60 + m;
-                };
-
-                let dayBlocked = 0;
-                for(let i=7; i<=18; i++) { if(currentForecast[i]?.windGust > 43) dayBlocked++; }
-                
-                let nightBlocked = 0;
-                for(let i=19; i<=23; i++) { if(currentForecast[i]?.windGust > 43) nightBlocked++; }
-                for(let i=0; i<=6; i++) { if(currentForecast[i]?.windGust > 43) nightBlocked++; }
-
-                const daySpacing = dayBlocked >= 6 ? 50 : 80;
-                const nightSpacing = nightBlocked >= 6 ? 50 : 80;
-
-                const canAddFlight = (proposedTimeMins, requiredSpacing) => {
-                    for (let f of schedule) {
-                        let fMins = toMins(f.time);
-                        let diff = Math.abs(fMins - proposedTimeMins);
-                        if (diff > 12 * 60) diff = 24 * 60 - diff;
-                        if (diff < requiredSpacing) return false; 
-                    }
-                    return true;
-                };
-
-                schedule.push({ time: "08:20", type: "Forzoso (Post-Junta)", shift: "Turno Diurno", fixed: true });
-                schedule.push({ time: "14:00", type: "Forzoso (Cambio)", shift: "Turno Diurno", fixed: true });
-                schedule.push({ time: "17:00", type: "Forzoso", shift: "Turno Diurno", fixed: true });
-                schedule.push({ time: "21:30", type: "Forzoso", shift: "Turno Nocturno", fixed: true });
-
-                let dayAdded = 3; 
-                for(let h=7; h<=18 && dayAdded < 7; h++) {
-                    if(currentForecast[h]?.windGust > 43) continue;
-                    
-                    for(let m=0; m<=50 && dayAdded < 7; m+=10) {
-                        if(h===7 && m>=40) continue; 
-                        if(h===8 && m<20) continue;
-                        
-                        let mins = h * 60 + m;
-                        if(canAddFlight(mins, daySpacing)) {
-                            let timeStr = `${h.toString().padStart(2,'0')}:${m.toString().padStart(2,'0')}`;
-                            schedule.push({ time: timeStr, type: dayBlocked >= 6 ? "Dinámico (Compresión 50m)" : "Dinámico", shift: "Turno Diurno", fixed: false });
-                            dayAdded++;
-                        }
-                    }
-                }
-
-                let inheritedToNight = 7 - dayAdded; 
-                let eveningTarget = 2 + inheritedToNight; 
-                let nightAdded1 = 1; 
-                
-                for(let h=19; h<=23 && nightAdded1 < eveningTarget; h++) {
-                    if(currentForecast[h]?.windGust > 43) continue;
-                    for(let m=0; m<=50 && nightAdded1 < eveningTarget; m+=10) {
-                        let mins = h * 60 + m;
-                        if(canAddFlight(mins, nightSpacing)) {
-                            let timeStr = `${h.toString().padStart(2,'0')}:${m.toString().padStart(2,'0')}`;
-                            schedule.push({ time: timeStr, type: nightBlocked >= 6 ? "Dinámico (Compresión 50m)" : "Dinámico", shift: "Turno Nocturno", fixed: false });
-                            nightAdded1++;
-                        }
-                    }
-                }
-
-                let nightAdded2 = 0;
-                for(let h=0; h<=6 && nightAdded2 < 4; h++) {
-                    if(currentForecast[h]?.windGust > 43) continue;
-                    for(let m=0; m<=50 && nightAdded2 < 4; m+=10) {
-                        let mins = h * 60 + m;
-                        if(canAddFlight(mins, nightSpacing)) {
-                            let timeStr = `${h.toString().padStart(2,'0')}:${m.toString().padStart(2,'0')}`;
-                            schedule.push({ time: timeStr, type: nightBlocked >= 6 ? "Dinámico (Compresión 50m)" : "Dinámico", shift: "Turno Nocturno", fixed: false });
-                            nightAdded2++;
-                        }
-                    }
-                }
-
-                schedule.sort((a, b) => {
-                    let ah = parseInt(a.time.split(':')[0]); let am = parseInt(a.time.split(':')[1]);
-                    let bh = parseInt(b.time.split(':')[0]); let bm = parseInt(b.time.split(':')[1]);
-                    if(ah < 7) ah += 24; 
-                    if(bh < 7) bh += 24;
-                    return (ah * 60 + am) - (bh * 60 + bm);
-                });
-
-                setFlightItinerary(schedule);
-                speak("Análisis completado. Plan táctico generado exitosamente. Alerta de clima desactivada.");
-            };
+            }, [flightItinerary, audioUnlocked, forecastData, isRaining]);
 
             const analyzeImage = async (base64Image, retryCount = 0) => {
                 if (!data.apiSettings.apiKey) {
-                    setModal({ isOpen: true, title: "Falta API Key", message: "Configura tu API Key en el botón inferior.", type: "error" });
+                    setModal({ isOpen: true, title: "Falta API Key", message: "Configura tu API Key en el botón inferior (Engranaje).", type: "error" });
                     setIsScanning(false);
                     return;
                 }
 
-                // PROMPT ANTI-MATEMÁTICAS: SOLO LECTURA.
                 const promptText = `
                     Eres un asistente lector de pantallas de alta precisión. Tu único trabajo es buscar el número de km/h a 120m de altura en esta tabla de Airdata "OK TO FLY".
                     
@@ -265,17 +320,10 @@
 
                     if (!response.ok) {
                         const errorData = await response.json();
-                        
-                        // Protección Anti-Saturación: Intenta 2 veces de forma invisible.
                         if (errorData.error && (errorData.error.code === 503 || errorData.error.code === 429) && retryCount < 2) {
                              await new Promise(resolve => setTimeout(resolve, 2000));
                              return analyzeImage(base64Image, retryCount + 1);
                         }
-                        
-                        if (errorData.error && (errorData.error.code === 503 || errorData.error.code === 429)) {
-                            throw new Error("Los servidores de Google están experimentando alta demanda. Por favor, intenta de nuevo en un par de minutos.");
-                        }
-                        
                         throw new Error(`Error del Servidor: ${JSON.stringify(errorData.error)}`);
                     }
 
@@ -297,7 +345,8 @@
                     });
                     
                     setForecastData(forecastDict);
-                    generateIntelligentSchedule(forecastDict, flights);
+                    generateIntelligentSchedule(forecastDict, flights, isRaining);
+                    speak("Análisis completado. Clima actualizado.");
                     
                 } catch (error) {
                     console.error(error);
@@ -334,6 +383,8 @@
                 setFlights(updatedLogs);
                 updateData({ flights: updatedLogs });
                 
+                // Recalcular el itinerario para absorber el vuelo
+                generateIntelligentSchedule(forecastData, updatedLogs, isRaining);
                 speak(`Despegue registrado exitosamente a las ${flightTime}.`);
             };
 
@@ -350,7 +401,7 @@
                 newTimestamp.setHours(hour, parseInt(timeStr.split(':')[1]), 0, 0);
                 
                 if (hour < 7 && currentTime.getHours() >= 7) {
-                    newTimestamp.setDate(newTimestamp.getDate() + 1); // Si es madrugada de ayer a hoy
+                    newTimestamp.setDate(newTimestamp.getDate() + 1);
                 }
 
                 const newLog = {
@@ -365,8 +416,11 @@
                 setFlights(updatedLogs);
                 updateData({ flights: updatedLogs });
                 
+                // Recalcular itinerario
+                generateIntelligentSchedule(forecastData, updatedLogs, isRaining);
+                
                 setModal({ isOpen: false, title: '', message: '', type: 'info', isSettings: false, isManualLog: false });
-                speak(`Vuelo pasado registrado exitosamente a las ${timeStr}.`);
+                speak(`Vuelo pasado registrado a las ${timeStr}.`);
             };
 
             const handleSaveSettings = (e) => {
@@ -381,6 +435,20 @@
                 setModal({ isOpen: false, title: '', message: '', type: 'info', isSettings: false, isManualLog: false });
             };
 
+            const handleRainToggle = () => {
+                const newRainState = !isRaining;
+                setIsRaining(newRainState);
+                if (newRainState) {
+                    speak("Alerta. Lluvia local detectada. Operaciones de vuelo suspendidas temporalmente.");
+                    setFlightItinerary([]); // Borrar agenda mientras llueve
+                } else {
+                    speak("Condiciones favorables. Lluvia finalizada. Reprogramando itinerario.");
+                    if(Object.keys(forecastData).length > 0) {
+                        generateIntelligentSchedule(forecastData, flights, false);
+                    }
+                }
+            };
+
             const currentHourInt = currentTime.getHours();
             const currentMinInt = currentTime.getMinutes();
             const currentWind = forecastData[currentHourInt] ? forecastData[currentHourInt].windGust : 0;
@@ -389,14 +457,7 @@
             
             const isMeetingTime = (currentHourInt === 7 && currentMinInt >= 50) || (currentHourInt === 8 && currentMinInt < 20);
             
-            const getOperativeDayStart = () => {
-                const d = new Date(currentTime);
-                if (d.getHours() < 7) d.setDate(d.getDate() - 1);
-                d.setHours(7, 0, 0, 0);
-                return d;
-            };
-            
-            const operativeStart = getOperativeDayStart();
+            const operativeStart = getOperativeDayStart(currentTime);
             const todayFlightsTotal = flights.filter(f => new Date(f.timestamp) >= operativeStart);
             
             const dayFlightsCount = todayFlightsTotal.filter(f => f.shift === 'Turno Diurno').length;
@@ -406,36 +467,51 @@
 
             return (
                 <div className="pb-24">
-                    {/* Header */}
+                    {/* Header Top */}
                     <div className="fixed top-0 w-full bg-[#020617]/90 backdrop-blur-md border-b border-slate-800 p-3 z-30 flex justify-between items-center">
                         <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center shadow-[0_0_15px_rgba(79,70,229,0.5)]">
-                                <span className="text-white font-black">DP</span>
+                            <div className={`w-8 h-8 rounded-lg flex items-center justify-center shadow-[0_0_15px_rgba(79,70,229,0.5)] ${isRaining ? 'bg-red-600 animate-pulse' : 'bg-indigo-600'}`}>
+                                <span className="text-white font-black">{isRaining ? '🌧' : 'DP'}</span>
                             </div>
                             <div>
                                 <h1 className="text-white font-bold text-sm leading-tight tracking-wide">DISPATCHER PRO</h1>
-                                <p className="text-indigo-400 text-[10px] font-bold tracking-widest uppercase">v2026.G3_FINAL_V9</p>
+                                <p className="text-indigo-400 text-[10px] font-bold tracking-widest uppercase">v2026.G3_FINAL_V11</p>
                             </div>
                         </div>
+                        {/* Botón Lluvia */}
+                        <button 
+                            onClick={handleRainToggle}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-black uppercase tracking-wider transition-all border ${isRaining ? 'bg-emerald-600 border-emerald-500 text-white shadow-[0_0_15px_rgba(16,185,129,0.4)]' : 'bg-slate-800 border-slate-600 text-slate-300 hover:bg-slate-700'}`}>
+                            {isRaining ? '☀️ Reanudar' : '🌧 Lluvia Local'}
+                        </button>
                     </div>
 
                     <div className="max-w-md mx-auto pt-20 px-4">
-                        {/* Time Panel (Audio Ninja Mode) */}
-                        <div className="glass p-5 rounded-3xl relative overflow-hidden flex justify-between items-center mb-6">
+                        
+                        {/* Alerta de Lluvia Activa */}
+                        {isRaining && (
+                            <div className="rain-glass rounded-3xl p-4 mb-6 flex flex-col items-center justify-center text-center shadow-2xl animate-pulse">
+                                <span className="text-4xl mb-2">🌧️🛑</span>
+                                <h2 className="text-white font-black text-lg uppercase tracking-widest">Alerta Meteorológica</h2>
+                                <p className="text-red-200 text-sm">Operaciones suspendidas por lluvia. Sistema bloqueado hasta validación visual.</p>
+                            </div>
+                        )}
+
+                        <div className={`glass p-5 rounded-3xl relative overflow-hidden flex justify-between items-center mb-6 ${isRaining ? 'opacity-50 pointer-events-none' : ''}`}>
                             <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/10 rounded-full blur-3xl"></div>
                             <div>
                                 <p className="text-[10px] font-black tracking-widest text-indigo-400 uppercase mb-1">Turno en curso</p>
                                 <h2 className="text-2xl font-black text-white">{activeShift}</h2>
                                 <div className="mt-2 text-3xl font-mono font-bold text-white tracking-wider flex items-center gap-2">
-                                    {!audioUnlocked && <span className="text-xs animate-pulse text-amber-500 border border-amber-500/50 bg-amber-500/10 px-2 py-1 rounded">🔇 Toca la pantalla</span>}
+                                    {!audioUnlocked && <span className="text-[10px] animate-pulse text-amber-500 border border-amber-500/50 bg-amber-500/10 px-2 py-1 rounded">🔇 Toca la pantalla</span>}
                                     {currentTime.toLocaleTimeString('en-US', { hour12: false })}
                                 </div>
                             </div>
                             
                             <input type="file" ref={fileInputRef} accept="image/*" onChange={handleImageUpload} className="hidden" />
                             <button 
-                                onClick={() => { unlockAudio(); if (fileInputRef.current) fileInputRef.current.click(); }} 
-                                disabled={isScanning}
+                                onClick={() => { if (fileInputRef.current) fileInputRef.current.click(); }} 
+                                disabled={isScanning || isRaining}
                                 className={`flex flex-col items-center justify-center p-3 rounded-2xl transition border z-10 relative ${isScanning ? 'bg-indigo-900/50 border-indigo-400 animate-pulse' : needsScanUI ? 'bg-rose-600 border-rose-400 shadow-[0_0_20px_rgba(225,29,72,0.4)] animate-pulse' : 'bg-indigo-600/20 border-indigo-500/30 hover:bg-indigo-600/40'}`}>
                                 <span className="text-2xl mb-1">{isScanning ? '⏳' : '📸'}</span>
                                 <span className={`text-[10px] font-black uppercase text-center ${needsScanUI || isScanning ? 'text-white' : 'text-indigo-300'}`}>
@@ -444,20 +520,19 @@
                             </button>
                         </div>
 
-                        {/* Status Panel */}
-                        <div className={`mb-6 p-4 rounded-3xl border ${isMeetingTime ? 'bg-amber-950/40 border-amber-500/50' : needsScanUI ? 'bg-slate-900 border-slate-800' : isDanger ? 'bg-rose-950/40 border-rose-500/50' : isWarning ? 'bg-orange-950/40 border-orange-500/50' : 'bg-emerald-950/40 border-emerald-500/50'}`}>
+                        <div className={`mb-6 p-4 rounded-3xl border ${isRaining ? 'bg-slate-900 border-slate-800 opacity-50' : isMeetingTime ? 'bg-amber-950/40 border-amber-500/50' : needsScanUI ? 'bg-slate-900 border-slate-800' : isDanger ? 'bg-rose-950/40 border-rose-500/50' : isWarning ? 'bg-orange-950/40 border-orange-500/50' : 'bg-emerald-950/40 border-emerald-500/50'}`}>
                             <div className="flex items-center gap-3">
-                                <div className={`w-3 h-3 rounded-full animate-ping ${isMeetingTime ? 'bg-amber-500' : needsScanUI ? 'bg-slate-600' : isDanger ? 'bg-rose-500' : isWarning ? 'bg-orange-500' : 'bg-emerald-500'}`}></div>
+                                <div className={`w-3 h-3 rounded-full animate-ping ${isRaining ? 'bg-red-500' : isMeetingTime ? 'bg-amber-500' : needsScanUI ? 'bg-slate-600' : isDanger ? 'bg-rose-500' : isWarning ? 'bg-orange-500' : 'bg-emerald-500'}`}></div>
                                 <div>
                                     <p className="text-[10px] font-black text-slate-400 tracking-widest uppercase">ESTADO ACTUAL DEL VIENTO</p>
-                                    <h3 className={`font-black text-sm uppercase ${isMeetingTime ? 'text-amber-500' : needsScanUI ? 'text-slate-500' : isDanger ? 'text-rose-500' : isWarning ? 'text-orange-500' : 'text-emerald-500'}`}>
-                                        {isMeetingTime ? "BLOQUEO: JUNTA OBLIGATORIA" : needsScanUI ? "Esperando datos..." : isDanger ? `PELIGRO: BLOQUEADO (${currentWind} km/h)` : isWarning ? `OPERABLE CON PRECAUCIÓN (${currentWind} km/h)` : `OPERABLE (${currentWind} km/h)`}
+                                    <h3 className={`font-black text-sm uppercase ${isRaining ? 'text-slate-500' : isMeetingTime ? 'text-amber-500' : needsScanUI ? 'text-slate-500' : isDanger ? 'text-rose-500' : isWarning ? 'text-orange-500' : 'text-emerald-500'}`}>
+                                        {isRaining ? "CLIMA IGNORADO (LLUVIA)" : isMeetingTime ? "BLOQUEO: JUNTA OBLIGATORIA" : needsScanUI ? "Esperando datos..." : isDanger ? `PELIGRO: BLOQUEADO (${currentWind} km/h)` : isWarning ? `OPERABLE CON PRECAUCIÓN (${currentWind} km/h)` : `OPERABLE (${currentWind} km/h)`}
                                     </h3>
                                 </div>
                             </div>
                         </div>
 
-                        {/* Progress Panel con Contadores (Añadir Pasado) */}
+                        {/* Contadores */}
                         <div className="glass rounded-3xl p-6 text-center border border-slate-800 mb-6 relative overflow-hidden">
                             <div className="absolute top-0 left-0 w-full h-1 bg-slate-800">
                                 <div className="h-full bg-indigo-500 transition-all duration-500" style={{width: `${Math.min((todayFlightsTotal.length / 13) * 100, 100)}%`}}></div>
@@ -466,7 +541,7 @@
                             <div className="flex justify-between items-center mb-4">
                                 <p className="text-[10px] font-black tracking-widest text-slate-400 uppercase">Meta Operativa del Día</p>
                                 <button 
-                                    onClick={() => { unlockAudio(); setModal({ isOpen: true, title: "Registrar Vuelo Pasado", isSettings: false, isManualLog: true }); }} 
+                                    onClick={() => setModal({ isOpen: true, title: "Registrar Vuelo Pasado", isSettings: false, isManualLog: true })} 
                                     className="text-[9px] font-bold uppercase tracking-wider bg-slate-800/80 hover:bg-slate-700 text-slate-300 py-1.5 px-3 rounded-lg border border-slate-700 transition shadow-sm">
                                     + Añadir Pasado
                                 </button>
@@ -489,12 +564,14 @@
                             </div>
                         </div>
 
-                        {/* Master Plan */}
-                        {flightItinerary.length > 0 && (
+                        {/* Plan Maestro */}
+                        {flightItinerary.length > 0 && !isRaining && (
                             <div className="glass rounded-3xl p-4 border border-slate-800 mb-6">
                                 <h3 className="text-[11px] font-black tracking-widest text-indigo-400 uppercase mb-3 flex items-center justify-between">
-                                    <span>🤖 Plan Maestro (24h)</span>
-                                    <span className="bg-indigo-600 text-white px-2 py-0.5 rounded-full text-[10px]">{flightItinerary.length} Vuelos calculados</span>
+                                    <span>🤖 Plan Maestro Restante</span>
+                                    <button onClick={forceRecalculate} className="bg-indigo-900/50 hover:bg-indigo-800 text-indigo-300 px-2 py-0.5 rounded-full text-[10px] border border-indigo-700/50 flex items-center gap-1 transition">
+                                        <span>🔄 Recalcular</span>
+                                    </button>
                                 </h3>
                                 <div className="space-y-2 max-h-60 overflow-y-auto pr-2">
                                     {flightItinerary.map((f, i) => {
@@ -526,7 +603,6 @@
                             </div>
                         )}
 
-                        {/* Registro Físico de Bitácora */}
                         <div className="glass rounded-3xl p-4 border border-slate-800 mb-6">
                             <h3 className="text-[11px] font-black tracking-widest text-slate-400 uppercase mb-3 flex items-center justify-between">
                                 <span>✅ Bitácora de Despegues</span>
@@ -547,23 +623,21 @@
                         </div>
 
                         <div className="flex justify-center pb-8">
-                            <button onClick={() => { unlockAudio(); setModal({ isOpen: true, title: "Configuración del Sistema", isSettings: true, isManualLog: false }); }} className="text-xs text-slate-500 hover:text-white flex items-center gap-1 transition">
+                            <button onClick={() => setModal({ isOpen: true, title: "Configuración del Sistema", isSettings: true, isManualLog: false })} className="text-xs text-slate-500 hover:text-white flex items-center gap-1 transition">
                                 ⚙️ Configurar Sistema
                             </button>
                         </div>
                     </div>
 
-                    {/* Bottom Action Button */}
                     <div className="fixed bottom-0 left-0 w-full p-4 bg-gradient-to-t from-[#020617] via-[#020617] to-transparent flex justify-center z-40 pointer-events-none">
                         <button 
-                            onClick={() => { unlockAudio(); handleLogFlight(); }}
-                            disabled={isDanger || isMeetingTime}
-                            className={`pointer-events-auto w-full max-w-sm py-4 rounded-2xl font-black text-lg tracking-widest uppercase transition-all shadow-2xl flex items-center justify-center gap-3 ${isMeetingTime ? 'bg-slate-800 text-slate-500 cursor-not-allowed opacity-50' : isDanger ? 'bg-rose-900/80 text-rose-300 cursor-not-allowed' : isWarning ? 'bg-orange-500 hover:bg-orange-400 text-white shadow-[0_0_30px_rgba(249,115,22,0.3)]' : 'bg-emerald-500 hover:bg-emerald-400 text-white shadow-[0_0_30px_rgba(16,185,129,0.3)]'}`}>
-                            {isMeetingTime ? 'BLOQUEO (JUNTA)' : isDanger ? 'BLOQUEO (CLIMA)' : '🚀 REGISTRAR DESPEGUE'}
+                            onClick={handleLogFlight}
+                            disabled={isDanger || isMeetingTime || isRaining}
+                            className={`pointer-events-auto w-full max-w-sm py-4 rounded-2xl font-black text-lg tracking-widest uppercase transition-all shadow-2xl flex items-center justify-center gap-3 ${isRaining ? 'bg-red-900/80 text-red-300 cursor-not-allowed' : isMeetingTime ? 'bg-slate-800 text-slate-500 cursor-not-allowed opacity-50' : isDanger ? 'bg-rose-900/80 text-rose-300 cursor-not-allowed' : isWarning ? 'bg-orange-500 hover:bg-orange-400 text-white shadow-[0_0_30px_rgba(249,115,22,0.3)]' : 'bg-emerald-500 hover:bg-emerald-400 text-white shadow-[0_0_30px_rgba(16,185,129,0.3)]'}`}>
+                            {isRaining ? 'BLOQUEO (LLUVIA)' : isMeetingTime ? 'BLOQUEO (JUNTA)' : isDanger ? 'BLOQUEO (CLIMA)' : '🚀 REGISTRAR DESPEGUE'}
                         </button>
                     </div>
 
-                    {/* Modals (Configuración / Log Manual / Info) */}
                     {modal.isOpen && (
                         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
                             <div className="glass-panel w-full max-w-sm rounded-3xl overflow-hidden border border-slate-700 p-6 animate-in fade-in zoom-in duration-200">
@@ -573,7 +647,8 @@
                                     <form onSubmit={handleSaveSettings} className="space-y-4 mt-4">
                                         <div>
                                             <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Google API Key (AQ. o AIZA.)</label>
-                                            <input type="password" name="apiKey" defaultValue={data.apiSettings.apiKey} required className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-indigo-500 font-mono text-sm" placeholder="Pégala aquí. Empieza con AQ..." />
+                                            <input type="password" name="apiKey" defaultValue={data.apiSettings.apiKey} required className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-indigo-500 font-mono text-sm" placeholder="Pégala aquí..." />
+                                            <p className="text-[9px] text-slate-500 mt-1">Por seguridad, la llave se guarda solo en tu navegador.</p>
                                         </div>
                                         <div>
                                             <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Motor Táctico de IA</label>
