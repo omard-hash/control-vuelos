@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Dispatcher Pro (v2026.G3_CLOUD_V12)</title>
+    <title>Dispatcher Pro (v2026.G3_CLOUD_V13)</title>
     
     <script src="https://cdn.tailwindcss.com"></script>
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
@@ -57,7 +57,7 @@
 
         const App = () => {
             const [localSettings, setLocalSettings] = useState(() => {
-                const saved = localStorage.getItem('dispatcherSettings_v2026');
+                const saved = localStorage.getItem('dispatcherSettings_v2026_V13');
                 return saved ? JSON.parse(saved) : { apiKey: '', model: 'gemini-3-flash-preview' };
             });
 
@@ -347,16 +347,18 @@
                 }
 
                 const promptText = `
-                    Eres un asistente lector de pantallas de alta precisión. Tu único trabajo es buscar el número de km/h a 120m de altura en esta tabla de Airdata "OK TO FLY".
+                    Eres un asistente lector de pantallas experto en la interfaz de "OK TO FLY". Extrae el viento para cada hora mostrada.
                     
-                    REGLAS INQUEBRANTABLES:
-                    1. NO HAGAS NINGUNA OPERACIÓN MATEMÁTICA. PROHIBIDO MULTIPLICAR.
-                    2. Busca la hora de la previsión.
-                    3. Busca en la ventana el texto que dice "A 120m" o "At 120m".
-                    4. Lee el número en km/h que está escrito justo a su derecha. (Ejemplo: Si dice "38 km/h", extrae solo el número 38).
-                    5. Devuelve EXACTAMENTE este formato JSON puro: 
-                    [{"time": "14:00", "windGust": 38}]
-                    6. Si la imagen NO tiene la ventana abierta, busca en la tabla principal y si dice "Ráfagas fuertes >40m" extrae 45. Si dice ">80m" extrae 85.
+                    REGLAS INQUEBRANTABLES PARA EL JSON:
+                    1. Devuelve SOLO un arreglo JSON puro: [{"time": "19:00", "windGust": 45}, {"time": "20:00", "windGust": 13}]
+                    2. Convierte todas las horas al formato 24h (ej. 8:00pm = 20:00, 9:00pm = 21:00).
+                    
+                    REGLAS DE LECTURA DE VIENTO:
+                    3. BLOQUE "AHORA" (ROJO): Si ves una fila roja que dice "AHORA" y textualmente dice "Vientos, Ráfagas fuertes", deduce la hora restando 1 a la fila de abajo. Asígnale OBLIGATORIAMENTE un "windGust" de 45 (para que el sistema bloquee el vuelo).
+                    4. NÚMERO JUNTO A "120m": Si ves un número junto a la palabra "120m" (ej. "13 120m"), el "windGust" es ese número (13).
+                    5. APTO PARA VOLAR: Si la fila dice "Apto para volar" en azul, el "windGust" es 0.
+                    6. OTROS AVISOS: Si dice ">40m" pon 45. Si dice ">80m" pon 85.
+                    7. PROHIBIDO MULTIPLICAR. Extrae los números literalmente.
                 `;
 
                 try {
@@ -475,7 +477,7 @@
                 const formData = new FormData(e.target);
                 const newSettings = { apiKey: formData.get('apiKey'), model: formData.get('model') };
                 setLocalSettings(newSettings);
-                localStorage.setItem('dispatcherSettings_v2026', JSON.stringify(newSettings));
+                localStorage.setItem('dispatcherSettings_v2026_V13', JSON.stringify(newSettings));
                 setModal({ isOpen: false, title: '', message: '', type: 'info', isSettings: false, isManualLog: false });
             };
 
@@ -492,9 +494,13 @@
 
             const currentHourInt = currentTime.getHours();
             const currentMinInt = currentTime.getMinutes();
-            const currentWind = forecastData[currentHourInt] ? forecastData[currentHourInt].windGust : 0;
+            
+            const hasForecastForCurrentHour = forecastData.hasOwnProperty(currentHourInt);
+            const currentWind = hasForecastForCurrentHour ? forecastData[currentHourInt].windGust : 0;
+            
             const isDanger = currentWind > 43; 
             const isWarning = currentWind === 43; 
+            const isMissingData = !hasForecastForCurrentHour && Object.keys(forecastData).length > 0;
             
             const isMeetingTime = (currentHourInt === 7 && currentMinInt >= 50) || (currentHourInt === 8 && currentMinInt < 20);
             
@@ -516,8 +522,8 @@
                             <div>
                                 <h1 className="text-white font-black text-sm md:text-base leading-tight tracking-wide">DISPATCHER PRO</h1>
                                 <p className="text-indigo-400 text-[9px] md:text-xs font-bold tracking-widest uppercase flex items-center gap-1">
-                                    V12_CLOUD 
-                                    {isCloudConnected ? <span className="text-emerald-400">🟢 Conectado</span> : <span className="text-rose-400">🔴 Sin red</span>}
+                                    V13_CLOUD 
+                                    {isCloudConnected ? <span className="text-emerald-400">🟢 Nube Activa</span> : <span className="text-rose-400">🔴 Sin red</span>}
                                 </p>
                             </div>
                         </div>
@@ -562,13 +568,13 @@
                             </button>
                         </div>
 
-                        <div className={`mb-6 p-4 rounded-3xl border ${isRaining ? 'bg-slate-900 border-slate-800 opacity-50' : isMeetingTime ? 'bg-amber-950/40 border-amber-500/50' : needsScanUI ? 'bg-slate-900 border-slate-800' : isDanger ? 'bg-rose-950/40 border-rose-500/50' : isWarning ? 'bg-orange-950/40 border-orange-500/50' : 'bg-emerald-950/40 border-emerald-500/50'}`}>
+                        <div className={`mb-6 p-4 rounded-3xl border ${isRaining ? 'bg-slate-900 border-slate-800 opacity-50' : isMeetingTime ? 'bg-amber-950/40 border-amber-500/50' : needsScanUI ? 'bg-slate-900 border-slate-800' : isDanger ? 'bg-rose-950/40 border-rose-500/50' : isMissingData ? 'bg-slate-800 border-slate-700' : isWarning ? 'bg-orange-950/40 border-orange-500/50' : 'bg-emerald-950/40 border-emerald-500/50'}`}>
                             <div className="flex items-center gap-3">
-                                <div className={`w-3 h-3 rounded-full animate-ping ${isRaining ? 'bg-red-500' : isMeetingTime ? 'bg-amber-500' : needsScanUI ? 'bg-slate-600' : isDanger ? 'bg-rose-500' : isWarning ? 'bg-orange-500' : 'bg-emerald-500'}`}></div>
+                                <div className={`w-3 h-3 rounded-full animate-ping ${isRaining ? 'bg-red-500' : isMeetingTime ? 'bg-amber-500' : needsScanUI ? 'bg-slate-600' : isDanger ? 'bg-rose-500' : isMissingData ? 'bg-slate-500' : isWarning ? 'bg-orange-500' : 'bg-emerald-500'}`}></div>
                                 <div>
                                     <p className="text-[10px] font-black text-slate-400 tracking-widest uppercase">ESTADO ACTUAL DEL VIENTO</p>
-                                    <h3 className={`font-black text-sm uppercase ${isRaining ? 'text-slate-500' : isMeetingTime ? 'text-amber-500' : needsScanUI ? 'text-slate-500' : isDanger ? 'text-rose-500' : isWarning ? 'text-orange-500' : 'text-emerald-500'}`}>
-                                        {isRaining ? "CLIMA IGNORADO (LLUVIA)" : isMeetingTime ? "BLOQUEO: JUNTA OBLIGATORIA" : needsScanUI ? "Esperando datos..." : isDanger ? `PELIGRO: BLOQUEADO (${currentWind} km/h)` : isWarning ? `OPERABLE CON PRECAUCIÓN (${currentWind} km/h)` : `OPERABLE (${currentWind} km/h)`}
+                                    <h3 className={`font-black text-sm uppercase ${isRaining ? 'text-slate-500' : isMeetingTime ? 'text-amber-500' : needsScanUI ? 'text-slate-500' : isDanger ? 'text-rose-500' : isMissingData ? 'text-slate-400' : isWarning ? 'text-orange-500' : 'text-emerald-500'}`}>
+                                        {isRaining ? "CLIMA IGNORADO (LLUVIA)" : isMeetingTime ? "BLOQUEO: JUNTA OBLIGATORIA" : needsScanUI ? "Esperando datos..." : isDanger ? `PELIGRO: BLOQUEADO (${currentWind} km/h)` : isMissingData ? "⚠️ SIN DATOS PARA ESTA HORA" : isWarning ? `OPERABLE CON PRECAUCIÓN (${currentWind} km/h)` : `OPERABLE (${currentWind} km/h)`}
                                     </h3>
                                 </div>
                             </div>
@@ -673,11 +679,12 @@
                         <button 
                             onClick={handleLogFlight}
                             disabled={isDanger || isMeetingTime || isRaining}
-                            className={`pointer-events-auto w-full max-w-sm py-4 rounded-2xl font-black text-lg tracking-widest uppercase transition-all shadow-2xl flex items-center justify-center gap-3 ${isRaining ? 'bg-red-900/80 text-red-300 cursor-not-allowed' : isMeetingTime ? 'bg-slate-800 text-slate-500 cursor-not-allowed opacity-50' : isDanger ? 'bg-rose-900/80 text-rose-300 cursor-not-allowed' : isWarning ? 'bg-orange-500 hover:bg-orange-400 text-white shadow-[0_0_30px_rgba(249,115,22,0.3)]' : 'bg-emerald-500 hover:bg-emerald-400 text-white shadow-[0_0_30px_rgba(16,185,129,0.3)]'}`}>
-                            {isRaining ? 'BLOQUEO (LLUVIA)' : isMeetingTime ? 'BLOQUEO (JUNTA)' : isDanger ? 'BLOQUEO (CLIMA)' : '🚀 REGISTRAR DESPEGUE'}
+                            className={`pointer-events-auto w-full max-w-sm py-4 rounded-2xl font-black text-lg tracking-widest uppercase transition-all shadow-2xl flex items-center justify-center gap-3 ${isRaining ? 'bg-red-900/80 text-red-300 cursor-not-allowed' : isMeetingTime ? 'bg-slate-800 text-slate-500 cursor-not-allowed opacity-50' : isDanger ? 'bg-rose-900/80 text-rose-300 cursor-not-allowed' : isMissingData ? 'bg-slate-700 hover:bg-slate-600 text-white shadow-[0_0_30px_rgba(51,65,85,0.4)]' : isWarning ? 'bg-orange-500 hover:bg-orange-400 text-white shadow-[0_0_30px_rgba(249,115,22,0.3)]' : 'bg-emerald-500 hover:bg-emerald-400 text-white shadow-[0_0_30px_rgba(16,185,129,0.3)]'}`}>
+                            {isRaining ? 'BLOQUEO (LLUVIA)' : isMeetingTime ? 'BLOQUEO (JUNTA)' : isDanger ? 'BLOQUEO (CLIMA)' : isMissingData ? '⚠️ REGISTRAR (CIEGAS)' : '🚀 REGISTRAR DESPEGUE'}
                         </button>
                     </div>
 
+                    {}
                     {modal.isOpen && (
                         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
                             <div className="glass-panel w-full max-w-sm rounded-3xl overflow-hidden border border-slate-700 p-6 animate-in fade-in zoom-in duration-200">
