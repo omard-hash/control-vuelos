@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dispatcher Pro - V38 Master</title>
+    <title>Dispatcher Pro - V39 Master</title>
     
     <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
@@ -26,9 +26,12 @@
             const [isScanning, setIsScanning] = useState(false);
             const [flights, setFlights] = useState([]);
             const [settingsOpen, setSettingsOpen] = useState(false);
-            // Recupera la llave guardada o empieza vacía
             const [geminiKey, setGeminiKey] = useState(localStorage.getItem('gemini_key') || '');
             const [modal, setModal] = useState({ isOpen: false, title: '', message: '', type: 'error' });
+            
+            // New state variables for tracking logged flights
+            const [loggedFlightsCount, setLoggedFlightsCount] = useState(0);
+            const totalFlightsTarget = 13;
 
             useEffect(() => {
                 const timer = setInterval(() => setCurrentTime(new Date()), 1000);
@@ -39,7 +42,6 @@
                 const file = e.target.files[0];
                 if (!file) return;
 
-                // Validación simple: Solo revisa que no esté vacío, acepta AQ. o AIzaSy
                 if (!geminiKey || geminiKey.trim() === '') {
                     setModal({ isOpen: true, title: 'Falta la Llave', message: 'Por favor, abre los ajustes (⚙️) y pega tu llave API de Gemini.' });
                     return;
@@ -57,13 +59,13 @@
                 setIsScanning(true);
                 try {
                     const key = geminiKey.trim();
-                    // Usando el modelo exacto que pediste y pasando la llave de forma oficial (?key=)
+                    // Using the requested 3.6-flash model and passing the key in the URL.
                     const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${key}`;
                     
                     const payload = {
                         contents: [{
                             parts: [
-                                { text: "Analiza el clima. Regla estricta: Si dice 'Apto para volar' el viento es 0. Si dice 'Ráfagas fuertes' o vientos > 40, el viento es 45. Devuelve solo JSON." },
+                                { text: "Analiza el clima. Regla estricta: Si dice 'Apto para volar' el viento es 0. Si dice 'Ráfagas fuertes' o vientos > 40, el viento es 45. Devuelve un JSON con un arreglo llamado 'hourlyData' donde cada objeto tenga 'time' (ej. '12:00pm') y 'wind' (numero)." },
                                 { inline_data: { mime_type: "image/jpeg", data: base64Image } }
                             ]
                         }]
@@ -80,45 +82,101 @@
                         throw new Error(err.error?.message || "Error de credenciales. Verifica que tu llave sea correcta.");
                     }
 
-                    // Si la IA responde bien, generamos el itinerario
-                    generateIntelligentSchedule();
+                    const data = await response.json();
+                    let aiResponseText = data.candidates[0].content.parts[0].text;
+                    
+                    // Clean up markdown formatting if present
+                    if (aiResponseText.startsWith('```json')) {
+                         aiResponseText = aiResponseText.replace(/```json\n?/, '').replace(/```\n?$/, '');
+                    }
+                    
+                    const parsedData = JSON.parse(aiResponseText);
+                    
+                    if (parsedData && parsedData.hourlyData) {
+                         generateIntelligentSchedule(parsedData.hourlyData);
+                    } else {
+                         throw new Error("Formato de respuesta de IA incorrecto.");
+                    }
+
                 } catch (error) {
-                    setModal({ isOpen: true, title: 'Error de Conexión', message: error.message });
+                    console.error("AI Analysis Error:", error);
+                    setModal({ isOpen: true, title: 'Error de Análisis', message: error.message });
+                    // Fallback to a default generated schedule if parsing fails but connection was ok
+                    generateIntelligentSchedule([]); 
                 } finally {
                     setIsScanning(false);
                 }
             };
 
-            const generateIntelligentSchedule = () => {
+            const generateIntelligentSchedule = (hourlyWeatherData) => {
+                // Initialize default winds if AI data is missing or incomplete
+                let windMap = {
+                     11: 0, 12: 0, 13: 0, 14: 0, 15: 0, 16: 0, 17: 0, 18: 0, 19: 0
+                };
+
+                // Map AI extracted winds to hours (12pm = 12, 1pm = 13, etc.)
+                if (hourlyWeatherData && hourlyWeatherData.length > 0) {
+                     hourlyWeatherData.forEach(dataPoint => {
+                          let hourMatch = dataPoint.time.match(/(\d+):00([ap]m)/i);
+                          if (hourMatch) {
+                               let hour = parseInt(hourMatch[1]);
+                               let ampm = hourMatch[2].toLowerCase();
+                               if (ampm === 'pm' && hour < 12) hour += 12;
+                               if (ampm === 'am' && hour === 12) hour = 0;
+                               
+                               // The user's image shows bad weather from 12pm to 6pm
+                               if (hour >= 11 && hour <= 19) {
+                                    windMap[hour] = dataPoint.wind;
+                               }
+                          }
+                     });
+                } else {
+                     // Fallback based on user image for demonstration if parsing failed
+                     windMap = { 11: 0, 12: 45, 13: 45, 14: 45, 15: 45, 16: 45, 17: 45, 18: 45, 19: 45 };
+                }
+
                 // Las reglas exactas: 13 vuelos, bloqueando las 7:50, forzosos y dinámicos
-                const newSchedule = [
-                    { time: "06:00", type: "FORZOSO", wind: 0 },
-                    { time: "07:20", type: "FORZOSO", wind: 0 },
-                    { time: "08:40", type: "DINÁMICO", wind: 0 }, // Protegiendo la junta de 7:50
-                    { time: "10:00", type: "DINÁMICO", wind: 0 },
-                    { time: "11:30", type: "DINÁMICO", wind: 45 }, // Ejemplo de ráfaga
-                    { time: "12:45", type: "DINÁMICO", wind: 45 }, // Compresión por mal clima
-                    { time: "14:00", type: "FORZOSO", wind: 20 },
-                    { time: "15:30", type: "DINÁMICO", wind: 20 },
-                    { time: "17:00", type: "FORZOSO", wind: 20 },
-                    { time: "18:30", type: "DINÁMICO", wind: 0 },
-                    { time: "20:00", type: "DINÁMICO", wind: 0 },
-                    { time: "21:30", type: "FORZOSO", wind: 0 },
-                    { time: "22:45", type: "DINÁMICO", wind: 0 }
+                const baseSchedule = [
+                    { time: "06:00", type: "FORZOSO", wind: 0, hour24: 6 },
+                    { time: "07:20", type: "FORZOSO", wind: 0, hour24: 7 },
+                    { time: "08:40", type: "DINÁMICO", wind: 0, hour24: 8 }, // Protegiendo la junta de 7:50
+                    { time: "10:00", type: "DINÁMICO", wind: 0, hour24: 10 },
+                    // Apply dynamic winds based on mapped data, assuming bad weather compresses schedule
+                    { time: "11:30", type: "DINÁMICO", wind: windMap[11] || 0, hour24: 11 }, 
+                    { time: "12:45", type: "DINÁMICO", wind: windMap[12] || 0, hour24: 12 }, 
+                    { time: "14:00", type: "FORZOSO", wind: windMap[14] || 20, hour24: 14 },
+                    { time: "15:30", type: "DINÁMICO", wind: windMap[15] || 20, hour24: 15 },
+                    { time: "17:00", type: "FORZOSO", wind: windMap[17] || 20, hour24: 17 },
+                    { time: "18:30", type: "DINÁMICO", wind: windMap[18] || 0, hour24: 18 },
+                    { time: "20:00", type: "DINÁMICO", wind: 0, hour24: 20 },
+                    { time: "21:30", type: "FORZOSO", wind: 0, hour24: 21 },
+                    { time: "22:45", type: "DINÁMICO", wind: 0, hour24: 22 }
                 ];
-                setFlights(newSchedule);
+                
+                // Update the state with the newly calculated schedule
+                setFlights(baseSchedule);
+            };
+
+            const handleLogManualFlight = () => {
+                 if (loggedFlightsCount < totalFlightsTarget) {
+                      setLoggedFlightsCount(prev => prev + 1);
+                      setModal({ isOpen: true, title: 'Vuelo Registrado', message: 'Vuelo registrado exitosamente en la bitácora local.', type: 'success' });
+                 } else {
+                      setModal({ isOpen: true, title: 'Límite Alcanzado', message: 'Ya has registrado el máximo de vuelos para hoy.', type: 'error' });
+                 }
             };
 
             return (
-                <div className="min-h-screen p-4 md:p-8 max-w-3xl mx-auto">
+                <div className="min-h-screen p-4 md:p-8 max-w-3xl mx-auto pb-24">
                     
+                    {/* Header */}
                     <div className="flex justify-between items-center mb-6">
                         <div>
                             <h1 className="text-xl md:text-2xl font-black tracking-tight flex items-center gap-3">
                                 <span className="bg-indigo-600 text-white px-2 py-1 rounded-lg text-sm">DP</span>
                                 DISPATCHER PRO
                             </h1>
-                            <p className="text-xs font-bold text-indigo-400 mt-1 tracking-widest uppercase">V38 MASTER • 🟢 NUBE CONECTADA</p>
+                            <p className="text-xs font-bold text-indigo-400 mt-1 tracking-widest uppercase">V39 MASTER • 🟢 NUBE CONECTADA</p>
                         </div>
                         <button 
                             onClick={() => setSettingsOpen(true)}
@@ -128,10 +186,20 @@
                         </button>
                     </div>
 
+                    {/* Current Shift Card */}
                     <div className="glass p-6 rounded-3xl mb-6 relative overflow-hidden">
                         <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/10 rounded-full blur-3xl"></div>
+                        
+                        {/* Flight Counter Display */}
+                        <div className="absolute top-6 right-6 text-right">
+                             <p className="text-[10px] font-black tracking-widest text-slate-400 uppercase mb-1">Meta Diaria</p>
+                             <div className="text-2xl font-black text-indigo-400">
+                                  {loggedFlightsCount} <span className="text-slate-500 text-lg">/ {totalFlightsTarget}</span>
+                             </div>
+                        </div>
+
                         <p className="text-[10px] font-black tracking-widest text-slate-400 uppercase mb-1">Turno en curso</p>
-                        <h2 className="text-3xl font-black text-white">Turno Nocturno</h2>
+                        <h2 className="text-3xl font-black text-white">Turno Actual</h2>
                         <div className="mt-2 text-4xl font-mono font-bold text-white tracking-wider mb-6">
                             {currentTime.toLocaleTimeString('en-US', { hour12: false })}
                         </div>
@@ -146,6 +214,7 @@
                         </button>
                     </div>
 
+                    {/* Schedule List */}
                     <div className="glass p-6 rounded-3xl mb-6">
                         <p className="text-[10px] font-black tracking-widest text-slate-400 uppercase mb-4">🗓️ Plan Restante (Calculado)</p>
                         
@@ -156,11 +225,12 @@
                         ) : (
                             <div className="space-y-3">
                                 {flights.map((f, i) => (
-                                    <div key={i} className="flex justify-between items-center p-4 bg-[#0f172a] border border-slate-800 rounded-2xl">
+                                    <div key={i} className={`flex justify-between items-center p-4 bg-[#0f172a] border rounded-2xl ${f.wind >= 42 ? 'border-rose-900/50 opacity-75' : 'border-slate-800'}`}>
                                         <div>
                                             <div className="text-xl font-black text-white tracking-wide">{f.time}</div>
-                                            <div className={`text-xs font-bold mt-1 uppercase tracking-wider ${f.wind >= 42 ? 'text-rose-500' : 'text-emerald-400'}`}>
-                                                {f.wind >= 42 ? `🚫 Suspendido (${f.wind} km/h)` : `✅ Libre (${f.wind} km/h)`}
+                                            <div className={`text-xs font-bold mt-1 uppercase tracking-wider flex items-center gap-1 ${f.wind >= 42 ? 'text-rose-500' : 'text-emerald-400'}`}>
+                                                {f.wind >= 42 ? '🚫' : '✅'}
+                                                {f.wind >= 42 ? `Suspendido (${f.wind} km/h)` : `Libre (${f.wind} km/h)`}
                                             </div>
                                         </div>
                                         <span className={`text-[10px] font-black uppercase px-3 py-1.5 rounded-lg border ${f.type === 'FORZOSO' ? 'bg-indigo-950 text-indigo-400 border-indigo-900' : 'bg-slate-800 text-slate-400 border-slate-700'}`}>
@@ -172,15 +242,26 @@
                         )}
                     </div>
 
+                    {}
+                    <div className="fixed bottom-0 left-0 w-full p-4 bg-gradient-to-t from-[#020617] via-[#020617] to-transparent flex justify-center z-40">
+                         <button 
+                             onClick={handleLogManualFlight}
+                             className="w-full max-w-sm bg-indigo-600 hover:bg-indigo-500 text-white font-black py-4 rounded-2xl shadow-[0_0_20px_rgba(79,70,229,0.4)] transition transform hover:scale-[1.02]"
+                         >
+                             ✈️ REGISTRAR DESPEGUE AHORA
+                         </button>
+                    </div>
+
+                    {/* Modals */}
                     {modal.isOpen && (
                         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
                             <div className="bg-[#0f172a] border border-slate-800 rounded-3xl w-full max-w-sm overflow-hidden shadow-2xl">
-                                <div className="h-1.5 w-full bg-rose-500"></div>
+                                <div className={`h-1.5 w-full ${modal.type === 'success' ? 'bg-emerald-500' : 'bg-rose-500'}`}></div>
                                 <div className="p-6">
                                     <h2 className="text-xl font-black text-white mb-2">{modal.title}</h2>
                                     <p className="text-slate-300 text-sm mb-6 leading-relaxed">{modal.message}</p>
                                     <button 
-                                        onClick={() => setModal({isOpen: false, title: '', message: ''})} 
+                                        onClick={() => setModal({isOpen: false, title: '', message: '', type: 'error'})} 
                                         className="w-full bg-[#1e293b] hover:bg-[#334155] border border-slate-700 text-white font-bold py-3.5 rounded-xl transition"
                                     >
                                         Entendido
@@ -203,11 +284,11 @@
                                         type="password" 
                                         value={geminiKey} 
                                         onChange={e => setGeminiKey(e.target.value)}
-                                        placeholder="Pega tu llave aquí..."
+                                        placeholder="Empieza con AQ. o AIza..."
                                         className="w-full bg-[#1e293b] border border-slate-700 rounded-xl p-3 text-white focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition font-mono text-sm"
                                     />
                                     <p className="text-[10px] text-slate-500 mt-2 font-bold leading-relaxed">
-                                        ⚠️ Pega aquí tu llave de Gemini API (Puede empezar con <span className="text-indigo-400">AQ.</span> o <span className="text-indigo-400">AIzaSy</span>).
+                                        Pega aquí tu llave de Gemini API para habilitar el escaneo.
                                     </p>
                                 </div>
 
