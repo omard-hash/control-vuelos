@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Dispatcher Pro V29</title>
+    <title>Dispatcher Pro V31</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
@@ -25,11 +25,6 @@
 
     <script type="text/babel">
         const { useState, useEffect, useRef } = React;
-
-        const toOpMins = (h, m) => {
-            let adjH = h < 7 ? h + 24 : h;
-            return adjH * 60 + m;
-        };
 
         const App = () => {
             const [currentTime, setCurrentTime] = useState(new Date());
@@ -79,75 +74,122 @@
 
             const generateIntelligentSchedule = (forecast, completedFlights, raining) => {
                 let schedule = [];
+                
+                // 1. Vuelos Forzosos Exactos (Con el de las 7:20 para librar la junta)
                 const forzosos = [
-                    { h: 8, m: 20 }, { h: 14, m: 0 }, { h: 17, m: 0 }, { h: 21, m: 30 }, { h: 6, m: 0 }
+                    { h: 6, m: 0 },
+                    { h: 7, m: 20 },
+                    { h: 14, m: 0 },
+                    { h: 17, m: 0 },
+                    { h: 21, m: 30 }
                 ];
 
+                const currentH = currentTime.getHours();
+                const currentM = currentTime.getMinutes();
+                const nowMins = currentH * 60 + currentM;
+
+                // 2. Filtrar Forzosos al itinerario
                 forzosos.forEach(fz => {
-                    let speed = forecast[fz.h.toString()] || 0;
+                    let fzMins = fz.h * 60 + fz.m;
+                    let speed = forecast[fz.h.toString()] !== undefined ? forecast[fz.h.toString()] : 0;
                     schedule.push({
                         time: `${fz.h.toString().padStart(2, '0')}:${fz.m.toString().padStart(2, '0')}`,
                         type: 'FORZOSO',
                         wind: speed,
                         isPermitted: !raining && speed <= 43,
-                        slotMins: toOpMins(fz.h, fz.m)
+                        slotMins: fzMins
                     });
                 });
 
-                const currentH = currentTime.getHours();
-                const currentM = currentTime.getMinutes();
-                const nowMins = toOpMins(currentH, currentM);
-
+                // 3. Contabilizar Vuelos Restantes del Día (Reseteo estricto a las 12 AM)
                 const todayStr = new Date().toLocaleDateString();
                 const todayFlightsTotal = completedFlights.filter(f => new Date(f.timestamp).toLocaleDateString() === todayStr);
                 const remainingTotal = 13 - todayFlightsTotal.length;
-                const futureForzososCount = schedule.filter(s => s.slotMins > nowMins).length;
-                let neededDynamics = remainingTotal - futureForzososCount;
+                
+                const futureForzososMins = schedule.filter(s => s.slotMins > nowMins).map(s => s.slotMins);
+                let neededDynamics = remainingTotal - futureForzososMins.length;
 
+                // 4. Generar Slots Dinámicos Inteligentemente
                 if (neededDynamics > 0) {
+                    
+                    // REGLA CLAVE: ¿Hay suspensión temprana detectada a las 11 AM, 12 PM o 1 PM?
+                    let isSuspensionDay = false;
+                    if ((forecast['11'] && forecast['11'] > 43) || (forecast['12'] && forecast['12'] > 43) || (forecast['13'] && forecast['13'] > 43)) {
+                        isSuspensionDay = true;
+                    }
+
+                    // Separación Inteligente: Si hay suspensión, los apresuramos (45 mins). Si es día normal, los relajamos a cada 2 horas (120 mins).
+                    let idealSeparation = isSuspensionDay ? 45 : 120;
+
                     let possibleSlots = [];
                     for (let h = 0; h < 24; h++) {
-                        if (h === 6) continue; // Regla estricta 6 AM
-                        
-                        let speed = forecast[h.toString()] || 0;
-                        if (speed > 43 || raining) continue; 
+                        let speed = forecast[h.toString()] !== undefined ? forecast[h.toString()] : 0;
+                        if (speed > 43 || raining) continue;
 
                         for (let m = 0; m <= 50; m += 10) {
-                            if (h === 8 && m === 20) continue;
-                            if (h === 14 && m === 0) continue;
-                            if (h === 17 && m === 0) continue;
-                            if (h === 21 && m === 30) continue;
+                            let slotMins = h * 60 + m;
 
-                            let slotMins = toOpMins(h, m);
-                            let limitMins = toOpMins(6, 0); 
+                            if (slotMins <= nowMins + 10) continue; // Ignorar el pasado
                             
-                            if (currentH >= 6) { limitMins += 24 * 60; }
+                            // Regla Estricta: Prohibido entre 6:01 AM y 6:59 AM
+                            if (h === 6 && m > 0) continue;
+                            
+                            // Regla Estricta: Libre a las 7:50 para la junta
+                            if (h === 7 && m === 50) continue; 
 
-                            if (slotMins > nowMins + 10 && slotMins < limitMins) {
-                                possibleSlots.push({ h, m, slotMins, wind: speed });
+                            // Ignorar horas que choquen exactamente con forzosos (+- 20 mins de separación)
+                            let chocaConForzoso = futureForzososMins.some(fMins => Math.abs(fMins - slotMins) <= 20);
+                            if (chocaConForzoso) continue;
+
+                            possibleSlots.push({ h, m, slotMins, wind: speed });
+                        }
+                    }
+
+                    // Primer Pase: Intentar acomodarlos con la separación ideal
+                    let lastFlightMins = nowMins; 
+                    let assigned = 0;
+                    let dynamicCandidates = [];
+
+                    for (let i = 0; i < possibleSlots.length && assigned < neededDynamics; i++) {
+                        let slot = possibleSlots[i];
+                        
+                        if (slot.slotMins >= lastFlightMins + idealSeparation) {
+                            dynamicCandidates.push(slot);
+                            lastFlightMins = slot.slotMins;
+                            assigned++;
+                        }
+                    }
+
+                    // Segundo Pase (Plan B): Si el día es normal pero no cupieron todos a 2 horas,
+                    // recalculamos y obligamos una separación de emergencia (45 mins) para meter los vuelos heredados que falten.
+                    if (assigned < neededDynamics && !isSuspensionDay) {
+                        dynamicCandidates = [];
+                        assigned = 0;
+                        lastFlightMins = nowMins;
+                        
+                        for (let i = 0; i < possibleSlots.length && assigned < neededDynamics; i++) {
+                            let slot = possibleSlots[i];
+                            if (slot.slotMins >= lastFlightMins + 45) { // Separación comprimida de herencia
+                                dynamicCandidates.push(slot);
+                                lastFlightMins = slot.slotMins;
+                                assigned++;
                             }
                         }
                     }
 
-                    // Espaciado uniforme para no amontonar vuelos
-                    if (possibleSlots.length > 0) {
-                        let step = Math.max(1, Math.floor(possibleSlots.length / neededDynamics));
-                        
-                        let assigned = 0;
-                        for (let i = 0; i < possibleSlots.length && assigned < neededDynamics; i += step) {
-                            let slot = possibleSlots[i];
-                            schedule.push({
-                                time: `${slot.h.toString().padStart(2, '0')}:${slot.m.toString().padStart(2, '0')}`,
-                                type: 'DINÁMICO',
-                                wind: slot.wind,
-                                isPermitted: true,
-                                slotMins: slot.slotMins
-                            });
-                            assigned++;
-                        }
-                    }
+                    // Guardarlos en el itinerario oficial
+                    dynamicCandidates.forEach(slot => {
+                        schedule.push({
+                            time: `${slot.h.toString().padStart(2, '0')}:${slot.m.toString().padStart(2, '0')}`,
+                            type: 'DINÁMICO',
+                            wind: slot.wind,
+                            isPermitted: true,
+                            slotMins: slot.slotMins
+                        });
+                    });
                 }
 
+                // Ordenar y devolver solo lo que sigue
                 schedule.sort((a, b) => a.slotMins - b.slotMins);
                 return schedule.filter(s => s.slotMins >= nowMins);
             };
@@ -156,9 +198,15 @@
 
             useEffect(() => {
                 if (!audioUnlocked || currentTime.getSeconds() !== 0) return;
+                
                 const currentH = currentTime.getHours();
                 const currentM = currentTime.getMinutes();
-                const nowMins = toOpMins(currentH, currentM);
+                const nowMins = currentH * 60 + currentM;
+
+                // Alarma Junta 7:50 AM
+                if (currentH === 7 && currentM === 50) {
+                    speak("Aviso importante. Junta de pilotos en progreso. El área debe permanecer despejada.");
+                }
 
                 if (!forecastData.hasOwnProperty(currentH.toString()) && currentM % 5 === 0) {
                     speak("Alerta. Clima desactualizado. Por favor, suba una nueva captura de inmediato.");
@@ -182,10 +230,9 @@
 EXTRAE LA VELOCIDAD MÁXIMA DEL VIENTO POR CADA HORA.
 REGLAS ESTRICTAS Y ABSOLUTAS:
 1. Revisa la tabla FILA POR FILA.
-2. Si en la fila "AHORA" (o cualquier hora) dice "Apto para volar" o "Calma", el viento es 0 (CERO). ¡Pon 0!
-3. NO te asustes ni bloquees la hora actual solo porque hay ráfagas pronosticadas para horas de la tarde. ¡Respeta lo que dice la hora actual!
-4. Si a las 2:00pm o más tarde dice "Ráfagas fuertes" o "Vientos >40m", extrae el número (ej. 45) SOLO para esa hora específica.
-5. Devuelve ÚNICAMENTE un objeto JSON con este formato exacto: {"0": 15, "1": 0, "2": 45, "14": 0} (claves en 24h, valores en km/h). NUNCA devuelvas texto fuera del JSON.`;
+2. Si en la fila dice "Apto para volar" o "Calma", el viento es 0. PON CERO.
+3. Ignora advertencias futuras para la hora actual. Si AHORA dice apto, pon 0.
+4. Devuelve ÚNICAMENTE un objeto JSON con formato: {"0": 15, "1": 0, "2": 45} (24h, km/h). NUNCA devuelvas texto.`;
 
                     const payload = {
                         contents: [{
@@ -214,7 +261,7 @@ REGLAS ESTRICTAS Y ABSOLUTAS:
                     const parsedData = JSON.parse(responseText);
                     setForecastData(parsedData);
                     
-                    speak("Análisis de clima completado. Itinerario actualizado y libre de errores.");
+                    speak("Análisis de clima completado. Itinerario actualizado.");
                     setModal({ isOpen: true, title: "Análisis Exitoso", message: "El clima ha sido procesado correctamente.", type: "success" });
 
                 } catch (error) {
@@ -250,7 +297,7 @@ REGLAS ESTRICTAS Y ABSOLUTAS:
                             <div className="leading-tight">
                                 <h1 className="font-black text-lg tracking-wide uppercase">Dispatcher Pro</h1>
                                 <p className="text-[10px] text-emerald-400 font-bold uppercase tracking-wider flex items-center gap-1">
-                                    V29 FINAL <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse"></span> {cloudConfig.geminiKey ? 'Nube Activa' : 'Sin Configurar'}
+                                    V31 DEFINITIVA <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse"></span> {cloudConfig.geminiKey ? 'Nube Activa' : 'Sin Configurar'}
                                 </p>
                             </div>
                         </div>
@@ -266,7 +313,7 @@ REGLAS ESTRICTAS Y ABSOLUTAS:
 
                     {!audioUnlocked && (
                         <div className="mb-4 bg-amber-500/10 border border-amber-500/50 text-amber-500 text-xs font-bold p-3 rounded-xl text-center animate-pulse shadow-[0_0_15px_rgba(245,158,11,0.2)]">
-                            🔇 Toca cualquier parte de la pantalla para activar el audio de Alertas
+                            🔇 Toca cualquier parte de la pantalla para activar el audio
                         </div>
                     )}
 
@@ -283,7 +330,7 @@ REGLAS ESTRICTAS Y ABSOLUTAS:
                         <button 
                             onClick={() => document.getElementById('file-upload-input').click()} 
                             disabled={isScanning}
-                            className={`flex flex-col items-center justify-center p-3 rounded-2xl transition border ${isScanning ? 'bg-indigo-900/50 border-indigo-400 animate-pulse' : needsScanUI ? 'bg-rose-600 border-rose-400 shadow-[0_0_20px_rgba(225,29,72,0.4)] animate-pulse' : 'bg-indigo-600/20 border-indigo-500/30 hover:bg-indigo-600/40'}`}>
+                            className={`flex flex-col items-center justify-center p-3 rounded-2xl transition border z-10 ${isScanning ? 'bg-indigo-900/50 border-indigo-400 animate-pulse' : needsScanUI ? 'bg-rose-600 border-rose-400 shadow-[0_0_20px_rgba(225,29,72,0.4)] animate-pulse' : 'bg-indigo-600/20 border-indigo-500/30 hover:bg-indigo-600/40'}`}>
                             <span className="text-2xl mb-1">{isScanning ? '⏳' : '📸'}</span>
                             <span className={`text-[10px] font-black uppercase text-center ${needsScanUI || isScanning ? 'text-white' : 'text-indigo-300'}`}>
                                 {isScanning ? 'Analizando...' : needsScanUI ? 'ESCANEAR' : 'ESCANEAR'}
@@ -305,7 +352,7 @@ REGLAS ESTRICTAS Y ABSOLUTAS:
                     <div className="glass rounded-3xl p-5 mb-6">
                         <div className="flex justify-between items-end mb-4">
                             <div>
-                                <p className="text-[10px] font-black tracking-widest text-slate-400 uppercase mb-1">Meta de hoy</p>
+                                <p className="text-[10px] font-black tracking-widest text-slate-400 uppercase mb-1">Meta Diaria Total</p>
                                 <div className="text-5xl font-black text-indigo-400 leading-none">
                                     {todayFlightsTotal.length} <span className="text-2xl text-slate-600">/ 13</span>
                                 </div>
@@ -329,7 +376,7 @@ REGLAS ESTRICTAS Y ABSOLUTAS:
                         </h3>
                         <div className="space-y-3">
                             {dynamicSchedule.length === 0 ? (
-                                <div className="text-center py-6 text-sm text-slate-500 bg-slate-900/50 rounded-2xl">Misión completada o bloqueada por clima.</div>
+                                <div className="text-center py-6 text-sm text-slate-500 bg-slate-900/50 rounded-2xl">Misión de 13 vuelos completada hoy.</div>
                             ) : (
                                 dynamicSchedule.map((p, i) => (
                                     <div key={i} className="flex justify-between items-center p-3 rounded-2xl bg-slate-800/30 border border-slate-700/50 relative overflow-hidden">
@@ -385,7 +432,7 @@ REGLAS ESTRICTAS Y ABSOLUTAS:
                     {settingsOpen && (
                         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
                             <div className="glass modal-animate w-full max-w-sm rounded-3xl p-6 border border-slate-700 shadow-2xl">
-                                <h3 className="text-xl font-black text-white mb-4">Configuración Nube (V29)</h3>
+                                <h3 className="text-xl font-black text-white mb-4">Configuración Nube (V31)</h3>
                                 
                                 <div className="mb-4">
                                     <label className="text-xs font-bold text-emerald-400 mb-1 block">1. Gemini API Key</label>
