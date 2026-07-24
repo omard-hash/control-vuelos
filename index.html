@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dispatcher Pro - V41 Master</title>
+    <title>Dispatcher Pro - V42 Master</title>
     
     <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
@@ -97,7 +97,7 @@
                 if (!audioUnlocked) {
                     setAudioUnlocked(true);
                     audioUnlockedRef.current = true;
-                    const u = new SpeechSynthesisUtterance("Sistema de voz listo.");
+                    const u = new SpeechSynthesisUtterance("Sistema de voz activado y listo para instrucciones.");
                     u.lang = 'es-MX';
                     u.volume = 0.3;
                     window.speechSynthesis.speak(u);
@@ -109,18 +109,39 @@
                     const now = new Date();
                     setCurrentTime(now);
                     
-                    // Cálculo de Turno (Diurno 07:00-18:59, Nocturno 19:00-06:59)
                     const h = now.getHours();
+                    const m = now.getMinutes();
+                    const s = now.getSeconds();
+
+                    // Cálculo de Turno (Diurno 07:00-18:59, Nocturno 19:00-06:59)
                     if (h >= 7 && h < 19) {
                         setShiftName('Turno Diurno');
                     } else {
                         setShiftName('Turno Nocturno');
                     }
                     
-                    // Alarma Junta 7:50 AM
-                    if (now.getHours() === 7 && now.getMinutes() === 50 && now.getSeconds() === 0) {
-                        speak("Atención comandante. Es hora de la junta operativa de las siete cincuenta.");
-                        setModal({ isOpen: true, title: '⏰ JUNTA OPERATIVA', message: 'Reunión de las 7:50 AM.', type: 'error' });
+                    // ALARMAS OPERATIVAS (Solo se disparan en el segundo 0 exacto)
+                    if (s === 0) {
+                        // Alarma Junta 7:50 AM
+                        if (h === 7 && m === 50) {
+                            speak("Atención comandante. Es hora de la junta operativa de las siete cincuenta.");
+                            setModal({ isOpen: true, title: '⏰ JUNTA OPERATIVA', message: 'Reunión de las 7:50 AM.', type: 'error' });
+                        }
+                        // Alarma KPIs 12:00 PM
+                        else if (h === 12 && m === 0) {
+                            speak("Atención comandante. Es hora de elaborar los reportes K P I.");
+                            setModal({ isOpen: true, title: '📊 ELABORACIÓN DE KPIs', message: 'Es la hora designada para la elaboración de los KPIs operativos.', type: 'error' });
+                        }
+                        // Alarma Clima 12:05 PM
+                        else if (h === 12 && m === 5) {
+                            speak("Atención. Actualización de captura del clima requerida. Por favor confirme el ou kei to flai para garantizar condiciones adecuadas.");
+                            setModal({ isOpen: true, title: '🌤️ ACTUALIZAR CLIMA (Ok To Fly)', message: 'Es obligatorio actualizar la captura del clima y validar condiciones seguras para volar.', type: 'error' });
+                        }
+                        // Alarma Clima 12:05 AM
+                        else if (h === 0 && m === 5) {
+                            speak("Atención. Actualización de captura del clima requerida. Por favor confirme el ou kei to flai para garantizar condiciones adecuadas.");
+                            setModal({ isOpen: true, title: '🌙 ACTUALIZAR CLIMA (Ok To Fly)', message: 'Es obligatorio actualizar la captura del clima y validar condiciones seguras para volar.', type: 'error' });
+                        }
                     }
                 }, 1000);
                 return () => clearInterval(timer);
@@ -146,17 +167,16 @@
 
             const analyzeImageWithAI = async (base64Image) => {
                 setIsScanning(true);
-                speak("Analizando el clima...");
+                speak("Analizando el clima y ráfagas de viento...");
                 
                 try {
                     const key = geminiKey.trim();
-                    // Usando la versión de producción 3.6-flash validada
                     const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${key}`;
                     
                     const payload = {
                         contents: [{
                             parts: [
-                                { text: "Analiza el clima. Regla ESTRICTA para 11:00am: Si solo dice 'UV' (ej. 'UV 10', 'Extremo UV 13') ES APTO PARA VOLAR, el viento es 0. Regla general: Si dice 'Apto para volar', viento es 0. Si dice 'Ráfagas fuertes' o vientos > 40, viento es 45. Devuelve JSON con 'hourlyData' teniendo 'time' y 'wind' numérico." },
+                                { text: "Analiza el clima. REGLA ESTRICTA 11:00am: Si solo dice 'UV' (ej. 'UV 10', 'Extremo UV 13') ES APTO PARA VOLAR, el viento es 0. Regla general: Si dice 'Apto para volar', viento es 0. Si dice 'Ráfagas fuertes' o vientos > 40, viento es 45. Devuelve JSON con 'hourlyData' teniendo 'time' (ej. '11:00am') y 'wind' numérico." },
                                 { inline_data: { mime_type: "image/jpeg", data: base64Image } }
                             ]
                         }]
@@ -168,7 +188,7 @@
                         body: JSON.stringify(payload)
                     });
 
-                    if (!response.ok) throw new Error("Error de conexión con Google. Verifica tu llave.");
+                    if (!response.ok) throw new Error("Error de conexión. Verifica tu llave API en Ajustes.");
 
                     const data = await response.json();
                     let aiResponseText = data.candidates[0].content.parts[0].text;
@@ -179,15 +199,15 @@
                     const parsedData = JSON.parse(aiResponseText);
                     if (parsedData && parsedData.hourlyData) {
                          generateIntelligentSchedule(parsedData.hourlyData);
-                         speak("Itinerario calculado.");
+                         speak("Itinerario calculado con base en vientos detectados.");
                     } else {
-                         throw new Error("Formato de respuesta incorrecto.");
+                         throw new Error("La IA devolvió un formato incorrecto.");
                     }
 
                 } catch (error) {
                     console.error("AI Error:", error);
                     speak("Error al analizar el clima.");
-                    setModal({ isOpen: true, title: 'Error', message: error.message });
+                    setModal({ isOpen: true, title: 'Error de Análisis', message: error.message });
                     generateIntelligentSchedule([]); 
                 } finally {
                     setIsScanning(false);
@@ -196,7 +216,7 @@
 
             const generateIntelligentSchedule = (hourlyWeatherData) => {
                 let windMap = {};
-                for(let i=0; i<24; i++) windMap[i] = 0; // Default
+                for(let i=0; i<24; i++) windMap[i] = 0;
 
                 if (hourlyWeatherData && hourlyWeatherData.length > 0) {
                      hourlyWeatherData.forEach(dataPoint => {
@@ -211,7 +231,6 @@
                      });
                 }
 
-                // Guardar pronóstico del día en Nube para posibles reprogramaciones por lluvia
                 setWindDataMap(windMap);
                 db.collection('operaciones').doc('turno_actual').set({ windDataMap: windMap }, { merge: true });
 
@@ -223,16 +242,13 @@
                 const isSuspendedAt12 = windMap[12] >= 40 && !isSuspendedAt11;
 
                 if (isSuspendedAt11) {
-                    // 4 vuelos exactos entre 7:20 am y 11:00 am
                     newSchedule.push(
                         { time: "07:20", type: "FORZOSO", wind: windMap[7] || 0, hour24: 7 },
                         { time: "08:30", type: "DINÁMICO", wind: windMap[8] || 0, hour24: 8 },
-                        { time: "09:30", type: "DINÁMICO", wind: windMap[9] || 0, hour24: 9 },
-                        { time: "10:30", type: "DINÁMICO", wind: windMap[10] || 0, hour24: 10 },
-                        { time: "11:30", type: "DINÁMICO", wind: windMap[11] || 45, hour24: 11 } 
+                        { time: "09:45", type: "DINÁMICO", wind: windMap[9] || 0, hour24: 9 },
+                        { time: "11:00", type: "DINÁMICO", wind: windMap[11] || 45, hour24: 11 } 
                     );
                 } else if (isSuspendedAt12) {
-                    // 5 vuelos exactos entre 7:20 am y 12:00 pm (Cada 1 hora limpia)
                     newSchedule.push(
                         { time: "07:20", type: "FORZOSO", wind: windMap[7] || 0, hour24: 7 },
                         { time: "08:20", type: "DINÁMICO", wind: windMap[8] || 0, hour24: 8 },
@@ -242,7 +258,6 @@
                         { time: "12:00", type: "DINÁMICO", wind: windMap[12] || 45, hour24: 12 } 
                     );
                 } else {
-                    // Clima normal sin suspensiones tempranas
                     newSchedule.push(
                         { time: "07:20", type: "FORZOSO", wind: windMap[7] || 0, hour24: 7 },
                         { time: "08:40", type: "DINÁMICO", wind: windMap[8] || 0, hour24: 8 },
@@ -274,7 +289,7 @@
                 if (newState) {
                     speak("Alerta. Operaciones suspendidas por lluvia local.");
                 } else {
-                    speak("Lluvia finalizada. Reprogramando itinerario restante.");
+                    speak("Lluvia finalizada. Calculando itinerario extendido.");
                     recalculateAfterRain();
                 }
             };
@@ -285,16 +300,17 @@
                 const remaining = totalFlightsTarget - loggedFlightsCount;
 
                 if (remaining <= 0) {
-                    speak("Meta alcanzada. No se requieren reprogramar vuelos hoy.");
+                    speak("Meta alcanzada. No se requieren vuelos adicionales hoy.");
                     return;
                 }
 
-                const endTime = 22 * 60 + 45; // 22:45 hrs
-                const currentTimeInMins = currentHour * 60 + currentMinute + 15; // Empezar en 15 mins
+                // NUEVA REGLA: Límite máximo para el último vuelo son las 23:30 (11:30 PM)
+                const endTime = 23 * 60 + 30; 
+                const currentTimeInMins = currentHour * 60 + currentMinute + 15;
                 const timeWindow = endTime - currentTimeInMins;
                 
                 if (timeWindow <= 0) {
-                    speak("El día está por terminar. No hay tiempo para reprogramar.");
+                    speak("Fuera de horario operativo. No es posible reprogramar.");
                     return;
                 }
 
@@ -323,16 +339,16 @@
 
             const handleLogManualFlight = () => {
                  if (isRaining) {
-                     setModal({ isOpen: true, title: 'Operación Suspendida', message: 'No puedes registrar vuelos mientras el protocolo de lluvia esté activo.', type: 'error' });
+                     setModal({ isOpen: true, title: 'Bloqueo por Lluvia', message: 'No puedes registrar despegues durante el protocolo de lluvia.', type: 'error' });
                      return;
                  }
                  if (loggedFlightsCount < totalFlightsTarget) {
                       const newCount = loggedFlightsCount + 1;
                       setLoggedFlightsCount(newCount);
                       db.collection('operaciones').doc('turno_actual').set({ loggedFlightsCount: newCount }, { merge: true });
-                      speak("Vuelo registrado exitosamente.");
+                      speak(`Vuelo registrado. Total del día, ${newCount} de 13.`);
                  } else {
-                      speak("Límite alcanzado para hoy.");
+                      speak("Meta diaria de vuelos completada.");
                  }
             };
 
@@ -346,7 +362,7 @@
                                 <span className="bg-indigo-600 text-white px-2 py-0.5 rounded text-xs">DP</span>
                                 DISPATCHER PRO
                             </h1>
-                            <p className="text-[10px] font-bold text-indigo-400 mt-1 tracking-widest uppercase">V41 MASTER • 🟢 NUBE CONECTADA</p>
+                            <p className="text-[10px] font-bold text-indigo-400 mt-1 tracking-widest uppercase">V42 MASTER • 🟢 NUBE CONECTADA</p>
                         </div>
                         <button 
                             onClick={(e) => { e.stopPropagation(); setSettingsOpen(true); }}
@@ -357,25 +373,45 @@
                     </div>
 
                     {!audioUnlocked && (
-                        <div className="bg-amber-500/20 border border-amber-500/50 text-amber-400 text-xs font-bold text-center p-2 rounded-lg mb-4 animate-pulse">
-                            🔇 Toca cualquier parte de la pantalla para activar la voz
+                        <div className="bg-amber-500/20 border border-amber-500/50 text-amber-400 text-xs font-bold text-center p-2 rounded-lg mb-4 animate-pulse shadow-md">
+                            🔇 Toca la pantalla para activar el Asistente de Voz y Alertas
                         </div>
                     )}
 
                     {/* Current Shift Card */}
                     <div className="glass-card p-5 rounded-2xl mb-5 relative overflow-hidden">
                         
-                        <div className="absolute top-5 right-5 text-right">
-                             <p className="text-[10px] font-bold tracking-widest text-slate-400 uppercase mb-0.5">Meta Diaria</p>
-                             <div className="text-xl font-black text-indigo-400">
-                                  {loggedFlightsCount} <span className="text-slate-500 text-base">/ {totalFlightsTarget}</span>
-                             </div>
-                        </div>
+                        <div className="flex justify-between items-start mb-6">
+                            {/* Lado Izquierdo: Hora y Turno */}
+                            <div>
+                                <p className="text-[10px] font-bold tracking-widest text-slate-400 uppercase mb-1">{shiftName}</p>
+                                <h2 className="text-2xl font-black text-white">{shiftName === 'Turno Diurno' ? '☀️ Día' : '🌙 Noche'}</h2>
+                                <div className="mt-1 text-3xl font-mono font-bold text-white tracking-wider">
+                                    {currentTime.toLocaleTimeString('en-US', { hour12: false })}
+                                </div>
+                            </div>
 
-                        <p className="text-[10px] font-bold tracking-widest text-slate-400 uppercase mb-1">{shiftName}</p>
-                        <h2 className="text-2xl font-black text-white">{shiftName === 'Turno Diurno' ? '☀️ Día' : '🌙 Noche'}</h2>
-                        <div className="mt-1 text-3xl font-mono font-bold text-white tracking-wider mb-5">
-                            {currentTime.toLocaleTimeString('en-US', { hour12: false })}
+                            {/* Lado Derecho: METAS GIGANTES */}
+                            <div className="text-right flex flex-col items-end">
+                                
+                                {/* Contador de Meta de Turno Dinámico */}
+                                <div className={`mb-3 px-4 py-2 rounded-xl border shadow-[0_0_20px_rgba(0,0,0,0.4)] transition-all ${shiftName === 'Turno Diurno' ? 'bg-amber-500/20 border-amber-500/50' : 'bg-fuchsia-600/20 border-fuchsia-500/50'}`}>
+                                    <p className={`text-[10px] font-black uppercase tracking-widest ${shiftName === 'Turno Diurno' ? 'text-amber-400' : 'text-fuchsia-400'}`}>
+                                        {shiftName === 'Turno Diurno' ? '🎯 Faltan (Diurno)' : '🔄 Heredados (Noct.)'}
+                                    </p>
+                                    <div className="text-2xl font-black text-white drop-shadow-md text-right mt-0.5">
+                                        {shiftName === 'Turno Diurno' ? Math.max(0, 7 - loggedFlightsCount) : Math.max(0, 13 - loggedFlightsCount)}
+                                        <span className="text-sm font-bold text-white/60 ml-1.5 uppercase tracking-wider">vuelos</span>
+                                    </div>
+                                </div>
+                                
+                                {/* Contador Global */}
+                                <div className="flex items-baseline gap-1 bg-[#0f172a] px-4 py-2.5 rounded-xl border border-indigo-500/30 shadow-[0_0_20px_rgba(79,70,229,0.3)] mt-1">
+                                    <span className="text-5xl font-black text-white tracking-tighter drop-shadow-lg">{loggedFlightsCount}</span>
+                                    <span className="text-2xl font-bold text-indigo-500/70">/{totalFlightsTarget}</span>
+                                </div>
+                                <p className="text-[11px] text-indigo-300 font-black uppercase tracking-widest mt-2">📍 Avance Global</p>
+                            </div>
                         </div>
                         
                         <div className="grid grid-cols-2 gap-3">
@@ -385,36 +421,35 @@
                                 disabled={isScanning || isRaining}
                                 className={`w-full py-3 rounded-xl font-bold text-sm transition flex justify-center items-center gap-2 ${isScanning ? 'bg-indigo-900/50 text-indigo-300 animate-pulse' : isRaining ? 'bg-slate-800 text-slate-600 cursor-not-allowed' : 'bg-[#1e293b] hover:bg-[#334155] text-white border border-slate-700'}`}
                             >
-                                {isScanning ? '⏳ Analizando...' : '📸 IA CLIMA'}
+                                {isScanning ? '⏳ Analizando...' : '📸 ESCANEAR CLIMA'}
                             </button>
                             
                             <button 
                                 onClick={(e) => { e.stopPropagation(); toggleRainProtocol(); }}
                                 className={`w-full py-3 rounded-xl font-bold text-sm transition flex justify-center items-center gap-2 ${isRaining ? 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-[0_0_15px_rgba(16,185,129,0.4)]' : 'bg-rose-900/40 hover:bg-rose-900/60 text-rose-400 border border-rose-900'}`}
                             >
-                                {isRaining ? '☀️ REANUDAR' : '🌧️ LLUVIA LOCAL'}
+                                {isRaining ? '☀️ REANUDAR' : '🌧️ DECLARAR LLUVIA'}
                             </button>
                         </div>
                     </div>
 
-                    {/* Alerta de Lluvia Activa */}
                     {isRaining && (
                         <div className="bg-rose-600 text-white text-center p-3 rounded-xl mb-5 font-black uppercase tracking-wider text-sm shadow-[0_0_20px_rgba(225,29,72,0.5)] animate-pulse">
-                            ⚠️ OPERACIONES SUSPENDIDAS POR LLUVIA LOCAL ⚠️
+                            ⚠️ OPERACIONES SUSPENDIDAS POR LLUVIA ⚠️
                         </div>
                     )}
 
                     {/* Schedule List */}
                     <div className={`glass-card p-5 rounded-2xl mb-6 relative ${isRaining ? 'opacity-50 pointer-events-none' : ''}`}>
                         {isRaining && <div className="absolute inset-0 rain-overlay rounded-2xl z-10 flex items-center justify-center text-center p-4">
-                            <span className="text-white font-bold text-lg">Esperando reanudación para recalcular...</span>
+                            <span className="text-white font-bold text-lg">Esperando que mejore el clima para calcular itinerario extendido...</span>
                         </div>}
 
                         <p className="text-[10px] font-bold tracking-widest text-slate-400 uppercase mb-3">🗓️ Plan Restante (Calculado)</p>
                         
                         {flights.length === 0 ? (
                             <div className="text-center py-6 text-xs font-bold text-slate-500">
-                                Sube una captura para generar el itinerario.
+                                Sube una captura para generar el itinerario de vuelos.
                             </div>
                         ) : (
                             <div className="space-y-2.5">
@@ -435,18 +470,18 @@
                         )}
                     </div>
 
-                    {/* Botón Flotante para Registrar Vuelo */}
+                    {/* Floating Action Button */}
                     <div className="fixed bottom-0 left-0 w-full p-4 bg-gradient-to-t from-[#0B0F19] via-[#0B0F19] to-transparent flex justify-center z-40 pointer-events-none">
                          <button 
                              onClick={(e) => { e.stopPropagation(); handleLogManualFlight(); }}
                              disabled={isRaining}
                              className={`pointer-events-auto w-full max-w-xs font-black py-3.5 rounded-xl transition transform hover:scale-105 ${isRaining ? 'bg-slate-800 text-slate-600' : 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-[0_0_20px_rgba(79,70,229,0.4)]'}`}
                          >
-                             ✈️ REGISTRAR VUELO
+                             ✈️ REGISTRAR DESPEGUE AHORA
                          </button>
                     </div>
 
-                    {/* Modal Ajustes y Errores */}
+                    {/* Modals */}
                     {settingsOpen && (
                         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4" onClick={(e) => e.stopPropagation()}>
                             <div className="bg-[#131826] border border-slate-800 rounded-2xl w-full max-w-sm shadow-2xl p-6">
@@ -466,8 +501,8 @@
                                 </div>
 
                                 <div className="flex gap-2">
-                                    <button onClick={() => setSettingsOpen(false)} className="flex-1 bg-slate-800 hover:bg-slate-700 text-white font-bold py-2.5 rounded-lg text-xs border border-slate-700">Cancelar</button>
-                                    <button onClick={() => { localStorage.setItem('gemini_key', geminiKey); setSettingsOpen(false); speak("Ajustes guardados."); }} className="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2.5 rounded-lg text-xs">Guardar</button>
+                                    <button onClick={() => setSettingsOpen(false)} className="flex-1 bg-slate-800 hover:bg-slate-700 text-white font-bold py-2.5 rounded-lg text-xs border border-slate-700">Cerrar</button>
+                                    <button onClick={() => { localStorage.setItem('gemini_key', geminiKey); setSettingsOpen(false); speak("Llave guardada exitosamente."); }} className="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2.5 rounded-lg text-xs">Guardar</button>
                                 </div>
                             </div>
                         </div>
