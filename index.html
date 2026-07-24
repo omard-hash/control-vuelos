@@ -19,17 +19,6 @@
         }
         .modal-animate { animation: modalPop 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
     </style>
-
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, collection, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-        
-        // Exportamos las herramientas a la ventana global para que React las pueda usar sin problemas
-        window.FirebaseModules = {
-            initializeApp, getAuth, signInAnonymously, getFirestore, collection, doc, setDoc, onSnapshot
-        };
-    </script>
 </head>
 <body class="antialiased min-h-screen pb-24">
     <div id="root"></div>
@@ -46,9 +35,10 @@
             const [audioUnlocked, setAudioUnlocked] = useState(false);
             const [isOnline, setIsOnline] = useState(false);
             
-            const [cloudConfig, setCloudConfig] = useState({
-                geminiKey: localStorage.getItem('dispatcher_gemini_key') || '',
-                firebaseJson: localStorage.getItem('dispatcher_firebase_json') || ''
+            // Llaves incrustadas directamente usando la info que subiste (ya no dependemos de localStorage ni del engrane)
+            const [cloudConfig] = useState({
+                geminiKey: 'AQ.Ab8RN6Lu-oSyr3Qw9R-iO4Gpr95uBBgpsMT1nJ7Ivdu1w2M5sA',
+                firebaseJson: '{"apiKey": "AIzaSyDXjwv133-dIKyprCktTUkjx_adAz1DhAY", "authDomain": "control-vuelos.firebaseapp.com", "projectId": "control-vuelos", "storageBucket": "control-vuelos.firebasestorage.app", "messagingSenderId": "756032981781", "appId": "1:756032981781:web:451641e72abe3692c0771c"}'
             });
 
             const [modal, setModal] = useState({ isOpen: false, title: '', message: '', type: 'info' });
@@ -65,12 +55,13 @@
                 let unsubForecast = () => {};
 
                 const initFirebase = async () => {
-                    const fbStr = cloudConfig.firebaseJson;
-                    if (!fbStr || fbStr.trim() === '' || !window.FirebaseModules) return;
-                    
                     try {
-                        const config = JSON.parse(fbStr);
-                        const { initializeApp, getAuth, signInAnonymously, getFirestore, collection, doc, setDoc, onSnapshot } = window.FirebaseModules;
+                        // Importación dinámica ultra-segura para evitar que la app cargue antes que la Nube
+                        const { initializeApp } = await import("https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js");
+                        const { getAuth, signInAnonymously } = await import("https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js");
+                        const { getFirestore, collection, doc, setDoc, onSnapshot } = await import("https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js");
+                        
+                        const config = JSON.parse(cloudConfig.firebaseJson);
                         
                         const app = initializeApp(config);
                         const auth = getAuth(app);
@@ -115,7 +106,7 @@
 
                 initFirebase();
                 return () => { unsubFlights(); unsubForecast(); };
-            }, [cloudConfig.firebaseJson]);
+            }, []);
 
             const unlockAudio = () => {
                 if (!audioUnlocked) {
@@ -361,7 +352,7 @@ REGLAS ESTRICTAS Y ABSOLUTAS:
                             <div className="leading-tight">
                                 <h1 className="font-black text-lg tracking-wide uppercase">Dispatcher Pro</h1>
                                 <p className="text-[10px] font-bold uppercase tracking-wider flex items-center gap-1 text-slate-400">
-                                    V32 FINAL <span className={`w-1.5 h-1.5 rounded-full animate-pulse ${isOnline ? 'bg-emerald-400' : 'bg-rose-500'}`}></span> {isOnline ? <span className="text-emerald-400">NUBE CONECTADA</span> : 'MODO LOCAL'}
+                                    V33 FINAL <span className={`w-1.5 h-1.5 rounded-full animate-pulse ${isOnline ? 'bg-emerald-400' : 'bg-rose-500'}`}></span> {isOnline ? <span className="text-emerald-400">NUBE CONECTADA</span> : 'MODO LOCAL'}
                                 </p>
                             </div>
                         </div>
