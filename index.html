@@ -332,19 +332,20 @@
                     return;
                 }
 
-                // INSTRUCCIONES SUPER ESTRICTAS (FIX DEL 36 KM/H)
+                // INSTRUCCIONES SUPER ESTRICTAS (FIX RÁFAGAS FUERTES)
                 const promptText = `
                     Eres un asistente lector de pantallas experto en la interfaz de "OK TO FLY". Extrae el viento para cada hora mostrada.
                     
                     REGLAS INQUEBRANTABLES PARA EL JSON:
-                    1. Devuelve SOLO un arreglo JSON puro: [{"time": "20:00", "windGust": 36}, {"time": "21:00", "windGust": 0}]
-                    2. Convierte todas las horas al formato 24h (ej. 8:00pm = 20:00, 9:00pm = 21:00).
+                    1. Devuelve SOLO un arreglo JSON puro: [{"time": "20:00", "windGust": 45}, {"time": "21:00", "windGust": 0}]
+                    2. Convierte todas las horas al formato 24h (ej. 8:00pm = 20:00).
                     
                     REGLAS DE LECTURA DE VIENTO (CRÍTICAS):
-                    3. BLOQUE "AHORA": Si ves una fila que dice "AHORA", deduce su hora restando una hora a la fila de abajo (Si abajo es 9:00pm, AHORA es 20:00).
-                    4. PANELES EXPANDIDOS (¡PRIORIDAD MÁXIMA!): Si ves que una hora está desplegada mostrando varios recuadros de colores (como Temp, Visibilidad, etc.), **IGNORA TOTALMENTE** el texto de la cabecera (no leas el "13 120m"). Tu ÚNICA orden es buscar el recuadro rojo/naranja titulado "Ráfagas (km/h)" y extraer el primer número que aparezca (Ejemplo: si el recuadro dice "36@20m", extrae EXACTAMENTE el 36). ¡NUNCA extraigas el número de la cabecera si hay recuadros de colores visibles!
-                    5. PANELES CERRADOS: Solo si NO hay recuadros de colores, busca el número justo antes de "120m" (ej. "13 120m" = 13). Si solo dice letras como "Vientos, Ráfagas fuertes", asume el valor 45.
-                    6. APTO PARA VOLAR: Si dice "Apto para volar", el valor es 0.
+                    3. BLOQUE "AHORA": Si ves una fila que dice "AHORA", deduce su hora restando una hora a la fila de abajo.
+                    4. PALABRA CLAVE DE PELIGRO (¡PRIORIDAD ABSOLUTA!): Si en la fila ves las palabras "Ráfagas fuertes" o si el bloque está en ROJO (sin importar si hay otros números como 13 o 20m al lado), significa PELIGRO EXTREMO. DEBES asignar el valor 45 automáticamente para forzar el bloqueo.
+                    5. PANELES EXPANDIDOS: Si hay recuadros de colores, busca el recuadro "Ráfagas (km/h)" y extrae su número (ej. de "36@20m" extrae 36).
+                    6. PANELES CERRADOS (Sin alerta de ráfagas): Busca el número antes de "120m" (ej. "13 120m" = 13).
+                    7. APTO PARA VOLAR: Si dice "Apto para volar", el valor es 0.
                 `;
 
                 try {
