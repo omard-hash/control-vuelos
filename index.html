@@ -194,7 +194,7 @@
             };
 
             const generateIntelligentSchedule = (hourlyWeatherData) => {
-                let windMap = { 11: 0, 12: 0, 13: 0, 14: 0, 15: 0, 16: 0, 17: 0, 18: 0, 19: 0 };
+                let windMap = { 6: 0, 7: 0, 8: 0, 9: 0, 10: 0, 11: 0, 12: 0, 13: 0, 14: 0, 15: 0, 16: 0, 17: 0, 18: 0, 19: 0, 20: 0, 21: 0, 22: 0 };
 
                 if (hourlyWeatherData && hourlyWeatherData.length > 0) {
                      hourlyWeatherData.forEach(dataPoint => {
@@ -205,35 +205,63 @@
                                if (ampm === 'pm' && hour < 12) hour += 12;
                                if (ampm === 'am' && hour === 12) hour = 0;
                                
-                               if (hour >= 11 && hour <= 19) {
-                                    windMap[hour] = dataPoint.wind;
-                               }
+                               windMap[hour] = dataPoint.wind;
                           }
                      });
                 } else {
                      windMap = { 11: 0, 12: 45, 13: 45, 14: 45, 15: 45, 16: 45, 17: 45, 18: 45, 19: 45 };
                 }
 
-                const baseSchedule = [
-                    { time: "06:00", type: "FORZOSO", wind: 0, hour24: 6 },
-                    { time: "07:20", type: "FORZOSO", wind: 0, hour24: 7 },
-                    { time: "08:40", type: "DINÁMICO", wind: 0, hour24: 8 }, 
-                    { time: "10:00", type: "DINÁMICO", wind: 0, hour24: 10 },
-                    { time: "11:30", type: "DINÁMICO", wind: windMap[11] || 0, hour24: 11 }, 
-                    { time: "12:45", type: "DINÁMICO", wind: windMap[12] || 0, hour24: 12 }, 
+                let newSchedule = [
+                    { time: "06:00", type: "FORZOSO", wind: windMap[6] || 0, hour24: 6 },
+                    { time: "07:20", type: "FORZOSO", wind: windMap[7] || 0, hour24: 7 }
+                ];
+
+                // REGLAS DE COMPRESIÓN MATUTINA (Si hay clima feo temprano)
+                const isSuspendedAt11 = windMap[11] >= 40;
+                const isSuspendedAt12 = windMap[12] >= 40 && !isSuspendedAt11;
+
+                if (isSuspendedAt11) {
+                    // Si se suspende a las 11:00, aseguramos 4 vuelos exactos antes de esa hora
+                    newSchedule.push(
+                        { time: "08:30", type: "DINÁMICO", wind: windMap[8] || 0, hour24: 8 },
+                        { time: "09:45", type: "DINÁMICO", wind: windMap[9] || 0, hour24: 9 },
+                        { time: "11:00", type: "DINÁMICO", wind: windMap[11], hour24: 11 }, // Aparecerá suspendido
+                        { time: "12:15", type: "DINÁMICO", wind: windMap[12] || 0, hour24: 12 }
+                    );
+                } else if (isSuspendedAt12) {
+                    // Si se suspende a las 12:00, apretamos el itinerario para asegurar 5 vuelos exactos
+                    newSchedule.push(
+                        { time: "08:20", type: "DINÁMICO", wind: windMap[8] || 0, hour24: 8 },
+                        { time: "09:30", type: "DINÁMICO", wind: windMap[9] || 0, hour24: 9 },
+                        { time: "10:45", type: "DINÁMICO", wind: windMap[10] || 0, hour24: 10 },
+                        { time: "12:00", type: "DINÁMICO", wind: windMap[12], hour24: 12 } // Aparecerá suspendido
+                    );
+                } else {
+                    // Itinerario estándar relajado si no hay mal clima temprano
+                    newSchedule.push(
+                        { time: "08:40", type: "DINÁMICO", wind: windMap[8] || 0, hour24: 8 },
+                        { time: "10:00", type: "DINÁMICO", wind: windMap[10] || 0, hour24: 10 },
+                        { time: "11:30", type: "DINÁMICO", wind: windMap[11] || 0, hour24: 11 },
+                        { time: "12:45", type: "DINÁMICO", wind: windMap[12] || 0, hour24: 12 }
+                    );
+                }
+
+                // Bloque de la tarde y noche (Vuelos restantes)
+                newSchedule.push(
                     { time: "14:00", type: "FORZOSO", wind: windMap[14] || 20, hour24: 14 },
                     { time: "15:30", type: "DINÁMICO", wind: windMap[15] || 20, hour24: 15 },
                     { time: "17:00", type: "FORZOSO", wind: windMap[17] || 20, hour24: 17 },
                     { time: "18:30", type: "DINÁMICO", wind: windMap[18] || 0, hour24: 18 },
-                    { time: "20:00", type: "DINÁMICO", wind: 0, hour24: 20 },
-                    { time: "21:30", type: "FORZOSO", wind: 0, hour24: 21 },
-                    { time: "22:45", type: "DINÁMICO", wind: 0, hour24: 22 }
-                ];
+                    { time: "20:00", type: "DINÁMICO", wind: windMap[20] || 0, hour24: 20 },
+                    { time: "21:30", type: "FORZOSO", wind: windMap[21] || 0, hour24: 21 },
+                    { time: "22:45", type: "DINÁMICO", wind: windMap[22] || 0, hour24: 22 }
+                );
                 
-                setFlights(baseSchedule);
+                setFlights(newSchedule);
                 
                 // GUARDAR ITINERARIO EN LA NUBE AL CALCULAR
-                db.collection('operaciones').doc('turno_actual').set({ flights: baseSchedule }, { merge: true });
+                db.collection('operaciones').doc('turno_actual').set({ flights: newSchedule }, { merge: true });
             };
 
             const handleLogManualFlight = () => {
