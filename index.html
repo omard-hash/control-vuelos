@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dispatcher Pro - V43 Master</title>
+    <title>Dispatcher Pro - V44 Master</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/react@17/umd/react.development.js"></script>
     <script src="https://unpkg.com/react-dom@17/umd/react-dom.development.js"></script>
@@ -98,14 +98,14 @@
                         const firestore = firebase.firestore();
                         setDb(firestore);
                         
-                        // Autenticación Silenciosa
+                        // Autenticación Silenciosa obligatoria
                         firebase.auth().signInAnonymously()
                             .then(() => {
                                 console.log("Conectado a Firebase silenciosamente");
                             })
                             .catch((error) => {
                                 console.error("Error Auth:", error);
-                                setModal({isOpen: true, title: "Error de Permisos", message: "Habilita el inicio de sesión Anónimo en Firebase Authentication.", type: "error"});
+                                setModal({isOpen: true, title: "Error de Nube", message: "Habilita el inicio de sesión Anónimo en Firebase Authentication.", type: "error"});
                             });
                     } catch (e) {
                         console.error("Error parseando Firebase JSON", e);
@@ -143,7 +143,7 @@
                     const minutes = now.getMinutes();
                     const secs = now.getSeconds();
 
-                    // Cambio de Turno Automático
+                    // Cambio de Turno Automático (7am a 7pm es Diurno)
                     if (hours >= 7 && hours < 19) {
                         setActiveShift("Turno Diurno");
                     } else {
@@ -180,7 +180,7 @@
                                if (ampm === 'pm' && hour < 12) hour += 12;
                                if (ampm === 'am' && hour === 12) hour = 0;
                                
-                               // Regla estricta: Si a las 11 AM dice solo UV, es vuelo seguro (viento 0)
+                               // Regla estricta: Si a las 11 AM dice solo UV, es vuelo seguro
                                if (hour === 11 && dataPoint.wind === 0 && dataPoint.rawText && dataPoint.rawText.includes('UV')) {
                                    windMap[11] = 0;
                                } else {
@@ -193,12 +193,11 @@
                 setWindDataMap(windMap);
                 updateData({ windDataMap: windMap });
 
-                // Función para aplicar Variabilidad Táctica a los vuelos
+                // Variabilidad Táctica (±15 mins para evitar patrones predecibles)
                 const applyVariance = (timeStr, isForzoso = false) => {
                     if (isForzoso) return timeStr; // Forzosos no cambian
                     
                     let [h, m] = timeStr.split(':').map(Number);
-                    // Variación entre -15 y +15 minutos
                     let variance = Math.floor(Math.random() * 31) - 15; 
                     let date = new Date(2026, 0, 1, h, m + variance);
                     
@@ -214,6 +213,7 @@
 
                 // 1. BLOQUE MAÑANA
                 if (isSuspendedAt11) {
+                    // 4 Vuelos si se suspende a las 11 AM
                     newSchedule.push(
                         { time: applyVariance("06:00"), type: "DINÁMICO", wind: windMap[6] || 0, hour24: 6 },
                         { time: applyVariance("07:20", true), type: "FORZOSO", wind: windMap[7] || 0, hour24: 7 },
@@ -221,7 +221,7 @@
                         { time: applyVariance("09:45"), type: "DINÁMICO", wind: windMap[9] || 0, hour24: 9 }
                     );
                 } else if (isSuspendedAt12) {
-                    // Exactamente 5 vuelos con intervalo de 1 hr desde las 7:20
+                    // 5 Vuelos exactos cada hora si se suspende a las 12 PM
                     newSchedule.push(
                         { time: applyVariance("07:20", true), type: "FORZOSO", wind: windMap[7] || 0, hour24: 7 },
                         { time: applyVariance("08:20"), type: "DINÁMICO", wind: windMap[8] || 0, hour24: 8 },
@@ -230,6 +230,7 @@
                         { time: applyVariance("11:20"), type: "DINÁMICO", wind: windMap[11] || 0, hour24: 11 } 
                     );
                 } else {
+                    // Clima normal
                     newSchedule.push(
                         { time: applyVariance("07:20", true), type: "FORZOSO", wind: windMap[7] || 0, hour24: 7 },
                         { time: applyVariance("08:40"), type: "DINÁMICO", wind: windMap[8] || 0, hour24: 8 },
@@ -247,10 +248,10 @@
                     { time: applyVariance("18:30"), type: "DINÁMICO", wind: windMap[18] || 0, hour24: 18 }
                 );
                 
-                // 3. BLOQUE NOCTURNO (Recuperación)
+                // 3. BLOQUE NOCTURNO (Recuperación - 4 vuelos perfectos hasta 23:30)
                 newSchedule.push(
                     { time: applyVariance("20:00"), type: "RECUPERAR", wind: windMap[20] || 0, hour24: 20 },
-                    { time: applyVariance("21:10", true), type: "FORZOSO", wind: windMap[21] || 0, hour24: 21 },
+                    { time: applyVariance("21:10"), type: "RECUPERAR", wind: windMap[21] || 0, hour24: 21 },
                     { time: applyVariance("22:20"), type: "RECUPERAR", wind: windMap[22] || 0, hour24: 22 },
                     { time: applyVariance("23:30"), type: "RECUPERAR", wind: windMap[23] || 0, hour24: 23 }
                 );
@@ -277,7 +278,6 @@
                     setModal({ isOpen: true, title: "🌧️ Lluvia Declarada", message: "Las operaciones están bloqueadas hasta nuevo aviso.", type: "error" });
                 } else {
                     speak("Lluvia finalizada. Reprogramando itinerario restante.");
-                    // Reprogramar los que faltan
                     const flightsDone = todayFlightsTotal.length;
                     const flightsLeft = 13 - flightsDone;
                     
@@ -285,7 +285,7 @@
                         const h = currentTime.getHours();
                         const m = currentTime.getMinutes();
                         let startMins = h * 60 + m + 15; // Empezar en 15 mins
-                        const endMins = 23 * 60 + 30; // Límite 23:30
+                        const endMins = 23 * 60 + 30; // Límite máximo 23:30 hrs
                         
                         let newRemaining = [];
                         if (startMins < endMins) {
@@ -305,7 +305,6 @@
                                 });
                             }
                             
-                            // Reemplazar solo vuelos futuros
                             const pastFlights = flights.filter(f => {
                                 const fMins = parseInt(f.time.split(':')[0]) * 60 + parseInt(f.time.split(':')[1]);
                                 return fMins < (h * 60 + m);
@@ -317,7 +316,7 @@
                         }
                     }
                     
-                    setModal({ isOpen: true, title: "☀️ Cielo Despejado", message: "Itinerario recalculado para lo que resta del día.", type: "success" });
+                    setModal({ isOpen: true, title: "☀️ Cielo Despejado", message: "Itinerario recalculado hasta las 23:30 hrs.", type: "success" });
                 }
             };
 
@@ -355,7 +354,9 @@
 
                         if (!response.ok) {
                             const errorData = await response.json();
-                            throw new Error(errorData.error?.message || 'Error de conexión con IA');
+                            // FIX: Código clásico compatible con Babel 6 (Sin uso de ?.)
+                            const errorMessage = (errorData.error && errorData.error.message) ? errorData.error.message : 'Error de conexión con IA';
+                            throw new Error(errorMessage);
                         }
 
                         const result = await response.json();
@@ -366,7 +367,7 @@
                         
                         generateIntelligentSchedule(weatherData);
                         speak("Itinerario de vuelos calculado exitosamente.");
-                        setModal({ isOpen: true, title: 'Análisis Completado', message: 'Itinerario actualizado con los datos del clima.', type: 'success' });
+                        setModal({ isOpen: true, title: 'Análisis Completado', message: 'Itinerario actualizado y sincronizado en la Nube.', type: 'success' });
                     };
                 } catch (error) {
                     console.error(error);
@@ -381,6 +382,7 @@
             const handleLogFlight = () => {
                 if (isSuspendedNow) {
                     setModal({ isOpen: true, title: 'Operación Bloqueada', message: 'No puedes registrar despegues. Viento fuera de límites o lluvia activa.', type: 'error' });
+                    speak("Operación bloqueada por seguridad.");
                     return;
                 }
 
@@ -398,7 +400,7 @@
                 updateData({ todayFlightsTotal: updatedLogs });
                 
                 speak("Vuelo registrado en bitácora.");
-                setModal({ isOpen: true, title: "¡Despegue Registrado!", message: `Vuelo de las ${flightTime} registrado exitosamente.`, type: "success" });
+                setModal({ isOpen: true, title: "¡Despegue Registrado!", message: `Vuelo de las ${flightTime} guardado y sincronizado.`, type: "success" });
             };
 
             const handleSaveSettings = (e) => {
@@ -409,6 +411,7 @@
                 setModal({ isOpen: true, title: 'Guardado', message: 'Configuración actualizada.', type: 'success' });
             };
 
+            // Cálculos para Metas Gigantes
             const shiftTarget = 7;
             const shiftFlightsDone = todayFlightsTotal.filter(f => f.shift === "Turno Diurno").length;
             let currentTargetDisplay = 0;
@@ -436,7 +439,7 @@
                                 DISPATCHER PRO
                             </h1>
                             <p className="text-xs font-medium text-indigo-400 tracking-widest mt-1">
-                                V43 MASTER • {db ? <span className="text-emerald-400">🟢 NUBE CONECTADA</span> : <span className="text-rose-500 animate-pulse">🔴 NUBE DESCONECTADA</span>}
+                                V44 MASTER • {db ? <span className="text-emerald-400">🟢 NUBE CONECTADA</span> : <span className="text-rose-500 animate-pulse">🔴 DESCONECTADO</span>}
                             </p>
                         </div>
                         <button onClick={() => setIsSettingsOpen(true)} className="p-3 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl transition border border-slate-700">
@@ -456,7 +459,7 @@
                                         <p className="text-[10px] font-black tracking-widest text-indigo-400 uppercase mb-1">Turno en curso</p>
                                         <h2 className="text-3xl font-black text-white tracking-tight">{activeShift}</h2>
                                         <div className="mt-2 text-4xl font-mono font-bold text-white tracking-wider flex items-center gap-3">
-                                            {!audioUnlocked && <span className="text-xs animate-pulse text-amber-500 border border-amber-500/50 bg-amber-500/10 px-2 py-1 rounded cursor-pointer" onClick={unlockAudio}>🔇 Toca para Audio</span>}
+                                            {!audioUnlocked && <span className="text-xs animate-pulse text-amber-500 border border-amber-500/50 bg-amber-500/10 px-2 py-1 rounded cursor-pointer">🔇 Toca para Audio</span>}
                                             {currentTime.toLocaleTimeString('en-US', { hour12: false })}
                                         </div>
                                     </div>
@@ -470,12 +473,9 @@
                                             {isScanning ? '⏳ Analizando...' : '📸 ESCANEAR CLIMA'}
                                         </button>
                                         
-                                        <div className="grid grid-cols-2 gap-2 w-full sm:w-48">
-                                            <button onClick={toggleRainProtocol} className={`py-2 rounded-xl text-xs font-bold border transition ${isRaining ? 'bg-amber-500 text-black border-amber-400 shadow-[0_0_15px_rgba(245,158,11,0.5)]' : 'bg-slate-800 text-slate-400 border-slate-700 hover:bg-slate-700'}`}>
-                                                {isRaining ? '☀️ Reanudar' : '🌧️ Lluvia'}
-                                            </button>
-                                            <button onClick={handleLogFlight} disabled={isSuspendedNow} className={`py-2 rounded-xl text-xs font-bold border transition ${isSuspendedNow ? 'bg-slate-900 text-slate-600 border-slate-800 opacity-50 cursor-not-allowed' : 'bg-indigo-600 text-white border-indigo-500 hover:bg-indigo-500'}`}>
-                                                ✈️ Registrar
+                                        <div className="grid grid-cols-1 w-full sm:w-48">
+                                            <button onClick={toggleRainProtocol} className={`py-3 rounded-xl text-sm font-bold border transition ${isRaining ? 'bg-amber-500 text-black border-amber-400 shadow-[0_0_15px_rgba(245,158,11,0.5)]' : 'bg-slate-800 text-slate-400 border-slate-700 hover:bg-slate-700'}`}>
+                                                {isRaining ? '☀️ Reanudar Operaciones' : '🌧️ Declarar Lluvia'}
                                             </button>
                                         </div>
                                     </div>
@@ -485,7 +485,7 @@
                             {/* PLAN DE VUELOS CALCULADO */}
                             <div className="glass rounded-3xl p-5 border border-slate-800">
                                 <h3 className="text-[11px] font-black tracking-widest text-slate-400 uppercase mb-4 flex items-center gap-2">
-                                    <span className="w-2 h-2 bg-indigo-500 rounded-sm"></span> PLAN RESTANTE (CALCULADO)
+                                    <span className="w-2 h-2 bg-indigo-500 rounded-sm"></span> PLAN RESTANTE (TÁCTICO)
                                 </h3>
                                 
                                 {flights.length === 0 ? (
@@ -582,6 +582,16 @@
 
                         </div>
                     </div>
+                    
+                    {/* BOTÓN FLOTANTE REGISTRO MANUAL */}
+                    <div className="fixed bottom-0 left-0 w-full p-4 bg-gradient-to-t from-[#020617] via-[#020617] to-transparent flex justify-center pointer-events-none z-40">
+                        <button 
+                            onClick={handleLogFlight}
+                            disabled={isSuspendedNow}
+                            className={`pointer-events-auto px-8 py-4 rounded-full font-black tracking-wide text-sm shadow-2xl transition-all border-2 ${isSuspendedNow ? 'bg-slate-900 border-slate-800 text-slate-600 cursor-not-allowed opacity-80' : 'bg-indigo-600 hover:bg-indigo-500 text-white border-indigo-400 hover:scale-105 shadow-[0_0_30px_rgba(79,70,229,0.5)]'}`}>
+                            {isSuspendedNow ? '🚫 OPERACIÓN BLOQUEADA' : '✈️ REGISTRAR DESPEGUE AHORA'}
+                        </button>
+                    </div>
 
                     {/* MODALES Y SETTINGS */}
                     {modal.isOpen && (
@@ -608,7 +618,7 @@
                                 </div>
                                 <form onSubmit={handleSaveSettings} className="space-y-4">
                                     <div>
-                                        <label className="block text-xs font-bold text-slate-400 uppercase mb-2">Gemini API Key (Modelo 3.6)</label>
+                                        <label className="block text-xs font-bold text-slate-400 uppercase mb-2">Gemini API Key (Modelo 3.6 Flash)</label>
                                         <input type="password" value={settings.geminiKey} onChange={(e) => setSettings({...settings, geminiKey: e.target.value})} className="w-full bg-[#0f172a] border border-slate-700 rounded-xl p-3 text-white focus:border-indigo-500 outline-none" placeholder="AQ.Ab8..." />
                                     </div>
                                     <div>
