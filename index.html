@@ -46,7 +46,6 @@
             const [localMode, setLocalMode] = useState(false);
             const [isRaining, setIsRaining] = useState(false);
 
-            // Audio setup
             const unlockAudio = () => {
                 if (!audioUnlocked) {
                     const silent = new Audio("data:audio/mp3;base64,//MkxAA...");
@@ -66,7 +65,7 @@
                 }
             };
 
-            // EL CORTE SE HACE A LA MEDIANOCHE
+            // EL CORTE SE HACE A LA MEDIANOCHE EXACTA
             const getOperativeDayStart = (dateObj) => {
                 const d = new Date(dateObj);
                 d.setHours(0, 0, 0, 0); 
@@ -78,7 +77,6 @@
             };
 
             const generateIntelligentSchedule = useCallback((currentForecast, currentFlights, rainStatus) => {
-                // Vuelos obligatorios (Incluyendo el de las 6:00am)
                 const targetSlots = [
                     { h: 6, m: 0, type: 'FORZOSO' },
                     { h: 8, m: 20, type: 'FORZOSO' },
@@ -100,7 +98,6 @@
                     return [{ time: "--:--", type: "BLOQUEO POR LLUVIA", isPermitted: false, wind: "N/A" }];
                 }
 
-                // Meter forzosos futuros
                 targetSlots.forEach(slot => {
                     const slotMins = toOpMins(slot.h, slot.m);
                     if (slotMins > currentOpMins) {
@@ -110,7 +107,6 @@
                     }
                 });
 
-                // Meter dinámicos hasta llegar a 13 (contando los forzosos futuros)
                 const futureForzososCount = schedule.length;
                 let neededDynamics = remainingTotal - futureForzososCount;
 
@@ -122,7 +118,6 @@
                         
                         for (let m = 0; m <= 50; m += 10) {
                             const sm = toOpMins(h, m);
-                            // Solo horarios futuros, no chocar con forzosos, y no muy pegados al ahora
                             if (sm > currentOpMins + 15) {
                                 const isBusy = targetSlots.some(t => Math.abs(toOpMins(t.h, t.m) - sm) < 30);
                                 if (!isBusy) {
@@ -132,7 +127,6 @@
                         }
                     }
 
-                    // Distribuir equitativamente
                     if (possibleSlots.length > 0) {
                         const step = Math.max(1, Math.floor(possibleSlots.length / neededDynamics));
                         for (let i = 0; i < neededDynamics && i * step < possibleSlots.length; i++) {
@@ -140,7 +134,6 @@
                             schedule.push({ time: `${String(slot.h).padStart(2, '0')}:${String(slot.m).padStart(2, '0')}`, wind: slot.wind, isPermitted: true, type: 'DINÁMICO', slotMins: slot.slotMins });
                         }
                     } else {
-                        // Comprimir si hay poco tiempo
                         schedule.push({ time: "Sin ventanas", wind: 0, isPermitted: false, type: "CRÍTICO", slotMins: 9999 });
                     }
                 }
@@ -164,11 +157,10 @@
                             firebase.initializeApp(config);
                         }
                         
-                        // Intentar login anónimo silencioso (Necesario para las reglas nuevas)
                         try {
                             await firebase.auth().signInAnonymously();
                         } catch(authErr) {
-                            console.warn("Fallo Auth Anónimo, intentando continuar sin él:", authErr);
+                            console.warn("Fallo Auth Anónimo:", authErr);
                         }
 
                         const db = firebase.firestore();
@@ -186,7 +178,7 @@
                         }, (error) => {
                             console.error("Error Firebase:", error);
                             setCloudStatus('error');
-                            setLocalMode(true); // Activar supervivencia
+                            setLocalMode(true);
                         });
                     } catch (error) {
                         console.error("Configuración de Firebase inválida:", error);
@@ -200,18 +192,16 @@
             }, [firebaseConfigStr]);
 
             const updateData = async (newData) => {
-                // Actualización local siempre (Modo Supervivencia)
                 if (newData.flights) setFlights(newData.flights);
                 if (newData.forecast) setForecastData(newData.forecast);
                 if (newData.isRaining !== undefined) setIsRaining(newData.isRaining);
 
-                // Intento de actualización en la nube
                 if (firebase.apps.length > 0 && !localMode) {
                     try {
                         const db = firebase.firestore();
                         await db.collection('operaciones').doc('estado_actual').set(newData, { merge: true });
                     } catch (error) {
-                        console.error("Error guardando en la nube, continuando en modo local:", error);
+                        console.error("Error guardando en la nube:", error);
                         setCloudStatus('error');
                         setLocalMode(true);
                     }
@@ -238,22 +228,20 @@
                     const minute = now.getMinutes();
                     const hour = now.getHours();
 
-                    if (second === 0) { // Evaluar eventos solo una vez por minuto
+                    if (second === 0) { 
                         if (isRaining) return;
 
                         if (timeStr === "07:50") speak("Atención piloto. Es hora de aterrizar. Junta obligatoria en curso.");
                         
-                        // Alertas de actualización mandatorias
+                        // ALARMAS NUEVAS DE MEDIANOCHE Y MEDIODÍA
                         if (timeStr === "00:00") speak("Atención. Corte de vuelos realizado a la medianoche. Pilotos, por favor actualicen la captura del clima para el nuevo día.");
                         if (timeStr === "12:00") speak("Atención. Actualización de medio día. Pilotos, por favor actualicen la captura del clima.");
 
-                        // Alerta de caducidad cada 5 mins si no hay datos de esta hora
                         const hasDataForCurrentHour = forecastData && forecastData.hasOwnProperty(hour.toString());
                         if (!hasDataForCurrentHour && minute % 5 === 0) {
                             speak("Alerta. Datos del clima desactualizados para esta hora. Suba una nueva captura, por favor.");
                         }
 
-                        // Alarma predictiva de despegue (10 minutos antes)
                         const futureDate = new Date(now.getTime() + 10 * 60000);
                         const targetTimeStr = futureDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
                         
@@ -264,7 +252,7 @@
                             if (nextFlight.isPermitted) {
                                 speak(`Pilotos, prepárense. Próximo despegue programado en 10 minutos.`);
                             } else {
-                                speak(`Alerta. Vuelo de las ${targetTimeStr} bloqueado por vientos de ${nextFlight.wind} kilómetros por hora. No hay autorización para despegue.`);
+                                speak(`Alerta. Vuelo de las ${targetTimeStr} bloqueado por vientos de ${nextFlight.wind} kilómetros por hora.`);
                             }
                         }
                     }
@@ -281,7 +269,7 @@
                 setIsScanning(true);
                 setModal({ isOpen: true, title: 'Escaneando Clima', message: 'La IA está analizando los vientos. Por favor espere...', type: 'info' });
 
-                // INSTRUCCIONES ESTRICTAS (Parche 36 km/h y Ráfagas fuertes)
+                // NUEVO PROMPT SÚPER ESTRICTO (45 km/h)
                 const promptText = `Eres un sistema de seguridad de control de vuelos de drones. Analiza la imagen de la predicción meteorológica.
 REGLAS ESTRICTAS DE PRIORIDAD ABSOLUTA:
 1. Si ves la frase EXACTA "Ráfagas fuertes" (en un recuadro rojo, ej. "Ráfagas fuertes >20m"), DETÉN TODO y asígnale inmediatamente 45 km/h a esa hora. No importa si a la derecha dice "13" u otro número, la advertencia "Ráfagas fuertes" = 45.
@@ -293,7 +281,8 @@ Ejemplo de salida válida:
 Si una hora dice "Apto para volar", asume 10 km/h. No devuelvas texto adicional, solo el JSON.`;
 
                 try {
-                    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-pro-vision:generateContent?key=${geminiKey}`, {
+                    // SERVIDOR ACTUALIZADO A 1.5 FLASH (El viejo fue borrado por Google)
+                    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiKey}`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
@@ -319,7 +308,6 @@ Si una hora dice "Apto para volar", asume 10 km/h. No devuelvas texto adicional,
                         delete parsedForecast["AHORA"];
                     }
 
-                    // Falso Seguro: Garantizar que la hora actual exista o se quede vacía para activar advertencia
                     if (!parsedForecast.hasOwnProperty(nowHr.toString())) {
                         console.warn("La IA no detectó datos para la hora actual.");
                     }
@@ -355,7 +343,7 @@ Si una hora dice "Apto para volar", asume 10 km/h. No devuelvas texto adicional,
                 const shift = (h >= 7 && h < 19) ? 'Turno Diurno' : 'Turno Nocturno';
 
                 const newTimestamp = new Date();
-                newTimestamp.setHours(h, m, 0, 0); // Asignado al día natural (00:00 a 23:59)
+                newTimestamp.setHours(h, m, 0, 0); 
 
                 const newLog = { id: Date.now(), time: timeStr, timestamp: newTimestamp.toISOString(), shift: shift, wind: windNum };
                 const updatedLogs = [newLog, ...flights].sort((a,b) => b.id - a.id);
@@ -366,7 +354,6 @@ Si una hora dice "Apto para volar", asume 10 km/h. No devuelvas texto adicional,
             const activeShift = (currentTime.getHours() >= 7 && currentTime.getHours() < 19) ? 'Turno Diurno' : 'Turno Nocturno';
             const currentHourStr = currentTime.getHours().toString();
             
-            // Lógica de "Falso Seguro" corregida
             const hasCurrentData = forecastData.hasOwnProperty(currentHourStr);
             const currentWind = hasCurrentData ? forecastData[currentHourStr] : null;
             
@@ -388,7 +375,6 @@ Si una hora dice "Apto para volar", asume 10 km/h. No devuelvas texto adicional,
                     currentStatusText = `OPERABLE (${currentWind} KM/H)`;
                 }
             } else {
-                // Alerta gris de volar a ciegas
                 currentStatusClass = "bg-slate-800 border-slate-600";
                 currentStatusText = "⚠️ SIN DATOS PARA ESTA HORA";
             }
@@ -418,7 +404,6 @@ Si una hora dice "Apto para volar", asume 10 km/h. No devuelvas texto adicional,
             return (
                 <div className="w-full max-w-md mx-auto p-4 flex flex-col h-full relative" onClick={unlockAudio}>
                     
-                    {/* Header y Nube Status */}
                     <div className="flex justify-between items-center mb-6 pt-2">
                         <div className="flex items-center gap-3">
                             <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center font-black text-xl shadow-lg shadow-indigo-600/30">DP</div>
@@ -444,7 +429,6 @@ Si una hora dice "Apto para volar", asume 10 km/h. No devuelvas texto adicional,
 
                     <div className="flex-grow overflow-y-auto hide-scroll pb-24 space-y-4">
                         
-                        {/* Status principal del turno */}
                         <div className="glass p-5 rounded-3xl relative overflow-hidden flex justify-between items-center">
                             <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/10 rounded-full blur-3xl"></div>
                             <div>
@@ -463,7 +447,6 @@ Si una hora dice "Apto para volar", asume 10 km/h. No devuelvas texto adicional,
                             </button>
                         </div>
 
-                        {/* Indicador de Viento */}
                         <div className={`p-4 rounded-3xl border flex items-center gap-3 transition-colors ${currentStatusClass}`}>
                             <div className={`w-4 h-4 rounded-full ${isPermitted ? 'bg-emerald-500' : 'bg-rose-500 animate-pulse'}`}></div>
                             <div>
@@ -472,7 +455,6 @@ Si una hora dice "Apto para volar", asume 10 km/h. No devuelvas texto adicional,
                             </div>
                         </div>
 
-                        {/* Contadores */}
                         <div className="glass rounded-3xl p-5 border border-slate-800">
                             <div className="flex justify-between items-end mb-4">
                                 <p className="text-[10px] font-black tracking-widest text-slate-400 uppercase">Meta Operativa de Hoy</p>
@@ -494,7 +476,6 @@ Si una hora dice "Apto para volar", asume 10 km/h. No devuelvas texto adicional,
                             </div>
                         </div>
 
-                        {/* Itinerario IA */}
                         <div className="glass rounded-3xl p-4 border border-slate-800">
                             <div className="flex justify-between items-center mb-4">
                                 <h3 className="text-[11px] font-black tracking-widest text-indigo-300 uppercase flex items-center gap-1.5"><span className="text-sm">🤖</span> Plan Maestro Restante</h3>
@@ -523,7 +504,7 @@ Si una hora dice "Apto para volar", asume 10 km/h. No devuelvas texto adicional,
 
                     </div>
 
-                    {/* Botón Flotante */}
+                    {}
                     <div className="fixed bottom-0 left-0 w-full p-4 bg-gradient-to-t from-[#020617] via-[#020617] to-transparent flex justify-center z-40">
                         <button onClick={handleLogFlight} disabled={!isPermitted}
                             className={`w-full max-w-md py-4 rounded-2xl font-black text-lg tracking-wide shadow-xl transition-all ${isPermitted ? 'bg-emerald-500 text-slate-950 shadow-emerald-500/20 hover:bg-emerald-400 hover:-translate-y-1' : 'bg-rose-950/50 text-rose-500 border border-rose-900 cursor-not-allowed'}`}>
@@ -531,7 +512,6 @@ Si una hora dice "Apto para volar", asume 10 km/h. No devuelvas texto adicional,
                         </button>
                     </div>
 
-                    {/* Modales */}
                     {modal.isOpen && (
                         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
                             <div className="bg-slate-900 border border-slate-700 p-6 rounded-3xl w-full max-w-sm text-center">
