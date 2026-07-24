@@ -61,6 +61,7 @@
             useEffect(() => {
                 let unsubscribe = () => {};
 
+                // Iniciar sesión silenciosa para no ser bloqueados por las reglas de Firebase
                 firebase.auth().signInAnonymously().then(() => {
                     unsubscribe = db.collection('operaciones').doc('turno_actual').onSnapshot((doc) => {
                         if (doc.exists) {
@@ -149,6 +150,7 @@
                 
                 try {
                     const key = geminiKey.trim();
+                    // Usando la versión de producción 3.6-flash validada
                     const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${key}`;
                     
                     const payload = {
@@ -214,29 +216,35 @@
                 db.collection('operaciones').doc('turno_actual').set({ windDataMap: windMap }, { merge: true });
 
                 let newSchedule = [
-                    { time: "06:00", type: "FORZOSO", wind: windMap[6] || 0, hour24: 6 },
-                    { time: "07:20", type: "FORZOSO", wind: windMap[7] || 0, hour24: 7 }
+                    { time: "06:00", type: "FORZOSO", wind: windMap[6] || 0, hour24: 6 }
                 ];
 
                 const isSuspendedAt11 = windMap[11] >= 40;
                 const isSuspendedAt12 = windMap[12] >= 40 && !isSuspendedAt11;
 
                 if (isSuspendedAt11) {
+                    // 4 vuelos exactos entre 7:20 am y 11:00 am
                     newSchedule.push(
+                        { time: "07:20", type: "FORZOSO", wind: windMap[7] || 0, hour24: 7 },
                         { time: "08:30", type: "DINÁMICO", wind: windMap[8] || 0, hour24: 8 },
-                        { time: "09:45", type: "DINÁMICO", wind: windMap[9] || 0, hour24: 9 },
-                        { time: "11:00", type: "DINÁMICO", wind: windMap[11], hour24: 11 }, 
-                        { time: "12:15", type: "DINÁMICO", wind: windMap[12] || 0, hour24: 12 }
+                        { time: "09:30", type: "DINÁMICO", wind: windMap[9] || 0, hour24: 9 },
+                        { time: "10:30", type: "DINÁMICO", wind: windMap[10] || 0, hour24: 10 },
+                        { time: "11:30", type: "DINÁMICO", wind: windMap[11] || 45, hour24: 11 } 
                     );
                 } else if (isSuspendedAt12) {
+                    // 5 vuelos exactos entre 7:20 am y 12:00 pm (Cada 1 hora limpia)
                     newSchedule.push(
+                        { time: "07:20", type: "FORZOSO", wind: windMap[7] || 0, hour24: 7 },
                         { time: "08:20", type: "DINÁMICO", wind: windMap[8] || 0, hour24: 8 },
-                        { time: "09:30", type: "DINÁMICO", wind: windMap[9] || 0, hour24: 9 },
-                        { time: "10:45", type: "DINÁMICO", wind: windMap[10] || 0, hour24: 10 },
-                        { time: "12:00", type: "DINÁMICO", wind: windMap[12], hour24: 12 } 
+                        { time: "09:20", type: "DINÁMICO", wind: windMap[9] || 0, hour24: 9 },
+                        { time: "10:20", type: "DINÁMICO", wind: windMap[10] || 0, hour24: 10 },
+                        { time: "11:20", type: "DINÁMICO", wind: windMap[11] || 0, hour24: 11 },
+                        { time: "12:00", type: "DINÁMICO", wind: windMap[12] || 45, hour24: 12 } 
                     );
                 } else {
+                    // Clima normal sin suspensiones tempranas
                     newSchedule.push(
+                        { time: "07:20", type: "FORZOSO", wind: windMap[7] || 0, hour24: 7 },
                         { time: "08:40", type: "DINÁMICO", wind: windMap[8] || 0, hour24: 8 },
                         { time: "10:00", type: "DINÁMICO", wind: windMap[10] || 0, hour24: 10 },
                         { time: "11:30", type: "DINÁMICO", wind: windMap[11] || 0, hour24: 11 },
@@ -438,7 +446,7 @@
                          </button>
                     </div>
 
-                    {/* Modal Ajustes */}
+                    {/* Modal Ajustes y Errores */}
                     {settingsOpen && (
                         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4" onClick={(e) => e.stopPropagation()}>
                             <div className="bg-[#131826] border border-slate-800 rounded-2xl w-full max-w-sm shadow-2xl p-6">
@@ -461,6 +469,18 @@
                                     <button onClick={() => setSettingsOpen(false)} className="flex-1 bg-slate-800 hover:bg-slate-700 text-white font-bold py-2.5 rounded-lg text-xs border border-slate-700">Cancelar</button>
                                     <button onClick={() => { localStorage.setItem('gemini_key', geminiKey); setSettingsOpen(false); speak("Ajustes guardados."); }} className="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2.5 rounded-lg text-xs">Guardar</button>
                                 </div>
+                            </div>
+                        </div>
+                    )}
+                    
+                    {modal.isOpen && (
+                        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4" onClick={(e) => e.stopPropagation()}>
+                            <div className="bg-[#131826] border border-slate-800 rounded-2xl w-full max-w-sm shadow-2xl p-6">
+                                <h2 className="text-lg font-black text-white mb-2">{modal.title}</h2>
+                                <p className="text-slate-300 text-sm mb-6">{modal.message}</p>
+                                <button onClick={() => setModal({ ...modal, isOpen: false })} className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2.5 rounded-lg text-xs">
+                                    Entendido
+                                </button>
                             </div>
                         </div>
                     )}
