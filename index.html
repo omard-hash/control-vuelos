@@ -42,7 +42,7 @@
             // Estado de red / Firebase
             const [firebaseConfigStr, setFirebaseConfigStr] = useState(localStorage.getItem('dispatcher_firebase_config') || '');
             const [geminiKey, setGeminiKey] = useState(localStorage.getItem('dispatcher_gemini_key') || '');
-            const [cloudStatus, setCloudStatus] = useState('offline'); // 'online', 'offline', 'error'
+            const [cloudStatus, setCloudStatus] = useState('offline');
             const [localMode, setLocalMode] = useState(false);
             const [isRaining, setIsRaining] = useState(false);
 
@@ -159,8 +159,6 @@
                         }
                         
                         const db = firebase.firestore();
-                        
-                        // Inicio de sesión anónimo silencioso
                         await firebase.auth().signInAnonymously();
                         
                         setCloudStatus('online');
@@ -204,10 +202,8 @@
                     await db.collection('settings').doc('master_state').set(newData, { merge: true });
                 } catch (error) {
                     console.error("Error guardando:", error);
-                    setModal({ isOpen: true, title: 'Error de Red', message: 'Se guardó localmente. Revisa tu conexión.', type: 'error' });
                     setLocalMode(true);
                     setCloudStatus('error');
-                    
                     if (newData.flights) setFlights(newData.flights);
                     if (newData.forecast) setForecastData(newData.forecast);
                     if (newData.isRaining !== undefined) setIsRaining(newData.isRaining);
@@ -224,7 +220,7 @@
                     const currentH = now.getHours();
                     const currentM = now.getMinutes();
 
-                    // Avisos fijos (Cambio de turno)
+                    // Avisos fijos a las 12 AM y 12 PM
                     if (currentM === 0 && currentH !== lastSpokenHour) {
                         if (currentH === 0) {
                             speak("Atención. Iniciando nuevo día operativo. Pilotos, por favor actualicen la captura del clima.");
@@ -234,14 +230,13 @@
                         lastSpokenHour = currentH;
                     }
 
-                    // Alarma de Caducidad (Cada 5 minutos)
-                    // Solo revisamos la variable forecastData directamente porque el componente se re-renderiza
+                    // Alarma de Caducidad (Cada 5 minutos si falta clima para la hora actual)
                     setForecastData(currentForecast => {
                         const hasCurrentData = currentForecast.hasOwnProperty(currentH.toString());
                         if (!hasCurrentData && currentM % 5 === 0 && now.getSeconds() === 0) {
                             speak("Alerta. Datos del clima desactualizados para esta hora. Suba una nueva captura inmediatamente, por favor.");
                         }
-                        return currentForecast; // No modificamos el estado, solo lo leemos de manera segura
+                        return currentForecast; 
                     });
 
                 }, 1000);
@@ -256,7 +251,6 @@
                 
                 setIsScanning(true);
                 try {
-                    // REGLAS ESTRICTAS DE IA
                     const promptText = `Eres un asistente de aviación de precisión analizando una captura de clima de "OK TO FLY".
                     
                     REGLAS CRÍTICAS DE SUPERVIVENCIA:
@@ -268,12 +262,11 @@
                     Ejemplo de respuesta estricta: {"AHORA": 45, "21": 22, "22": 19, "23": 15}. 
                     NO escribas markdown, no uses la palabra json, devuelve solo las llaves {}.`;
 
-                    // FIX: Mandamos la llave AQ en los HEADERS (x-goog-api-key) para saltarnos el error de credenciales
-                    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent`, {
+                    // FIX V18: Método oficial de conexión estable. La llave va directo en la URL.
+                    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiKey}`, {
                         method: 'POST',
                         headers: { 
-                            'Content-Type': 'application/json',
-                            'x-goog-api-key': geminiKey 
+                            'Content-Type': 'application/json'
                         },
                         body: JSON.stringify({
                             contents: [{
@@ -292,7 +285,6 @@
                     }
                     
                     let textResult = data.candidates[0].content.parts[0].text;
-                    // Limpieza del JSON
                     textResult = textResult.replace(/```json/g, '').replace(/```/g, '').trim();
                     const parsedForecast = JSON.parse(textResult);
 
@@ -410,7 +402,7 @@
                             <div>
                                 <h1 className="font-black text-lg leading-none tracking-tight">DISPATCHER PRO</h1>
                                 <div className="text-[10px] font-bold mt-1 flex items-center gap-1 uppercase tracking-wider">
-                                    <span className="text-indigo-400">V17_AQ_FIX_ES</span>
+                                    <span className="text-indigo-400">V18_ESTABLE</span>
                                     {cloudStatus === 'online' ? <span className="text-emerald-400 flex items-center gap-1"><span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span> Nube Activa</span> : 
                                      cloudStatus === 'error' || localMode ? <span className="text-rose-400 flex items-center gap-1"><span className="w-2 h-2 bg-rose-500 rounded-full"></span> Sin Red (Local)</span> : 
                                      <span className="text-slate-400">Desconectado</span>}
@@ -561,7 +553,7 @@
                                 <h3 className="text-lg font-black mb-4">Configuración Cloud</h3>
                                 <div className="space-y-4">
                                     <div>
-                                        <label className="block text-xs font-bold text-slate-400 mb-1">Gemini API Key (Empieza con AQ. o AIza)</label>
+                                        <label className="block text-xs font-bold text-slate-400 mb-1">Gemini API Key</label>
                                         <input type="password" value={geminiKey} onChange={(e) => setGeminiKey(e.target.value)} className="w-full bg-slate-800 border border-slate-700 rounded-xl p-3 text-sm text-white font-mono" placeholder="AQ.Ab8RN6Lu..." />
                                     </div>
                                     <div>
