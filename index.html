@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Dispatcher Pro V31</title>
+    <title>Dispatcher Pro V32</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
@@ -19,6 +19,17 @@
         }
         .modal-animate { animation: modalPop 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
     </style>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        
+        // Exportamos las herramientas a la ventana global para que React las pueda usar sin problemas
+        window.FirebaseModules = {
+            initializeApp, getAuth, signInAnonymously, getFirestore, collection, doc, setDoc, onSnapshot
+        };
+    </script>
 </head>
 <body class="antialiased min-h-screen pb-24">
     <div id="root"></div>
@@ -33,6 +44,7 @@
             const [isRaining, setIsRaining] = useState(false);
             const [isScanning, setIsScanning] = useState(false);
             const [audioUnlocked, setAudioUnlocked] = useState(false);
+            const [isOnline, setIsOnline] = useState(false);
             
             const [cloudConfig, setCloudConfig] = useState({
                 geminiKey: localStorage.getItem('dispatcher_gemini_key') || '',
@@ -42,10 +54,68 @@
             const [modal, setModal] = useState({ isOpen: false, title: '', message: '', type: 'info' });
             const [settingsOpen, setSettingsOpen] = useState(false);
 
+            // Reloj en tiempo real
             useEffect(() => {
                 const timer = setInterval(() => setCurrentTime(new Date()), 1000);
                 return () => clearInterval(timer);
             }, []);
+
+            useEffect(() => {
+                let unsubFlights = () => {};
+                let unsubForecast = () => {};
+
+                const initFirebase = async () => {
+                    const fbStr = cloudConfig.firebaseJson;
+                    if (!fbStr || fbStr.trim() === '' || !window.FirebaseModules) return;
+                    
+                    try {
+                        const config = JSON.parse(fbStr);
+                        const { initializeApp, getAuth, signInAnonymously, getFirestore, collection, doc, setDoc, onSnapshot } = window.FirebaseModules;
+                        
+                        const app = initializeApp(config);
+                        const auth = getAuth(app);
+                        const database = getFirestore(app);
+                        
+                        // Guardar herramientas de base de datos de manera global
+                        window.FbSetDoc = setDoc;
+                        window.FbDoc = doc;
+                        window.FbCollection = collection;
+                        window.FbDb = database;
+
+                        // Ingreso silencioso obligatorio
+                        const userCred = await signInAnonymously(auth);
+                        if (!userCred.user) return;
+
+                        setIsOnline(true);
+                        
+                        const appId = typeof __app_id !== 'undefined' ? __app_id : 'dispatcher-v32';
+
+                        // Escuchar Vuelos Globales en tiempo real
+                        const flightsCol = collection(database, 'artifacts', appId, 'public', 'data', 'flights');
+                        unsubFlights = onSnapshot(flightsCol, (snapshot) => {
+                            const loadedFlights = [];
+                            snapshot.forEach(d => loadedFlights.push(d.data()));
+                            loadedFlights.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+                            setFlights(loadedFlights);
+                        }, (err) => console.error("Error nube vuelos", err));
+
+                        // Escuchar Clima Global en tiempo real
+                        const forecastDocRef = doc(database, 'artifacts', appId, 'public', 'data', 'forecast', 'current');
+                        unsubForecast = onSnapshot(forecastDocRef, (snap) => {
+                            if (snap.exists()) {
+                                setForecastData(snap.data().data);
+                            }
+                        }, (err) => console.error("Error nube clima", err));
+
+                    } catch (e) {
+                        console.error("Fallo al iniciar Nube:", e);
+                        setIsOnline(false);
+                    }
+                };
+
+                initFirebase();
+                return () => { unsubFlights(); unsubForecast(); };
+            }, [cloudConfig.firebaseJson]);
 
             const unlockAudio = () => {
                 if (!audioUnlocked) {
@@ -75,7 +145,7 @@
             const generateIntelligentSchedule = (forecast, completedFlights, raining) => {
                 let schedule = [];
                 
-                // 1. Vuelos Forzosos Exactos (Con el de las 7:20 para librar la junta)
+                // Vuelos Forzosos Inamovibles
                 const forzosos = [
                     { h: 6, m: 0 },
                     { h: 7, m: 20 },
@@ -88,7 +158,6 @@
                 const currentM = currentTime.getMinutes();
                 const nowMins = currentH * 60 + currentM;
 
-                // 2. Filtrar Forzosos al itinerario
                 forzosos.forEach(fz => {
                     let fzMins = fz.h * 60 + fz.m;
                     let speed = forecast[fz.h.toString()] !== undefined ? forecast[fz.h.toString()] : 0;
@@ -96,12 +165,12 @@
                         time: `${fz.h.toString().padStart(2, '0')}:${fz.m.toString().padStart(2, '0')}`,
                         type: 'FORZOSO',
                         wind: speed,
-                        isPermitted: !raining && speed <= 43,
+                        isPermitted: !raining && speed <= 42,
                         slotMins: fzMins
                     });
                 });
 
-                // 3. Contabilizar Vuelos Restantes del Día (Reseteo estricto a las 12 AM)
+                // Contabilizar Meta Global del Día (Reinicia a las 12am)
                 const todayStr = new Date().toLocaleDateString();
                 const todayFlightsTotal = completedFlights.filter(f => new Date(f.timestamp).toLocaleDateString() === todayStr);
                 const remainingTotal = 13 - todayFlightsTotal.length;
@@ -109,35 +178,28 @@
                 const futureForzososMins = schedule.filter(s => s.slotMins > nowMins).map(s => s.slotMins);
                 let neededDynamics = remainingTotal - futureForzososMins.length;
 
-                // 4. Generar Slots Dinámicos Inteligentemente
                 if (neededDynamics > 0) {
-                    
-                    // REGLA CLAVE: ¿Hay suspensión temprana detectada a las 11 AM, 12 PM o 1 PM?
+                    // Detección de suspensión matutina
                     let isSuspensionDay = false;
-                    if ((forecast['11'] && forecast['11'] > 43) || (forecast['12'] && forecast['12'] > 43) || (forecast['13'] && forecast['13'] > 43)) {
+                    if ((forecast['11'] && forecast['11'] > 42) || (forecast['12'] && forecast['12'] > 42) || (forecast['13'] && forecast['13'] > 42)) {
                         isSuspensionDay = true;
                     }
-
-                    // Separación Inteligente: Si hay suspensión, los apresuramos (45 mins). Si es día normal, los relajamos a cada 2 horas (120 mins).
-                    let idealSeparation = isSuspensionDay ? 45 : 120;
 
                     let possibleSlots = [];
                     for (let h = 0; h < 24; h++) {
                         let speed = forecast[h.toString()] !== undefined ? forecast[h.toString()] : 0;
-                        if (speed > 43 || raining) continue;
+                        if (speed > 42 || raining) continue;
 
                         for (let m = 0; m <= 50; m += 10) {
                             let slotMins = h * 60 + m;
-
-                            if (slotMins <= nowMins + 10) continue; // Ignorar el pasado
+                            if (slotMins <= nowMins + 10) continue; 
                             
-                            // Regla Estricta: Prohibido entre 6:01 AM y 6:59 AM
+                            // Prohibición 6:01 AM - 6:59 AM
                             if (h === 6 && m > 0) continue;
                             
-                            // Regla Estricta: Libre a las 7:50 para la junta
+                            // Prohibición Junta 7:50 AM
                             if (h === 7 && m === 50) continue; 
 
-                            // Ignorar horas que choquen exactamente con forzosos (+- 20 mins de separación)
                             let chocaConForzoso = futureForzososMins.some(fMins => Math.abs(fMins - slotMins) <= 20);
                             if (chocaConForzoso) continue;
 
@@ -145,31 +207,25 @@
                         }
                     }
 
-                    // Primer Pase: Intentar acomodarlos con la separación ideal
-                    let lastFlightMins = nowMins; 
-                    let assigned = 0;
+                    // Asignación con Herencia Inteligente
                     let dynamicCandidates = [];
+                    let assigned = 0;
+                    let lastFlightMins = nowMins;
+                    
+                    // Si hay urgencia, separación corta. Si no, separamos equitativamente para dejar descansar.
+                    let idealSeparation = isSuspensionDay ? 45 : 120;
 
-                    for (let i = 0; i < possibleSlots.length && assigned < neededDynamics; i++) {
-                        let slot = possibleSlots[i];
-                        
-                        if (slot.slotMins >= lastFlightMins + idealSeparation) {
-                            dynamicCandidates.push(slot);
-                            lastFlightMins = slot.slotMins;
-                            assigned++;
-                        }
-                    }
+                    for (let pass = 0; pass < 2 && assigned < neededDynamics; pass++) {
+                        // Plan B: Si no caben con espaciado largo, acortamos distancias
+                        if (pass === 1) idealSeparation = 45; 
 
-                    // Segundo Pase (Plan B): Si el día es normal pero no cupieron todos a 2 horas,
-                    // recalculamos y obligamos una separación de emergencia (45 mins) para meter los vuelos heredados que falten.
-                    if (assigned < neededDynamics && !isSuspensionDay) {
                         dynamicCandidates = [];
                         assigned = 0;
                         lastFlightMins = nowMins;
-                        
+
                         for (let i = 0; i < possibleSlots.length && assigned < neededDynamics; i++) {
                             let slot = possibleSlots[i];
-                            if (slot.slotMins >= lastFlightMins + 45) { // Separación comprimida de herencia
+                            if (slot.slotMins >= lastFlightMins + idealSeparation) {
                                 dynamicCandidates.push(slot);
                                 lastFlightMins = slot.slotMins;
                                 assigned++;
@@ -177,7 +233,6 @@
                         }
                     }
 
-                    // Guardarlos en el itinerario oficial
                     dynamicCandidates.forEach(slot => {
                         schedule.push({
                             time: `${slot.h.toString().padStart(2, '0')}:${slot.m.toString().padStart(2, '0')}`,
@@ -189,7 +244,6 @@
                     });
                 }
 
-                // Ordenar y devolver solo lo que sigue
                 schedule.sort((a, b) => a.slotMins - b.slotMins);
                 return schedule.filter(s => s.slotMins >= nowMins);
             };
@@ -203,7 +257,6 @@
                 const currentM = currentTime.getMinutes();
                 const nowMins = currentH * 60 + currentM;
 
-                // Alarma Junta 7:50 AM
                 if (currentH === 7 && currentM === 50) {
                     speak("Aviso importante. Junta de pilotos en progreso. El área debe permanecer despejada.");
                 }
@@ -227,12 +280,13 @@
                 setIsScanning(true);
                 try {
                     const promptText = `Eres un despachador de vuelos automatizado. Lee esta tabla de clima.
-EXTRAE LA VELOCIDAD MÁXIMA DEL VIENTO POR CADA HORA.
+EXTRAE LA VELOCIDAD MÁXIMA DEL VIENTO POR CADA HORA EN NÚMEROS (km/h).
 REGLAS ESTRICTAS Y ABSOLUTAS:
 1. Revisa la tabla FILA POR FILA.
-2. Si en la fila dice "Apto para volar" o "Calma", el viento es 0. PON CERO.
-3. Ignora advertencias futuras para la hora actual. Si AHORA dice apto, pon 0.
-4. Devuelve ÚNICAMENTE un objeto JSON con formato: {"0": 15, "1": 0, "2": 45} (24h, km/h). NUNCA devuelvas texto.`;
+2. Si en la fila dice "Apto para volar", el viento es 0. PON CERO (0).
+3. Si en la fila dice "Ráfagas fuertes", "Vientos >40", "Ráfagas fuertes >80m" o advierte peligro, DEBES PONER 45 SIN EXCEPCIÓN. (Esto es crucial para que el sistema suspenda el vuelo).
+4. Si dice algo como "13 30m" o "14 120m", extrae solo el primer número (ej. 13 o 14).
+5. Devuelve ÚNICAMENTE un objeto JSON con formato: {"0": 13, "1": 0, "12": 45, "13": 45} (24h, km/h). NUNCA devuelvas texto.`;
 
                     const payload = {
                         contents: [{
@@ -259,9 +313,18 @@ REGLAS ESTRICTAS Y ABSOLUTAS:
                     responseText = responseText.replace(/```json/g, '').replace(/```/g, '').trim();
                     
                     const parsedData = JSON.parse(responseText);
-                    setForecastData(parsedData);
                     
-                    speak("Análisis de clima completado. Itinerario actualizado.");
+                    // Sincronizar Clima a la Nube
+                    if (window.FbDb && isOnline) {
+                        const appId = typeof __app_id !== 'undefined' ? __app_id : 'dispatcher-v32';
+                        const fDoc = window.FbDoc(window.FbDb, 'artifacts', appId, 'public', 'data', 'forecast', 'current');
+                        await window.FbSetDoc(fDoc, { data: parsedData, timestamp: new Date().toISOString() });
+                        speak("Clima analizado y sincronizado en la nube global.");
+                    } else {
+                        setForecastData(parsedData); // Local
+                        speak("Análisis completado en modo local.");
+                    }
+                    
                     setModal({ isOpen: true, title: "Análisis Exitoso", message: "El clima ha sido procesado correctamente.", type: "success" });
 
                 } catch (error) {
@@ -283,7 +346,7 @@ REGLAS ESTRICTAS Y ABSOLUTAS:
             const currentHStr = currentTime.getHours().toString();
             const currentWind = forecastData[currentHStr] !== undefined ? forecastData[currentHStr] : null;
             const needsScanUI = currentWind === null;
-            const isBlocked = isRaining || (currentWind !== null && currentWind > 43);
+            const isBlocked = isRaining || (currentWind !== null && currentWind > 42); // > 42 activa el bloqueo
             const activeShift = (currentTime.getHours() >= 7 && currentTime.getHours() < 19) ? 'Turno Diurno' : 'Turno Nocturno';
             const todayStr = new Date().toLocaleDateString();
             const todayFlightsTotal = flights.filter(f => new Date(f.timestamp).toLocaleDateString() === todayStr);
@@ -291,13 +354,14 @@ REGLAS ESTRICTAS Y ABSOLUTAS:
             return (
                 <div className="w-full max-w-md mx-auto p-4 flex flex-col h-full relative" onClick={unlockAudio}>
                     
+                    {/* ENCABEZADO */}
                     <div className="flex justify-between items-center mb-6 pt-4">
                         <div className="flex items-center gap-2">
                             <div className="bg-indigo-600 w-10 h-10 rounded-xl flex items-center justify-center font-black text-xl shadow-lg">DP</div>
                             <div className="leading-tight">
                                 <h1 className="font-black text-lg tracking-wide uppercase">Dispatcher Pro</h1>
-                                <p className="text-[10px] text-emerald-400 font-bold uppercase tracking-wider flex items-center gap-1">
-                                    V31 DEFINITIVA <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse"></span> {cloudConfig.geminiKey ? 'Nube Activa' : 'Sin Configurar'}
+                                <p className="text-[10px] font-bold uppercase tracking-wider flex items-center gap-1 text-slate-400">
+                                    V32 FINAL <span className={`w-1.5 h-1.5 rounded-full animate-pulse ${isOnline ? 'bg-emerald-400' : 'bg-rose-500'}`}></span> {isOnline ? <span className="text-emerald-400">NUBE CONECTADA</span> : 'MODO LOCAL'}
                                 </p>
                             </div>
                         </div>
@@ -317,6 +381,7 @@ REGLAS ESTRICTAS Y ABSOLUTAS:
                         </div>
                     )}
 
+                    {/* TURNO Y CÁMARA */}
                     <div className="glass p-5 rounded-3xl relative overflow-hidden flex justify-between items-center mb-4">
                         <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/10 rounded-full blur-3xl"></div>
                         <div>
@@ -338,6 +403,7 @@ REGLAS ESTRICTAS Y ABSOLUTAS:
                         </button>
                     </div>
 
+                    {/* ESTADO DEL VIENTO */}
                     <div className={`p-4 rounded-2xl border flex items-center gap-3 mb-6 shadow-lg transition-colors ${needsScanUI ? 'bg-slate-900 border-slate-800' : isBlocked ? 'bg-rose-950/50 border-rose-900 text-rose-500 shadow-rose-900/20' : 'bg-emerald-950/30 border-emerald-900/50 text-emerald-400 shadow-emerald-900/10'}`}>
                         <div className={`w-3 h-3 rounded-full shadow-[0_0_10px] ${needsScanUI ? 'bg-slate-500 shadow-slate-500' : isBlocked ? 'bg-rose-500 shadow-rose-500 animate-pulse' : 'bg-emerald-400 shadow-emerald-400'}`}></div>
                         <div>
@@ -349,6 +415,7 @@ REGLAS ESTRICTAS Y ABSOLUTAS:
                         </div>
                     </div>
 
+                    {/* META DIARIA */}
                     <div className="glass rounded-3xl p-5 mb-6">
                         <div className="flex justify-between items-end mb-4">
                             <div>
@@ -370,6 +437,7 @@ REGLAS ESTRICTAS Y ABSOLUTAS:
                         </div>
                     </div>
 
+                    {/* ITINERARIO FUTURO */}
                     <div className="glass rounded-3xl p-4 border border-slate-800 mb-24">
                         <h3 className="text-[11px] font-black tracking-widest text-slate-400 uppercase mb-4 flex items-center gap-2">
                             <span>🤖 Plan Restante (Calculado)</span>
@@ -398,19 +466,34 @@ REGLAS ESTRICTAS Y ABSOLUTAS:
                         </div>
                     </div>
 
+                    {/* BOTÓN REGISTRAR VUELO (A LA NUBE) */}
                     <div className="fixed bottom-0 left-0 w-full p-4 bg-gradient-to-t from-[#020617] via-[#020617] to-transparent flex justify-center z-40">
                         <button 
-                            onClick={() => {
+                            onClick={async () => {
                                 const newFlight = {
-                                    id: Date.now(),
+                                    id: Date.now().toString(),
                                     time: currentTime.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}),
                                     timestamp: currentTime.toISOString(),
                                     shift: activeShift,
                                     wind: currentWind || 0
                                 };
-                                setFlights([newFlight, ...flights]);
-                                speak("Despegue registrado.");
-                                setModal({isOpen: true, title: "Despegue Registrado", message: "Vuelo guardado correctamente.", type: "success"});
+                                
+                                if (window.FbDb && isOnline) {
+                                    try {
+                                        const appId = typeof __app_id !== 'undefined' ? __app_id : 'dispatcher-v32';
+                                        const fDoc = window.FbDoc(window.FbCollection(window.FbDb, 'artifacts', appId, 'public', 'data', 'flights'), newFlight.id);
+                                        await window.FbSetDoc(fDoc, newFlight);
+                                        speak("Despegue sincronizado exitosamente.");
+                                        setModal({isOpen: true, title: "☁️ Nube Actualizada", message: "Tu despegue ya aparece en todos los dispositivos.", type: "success"});
+                                    } catch (e) {
+                                        console.error(e);
+                                        setFlights([newFlight, ...flights]);
+                                    }
+                                } else {
+                                    setFlights([newFlight, ...flights]);
+                                    speak("Despegue registrado en modo local.");
+                                    setModal({isOpen: true, title: "📱 Modo Local", message: "Vuelo guardado solo en este dispositivo.", type: "success"});
+                                }
                             }}
                             disabled={needsScanUI || isBlocked}
                             className={`w-full max-w-md h-16 rounded-2xl font-black text-lg tracking-widest uppercase transition-all shadow-2xl ${needsScanUI || isBlocked ? 'bg-rose-950 text-rose-500 border border-rose-900' : 'bg-emerald-500 text-emerald-950 hover:bg-emerald-400 shadow-[0_0_30px_rgba(16,185,129,0.3)]'}`}>
@@ -418,13 +501,14 @@ REGLAS ESTRICTAS Y ABSOLUTAS:
                         </button>
                     </div>
 
+                    {/* MODALES */}
                     {modal.isOpen && (
                         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
                             <div className="glass modal-animate w-full max-w-sm rounded-3xl p-6 border border-slate-700 shadow-2xl relative overflow-hidden">
                                 <div className={`absolute top-0 left-0 w-full h-1 ${modal.type === 'error' ? 'bg-rose-500' : modal.type === 'success' ? 'bg-emerald-500' : 'bg-indigo-500'}`}></div>
                                 <h3 className="text-xl font-black text-white mb-2">{modal.title}</h3>
                                 <p className="text-slate-300 text-sm mb-6">{modal.message}</p>
-                                <button onClick={() => setModal({...modal, isOpen: false})} className="w-full py-3 rounded-xl bg-slate-800 text-white font-bold border border-slate-700 hover:bg-slate-700">Cerrar</button>
+                                <button onClick={() => setModal({...modal, isOpen: false})} className="w-full py-3 rounded-xl bg-slate-800 text-white font-bold border border-slate-700 hover:bg-slate-700">Entendido</button>
                             </div>
                         </div>
                     )}
@@ -432,7 +516,7 @@ REGLAS ESTRICTAS Y ABSOLUTAS:
                     {settingsOpen && (
                         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
                             <div className="glass modal-animate w-full max-w-sm rounded-3xl p-6 border border-slate-700 shadow-2xl">
-                                <h3 className="text-xl font-black text-white mb-4">Configuración Nube (V31)</h3>
+                                <h3 className="text-xl font-black text-white mb-4">Configuración Nube (V32)</h3>
                                 
                                 <div className="mb-4">
                                     <label className="text-xs font-bold text-emerald-400 mb-1 block">1. Gemini API Key</label>
@@ -441,17 +525,17 @@ REGLAS ESTRICTAS Y ABSOLUTAS:
                                         value={cloudConfig.geminiKey}
                                         onChange={(e) => setCloudConfig({...cloudConfig, geminiKey: e.target.value})}
                                         className="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-sm text-white focus:border-indigo-500 outline-none"
-                                        placeholder="Pegar llave aquí..."
+                                        placeholder="Pegar llave de Google..."
                                     />
                                 </div>
 
                                 <div className="mb-6">
-                                    <label className="text-xs font-bold text-amber-400 mb-1 block">2. Firebase Config (Opcional)</label>
+                                    <label className="text-xs font-bold text-amber-400 mb-1 block">2. Firebase Config JSON</label>
                                     <textarea 
                                         value={cloudConfig.firebaseJson}
                                         onChange={(e) => setCloudConfig({...cloudConfig, firebaseJson: e.target.value})}
                                         className="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-xs text-slate-400 h-24 outline-none font-mono opacity-50"
-                                        placeholder='{"apiKey": "..."}'
+                                        placeholder='{"apiKey": "...", "projectId": "control-vuelos"...}'
                                     />
                                 </div>
 
@@ -459,7 +543,7 @@ REGLAS ESTRICTAS Y ABSOLUTAS:
                                     localStorage.setItem('dispatcher_gemini_key', cloudConfig.geminiKey);
                                     localStorage.setItem('dispatcher_firebase_json', cloudConfig.firebaseJson);
                                     window.location.reload();
-                                }} className="w-full py-3 rounded-xl bg-indigo-600 text-white font-bold hover:bg-indigo-500 mb-2">Guardar y Reiniciar</button>
+                                }} className="w-full py-3 rounded-xl bg-indigo-600 text-white font-bold hover:bg-indigo-500 mb-2">Guardar y Conectar</button>
                                 
                                 <button onClick={() => setSettingsOpen(false)} className="w-full py-3 rounded-xl bg-slate-800 text-slate-400 font-bold hover:bg-slate-700 hover:text-white">Cancelar</button>
                             </div>
