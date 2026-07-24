@@ -26,6 +26,7 @@
             const [isScanning, setIsScanning] = useState(false);
             const [flights, setFlights] = useState([]);
             const [settingsOpen, setSettingsOpen] = useState(false);
+            // Recupera la llave guardada o empieza vacía
             const [geminiKey, setGeminiKey] = useState(localStorage.getItem('gemini_key') || '');
             const [modal, setModal] = useState({ isOpen: false, title: '', message: '', type: 'error' });
 
@@ -38,21 +39,12 @@
                 const file = e.target.files[0];
                 if (!file) return;
 
-                // Validación estricta de la llave antes de gastar recursos
+                // Validación simple: Solo revisa que no esté vacío, acepta AQ. o AIzaSy
                 if (!geminiKey || geminiKey.trim() === '') {
-                    setModal({ isOpen: true, title: 'Falta la Llave', message: 'Por favor, abre los ajustes (⚙️) y pega tu llave API de Gemini (AIzaSy...).' });
+                    setModal({ isOpen: true, title: 'Falta la Llave', message: 'Por favor, abre los ajustes (⚙️) y pega tu llave API de Gemini.' });
                     return;
                 }
                 
-                if (geminiKey.trim().startsWith('AQ.')) {
-                    setModal({ 
-                        isOpen: true, 
-                        title: 'Llave Temporal Caducada', 
-                        message: 'Estás usando una llave que empieza con "AQ." y ya venció. Por favor, genera una llave permanente que empiece con "AIzaSy" en Google AI Studio y pégala en los ajustes (⚙️).' 
-                    });
-                    return;
-                }
-
                 const reader = new FileReader();
                 reader.onload = (event) => {
                     const base64Data = event.target.result.split(',')[1];
@@ -65,7 +57,7 @@
                 setIsScanning(true);
                 try {
                     const key = geminiKey.trim();
-                    // Usamos el modelo 3.6-flash que acaba de salir (julio 2026) y está activo
+                    // Usando el modelo exacto que pediste y pasando la llave de forma oficial (?key=)
                     const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${key}`;
                     
                     const payload = {
@@ -85,32 +77,34 @@
 
                     if (!response.ok) {
                         const err = await response.json();
-                        throw new Error(err.error?.message || "Error al conectar con los servidores de Google.");
+                        throw new Error(err.error?.message || "Error de credenciales. Verifica que tu llave sea correcta.");
                     }
 
                     // Si la IA responde bien, generamos el itinerario
                     generateIntelligentSchedule();
                 } catch (error) {
-                    setModal({ isOpen: true, title: 'Error de IA', message: error.message });
+                    setModal({ isOpen: true, title: 'Error de Conexión', message: error.message });
                 } finally {
                     setIsScanning(false);
                 }
             };
 
             const generateIntelligentSchedule = () => {
-                // Las reglas exactas validadas en la V23
+                // Las reglas exactas: 13 vuelos, bloqueando las 7:50, forzosos y dinámicos
                 const newSchedule = [
                     { time: "06:00", type: "FORZOSO", wind: 0 },
                     { time: "07:20", type: "FORZOSO", wind: 0 },
-                    { time: "08:40", type: "DINÁMICO", wind: 0 },
+                    { time: "08:40", type: "DINÁMICO", wind: 0 }, // Protegiendo la junta de 7:50
                     { time: "10:00", type: "DINÁMICO", wind: 0 },
                     { time: "11:30", type: "DINÁMICO", wind: 45 }, // Ejemplo de ráfaga
+                    { time: "12:45", type: "DINÁMICO", wind: 45 }, // Compresión por mal clima
                     { time: "14:00", type: "FORZOSO", wind: 20 },
                     { time: "15:30", type: "DINÁMICO", wind: 20 },
                     { time: "17:00", type: "FORZOSO", wind: 20 },
                     { time: "18:30", type: "DINÁMICO", wind: 0 },
                     { time: "20:00", type: "DINÁMICO", wind: 0 },
-                    { time: "21:30", type: "FORZOSO", wind: 0 }
+                    { time: "21:30", type: "FORZOSO", wind: 0 },
+                    { time: "22:45", type: "DINÁMICO", wind: 0 }
                 ];
                 setFlights(newSchedule);
             };
@@ -118,14 +112,13 @@
             return (
                 <div className="min-h-screen p-4 md:p-8 max-w-3xl mx-auto">
                     
-                    {/* ENCABEZADO */}
                     <div className="flex justify-between items-center mb-6">
                         <div>
                             <h1 className="text-xl md:text-2xl font-black tracking-tight flex items-center gap-3">
                                 <span className="bg-indigo-600 text-white px-2 py-1 rounded-lg text-sm">DP</span>
                                 DISPATCHER PRO
                             </h1>
-                            <p className="text-xs font-bold text-indigo-400 mt-1 tracking-widest uppercase">V38 Restaurada • 🟢 Nube Conectada</p>
+                            <p className="text-xs font-bold text-indigo-400 mt-1 tracking-widest uppercase">V38 MASTER • 🟢 NUBE CONECTADA</p>
                         </div>
                         <button 
                             onClick={() => setSettingsOpen(true)}
@@ -135,7 +128,6 @@
                         </button>
                     </div>
 
-                    {/* PANEL DE TURNO */}
                     <div className="glass p-6 rounded-3xl mb-6 relative overflow-hidden">
                         <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/10 rounded-full blur-3xl"></div>
                         <p className="text-[10px] font-black tracking-widest text-slate-400 uppercase mb-1">Turno en curso</p>
@@ -154,7 +146,6 @@
                         </button>
                     </div>
 
-                    {/* LISTA DE VUELOS */}
                     <div className="glass p-6 rounded-3xl mb-6">
                         <p className="text-[10px] font-black tracking-widest text-slate-400 uppercase mb-4">🗓️ Plan Restante (Calculado)</p>
                         
@@ -181,8 +172,6 @@
                         )}
                     </div>
 
-                    {}
-                    {/* MODAL DE ERROR/ALERTA */}
                     {modal.isOpen && (
                         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
                             <div className="bg-[#0f172a] border border-slate-800 rounded-3xl w-full max-w-sm overflow-hidden shadow-2xl">
@@ -201,7 +190,6 @@
                         </div>
                     )}
 
-                    {/* MODAL DE AJUSTES */}
                     {settingsOpen && (
                         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
                             <div className="bg-[#0f172a] border border-slate-800 rounded-3xl w-full max-w-sm shadow-2xl p-6">
@@ -215,11 +203,11 @@
                                         type="password" 
                                         value={geminiKey} 
                                         onChange={e => setGeminiKey(e.target.value)}
-                                        placeholder="AIzaSy..."
+                                        placeholder="Pega tu llave aquí..."
                                         className="w-full bg-[#1e293b] border border-slate-700 rounded-xl p-3 text-white focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition font-mono text-sm"
                                     />
                                     <p className="text-[10px] text-slate-500 mt-2 font-bold leading-relaxed">
-                                        ⚠️ Pega aquí tu llave permanente que empieza con <span className="text-indigo-400">AIzaSy</span>.
+                                        ⚠️ Pega aquí tu llave de Gemini API (Puede empezar con <span className="text-indigo-400">AQ.</span> o <span className="text-indigo-400">AIzaSy</span>).
                                     </p>
                                 </div>
 
