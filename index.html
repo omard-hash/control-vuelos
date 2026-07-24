@@ -150,7 +150,7 @@
                     const payload = {
                         contents: [{
                             parts: [
-                                { text: "Analiza el clima. Regla estricta: Si dice 'Apto para volar' el viento es 0. Si dice 'Ráfagas fuertes' o vientos > 40, el viento es 45. Devuelve un JSON con un arreglo llamado 'hourlyData' donde cada objeto tenga 'time' (ej. '12:00pm') y 'wind' (numero)." },
+                                { text: "Analiza el clima. Regla estricta: Si dice 'Apto para volar' o solo menciona 'UV' (ej. 'Extremo UV 13' o 'UV 10'), el viento es 0. Si dice 'Ráfagas fuertes' o vientos > 40, el viento es 45. ¡Presta mucha atención a las 11:00am, si solo dice UV, el viento es 0! Devuelve un JSON con un arreglo llamado 'hourlyData' donde cada objeto tenga 'time' (ej. '12:00pm') y 'wind' (numero)." },
                                 { inline_data: { mime_type: "image/jpeg", data: base64Image } }
                             ]
                         }]
