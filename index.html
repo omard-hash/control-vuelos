@@ -10,6 +10,11 @@
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     
+    <!-- FIREBASE (LA NUBE) -->
+    <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore-compat.js"></script>
+    
     <style>
         body { background-color: #020617; color: white; font-family: 'Inter', system-ui, sans-serif; margin: 0; padding: 0; }
         .glass { background: rgba(30, 41, 59, 0.6); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.05); }
@@ -19,6 +24,18 @@
     <div id="root"></div>
 
     <script type="text/babel">
+        // CONFIGURACIÓN DE FIREBASE
+        const firebaseConfig = {
+            apiKey: "AIzaSyDXjwv133-dIKyprCktTUkjx_adAz1DhAY",
+            authDomain: "control-vuelos.firebaseapp.com",
+            projectId: "control-vuelos",
+            storageBucket: "control-vuelos.firebasestorage.app",
+            messagingSenderId: "756032981781",
+            appId: "1:756032981781:web:451641e72abe3692c0771c"
+        };
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+
         const { useState, useEffect, useRef } = React;
 
         function App() {
@@ -35,6 +52,28 @@
             // Estado para el sistema de voz
             const [audioUnlocked, setAudioUnlocked] = useState(false);
             const audioUnlockedRef = useRef(false);
+
+            // SINCRONIZACIÓN EN TIEMPO REAL CON LA NUBE
+            useEffect(() => {
+                let unsubscribe = () => {};
+
+                // Iniciar sesión silenciosamente para que Firebase nos de permiso
+                firebase.auth().signInAnonymously().then(() => {
+                    unsubscribe = db.collection('operaciones').doc('turno_actual').onSnapshot((doc) => {
+                        if (doc.exists) {
+                            const data = doc.data();
+                            if (data.flights) setFlights(data.flights);
+                            if (data.loggedFlightsCount !== undefined) setLoggedFlightsCount(data.loggedFlightsCount);
+                        }
+                    }, (err) => {
+                        console.error("Error leyendo datos:", err);
+                    });
+                }).catch((error) => {
+                    console.error("Error al autenticar:", error);
+                });
+
+                return () => unsubscribe();
+            }, []);
 
             // Sincronizar el ref con el estado para usarlo dentro del setInterval
             useEffect(() => {
@@ -192,11 +231,19 @@
                 ];
                 
                 setFlights(baseSchedule);
+                
+                // GUARDAR ITINERARIO EN LA NUBE AL CALCULAR
+                db.collection('operaciones').doc('turno_actual').set({ flights: baseSchedule }, { merge: true });
             };
 
             const handleLogManualFlight = () => {
                  if (loggedFlightsCount < totalFlightsTarget) {
-                      setLoggedFlightsCount(prev => prev + 1);
+                      const newCount = prev => prev + 1;
+                      setLoggedFlightsCount(newCount);
+                      
+                      // ACTUALIZAR CONTEO EN LA NUBE PARA TODOS
+                      db.collection('operaciones').doc('turno_actual').set({ loggedFlightsCount: loggedFlightsCount + 1 }, { merge: true });
+                      
                       speak("Vuelo registrado exitosamente.");
                       setModal({ isOpen: true, title: 'Vuelo Registrado', message: 'Vuelo registrado exitosamente en la bitácora local.', type: 'success' });
                  } else {
