@@ -65,7 +65,7 @@
                 }
             };
 
-            // EL CORTE SE HACE A LA MEDIANOCHE EXACTA
+            // EL CORTE SE HACE A LA MEDIANOCHE EXACTA (00:00)
             const getOperativeDayStart = (dateObj) => {
                 const d = new Date(dateObj);
                 d.setHours(0, 0, 0, 0); 
@@ -101,7 +101,7 @@
                 targetSlots.forEach(slot => {
                     const slotMins = toOpMins(slot.h, slot.m);
                     if (slotMins > currentOpMins) {
-                        const wind = currentForecast[slot.h] || 0;
+                        const wind = currentForecast[slot.h] !== undefined ? currentForecast[slot.h] : 0;
                         const isPermitted = wind <= 43;
                         schedule.push({ time: `${String(slot.h).padStart(2, '0')}:${String(slot.m).padStart(2, '0')}`, wind, isPermitted, type: slot.type, slotMins });
                     }
@@ -151,21 +151,22 @@
                         setLocalMode(true);
                         return;
                     }
+
                     try {
                         const config = JSON.parse(firebaseConfigStr);
                         if (!firebase.apps.length) {
                             firebase.initializeApp(config);
                         }
                         
-                        try {
-                            await firebase.auth().signInAnonymously();
-                        } catch(authErr) {
-                            console.warn("Fallo Auth Anónimo:", authErr);
-                        }
-
                         const db = firebase.firestore();
-                        const docRef = db.collection('operaciones').doc('estado_actual');
-
+                        
+                        // Inicio de sesión anónimo silencioso
+                        await firebase.auth().signInAnonymously();
+                        
+                        setCloudStatus('online');
+                        setLocalMode(false);
+                        
+                        const docRef = db.collection('settings').doc('master_state');
                         unsubscribe = docRef.onSnapshot((doc) => {
                             if (doc.exists) {
                                 const data = doc.data();
@@ -173,15 +174,14 @@
                                 if (data.forecast) setForecastData(data.forecast);
                                 if (data.isRaining !== undefined) setIsRaining(data.isRaining);
                             }
-                            setCloudStatus('online');
-                            setLocalMode(false);
-                        }, (error) => {
-                            console.error("Error Firebase:", error);
+                        }, (err) => {
+                            console.error("Error leyendo Firebase:", err);
                             setCloudStatus('error');
                             setLocalMode(true);
                         });
+
                     } catch (error) {
-                        console.error("Configuración de Firebase inválida:", error);
+                        console.error("Error conectando a Firebase:", error);
                         setCloudStatus('error');
                         setLocalMode(true);
                     }
@@ -192,99 +192,89 @@
             }, [firebaseConfigStr]);
 
             const updateData = async (newData) => {
-                if (newData.flights) setFlights(newData.flights);
-                if (newData.forecast) setForecastData(newData.forecast);
-                if (newData.isRaining !== undefined) setIsRaining(newData.isRaining);
-
-                if (firebase.apps.length > 0 && !localMode) {
-                    try {
-                        const db = firebase.firestore();
-                        await db.collection('operaciones').doc('estado_actual').set(newData, { merge: true });
-                    } catch (error) {
-                        console.error("Error guardando en la nube:", error);
-                        setCloudStatus('error');
-                        setLocalMode(true);
-                    }
+                if (localMode) {
+                    if (newData.flights) setFlights(newData.flights);
+                    if (newData.forecast) setForecastData(newData.forecast);
+                    if (newData.isRaining !== undefined) setIsRaining(newData.isRaining);
+                    return;
                 }
-            };
-
-            const toggleRainStatus = () => {
-                const newStatus = !isRaining;
-                updateData({ isRaining: newStatus });
-                if (newStatus) {
-                    speak("Alerta. Condiciones de lluvia declaradas. Operaciones suspendidas.");
-                } else {
-                    speak("Condiciones de lluvia canceladas. Recalculando ventana operativa.");
+                
+                try {
+                    const db = firebase.firestore();
+                    await db.collection('settings').doc('master_state').set(newData, { merge: true });
+                } catch (error) {
+                    console.error("Error guardando:", error);
+                    setModal({ isOpen: true, title: 'Error de Red', message: 'Se guardó localmente. Revisa tu conexión.', type: 'error' });
+                    setLocalMode(true);
+                    setCloudStatus('error');
+                    
+                    if (newData.flights) setFlights(newData.flights);
+                    if (newData.forecast) setForecastData(newData.forecast);
+                    if (newData.isRaining !== undefined) setIsRaining(newData.isRaining);
                 }
             };
 
             useEffect(() => {
+                let lastSpokenHour = -1;
+
                 const timer = setInterval(() => {
                     const now = new Date();
                     setCurrentTime(now);
                     
-                    const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
-                    const second = now.getSeconds();
-                    const minute = now.getMinutes();
-                    const hour = now.getHours();
+                    const currentH = now.getHours();
+                    const currentM = now.getMinutes();
 
-                    if (second === 0) { 
-                        if (isRaining) return;
-
-                        if (timeStr === "07:50") speak("Atención piloto. Es hora de aterrizar. Junta obligatoria en curso.");
-                        
-                        // ALARMAS NUEVAS DE MEDIANOCHE Y MEDIODÍA
-                        if (timeStr === "00:00") speak("Atención. Corte de vuelos realizado a la medianoche. Pilotos, por favor actualicen la captura del clima para el nuevo día.");
-                        if (timeStr === "12:00") speak("Atención. Actualización de medio día. Pilotos, por favor actualicen la captura del clima.");
-
-                        const hasDataForCurrentHour = forecastData && forecastData.hasOwnProperty(hour.toString());
-                        if (!hasDataForCurrentHour && minute % 5 === 0) {
-                            speak("Alerta. Datos del clima desactualizados para esta hora. Suba una nueva captura, por favor.");
+                    // Avisos fijos (Cambio de turno)
+                    if (currentM === 0 && currentH !== lastSpokenHour) {
+                        if (currentH === 0) {
+                            speak("Atención. Iniciando nuevo día operativo. Pilotos, por favor actualicen la captura del clima.");
+                        } else if (currentH === 12) {
+                            speak("Atención. Mitad de jornada. Pilotos, por favor actualicen la captura del clima para la tarde.");
                         }
-
-                        const futureDate = new Date(now.getTime() + 10 * 60000);
-                        const targetTimeStr = futureDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
-                        
-                        const schedule = generateIntelligentSchedule(forecastData, flights, isRaining);
-                        const nextFlight = schedule.find(s => s.time === targetTimeStr);
-                        
-                        if (nextFlight) {
-                            if (nextFlight.isPermitted) {
-                                speak(`Pilotos, prepárense. Próximo despegue programado en 10 minutos.`);
-                            } else {
-                                speak(`Alerta. Vuelo de las ${targetTimeStr} bloqueado por vientos de ${nextFlight.wind} kilómetros por hora.`);
-                            }
-                        }
+                        lastSpokenHour = currentH;
                     }
+
+                    // Alarma de Caducidad (Cada 5 minutos)
+                    // Solo revisamos la variable forecastData directamente porque el componente se re-renderiza
+                    setForecastData(currentForecast => {
+                        const hasCurrentData = currentForecast.hasOwnProperty(currentH.toString());
+                        if (!hasCurrentData && currentM % 5 === 0 && now.getSeconds() === 0) {
+                            speak("Alerta. Datos del clima desactualizados para esta hora. Suba una nueva captura inmediatamente, por favor.");
+                        }
+                        return currentForecast; // No modificamos el estado, solo lo leemos de manera segura
+                    });
+
                 }, 1000);
                 return () => clearInterval(timer);
-            }, [forecastData, flights, audioUnlocked, isRaining, generateIntelligentSchedule]);
+            }, []);
 
             const analyzeImage = async (base64Image) => {
                 if (!geminiKey) {
-                    setModal({ isOpen: true, title: 'Error', message: 'Falta la API Key de Gemini en configuración.', type: 'error' });
+                    setModal({ isOpen: true, title: 'Falta Clave IA', message: 'Configura tu Gemini API Key en los ajustes (⚙️).', type: 'error' });
                     return;
                 }
                 
                 setIsScanning(true);
-                setModal({ isOpen: true, title: 'Escaneando Clima', message: 'La IA está analizando los vientos. Por favor espere...', type: 'info' });
-
-                // NUEVO PROMPT SÚPER ESTRICTO (45 km/h)
-                const promptText = `Eres un sistema de seguridad de control de vuelos de drones. Analiza la imagen de la predicción meteorológica.
-REGLAS ESTRICTAS DE PRIORIDAD ABSOLUTA:
-1. Si ves la frase EXACTA "Ráfagas fuertes" (en un recuadro rojo, ej. "Ráfagas fuertes >20m"), DETÉN TODO y asígnale inmediatamente 45 km/h a esa hora. No importa si a la derecha dice "13" u otro número, la advertencia "Ráfagas fuertes" = 45.
-2. Si un panel (como "AHORA") está expandido y ves recuadros de colores con detalles internos (como uno rojo que dice "Ráfagas (km/h) 36@20m"), DEBES extraer ESE número interno mayor (ej. 36) e ignorar los números confusos del título de arriba.
-3. Para la fila "AHORA", asume que representa la hora actual.
-4. Devuelve ÚNICAMENTE un objeto JSON estricto con las horas en formato de 24 hrs como claves (ej. "20", "21") y la ráfaga de viento en km/h como número entero.
-Ejemplo de salida válida:
-{"19": 45, "20": 36, "21": 15, "22": 10}
-Si una hora dice "Apto para volar", asume 10 km/h. No devuelvas texto adicional, solo el JSON.`;
-
                 try {
-                    // SERVIDOR ACTUALIZADO A 1.5 FLASH (El viejo fue borrado por Google)
-                    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiKey}`, {
+                    // REGLAS ESTRICTAS DE IA
+                    const promptText = `Eres un asistente de aviación de precisión analizando una captura de clima de "OK TO FLY".
+                    
+                    REGLAS CRÍTICAS DE SUPERVIVENCIA:
+                    1. Si ves las palabras exactas "Ráfagas fuertes" o una barra ROJA de advertencia arriba, DEBES ASIGNAR 45 km/h a la hora "AHORA", sin importar qué otros números veas cerca. ¡Esto es de vida o muerte!
+                    2. Si el panel "AHORA" está expandido y ves un recuadro de color (ej. rojo o azul) que diga "Ráfagas (km/h)" y adentro tenga un valor como "36@20m", IGNORA EL TÍTULO y extrae ÚNICAMENTE el número grande del recuadro (en este caso 36).
+                    3. Si no hay alertas rojas ni paneles expandidos, lee las ráfagas normalmente de la columna derecha para cada hora visible.
+                    4. Convierte las horas PM/AM a formato de 24 horas (ej. 9:00pm = 21, 11:00pm = 23).
+                    5. Devuelve ÚNICAMENTE un objeto JSON válido con las horas como claves y el viento como valor numérico entero. 
+                    Ejemplo de respuesta estricta: {"AHORA": 45, "21": 22, "22": 19, "23": 15}. 
+                    NO escribas markdown, no uses la palabra json, devuelve solo las llaves {}.`;
+
+                    // FIX: Mandamos la llave AQ en los HEADERS (x-goog-api-key) para saltarnos el error de credenciales
+                    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent`, {
                         method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
+                        headers: { 
+                            'Content-Type': 'application/json',
+                            'x-goog-api-key': geminiKey 
+                        },
                         body: JSON.stringify({
                             contents: [{
                                 parts: [
@@ -296,9 +286,13 @@ Si una hora dice "Apto para volar", asume 10 km/h. No devuelvas texto adicional,
                     });
 
                     const data = await response.json();
-                    if (data.error) throw new Error(data.error.message);
+                    
+                    if (data.error) {
+                        throw new Error(data.error.message);
+                    }
                     
                     let textResult = data.candidates[0].content.parts[0].text;
+                    // Limpieza del JSON
                     textResult = textResult.replace(/```json/g, '').replace(/```/g, '').trim();
                     const parsedForecast = JSON.parse(textResult);
 
@@ -313,15 +307,14 @@ Si una hora dice "Apto para volar", asume 10 km/h. No devuelvas texto adicional,
                     }
 
                     updateData({ forecast: parsedForecast });
-                    setModal({ isOpen: true, title: 'Análisis Completo', message: 'Datos meteorológicos actualizados correctamente por IA.', type: 'success' });
-                    speak("Análisis meteorológico completado. Plan maestro recalculado.");
+                    setModal({ isOpen: true, title: 'Análisis Completo', message: 'Datos meteorológicos extraídos correctamente. Plan maestro recalculado.', type: 'success' });
+                    speak("Análisis meteorológico completado. Plan maestro actualizado.");
 
                 } catch (error) {
-                    console.error(error);
-                    setModal({ isOpen: true, title: 'Error de IA', message: 'No se pudo leer la imagen. Intenta de nuevo. ' + error.message, type: 'error' });
+                    console.error("Error en IA:", error);
+                    setModal({ isOpen: true, title: 'Error de IA', message: error.message, type: 'error' });
                 } finally {
                     setIsScanning(false);
-                    setTimeout(() => setModal(prev => ({...prev, isOpen: false})), 3000);
                 }
             };
 
@@ -349,6 +342,12 @@ Si una hora dice "Apto para volar", asume 10 km/h. No devuelvas texto adicional,
                 const updatedLogs = [newLog, ...flights].sort((a,b) => b.id - a.id);
                 updateData({ flights: updatedLogs });
                 setManualLogOpen(false);
+            };
+
+            const toggleRainStatus = () => {
+                const newRainStatus = !isRaining;
+                updateData({ isRaining: newRainStatus });
+                speak(newRainStatus ? "Alerta. Lluvia local declarada. Operaciones suspendidas." : "Atención. Lluvia finalizada. Evaluando condiciones de viento.");
             };
 
             const activeShift = (currentTime.getHours() >= 7 && currentTime.getHours() < 19) ? 'Turno Diurno' : 'Turno Nocturno';
@@ -404,15 +403,16 @@ Si una hora dice "Apto para volar", asume 10 km/h. No devuelvas texto adicional,
             return (
                 <div className="w-full max-w-md mx-auto p-4 flex flex-col h-full relative" onClick={unlockAudio}>
                     
+                    {/* ENCABEZADO */}
                     <div className="flex justify-between items-center mb-6 pt-2">
                         <div className="flex items-center gap-3">
                             <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center font-black text-xl shadow-lg shadow-indigo-600/30">DP</div>
                             <div>
                                 <h1 className="font-black text-lg leading-none tracking-tight">DISPATCHER PRO</h1>
                                 <div className="text-[10px] font-bold mt-1 flex items-center gap-1 uppercase tracking-wider">
-                                    <span className="text-indigo-400">V15_MIDNIGHT</span>
+                                    <span className="text-indigo-400">V17_AQ_FIX_ES</span>
                                     {cloudStatus === 'online' ? <span className="text-emerald-400 flex items-center gap-1"><span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span> Nube Activa</span> : 
-                                     cloudStatus === 'error' || localMode ? <span className="text-rose-400 flex items-center gap-1"><span className="w-2 h-2 bg-rose-500 rounded-full"></span> Sin Red (Modo Local)</span> : 
+                                     cloudStatus === 'error' || localMode ? <span className="text-rose-400 flex items-center gap-1"><span className="w-2 h-2 bg-rose-500 rounded-full"></span> Sin Red (Local)</span> : 
                                      <span className="text-slate-400">Desconectado</span>}
                                 </div>
                             </div>
@@ -429,6 +429,7 @@ Si una hora dice "Apto para volar", asume 10 km/h. No devuelvas texto adicional,
 
                     <div className="flex-grow overflow-y-auto hide-scroll pb-24 space-y-4">
                         
+                        {/* ESTADO ACTUAL Y ESCÁNER */}
                         <div className="glass p-5 rounded-3xl relative overflow-hidden flex justify-between items-center">
                             <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/10 rounded-full blur-3xl"></div>
                             <div>
@@ -441,12 +442,13 @@ Si una hora dice "Apto para volar", asume 10 km/h. No devuelvas texto adicional,
                             </div>
                             <input type="file" id="file-upload" accept="image/*" onChange={handleImageUpload} className="hidden" />
                             <button onClick={() => document.getElementById('file-upload').click()} disabled={isScanning}
-                                className={`flex flex-col items-center justify-center p-3 rounded-2xl transition border w-20 h-20 ${isScanning ? 'bg-indigo-900/50 border-indigo-400 animate-pulse' : !hasCurrentData && !isRaining ? 'bg-rose-600 border-rose-400 shadow-[0_0_20px_rgba(225,29,72,0.4)] animate-pulse' : 'bg-indigo-600/20 border-indigo-500/30 hover:bg-indigo-600/40'}`}>
+                                className={`flex flex-col items-center justify-center p-3 rounded-2xl transition border w-20 h-20 z-10 ${isScanning ? 'bg-indigo-900/50 border-indigo-400 animate-pulse' : !hasCurrentData && !isRaining ? 'bg-rose-600 border-rose-400 shadow-[0_0_20px_rgba(225,29,72,0.4)] animate-pulse' : 'bg-indigo-600/20 border-indigo-500/30 hover:bg-indigo-600/40'}`}>
                                 <span className="text-2xl mb-1">{isScanning ? '⏳' : '📸'}</span>
                                 <span className="text-[9px] font-black uppercase text-center text-white">{isScanning ? 'Pensando' : !hasCurrentData && !isRaining ? 'URGE CLIMA' : 'Escanear IA'}</span>
                             </button>
                         </div>
 
+                        {/* INDICADOR DE VIENTO */}
                         <div className={`p-4 rounded-3xl border flex items-center gap-3 transition-colors ${currentStatusClass}`}>
                             <div className={`w-4 h-4 rounded-full ${isPermitted ? 'bg-emerald-500' : 'bg-rose-500 animate-pulse'}`}></div>
                             <div>
@@ -455,6 +457,7 @@ Si una hora dice "Apto para volar", asume 10 km/h. No devuelvas texto adicional,
                             </div>
                         </div>
 
+                        {/* METAS Y ESTADÍSTICAS */}
                         <div className="glass rounded-3xl p-5 border border-slate-800">
                             <div className="flex justify-between items-end mb-4">
                                 <p className="text-[10px] font-black tracking-widest text-slate-400 uppercase">Meta Operativa de Hoy</p>
@@ -476,6 +479,7 @@ Si una hora dice "Apto para volar", asume 10 km/h. No devuelvas texto adicional,
                             </div>
                         </div>
 
+                        {/* PLAN MAESTRO RESTANTE */}
                         <div className="glass rounded-3xl p-4 border border-slate-800">
                             <div className="flex justify-between items-center mb-4">
                                 <h3 className="text-[11px] font-black tracking-widest text-indigo-300 uppercase flex items-center gap-1.5"><span className="text-sm">🤖</span> Plan Maestro Restante</h3>
@@ -499,12 +503,15 @@ Si una hora dice "Apto para volar", asume 10 km/h. No devuelvas texto adicional,
                                         </span>
                                     </div>
                                 ))}
+                                {dynamicSchedule.length === 0 && (
+                                    <div className="text-center py-4 text-xs text-slate-500">Meta diaria completada.</div>
+                                )}
                             </div>
                         </div>
 
                     </div>
 
-                    {}
+                    {/* BOTÓN INFERIOR (REGISTRAR) */}
                     <div className="fixed bottom-0 left-0 w-full p-4 bg-gradient-to-t from-[#020617] via-[#020617] to-transparent flex justify-center z-40">
                         <button onClick={handleLogFlight} disabled={!isPermitted}
                             className={`w-full max-w-md py-4 rounded-2xl font-black text-lg tracking-wide shadow-xl transition-all ${isPermitted ? 'bg-emerald-500 text-slate-950 shadow-emerald-500/20 hover:bg-emerald-400 hover:-translate-y-1' : 'bg-rose-950/50 text-rose-500 border border-rose-900 cursor-not-allowed'}`}>
@@ -512,12 +519,13 @@ Si una hora dice "Apto para volar", asume 10 km/h. No devuelvas texto adicional,
                         </button>
                     </div>
 
+                    {/* MODALES Y POPUPS */}
                     {modal.isOpen && (
                         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
                             <div className="bg-slate-900 border border-slate-700 p-6 rounded-3xl w-full max-w-sm text-center">
                                 <div className="text-4xl mb-3">{modal.type === 'error' ? '⚠️' : modal.type === 'success' ? '✅' : 'ℹ️'}</div>
                                 <h3 className="text-xl font-black mb-2">{modal.title}</h3>
-                                <p className="text-slate-400 text-sm mb-6">{modal.message}</p>
+                                <p className="text-slate-400 text-sm mb-6 whitespace-pre-wrap break-words">{modal.message}</p>
                                 {modal.type !== 'info' && (
                                     <button onClick={() => setModal({...modal, isOpen: false})} className="w-full bg-slate-800 py-3 rounded-xl font-bold">Cerrar</button>
                                 )}
@@ -553,18 +561,18 @@ Si una hora dice "Apto para volar", asume 10 km/h. No devuelvas texto adicional,
                                 <h3 className="text-lg font-black mb-4">Configuración Cloud</h3>
                                 <div className="space-y-4">
                                     <div>
-                                        <label className="block text-xs font-bold text-slate-400 mb-1">Gemini API Key</label>
-                                        <input type="password" value={geminiKey} onChange={(e) => setGeminiKey(e.target.value)} className="w-full bg-slate-800 border border-slate-700 rounded-xl p-3 text-sm text-white font-mono" placeholder="AIzaSy..." />
+                                        <label className="block text-xs font-bold text-slate-400 mb-1">Gemini API Key (Empieza con AQ. o AIza)</label>
+                                        <input type="password" value={geminiKey} onChange={(e) => setGeminiKey(e.target.value)} className="w-full bg-slate-800 border border-slate-700 rounded-xl p-3 text-sm text-white font-mono" placeholder="AQ.Ab8RN6Lu..." />
                                     </div>
                                     <div>
                                         <label className="block text-xs font-bold text-slate-400 mb-1">Firebase Config (JSON)</label>
-                                        <textarea value={firebaseConfigStr} onChange={(e) => setFirebaseConfigStr(e.target.value)} className="w-full h-32 bg-slate-800 border border-slate-700 rounded-xl p-3 text-xs text-white font-mono" placeholder='{ "apiKey": "..." }' />
+                                        <textarea value={firebaseConfigStr} onChange={(e) => setFirebaseConfigStr(e.target.value)} className="w-full h-40 bg-slate-800 border border-slate-700 rounded-xl p-3 text-xs text-white font-mono" placeholder='{ "apiKey": "..." }' />
                                     </div>
                                     <button onClick={() => {
-                                        localStorage.setItem('dispatcher_gemini_key', geminiKey);
-                                        localStorage.setItem('dispatcher_firebase_config', firebaseConfigStr);
+                                        localStorage.setItem('dispatcher_gemini_key', geminiKey.trim());
+                                        localStorage.setItem('dispatcher_firebase_config', firebaseConfigStr.trim());
                                         window.location.reload();
-                                    }} className="w-full bg-indigo-600 py-3 rounded-xl font-bold mt-4">Guardar y Reiniciar</button>
+                                    }} className="w-full bg-indigo-600 py-3 rounded-xl font-bold mt-4 shadow-lg shadow-indigo-600/20">Guardar y Reiniciar</button>
                                     <button onClick={() => setSettingsOpen(false)} className="w-full bg-slate-800 py-3 rounded-xl font-bold">Cancelar</button>
                                 </div>
                             </div>
