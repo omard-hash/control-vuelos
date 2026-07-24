@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Dispatcher Pro V26</title>
+    <title>Dispatcher Pro V27</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
@@ -58,7 +58,8 @@
                         const silent = new Audio("data:audio/mp3;base64,//MkxAAQAAAAQQQQAAAAQAAAAAAAQAAAAAAAQQQQAAAAQAAAAAAAQAAAAAAAQQQQAAAAQAAAAAAAQAAAAAAAQQQQAAAAQAAAAAAAQAAAAAAAAAAAAA");
                         silent.play().catch(() => {});
                         if ('speechSynthesis' in window) {
-                            const u = new SpeechSynthesisUtterance('');
+                            const u = new SpeechSynthesisUtterance('Audio activado');
+                            u.volume = 0.01; // Volumen casi cero solo para engañar al navegador y activar el motor
                             window.speechSynthesis.speak(u);
                         }
                         setAudioUnlocked(true);
@@ -72,6 +73,7 @@
                 const utterance = new SpeechSynthesisUtterance(text);
                 utterance.lang = 'es-MX';
                 utterance.rate = 1.0;
+                utterance.volume = 1.0;
                 window.speechSynthesis.speak(utterance);
             };
 
@@ -105,7 +107,7 @@
                 if (neededDynamics > 0) {
                     let possibleSlots = [];
                     for (let h = 0; h < 24; h++) {
-                        // REGLA ESTRICTA: Prohibido agendar vuelos dinámicos en la hora 6 (6:01 AM a 6:59 AM)
+                        // REGLA ESTRICTA 6 AM: Prohibido agendar vuelos dinámicos entre las 6:01 AM y las 6:59 AM
                         if (h === 6) continue;
                         
                         let speed = forecast[h.toString()] || 0;
@@ -169,14 +171,15 @@
 
                 setIsScanning(true);
                 try {
-                    // PROMPT MEJORADO Y ESTRICTO PARA EVITAR PÁNICO DE LA IA
+                    // PROMPT ESTRICTO A PRUEBA DE ERRORES ("Apto para volar" = 0)
                     const promptText = `Eres un despachador de vuelos automatizado. Lee esta tabla de clima.
 EXTRAE LA VELOCIDAD MÁXIMA DEL VIENTO POR CADA HORA.
 REGLAS ESTRICTAS Y ABSOLUTAS:
 1. Revisa la tabla FILA POR FILA.
-2. Si en la fila "AHORA" o en cualquier hora dice "Apto para volar" o "Calma", el viento es 0 (CERO). ¡NO te asustes por horas futuras!
-3. Si a las 2:00pm o más tarde dice "Ráfagas fuertes" o "Vientos >40m", extrae el número (ej. 40) SOLO para esa hora. NO asumas que hay ráfagas AHORA si dice "Apto para volar".
-4. Devuelve ÚNICAMENTE un objeto JSON con este formato exacto: {"0": 15, "1": 0, "2": 40, "14": 0} (las claves son la hora en formato 24h, los valores son la velocidad en km/h). NUNCA devuelvas texto fuera del JSON.`;
+2. Si en la fila "AHORA" (o cualquier hora) dice "Apto para volar" o "Calma", el viento es 0 (CERO). ¡Pon 0!
+3. NO te asustes ni bloquees la hora actual solo porque hay ráfagas pronosticadas para horas de la tarde. ¡Respeta lo que dice la hora actual!
+4. Si a las 2:00pm o más tarde dice "Ráfagas fuertes" o "Vientos >40m", extrae el número (ej. 45) SOLO para esa hora específica.
+5. Devuelve ÚNICAMENTE un objeto JSON con este formato exacto: {"0": 15, "1": 0, "2": 45, "14": 0} (claves en 24h, valores en km/h). NUNCA devuelvas texto fuera del JSON.`;
 
                     const payload = {
                         contents: [{
@@ -187,8 +190,8 @@ REGLAS ESTRICTAS Y ABSOLUTAS:
                         }]
                     };
 
-                    // USANDO EL MODELO OFICIAL ESTABLE
-                    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${cloudConfig.geminiKey}`, {
+                    // USAMOS LA VERSIÓN LATEST PARA EVITAR EL ERROR 404 NOT FOUND
+                    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${cloudConfig.geminiKey}`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify(payload)
@@ -242,7 +245,7 @@ REGLAS ESTRICTAS Y ABSOLUTAS:
                             <div className="leading-tight">
                                 <h1 className="font-black text-lg tracking-wide uppercase">Dispatcher Pro</h1>
                                 <p className="text-[10px] text-emerald-400 font-bold uppercase tracking-wider flex items-center gap-1">
-                                    V26 FINAL <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse"></span> {cloudConfig.geminiKey ? 'Nube Activa' : 'Sin Configurar'}
+                                    V27 MASTER <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse"></span> {cloudConfig.geminiKey ? 'Nube Activa' : 'Sin Configurar'}
                                 </p>
                             </div>
                         </div>
