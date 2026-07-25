@@ -3,15 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Heliport Drone Dispatcher Pro - V45</title>
+    <title>Heliport Drone Dispatcher Pro</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/react@17/umd/react.development.js"></script>
     <script src="https://unpkg.com/react-dom@17/umd/react-dom.development.js"></script>
     <script src="https://unpkg.com/babel-standalone@6/babel.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/lucide/0.263.0/lucide.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;900&display=swap" rel="stylesheet">
     
-    <!-- Firebase Libraries -->
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
@@ -19,7 +17,6 @@
     <style>
         body { font-family: 'Inter', sans-serif; background-color: #020617; color: white; -webkit-font-smoothing: antialiased; }
         .glass { background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border: 1px solid rgba(255,255,255,0.05); }
-        .neon-text { text-shadow: 0 0 10px rgba(99, 102, 241, 0.5); }
         .scroll-hide::-webkit-scrollbar { display: none; }
         .glow-box { box-shadow: 0 0 20px rgba(99, 102, 241, 0.15); }
         .rain-mode { background: radial-gradient(circle at center, #1e1b4b 0%, #020617 100%); animation: pulse-red 2s infinite; }
@@ -65,7 +62,7 @@
 
             const speak = (text) => {
                 if (!audioUnlocked) return;
-                window.speechSynthesis.cancel(); // Limpia la cola para que hable de inmediato
+                window.speechSynthesis.cancel();
                 const utterance = new SpeechSynthesisUtterance(text);
                 utterance.lang = 'es-MX';
                 utterance.rate = 1.0;
@@ -82,7 +79,6 @@
                         const fb = initializeFirebase(parsed.firebaseConfig);
                         if (fb) {
                             setFirebaseInstance(fb);
-                            // Iniciar sesión silenciosa para evitar bloqueos
                             fb.auth.signInAnonymously().catch(error => {
                                 console.error("Error Auth Silenciosa:", error);
                             });
@@ -93,9 +89,7 @@
 
             useEffect(() => {
                 if (!firebaseInstance || !firebaseInstance.auth) return;
-                
                 const { db, auth } = firebaseInstance;
-                
                 const unsubscribeAuth = auth.onAuthStateChanged(user => {
                     if (user) {
                         const todayStr = new Date().toISOString().split('T')[0];
@@ -113,7 +107,6 @@
                         return () => unsubscribeDb();
                     }
                 });
-
                 return () => unsubscribeAuth();
             }, [firebaseInstance]);
 
@@ -132,43 +125,43 @@
                     const now = new Date();
                     setCurrentTime(now);
 
-                    // ALARMAS Y AVISOS (Solo se activan en el segundo 00 para no repetirse)
                     if (now.getSeconds() === 0) {
                         const h = String(now.getHours()).padStart(2, '0');
                         const m = String(now.getMinutes()).padStart(2, '0');
                         const timeStr = `${h}:${m}`;
 
-                        // Alarma de Vuelo Próximo (10 y 5 Minutos)
+                        // Alarma de Vuelos (10 y 5 Minutos)
                         if (schedule && schedule.length > 0 && !isRaining) {
                             schedule.forEach(flight => {
                                 if (!flight.time) return;
-                                let [fh, fm] = flight.time.split(':').map(Number);
+                                let parts = flight.time.split(':');
+                                let fh = parseInt(parts[0]);
+                                let fm = parseInt(parts[1]);
+                                
                                 let flightDate = new Date();
                                 flightDate.setHours(fh, fm, 0, 0);
                                 
-                                // Restar 10 minutos al tiempo del vuelo
-                                let warningDate10 = new Date(flightDate.getTime() - 10 * 60000);
-                                let warn10H = String(warningDate10.getHours()).padStart(2, '0');
-                                let warn10M = String(warningDate10.getMinutes()).padStart(2, '0');
+                                // Calculando 10 mins antes
+                                let warn10 = new Date(flightDate.getTime() - 10 * 60000);
+                                let w10H = String(warn10.getHours()).padStart(2, '0');
+                                let w10M = String(warn10.getMinutes()).padStart(2, '0');
 
-                                // Restar 5 minutos al tiempo del vuelo
-                                let warningDate5 = new Date(flightDate.getTime() - 5 * 60000);
-                                let warn5H = String(warningDate5.getHours()).padStart(2, '0');
-                                let warn5M = String(warningDate5.getMinutes()).padStart(2, '0');
+                                // Calculando 5 mins antes
+                                let warn5 = new Date(flightDate.getTime() - 5 * 60000);
+                                let w5H = String(warn5.getHours()).padStart(2, '0');
+                                let w5M = String(warn5.getMinutes()).padStart(2, '0');
                                 
-                                // Lanzar aviso de 10 minutos
-                                if (timeStr === `${warn10H}:${warn10M}` && flight.wind < 40) {
+                                if (timeStr === `${w10H}:${w10M}` && flight.wind < 40) {
                                     speak(`Atención piloto. Faltan 10 minutos para el vuelo programado a las ${flight.time}. Inicie el protocolo de preparación.`);
                                 }
 
-                                // Lanzar aviso de 5 minutos
-                                if (timeStr === `${warn5H}:${warn5M}` && flight.wind < 40) {
-                                    speak(`Atención piloto. Faltan 5 minutos para el vuelo programado a las ${flight.time}. Prepárese para el despegue.`);
+                                if (timeStr === `${w5H}:${w5M}` && flight.wind < 40) {
+                                    speak(`Atención piloto. Faltan 5 minutos para el despegue de las ${flight.time}. Diríjase a plataforma.`);
                                 }
                             });
                         }
 
-                        // Alarmas Oficiales de Operaciones
+                        // Alarmas Oficiales Administrativas
                         if (timeStr === "12:00") speak("Atención piloto. Es medio día. Favor de iniciar la elaboración de los K P I y reportes de efectividad.");
                         if (timeStr === "00:00") speak("Atención piloto. Es media noche. Favor de iniciar la elaboración de los K P I y reportes de cierre de día.");
                         if (timeStr === "12:05" || timeStr === "00:05") speak("Alerta operativa. Es hora de actualizar y capturar la pantalla del clima O K To Fly para garantizar la seguridad del turno.");
@@ -176,7 +169,7 @@
                     }
                 }, 1000);
                 return () => clearInterval(timer);
-            }, [schedule, isRaining]); // Dependencias para que lea el schedule actualizado
+            }, [schedule, isRaining]); 
 
             const unlockAudio = () => {
                 if (!audioUnlocked) {
@@ -199,10 +192,20 @@
 
             const missingDayFlights = Math.max(0, DIURNAL_GOAL - flightsDoneDay);
             const nightGoal = (TOTAL_GOAL - DIURNAL_GOAL) + missingDayFlights; 
-            const currentWind = schedule.length > 0 ? (schedule.find(s => {
-                let [sh] = s.time.split(':');
-                return parseInt(sh) === currentHour;
-            })?.wind || 0) : 0;
+            
+            // Solución de sintaxis segura para currentWind sin optional chaining
+            let currentWind = 0;
+            if (schedule && schedule.length > 0) {
+                const currentF = schedule.find(s => {
+                    if (!s || !s.time) return false;
+                    let sh = s.time.split(':')[0];
+                    return parseInt(sh) === currentHour;
+                });
+                if (currentF) {
+                    currentWind = currentF.wind;
+                }
+            }
+
             const isCurrentlySuspended = currentWind >= 40 || isRaining;
 
             const handleImageUpload = async (e) => {
@@ -225,14 +228,14 @@
                         const payload = {
                             contents: [{
                                 parts: [
-                                    { text: "Extrae el pronóstico de viento hora por hora de esta imagen. Devuelve SOLO un array JSON válido con objetos { 'time': '7:00am', 'wind': 20, 'rawText': 'Ráfagas fuertes' }. REGLA CRÍTICA DE COLORES: Si el recuadro de la hora tiene fondo ROJO, pon el valor de 'wind' en 45 (Suspendido). Si el recuadro es CELESTE, AZUL o NARANJA, pon 'wind' en 0 (Apto para volar). Solo el color ROJO indica suspensión real. Ignora textos como '>40m' si el fondo no es rojo." },
+                                    { text: "Extrae el pronóstico de viento hora por hora de esta imagen. Devuelve SOLO un array JSON válido con objetos { 'time': '7:00am', 'wind': 20 }. REGLA CRÍTICA DE COLORES: Fíjate en el color de fondo del recuadro de la hora (Ej: 11:00am). Si el recuadro es ROJO, pon 'wind' en 45. Si el recuadro es NARANJA, CELESTE o AZUL, pon 'wind' en 0 (Apto para volar). Solo el rojo indica suspensión. IGNORA textos de alerta si el fondo NO es rojo." },
                                     { inline_data: { mime_type: file.type, data: base64Data } }
                                 ]
                             }],
                             generationConfig: { temperature: 0.1 }
                         };
 
-                        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${settings.geminiKey}`, {
+                        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${settings.geminiKey}`, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify(payload)
@@ -259,10 +262,11 @@
                         setWindDataMap(windMap);
                         updateData({ windDataMap: windMap });
 
-                        // Variabilidad Táctica (±15 mins para evitar patrones predecibles)
                         const applyVariance = (timeStr, isForzoso = false) => {
-                            if (isForzoso) return timeStr; // Forzosos no cambian
-                            let [h, m] = timeStr.split(':').map(Number);
+                            if (isForzoso) return timeStr; 
+                            let parts = timeStr.split(':');
+                            let h = parseInt(parts[0]);
+                            let m = parseInt(parts[1]);
                             let variance = Math.floor(Math.random() * 31) - 15; 
                             let date = new Date(2026, 0, 1, h, m + variance);
                             let newH = String(date.getHours()).padStart(2, '0');
@@ -275,7 +279,6 @@
                         const isSuspendedAt12 = windMap[12] >= 40 && !isSuspendedAt11;
                         const isSuspendedAt13 = windMap[13] >= 40 && !isSuspendedAt11 && !isSuspendedAt12;
 
-                        // BLOQUE MAÑANA
                         if (isSuspendedAt11) {
                             newSchedule.push(
                                 { time: applyVariance("06:00"), type: "DINÁMICO", wind: windMap[6] || 0, hour24: 6 },
@@ -285,19 +288,19 @@
                             );
                         } else if (isSuspendedAt12) {
                             newSchedule.push(
+                                { time: applyVariance("06:00"), type: "DINÁMICO", wind: windMap[6] || 0, hour24: 6 },
                                 { time: applyVariance("07:20", true), type: "FORZOSO", wind: windMap[7] || 0, hour24: 7 },
                                 { time: applyVariance("08:20"), type: "DINÁMICO", wind: windMap[8] || 0, hour24: 8 },
-                                { time: applyVariance("09:20"), type: "DINÁMICO", wind: windMap[9] || 0, hour24: 9 },
-                                { time: applyVariance("10:20"), type: "DINÁMICO", wind: windMap[10] || 0, hour24: 10 },
-                                { time: applyVariance("11:20"), type: "DINÁMICO", wind: windMap[11] || 0, hour24: 11 } 
+                                { time: applyVariance("09:30"), type: "DINÁMICO", wind: windMap[9] || 0, hour24: 9 },
+                                { time: applyVariance("10:45"), type: "DINÁMICO", wind: windMap[10] || 0, hour24: 10 }
                             );
                         } else if (isSuspendedAt13) {
                             newSchedule.push(
                                 { time: applyVariance("07:20", true), type: "FORZOSO", wind: windMap[7] || 0, hour24: 7 },
-                                { time: applyVariance("08:30"), type: "DINÁMICO", wind: windMap[8] || 0, hour24: 8 },
-                                { time: applyVariance("09:45"), type: "DINÁMICO", wind: windMap[9] || 0, hour24: 9 },
-                                { time: applyVariance("11:00"), type: "DINÁMICO", wind: windMap[11] || 0, hour24: 11 },
-                                { time: applyVariance("12:15"), type: "DINÁMICO", wind: windMap[12] || 0, hour24: 12 } 
+                                { time: applyVariance("08:20"), type: "DINÁMICO", wind: windMap[8] || 0, hour24: 8 },
+                                { time: applyVariance("09:20"), type: "DINÁMICO", wind: windMap[9] || 0, hour24: 9 },
+                                { time: applyVariance("10:20"), type: "DINÁMICO", wind: windMap[10] || 0, hour24: 10 },
+                                { time: applyVariance("11:20"), type: "DINÁMICO", wind: windMap[11] || 0, hour24: 11 }
                             );
                         } else {
                             newSchedule.push(
@@ -309,21 +312,20 @@
                             );
                         }
 
-                        // BLOQUE TARDE Y NOCHE (Incluyendo Recuperación)
+                        // BLOQUE TARDE Y NOCHE 
                         newSchedule.push(
                             { time: applyVariance("14:00", true), type: "FORZOSO", wind: windMap[14] || 0, hour24: 14 },
                             { time: applyVariance("15:30"), type: "DINÁMICO", wind: windMap[15] || 0, hour24: 15 },
                             { time: applyVariance("17:00", true), type: "FORZOSO", wind: windMap[17] || 0, hour24: 17 },
                             { time: applyVariance("18:30"), type: "DINÁMICO", wind: windMap[18] || 0, hour24: 18 },
                             
-                            // 4 Vuelos de recuperación nocturna espaciados hasta las 23:30
+                            // RECUPERACIONES NOCTURNAS
                             { time: applyVariance("20:00"), type: "RECUPERACIÓN", wind: windMap[20] || 0, hour24: 20 },
                             { time: applyVariance("21:10", true), type: "FORZOSO", wind: windMap[21] || 0, hour24: 21 },
                             { time: applyVariance("22:20"), type: "RECUPERACIÓN", wind: windMap[22] || 0, hour24: 22 },
                             { time: applyVariance("23:30"), type: "RECUPERACIÓN", wind: windMap[23] || 0, hour24: 23 }
                         );
 
-                        // Marcar suspensiones si el viento es mayor a 40
                         const finalSchedule = newSchedule.map(f => ({
                             ...f, wind: windMap[f.hour24] >= 40 ? 45 : f.wind
                         }));
@@ -367,13 +369,6 @@
                     speak("Alerta. Condición de lluvia activada. Operaciones suspendidas.");
                 } else {
                     speak("Operaciones reanudadas. Calculando tiempo restante de vuelos.");
-                    // Lógica de Reprogramación (comprimiendo en horas restantes hasta las 23:30)
-                    if (schedule.length > 0) {
-                        const remainingFlightsToGoal = Math.max(0, TOTAL_GOAL - todayFlightsTotal.length);
-                        let updatedSchedule = [...schedule];
-                        // Aquí iría el algoritmo complejo de reorganización, por ahora solo avisa
-                        setModal({ isOpen: true, title: "Operaciones Reanudadas", message: `Faltan ${remainingFlightsToGoal} vuelos para la meta. Trate de acomodarlos antes de las 23:30.`, type: "success" });
-                    }
                 }
             };
 
@@ -384,16 +379,15 @@
                 setSettings(newSettings);
                 localStorage.setItem('dispatcherSettings', JSON.stringify(newSettings));
                 setShowSettings(false);
-                window.location.reload(); // Recargar para aplicar Firebase
+                window.location.reload(); 
             };
 
             return (
-                <div className={`min-h-screen p-4 md:p-8 pb-32 transition-colors duration-1000 ${isRaining ? 'rain-mode' : ''}`} onClick={unlockAudio}>
+                <div className="min-h-screen p-4 md:p-8 pb-32 transition-colors duration-1000" onClick={unlockAudio}>
                     <div className="max-w-6xl mx-auto flex flex-col md:flex-row gap-6">
                         
                         {/* COLUMNA IZQUIERDA: CONTROLES E ITINERARIO */}
                         <div className="w-full md:w-2/3">
-                            {/* HEADER */}
                             <div className="flex justify-between items-center mb-6">
                                 <div className="flex items-center gap-3">
                                     <div className="bg-indigo-600 p-2.5 rounded-xl glow-box">
@@ -402,59 +396,56 @@
                                     <div>
                                         <h1 className="text-xl font-black text-white tracking-wide uppercase">Dispatcher Pro</h1>
                                         <p className="text-xs text-indigo-400 font-bold tracking-widest uppercase flex items-center gap-2">
-                                            V45 MASTER <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span> NUBE CONECTADA
+                                            V46 MASTER <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span> NUBE CONECTADA
                                         </p>
                                     </div>
                                 </div>
-                                <button onClick={() => setShowSettings(true)} className="p-3 bg-slate-800/50 hover:bg-slate-700/50 rounded-xl transition border border-slate-700/50">
+                                <button onClick={() => setShowSettings(true)} className="p-3 bg-slate-800/50 hover:bg-slate-700/50 rounded-xl border border-slate-700/50">
                                     ⚙️
                                 </button>
                             </div>
 
-                            {/* ESTADO DEL TURNO */}
-                            <div className="glass p-6 rounded-3xl relative overflow-hidden flex justify-between items-center mb-6 border border-slate-800">
+                            <div className="glass p-5 rounded-3xl relative overflow-hidden flex justify-between items-center mb-6">
                                 <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/10 rounded-full blur-3xl"></div>
                                 <div>
-                                    <p className="text-xs font-black tracking-widest text-indigo-400 uppercase mb-1">Turno en curso</p>
-                                    <h2 className="text-3xl font-black text-white">{activeShift}</h2>
-                                    <div className="mt-2 text-4xl font-mono font-bold text-white tracking-wider flex items-center gap-2">
+                                    <p className="text-[10px] font-black tracking-widest text-indigo-400 uppercase mb-1">Turno en curso</p>
+                                    <h2 className="text-2xl font-black text-white">{activeShift}</h2>
+                                    <div className="mt-2 text-3xl font-mono font-bold text-white tracking-wider flex items-center gap-2">
                                         {!audioUnlocked && <span className="text-[10px] animate-pulse text-amber-500 border border-amber-500/50 bg-amber-500/10 px-2 py-1 rounded absolute -top-4">🔇 Toca para Audio</span>}
                                         {currentTime.toLocaleTimeString('en-US', { hour12: false })}
                                     </div>
                                 </div>
-                                <div className="flex flex-col gap-2">
+                                <div className="flex flex-col gap-2 z-10">
                                     <input type="file" id="file-upload-input" accept="image/*" onChange={handleImageUpload} className="hidden" />
                                     <button 
                                         onClick={() => document.getElementById('file-upload-input').click()} 
                                         disabled={isScanning || isRaining}
-                                        className={`flex items-center justify-center gap-2 p-3 rounded-2xl transition border ${isScanning ? 'bg-indigo-900/50 border-indigo-400 animate-pulse' : 'bg-slate-800/50 border-slate-700 hover:bg-slate-700'}`}>
-                                        <span>{isScanning ? '⏳' : '📸'}</span>
-                                        <span className="text-[11px] font-black uppercase text-white">Escanear Clima</span>
+                                        className={`flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl transition border shadow-lg ${isScanning ? 'bg-indigo-900/50 border-indigo-400 animate-pulse' : 'bg-slate-800/80 border-slate-700 text-slate-300 hover:bg-slate-700'}`}>
+                                        <span className="text-lg">{isScanning ? '⏳' : '📸'}</span>
+                                        <span className="text-[10px] font-black uppercase text-white tracking-wider">Escanear Clima</span>
                                     </button>
-                                    
                                     <button 
                                         onClick={toggleRain} 
-                                        className={`flex items-center justify-center gap-2 p-3 rounded-2xl transition border shadow-lg ${isRaining ? 'bg-rose-600 border-rose-400 text-white animate-pulse' : 'bg-slate-800/50 border-slate-700 text-slate-300 hover:bg-slate-700'}`}>
-                                        <span>{isRaining ? '☀️' : '🌧️'}</span>
-                                        <span className="text-[11px] font-black uppercase">{isRaining ? 'Reanudar Operación' : 'Declarar Lluvia'}</span>
+                                        className={`flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl transition border shadow-lg ${isRaining ? 'bg-rose-600 border-rose-400 text-white animate-pulse shadow-[0_0_20px_rgba(225,29,72,0.4)]' : 'bg-slate-800/80 border-slate-700 text-slate-300 hover:bg-slate-700'}`}>
+                                        <span className="text-lg">{isRaining ? '☀️' : '🌧️'}</span>
+                                        <span className="text-[10px] font-black uppercase tracking-wider">{isRaining ? 'Reanudar Operación' : 'Declarar Lluvia'}</span>
                                     </button>
                                 </div>
                             </div>
 
-                            {/* ITINERARIO LISTA */}
                             <div className="glass rounded-3xl p-5 border border-slate-800 relative">
                                 {isRaining && (
-                                    <div className="absolute inset-0 z-10 bg-rose-950/80 backdrop-blur-sm rounded-3xl flex flex-col items-center justify-center border-2 border-rose-500">
+                                    <div className="absolute inset-0 z-20 bg-rose-950/80 backdrop-blur-sm rounded-3xl flex flex-col items-center justify-center border-2 border-rose-500">
                                         <span className="text-6xl mb-4">🌧️</span>
-                                        <h3 className="text-2xl font-black text-rose-400 uppercase tracking-widest mb-2">Alerta de Lluvia</h3>
-                                        <p className="text-rose-200 text-sm font-bold">Vuelos temporalmente suspendidos</p>
+                                        <h3 className="text-2xl font-black text-rose-400 uppercase tracking-widest mb-2">Alerta de Lluvia Local</h3>
+                                        <p className="text-rose-200 text-sm font-bold">Vuelos de todos los pilotos suspendidos</p>
                                     </div>
                                 )}
                                 <h3 className="text-[11px] font-black tracking-widest text-slate-400 uppercase mb-4 flex items-center gap-2">
                                     <span className="w-1.5 h-1.5 rounded-full bg-indigo-500"></span> Plan Restante (Táctico)
                                 </h3>
                                 
-                                <div className="space-y-3">
+                                <div className="space-y-2">
                                     {schedule.length === 0 ? (
                                         <div className="text-center py-10 opacity-50 border border-dashed border-slate-700 rounded-xl">
                                             <p className="text-sm font-bold text-slate-400">Sin datos de clima.</p>
@@ -463,18 +454,18 @@
                                         schedule.filter(f => f.hour24 >= currentHour).map((flight, idx) => {
                                             const isSuspended = flight.wind >= 40;
                                             return (
-                                                <div key={idx} className={`p-4 rounded-xl border flex justify-between items-center transition-all ${isSuspended ? 'bg-rose-950/20 border-rose-900/50' : 'bg-slate-800/40 border-slate-700/50'}`}>
+                                                <div key={idx} className={`p-3.5 rounded-xl border flex justify-between items-center transition-all ${isSuspended ? 'bg-rose-950/20 border-rose-900/50' : 'bg-slate-800/40 border-slate-700/50'}`}>
                                                     <div>
-                                                        <h4 className="text-xl font-black text-white">{flight.time}</h4>
-                                                        <div className="flex items-center gap-1.5 mt-1">
+                                                        <h4 className="text-lg font-black text-white">{flight.time}</h4>
+                                                        <div className="flex items-center gap-1.5 mt-0.5">
                                                             {isSuspended ? (
-                                                                <span className="text-[10px] font-black text-rose-500 uppercase flex items-center gap-1">🚫 Suspendido ({flight.wind} km/h)</span>
+                                                                <span className="text-[9px] font-black text-rose-500 uppercase flex items-center gap-1">🚫 Suspendido ({flight.wind} km/h)</span>
                                                             ) : (
-                                                                <span className="text-[10px] font-black text-emerald-400 uppercase flex items-center gap-1">✅ Libre ({flight.wind} km/h)</span>
+                                                                <span className="text-[9px] font-black text-emerald-400 uppercase flex items-center gap-1">✅ Libre ({flight.wind} km/h)</span>
                                                             )}
                                                         </div>
                                                     </div>
-                                                    <span className={`text-[10px] font-black px-2 py-1 rounded border ${flight.type === 'FORZOSO' ? 'bg-indigo-900/50 text-indigo-400 border-indigo-700' : flight.type === 'RECUPERACIÓN' ? 'bg-amber-900/50 text-amber-400 border-amber-700' : 'bg-slate-800 text-slate-400 border-slate-600'}`}>
+                                                    <span className={`text-[9px] font-black px-2 py-1 rounded-md border tracking-wider ${flight.type === 'FORZOSO' ? 'bg-indigo-900/50 text-indigo-400 border-indigo-700' : flight.type === 'RECUPERACIÓN' ? 'bg-amber-900/50 text-amber-400 border-amber-700' : 'bg-slate-800 text-slate-400 border-slate-600'}`}>
                                                         {flight.type}
                                                     </span>
                                                 </div>
@@ -488,43 +479,40 @@
                         {/* COLUMNA DERECHA: METAS GIGANTES Y BITÁCORA */}
                         <div className="w-full md:w-1/3 flex flex-col gap-6">
                             
-                            {/* METAS GIGANTES */}
                             <div className="flex flex-col gap-4">
-                                {/* Tarjeta Meta del Turno Actual */}
-                                <div className={`glass p-6 rounded-3xl border text-center ${isDayShift ? 'bg-amber-500/10 border-amber-500/30' : 'bg-fuchsia-500/10 border-fuchsia-500/30'}`}>
-                                    <p className={`text-[10px] font-black tracking-widest uppercase mb-2 ${isDayShift ? 'text-amber-400' : 'text-fuchsia-400'}`}>
-                                        {isDayShift ? 'Vuelos Restantes (Día)' : 'Vuelos Heredados a Turno Nocturno'}
+                                <div className={`glass p-6 rounded-3xl border text-center relative overflow-hidden ${isDayShift ? 'bg-amber-500/5 border-amber-500/20' : 'bg-fuchsia-500/5 border-fuchsia-500/20'}`}>
+                                    <p className={`text-[10px] font-black tracking-widest uppercase mb-1 relative z-10 ${isDayShift ? 'text-amber-400' : 'text-fuchsia-400'}`}>
+                                        {isDayShift ? 'Meta del Turno Diurno' : 'Vuelos Heredados a Turno Nocturno'}
                                     </p>
-                                    <div className={`text-6xl font-black ${isDayShift ? 'text-amber-500' : 'text-fuchsia-500'}`}>
-                                        {isDayShift ? Math.max(0, DIURNAL_GOAL - flightsDoneDay) : nightGoal - flightsDoneNight}
+                                    <p className="text-xs text-slate-500 font-bold mb-3 relative z-10">Vuelos Restantes</p>
+                                    <div className={`text-6xl font-black relative z-10 ${isDayShift ? 'text-amber-500' : 'text-fuchsia-500'}`}>
+                                        {isDayShift ? Math.max(0, DIURNAL_GOAL - flightsDoneDay) : Math.max(0, nightGoal - flightsDoneNight)}
                                     </div>
                                 </div>
 
-                                {/* Tarjeta Meta Global (Gigante) */}
-                                <div className="glass p-6 rounded-3xl border border-indigo-500/30 text-center glow-box">
-                                    <p className="text-[11px] font-black tracking-widest text-indigo-300 uppercase mb-2">Meta Global del Día</p>
-                                    <div className="flex items-baseline justify-center gap-1">
+                                <div className="glass p-8 rounded-3xl border border-indigo-500/30 text-center glow-box relative overflow-hidden bg-indigo-950/20">
+                                    <div className="absolute -top-10 -right-10 w-40 h-40 bg-indigo-500/10 rounded-full blur-3xl"></div>
+                                    <p className="text-xs font-black tracking-widest text-indigo-300 uppercase mb-4 relative z-10">Meta Global del Día</p>
+                                    <div className="flex items-baseline justify-center gap-1 relative z-10">
                                         <span className="text-7xl font-black text-white">{todayFlightsTotal.length}</span>
-                                        <span className="text-3xl font-bold text-slate-500">/13</span>
+                                        <span className="text-3xl font-bold text-indigo-500/50">/13</span>
                                     </div>
                                 </div>
                             </div>
 
-                            {/* CONDICIÓN ACTUAL */}
                             <div className="glass rounded-3xl p-5 border border-slate-800 flex justify-between items-center">
                                 <div>
                                     <p className="text-[10px] font-black tracking-widest text-slate-400 uppercase mb-1">Condición Actual</p>
                                     <div className="flex items-baseline gap-1">
-                                        <span className="text-2xl font-black text-white">Viento</span>
+                                        <span className="text-xl font-black text-white">Viento</span>
                                     </div>
-                                    <span className={`text-xl font-bold ${isCurrentlySuspended ? 'text-rose-500' : 'text-emerald-400'}`}>{currentWind} km/h</span>
+                                    <span className={`text-lg font-bold ${isCurrentlySuspended ? 'text-rose-500' : 'text-emerald-400'}`}>{currentWind} km/h</span>
                                 </div>
-                                <div className={`w-12 h-12 rounded-2xl flex items-center justify-center text-2xl ${isCurrentlySuspended ? 'bg-rose-950 border-2 border-rose-500' : 'bg-emerald-950 border-2 border-emerald-500'}`}>
+                                <div className={`w-12 h-12 rounded-2xl flex items-center justify-center text-xl ${isCurrentlySuspended ? 'bg-rose-950 border-2 border-rose-500' : 'bg-emerald-950 border-2 border-emerald-500'}`}>
                                     {isCurrentlySuspended ? '🚫' : '✅'}
                                 </div>
                             </div>
 
-                            {/* BITÁCORA */}
                             <div className="glass rounded-3xl p-5 border border-slate-800 flex-1 min-h-[200px] flex flex-col">
                                 <h3 className="text-[11px] font-black tracking-widest text-slate-400 uppercase mb-4">Bitácora de Despegues</h3>
                                 <div className="space-y-2 overflow-y-auto flex-1 scroll-hide">
@@ -535,8 +523,8 @@
                                     ) : (
                                         todayFlightsTotal.map((f, i) => (
                                             <div key={i} className="flex justify-between items-center p-3 rounded-xl bg-slate-800/40 border border-slate-700/50">
-                                                <span className="text-white font-bold text-sm">Vuelo {f.time}</span>
-                                                <span className="text-[10px] font-bold text-emerald-400 bg-emerald-950/50 px-2 py-1 rounded border border-emerald-900/50">Viento: {f.wind}km/h</span>
+                                                <span className="text-white font-bold text-xs">Despegue {f.time}</span>
+                                                <span className="text-[9px] font-bold text-emerald-400 bg-emerald-950/50 px-2 py-1 rounded border border-emerald-900/50">Viento: {f.wind}km/h</span>
                                             </div>
                                         ))
                                     )}
@@ -545,12 +533,12 @@
                         </div>
                     </div>
 
-                    {/* BOTÓN FLOTANTE REGISTRAR VUELO */}
-                    <div className="fixed bottom-0 left-0 w-full p-6 bg-gradient-to-t from-[#020617] to-transparent flex justify-center z-40 pointer-events-none">
+                    {/* BOTÓN FLOTANTE */}
+                    <div className="fixed bottom-0 left-0 w-full p-6 bg-gradient-to-t from-[#020617] via-[#020617] to-transparent flex justify-center z-40 pointer-events-none">
                         <button 
                             onClick={handleLogFlight}
                             disabled={isCurrentlySuspended}
-                            className={`pointer-events-auto px-8 py-4 rounded-2xl font-black text-sm tracking-widest uppercase transition-all shadow-xl ${isCurrentlySuspended ? 'bg-slate-800 text-slate-500 border border-slate-700' : 'bg-indigo-600 text-white hover:bg-indigo-500 hover:scale-105 border border-indigo-400 glow-box'}`}>
+                            className={`pointer-events-auto px-8 py-4 rounded-2xl font-black text-sm tracking-widest uppercase transition-all shadow-xl ${isCurrentlySuspended ? 'bg-slate-800 text-slate-500 border border-slate-700 opacity-50' : 'bg-indigo-600 text-white hover:bg-indigo-500 hover:scale-105 border border-indigo-400 glow-box'}`}>
                             ✈️ Registrar Despegue Ahora
                         </button>
                     </div>
@@ -562,12 +550,12 @@
                                 <h3 className="text-xl font-black text-white mb-4">Configuración del Sistema</h3>
                                 <form onSubmit={handleSaveSettings} className="space-y-4">
                                     <div>
-                                        <label className="block text-xs font-bold text-slate-400 mb-1 uppercase tracking-wider">Gemini API Key (AQ...)</label>
-                                        <input type="text" name="geminiKey" defaultValue={settings.geminiKey} className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white font-mono text-sm focus:border-indigo-500 outline-none" required />
+                                        <label className="block text-xs font-bold text-slate-400 mb-1 uppercase tracking-wider">Gemini API Key</label>
+                                        <input type="text" name="geminiKey" defaultValue={settings.geminiKey} className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white font-mono text-sm outline-none" required />
                                     </div>
                                     <div>
                                         <label className="block text-xs font-bold text-slate-400 mb-1 uppercase tracking-wider">Firebase Config (JSON)</label>
-                                        <textarea name="firebaseConfig" defaultValue={settings.firebaseConfig} className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white font-mono text-xs focus:border-indigo-500 outline-none h-32" required placeholder='{"apiKey": "..."}'></textarea>
+                                        <textarea name="firebaseConfig" defaultValue={settings.firebaseConfig} className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white font-mono text-xs outline-none h-32" required></textarea>
                                     </div>
                                     <div className="flex gap-3 pt-4">
                                         <button type="button" onClick={() => setShowSettings(false)} className="flex-1 py-3 rounded-xl font-bold text-slate-300 bg-slate-800 hover:bg-slate-700">Cancelar</button>
