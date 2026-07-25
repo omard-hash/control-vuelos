@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dispatcher Pro - V60 Master</title>
+    <title>Dispatcher Pro - V42 Master</title>
     
     <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
@@ -56,7 +56,10 @@
 
             const [audioUnlocked, setAudioUnlocked] = useState(false);
             const audioUnlockedRef = useRef(false);
+            
+            // Referencias para el temporizador
             const flightsRef = useRef([]);
+            const isRainingRef = useRef(false);
 
             useEffect(() => {
                 let unsubscribe = () => {};
@@ -67,10 +70,13 @@
                             const data = doc.data();
                             if (data.flights) {
                                 setFlights(data.flights);
-                                flightsRef.current = data.flights; // Mantenemos la ref actualizada para el timer
+                                flightsRef.current = data.flights; // Mantenemos la ref actualizada
                             }
                             if (data.loggedFlightsCount !== undefined) setLoggedFlightsCount(data.loggedFlightsCount);
-                            if (data.isRaining !== undefined) setIsRaining(data.isRaining);
+                            if (data.isRaining !== undefined) {
+                                setIsRaining(data.isRaining);
+                                isRainingRef.current = data.isRaining;
+                            }
                             if (data.windDataMap) setWindDataMap(data.windDataMap);
                         }
                     }, (err) => {
@@ -115,12 +121,16 @@
                     const m = now.getMinutes();
                     const s = now.getSeconds();
 
-                    if (h >= 7 && h < 19) setShiftName('Turno Diurno');
-                    else setShiftName('Turno Nocturno');
+                    if (h >= 7 && h < 19) {
+                        setShiftName('Turno Diurno');
+                    } else {
+                        setShiftName('Turno Nocturno');
+                    }
                     
                     if (s === 0) {
                         const timeStr = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
                         
+                        // Alarmas Estáticas
                         if (h === 7 && m === 50) {
                             speak("Atención comandante. Es hora de la junta operativa de las siete cincuenta.");
                             setModal({ isOpen: true, title: '⏰ JUNTA OPERATIVA', message: 'Reunión de las 7:50 AM.', type: 'error' });
@@ -131,15 +141,15 @@
                         }
                         else if (h === 12 && m === 5) {
                             speak("Atención. Actualización de captura del clima requerida. Por favor confirme el ou kei to flai para garantizar condiciones adecuadas.");
-                            setModal({ isOpen: true, title: '🌤️ ACTUALIZAR CLIMA', message: 'Validar condiciones seguras para volar.', type: 'error' });
+                            setModal({ isOpen: true, title: '🌤️ ACTUALIZAR CLIMA', message: 'Es obligatorio actualizar la captura del clima y validar condiciones seguras para volar.', type: 'error' });
                         }
                         else if (h === 0 && m === 5) {
-                            speak("Atención. Actualización de captura del clima requerida. Por favor confirme el ou kei to flai.");
-                            setModal({ isOpen: true, title: '🌙 ACTUALIZAR CLIMA', message: 'Validar condiciones seguras para volar.', type: 'error' });
+                            speak("Atención. Actualización de captura del clima requerida. Por favor confirme el ou kei to flai para garantizar condiciones adecuadas.");
+                            setModal({ isOpen: true, title: '🌙 ACTUALIZAR CLIMA', message: 'Es obligatorio actualizar la captura del clima y validar condiciones seguras para volar.', type: 'error' });
                         }
 
-                        // LÓGICA 1: Alarmas 10 y 5 Minutos (Solo Vuelos NO Suspendidos)
-                        if (flightsRef.current && flightsRef.current.length > 0 && !isRaining) {
+                        // Alarmas Dinámicas de Vuelo (10 y 5 minutos antes)
+                        if (flightsRef.current && flightsRef.current.length > 0 && !isRainingRef.current) {
                             flightsRef.current.forEach(flight => {
                                 if (flight.wind < 42) {
                                     const parts = flight.time.split(':');
@@ -152,7 +162,7 @@
                                     let warn10 = new Date(flightDate.getTime() - 10 * 60000);
                                     let w10H = String(warn10.getHours()).padStart(2, '0');
                                     let w10M = String(warn10.getMinutes()).padStart(2, '0');
-    
+
                                     let warn5 = new Date(flightDate.getTime() - 5 * 60000);
                                     let w5H = String(warn5.getHours()).padStart(2, '0');
                                     let w5M = String(warn5.getMinutes()).padStart(2, '0');
@@ -169,11 +179,10 @@
                     }
                 }, 1000);
                 return () => clearInterval(timer);
-            }, [isRaining]);
+            }, []);
 
             const handleImageUpload = (e) => {
                 const file = e.target.files[0];
-                e.target.value = null; // reset input
                 if (!file) return;
 
                 if (!geminiKey || geminiKey.trim() === '') {
@@ -196,15 +205,15 @@
                 
                 try {
                     const key = geminiKey.trim();
-                    // Usando el modelo actual oficial: 2.5-flash
-                    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${key}`;
+                    // SE MANTIENE EL MODELO EXACTO DE LA V42 QUE SÍ FUNCIONA
+                    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${key}`;
                     
                     const payload = {
                         contents: [{
                             parts: [
-                                // LÓGICA 2: Lectura Clásica y Perfecta de Colores (No suspende en UV Naranja)
-                                { text: "Analiza esta imagen del clima de Airdata. Devuelve ÚNICAMENTE un arreglo JSON con formato exacto: {\"hourlyData\": [{\"time\":\"7:00am\", \"wind\":0}, {\"time\":\"12:00pm\", \"wind\":45}]}. Regla CRÍTICA 1: Guíate EXCLUSIVAMENTE por los colores. Si el fondo es ROJO, wind=45. Si el fondo es NARANJA, CELESTE, AMARILLO o BLANCO (aunque diga Ráfagas, UV, o Extremo), wind=0. Solo el JSON." },
-                                { inlineData: { mimeType: "image/jpeg", data: base64Image } }
+                                // REGLAS ESTRICTAS DE LA V42
+                                { text: "Analiza el clima. REGLA ESTRICTA 11:00am: Si solo dice 'UV' (ej. 'UV 10', 'Extremo UV 13') ES APTO PARA VOLAR, el viento es 0. Regla general: Si dice 'Apto para volar', viento es 0. Si dice 'Ráfagas fuertes' o vientos > 40, viento es 45. Devuelve JSON con 'hourlyData' teniendo 'time' (ej. '11:00am') y 'wind' numérico." },
+                                { inline_data: { mime_type: "image/jpeg", data: base64Image } }
                             ]
                         }]
                     };
@@ -215,21 +224,12 @@
                         body: JSON.stringify(payload)
                     });
 
-                    if (!response.ok) {
-                        const errData = await response.json().catch(() => ({}));
-                        const errMsg = (errData.error && errData.error.message) ? errData.error.message : response.statusText;
-                        throw new Error(`Error ${response.status}: ${errMsg}`);
-                    }
+                    if (!response.ok) throw new Error("Error de conexión. Verifica tu llave API en Ajustes.");
 
                     const data = await response.json();
                     let aiResponseText = data.candidates[0].content.parts[0].text;
-                    
-                    // Limpiador agresivo
-                    aiResponseText = aiResponseText.replace(/```json/gi, '').replace(/```/g, '').trim();
-                    const startIdx = aiResponseText.indexOf('{');
-                    const endIdx = aiResponseText.lastIndexOf('}');
-                    if (startIdx !== -1 && endIdx !== -1) {
-                         aiResponseText = aiResponseText.substring(startIdx, endIdx + 1);
+                    if (aiResponseText.startsWith('```json')) {
+                         aiResponseText = aiResponseText.replace(/```json\n?/, '').replace(/```\n?$/, '');
                     }
                     
                     const parsedData = JSON.parse(aiResponseText);
@@ -237,12 +237,12 @@
                          generateIntelligentSchedule(parsedData.hourlyData);
                          speak("Itinerario calculado con base en vientos detectados.");
                     } else {
-                         throw new Error("La IA no devolvió el formato esperado.");
+                         throw new Error("La IA devolvió un formato incorrecto.");
                     }
 
                 } catch (error) {
                     console.error("AI Error:", error);
-                    speak("Error al analizar el clima. Revisar recuadro en pantalla.");
+                    speak("Error al analizar el clima.");
                     setModal({ isOpen: true, title: 'Error de Análisis', message: error.message });
                     generateIntelligentSchedule([]); 
                 } finally {
@@ -256,10 +256,10 @@
 
                 if (hourlyWeatherData && hourlyWeatherData.length > 0) {
                      hourlyWeatherData.forEach(dataPoint => {
-                          let hourMatch = dataPoint.time.match(/(\d+):?(\d*)?\s*([ap]m)/i);
+                          let hourMatch = dataPoint.time.match(/(\d+):00([ap]m)/i);
                           if (hourMatch) {
                                let hour = parseInt(hourMatch[1]);
-                               let ampm = hourMatch[3].toLowerCase();
+                               let ampm = hourMatch[2].toLowerCase();
                                if (ampm === 'pm' && hour < 12) hour += 12;
                                if (ampm === 'am' && hour === 12) hour = 0;
                                windMap[hour] = dataPoint.wind;
@@ -270,7 +270,7 @@
                 setWindDataMap(windMap);
                 db.collection('operaciones').doc('turno_actual').set({ windDataMap: windMap }, { merge: true });
 
-                // LÓGICA 3: Aleatoriedad Táctica (±15 min)
+                // LÓGICA DE ALEATORIEDAD (+- 15 MIN)
                 const applyVariance = (timeStr, isForzoso = false) => {
                     if (isForzoso) return timeStr; 
                     let parts = timeStr.split(':');
@@ -284,8 +284,8 @@
                 };
 
                 let newSchedule = [];
-                
-                // LÓGICA 4: Matemáticas de 4 y 5 vuelos
+
+                // LÓGICA DE SUSPENSIÓN (4 o 5 vuelos)
                 const isSuspendedAt11 = windMap[11] >= 40;
                 const isSuspendedAt12 = windMap[12] >= 40 && !isSuspendedAt11;
                 const isSuspendedAt13 = windMap[13] >= 40 && !isSuspendedAt11 && !isSuspendedAt12;
@@ -333,18 +333,20 @@
                     { time: applyVariance("22:45"), type: "DINÁMICO", wind: windMap[22] || 0, hour24: 22 }
                 );
                 
-                // Mapeo final asegurando las suspensiones por viento real (rojo)
+                // Mapeo final para asegurar suspensiones con los datos reales del clima
                 const finalSchedule = newSchedule.map(f => ({
                     ...f, wind: windMap[f.hour24] >= 40 ? 45 : f.wind
                 }));
 
                 setFlights(finalSchedule);
+                flightsRef.current = finalSchedule;
                 db.collection('operaciones').doc('turno_actual').set({ flights: finalSchedule }, { merge: true });
             };
 
             const toggleRainProtocol = () => {
                 const newState = !isRaining;
                 setIsRaining(newState);
+                isRainingRef.current = newState;
                 db.collection('operaciones').doc('turno_actual').set({ isRaining: newState }, { merge: true });
 
                 if (newState) {
@@ -394,6 +396,7 @@
                 }
                 
                 setFlights(newSchedule);
+                flightsRef.current = newSchedule;
                 db.collection('operaciones').doc('turno_actual').set({ flights: newSchedule }, { merge: true });
             };
 
@@ -415,14 +418,13 @@
             return (
                 <div className="min-h-screen p-4 max-w-2xl mx-auto pb-24" onClick={unlockAudio}>
                     
-                    {/* Header */}
                     <div className="flex justify-between items-center mb-5">
                         <div>
                             <h1 className="text-lg md:text-xl font-black tracking-tight flex items-center gap-2">
                                 <span className="bg-indigo-600 text-white px-2 py-0.5 rounded text-xs">DP</span>
                                 DISPATCHER PRO
                             </h1>
-                            <p className="text-[10px] font-bold text-indigo-400 mt-1 tracking-widest uppercase">V60 MASTER • 🟢 NUBE CONECTADA</p>
+                            <p className="text-[10px] font-bold text-indigo-400 mt-1 tracking-widest uppercase">V42 MASTER • 🟢 NUBE CONECTADA</p>
                         </div>
                         <button 
                             onClick={(e) => { e.stopPropagation(); setSettingsOpen(true); }}
@@ -438,11 +440,9 @@
                         </div>
                     )}
 
-                    {/* Current Shift Card */}
                     <div className="glass-card p-5 rounded-2xl mb-5 relative overflow-hidden">
                         
                         <div className="flex justify-between items-start mb-6">
-                            {/* Lado Izquierdo: Hora y Turno */}
                             <div>
                                 <p className="text-[10px] font-bold tracking-widest text-slate-400 uppercase mb-1">{shiftName}</p>
                                 <h2 className="text-2xl font-black text-white">{shiftName === 'Turno Diurno' ? '☀️ Día' : '🌙 Noche'}</h2>
@@ -451,10 +451,8 @@
                                 </div>
                             </div>
 
-                            {/* Lado Derecho: METAS GIGANTES */}
                             <div className="text-right flex flex-col items-end">
                                 
-                                {/* Contador de Meta de Turno Dinámico */}
                                 <div className={`mb-3 px-4 py-2 rounded-xl border shadow-[0_0_20px_rgba(0,0,0,0.4)] transition-all ${shiftName === 'Turno Diurno' ? 'bg-amber-500/20 border-amber-500/50' : 'bg-fuchsia-600/20 border-fuchsia-500/50'}`}>
                                     <p className={`text-[10px] font-black uppercase tracking-widest ${shiftName === 'Turno Diurno' ? 'text-amber-400' : 'text-fuchsia-400'}`}>
                                         {shiftName === 'Turno Diurno' ? '🎯 Faltan (Diurno)' : '🔄 Heredados (Noct.)'}
@@ -465,7 +463,6 @@
                                     </div>
                                 </div>
                                 
-                                {/* Contador Global */}
                                 <div className="flex items-baseline gap-1 bg-[#0f172a] px-4 py-2.5 rounded-xl border border-indigo-500/30 shadow-[0_0_20px_rgba(79,70,229,0.3)] mt-1">
                                     <span className="text-5xl font-black text-white tracking-tighter drop-shadow-lg">{loggedFlightsCount}</span>
                                     <span className="text-2xl font-bold text-indigo-500/70">/{totalFlightsTarget}</span>
@@ -499,7 +496,6 @@
                         </div>
                     )}
 
-                    {/* Schedule List */}
                     <div className={`glass-card p-5 rounded-2xl mb-6 relative ${isRaining ? 'opacity-50 pointer-events-none' : ''}`}>
                         {isRaining && <div className="absolute inset-0 rain-overlay rounded-2xl z-10 flex items-center justify-center text-center p-4">
                             <span className="text-white font-bold text-lg">Esperando que mejore el clima para calcular itinerario extendido...</span>
@@ -530,7 +526,6 @@
                         )}
                     </div>
 
-                    {/* Floating Action Button */}
                     <div className="fixed bottom-0 left-0 w-full p-4 bg-gradient-to-t from-[#0B0F19] via-[#0B0F19] to-transparent flex justify-center z-40 pointer-events-none">
                          <button 
                              onClick={(e) => { e.stopPropagation(); handleLogManualFlight(); }}
@@ -541,7 +536,6 @@
                          </button>
                     </div>
 
-                    {/* Modals */}
                     {settingsOpen && (
                         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4" onClick={(e) => e.stopPropagation()}>
                             <div className="bg-[#131826] border border-slate-800 rounded-2xl w-full max-w-sm shadow-2xl p-6">
