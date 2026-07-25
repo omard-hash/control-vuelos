@@ -79,9 +79,7 @@
                         const fb = initializeFirebase(parsed.firebaseConfig);
                         if (fb) {
                             setFirebaseInstance(fb);
-                            fb.auth.signInAnonymously().catch(error => {
-                                console.error("Error Auth Silenciosa:", error);
-                            });
+                            fb.auth.signInAnonymously().catch(error => console.error("Error Auth Silenciosa:", error));
                         }
                     }
                 }
@@ -141,12 +139,10 @@
                                 let flightDate = new Date();
                                 flightDate.setHours(fh, fm, 0, 0);
                                 
-                                // Calculando 10 mins antes
                                 let warn10 = new Date(flightDate.getTime() - 10 * 60000);
                                 let w10H = String(warn10.getHours()).padStart(2, '0');
                                 let w10M = String(warn10.getMinutes()).padStart(2, '0');
 
-                                // Calculando 5 mins antes
                                 let warn5 = new Date(flightDate.getTime() - 5 * 60000);
                                 let w5H = String(warn5.getHours()).padStart(2, '0');
                                 let w5M = String(warn5.getMinutes()).padStart(2, '0');
@@ -161,7 +157,7 @@
                             });
                         }
 
-                        // Alarmas Oficiales Administrativas
+                        // Alarmas Oficiales
                         if (timeStr === "12:00") speak("Atención piloto. Es medio día. Favor de iniciar la elaboración de los K P I y reportes de efectividad.");
                         if (timeStr === "00:00") speak("Atención piloto. Es media noche. Favor de iniciar la elaboración de los K P I y reportes de cierre de día.");
                         if (timeStr === "12:05" || timeStr === "00:05") speak("Alerta operativa. Es hora de actualizar y capturar la pantalla del clima O K To Fly para garantizar la seguridad del turno.");
@@ -193,7 +189,6 @@
             const missingDayFlights = Math.max(0, DIURNAL_GOAL - flightsDoneDay);
             const nightGoal = (TOTAL_GOAL - DIURNAL_GOAL) + missingDayFlights; 
             
-            // Solución de sintaxis segura para currentWind sin optional chaining
             let currentWind = 0;
             if (schedule && schedule.length > 0) {
                 const currentF = schedule.find(s => {
@@ -210,26 +205,33 @@
 
             const handleImageUpload = async (e) => {
                 const file = e.target.files[0];
+                e.target.value = ''; // FIX: Permite subir la misma foto si hubo un error previo
+                
                 if (!file || !settings.geminiKey) {
-                    setModal({ isOpen: true, title: "Falta Configuración", message: "Necesitas configurar tu llave de Gemini AI en el engrane.", type: "error" });
+                    setModal({ isOpen: true, title: "Falta Configuración", message: "Sube un archivo y revisa que tu llave Gemini esté en el engrane.", type: "error" });
                     return;
                 }
 
                 setIsScanning(true);
                 speak("Analizando pronóstico del clima. Por favor espere.");
 
-                try {
-                    const reader = new FileReader();
-                    reader.readAsDataURL(file);
-                    reader.onload = async () => {
+                const reader = new FileReader();
+                reader.readAsDataURL(file);
+                
+                reader.onerror = () => {
+                    setIsScanning(false);
+                    setModal({ isOpen: true, title: "Error de Archivo", message: "No se pudo leer la imagen.", type: "error" });
+                };
+
+                reader.onload = async () => {
+                    try {
                         const base64Data = reader.result.split(',')[1];
                         
-                        // IA INSTRUCCIÓN ESTRICTA DE COLORES
                         const payload = {
                             contents: [{
                                 parts: [
-                                    { text: "Extrae el pronóstico de viento hora por hora de esta imagen. Devuelve SOLO un array JSON válido con objetos { 'time': '7:00am', 'wind': 20 }. REGLA CRÍTICA DE COLORES: Fíjate en el color de fondo del recuadro de la hora (Ej: 11:00am). Si el recuadro es ROJO, pon 'wind' en 45. Si el recuadro es NARANJA, CELESTE o AZUL, pon 'wind' en 0 (Apto para volar). Solo el rojo indica suspensión. IGNORA textos de alerta si el fondo NO es rojo." },
-                                    { inline_data: { mime_type: file.type, data: base64Data } }
+                                    { text: "Extrae el pronóstico de viento hora por hora de esta imagen. Devuelve SOLO un array JSON válido con objetos { 'time': '7:00am', 'wind': 20 }. REGLA CRÍTICA DE COLORES: Fíjate en el color de fondo del recuadro de la hora. Si el recuadro es ROJO, pon 'wind' en 45. Si el recuadro es NARANJA, CELESTE o AZUL, pon 'wind' en 0 (Apto para volar). Solo el rojo indica suspensión. IGNORA los textos de alerta, fíjate solo en el color." },
+                                    { inlineData: { mimeType: file.type, data: base64Data } }
                                 ]
                             }],
                             generationConfig: { temperature: 0.1 }
@@ -245,16 +247,27 @@
                         if (data.error) throw new Error(data.error.message);
 
                         let jsonStr = data.candidates[0].content.parts[0].text;
-                        jsonStr = jsonStr.replace(/```json/g, '').replace(/```/g, '').trim();
-                        const weatherData = JSON.parse(jsonStr);
+                        let weatherData = [];
+                        
+                        // FIX: Parseo seguro a prueba de balas
+                        try {
+                            const match = jsonStr.match(/\[[\s\S]*\]/);
+                            if (match) {
+                                weatherData = JSON.parse(match[0]);
+                            } else {
+                                weatherData = JSON.parse(jsonStr.replace(/```json/g, '').replace(/```/g, '').trim());
+                            }
+                        } catch(parseErr) {
+                            throw new Error("Formato de respuesta de la IA inválido.");
+                        }
 
                         const windMap = {};
                         weatherData.forEach(item => {
-                            let match = item.time.match(/(\d+):?(\d*)?\s*(am|pm)/i);
-                            if (match) {
-                                let h = parseInt(match[1]);
-                                if (match[3].toLowerCase() === 'pm' && h !== 12) h += 12;
-                                if (match[3].toLowerCase() === 'am' && h === 12) h = 0;
+                            let matchTime = item.time.match(/(\d+):?(\d*)?\s*(am|pm)/i);
+                            if (matchTime) {
+                                let h = parseInt(matchTime[1]);
+                                if (matchTime[3].toLowerCase() === 'pm' && h !== 12) h += 12;
+                                if (matchTime[3].toLowerCase() === 'am' && h === 12) h = 0;
                                 windMap[h] = item.wind;
                             }
                         });
@@ -262,6 +275,7 @@
                         setWindDataMap(windMap);
                         updateData({ windDataMap: windMap });
 
+                        // Aleatoriedad Táctica
                         const applyVariance = (timeStr, isForzoso = false) => {
                             if (isForzoso) return timeStr; 
                             let parts = timeStr.split(':');
@@ -288,19 +302,19 @@
                             );
                         } else if (isSuspendedAt12) {
                             newSchedule.push(
-                                { time: applyVariance("06:00"), type: "DINÁMICO", wind: windMap[6] || 0, hour24: 6 },
-                                { time: applyVariance("07:20", true), type: "FORZOSO", wind: windMap[7] || 0, hour24: 7 },
-                                { time: applyVariance("08:20"), type: "DINÁMICO", wind: windMap[8] || 0, hour24: 8 },
-                                { time: applyVariance("09:30"), type: "DINÁMICO", wind: windMap[9] || 0, hour24: 9 },
-                                { time: applyVariance("10:45"), type: "DINÁMICO", wind: windMap[10] || 0, hour24: 10 }
-                            );
-                        } else if (isSuspendedAt13) {
-                            newSchedule.push(
                                 { time: applyVariance("07:20", true), type: "FORZOSO", wind: windMap[7] || 0, hour24: 7 },
                                 { time: applyVariance("08:20"), type: "DINÁMICO", wind: windMap[8] || 0, hour24: 8 },
                                 { time: applyVariance("09:20"), type: "DINÁMICO", wind: windMap[9] || 0, hour24: 9 },
                                 { time: applyVariance("10:20"), type: "DINÁMICO", wind: windMap[10] || 0, hour24: 10 },
                                 { time: applyVariance("11:20"), type: "DINÁMICO", wind: windMap[11] || 0, hour24: 11 }
+                            );
+                        } else if (isSuspendedAt13) {
+                            newSchedule.push(
+                                { time: applyVariance("07:20", true), type: "FORZOSO", wind: windMap[7] || 0, hour24: 7 },
+                                { time: applyVariance("08:40"), type: "DINÁMICO", wind: windMap[8] || 0, hour24: 8 },
+                                { time: applyVariance("10:00"), type: "DINÁMICO", wind: windMap[10] || 0, hour24: 10 },
+                                { time: applyVariance("11:10"), type: "DINÁMICO", wind: windMap[11] || 0, hour24: 11 },
+                                { time: applyVariance("12:15"), type: "DINÁMICO", wind: windMap[12] || 0, hour24: 12 }
                             );
                         } else {
                             newSchedule.push(
@@ -312,7 +326,6 @@
                             );
                         }
 
-                        // BLOQUE TARDE Y NOCHE 
                         newSchedule.push(
                             { time: applyVariance("14:00", true), type: "FORZOSO", wind: windMap[14] || 0, hour24: 14 },
                             { time: applyVariance("15:30"), type: "DINÁMICO", wind: windMap[15] || 0, hour24: 15 },
@@ -334,14 +347,15 @@
                         updateData({ schedule: finalSchedule });
                         
                         setIsScanning(false);
-                        speak("Itinerario táctico calculado y sincronizado en la nube.");
+                        speak("Itinerario táctico calculado con aleatoriedad y sincronizado en la nube.");
 
-                    };
-                } catch (err) {
-                    setIsScanning(false);
-                    setModal({ isOpen: true, title: "Error de IA", message: err.message, type: "error" });
-                    speak("Ocurrió un error al procesar el clima.");
-                }
+                    } catch (err) {
+                        console.error("Error procesando IA:", err);
+                        setIsScanning(false);
+                        setModal({ isOpen: true, title: "Error en el Análisis", message: "La IA tuvo problemas procesando los datos. Reintenta la imagen.", type: "error" });
+                        speak("Ocurrió un error al procesar la imagen.");
+                    }
+                };
             };
 
             const handleLogFlight = () => {
@@ -368,7 +382,7 @@
                 if (newRainingState) {
                     speak("Alerta. Condición de lluvia activada. Operaciones suspendidas.");
                 } else {
-                    speak("Operaciones reanudadas. Calculando tiempo restante de vuelos.");
+                    speak("Operaciones reanudadas. El sistema recalculará los vuelos restantes.");
                 }
             };
 
@@ -396,7 +410,7 @@
                                     <div>
                                         <h1 className="text-xl font-black text-white tracking-wide uppercase">Dispatcher Pro</h1>
                                         <p className="text-xs text-indigo-400 font-bold tracking-widest uppercase flex items-center gap-2">
-                                            V46 MASTER <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span> NUBE CONECTADA
+                                            V47 MASTER <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span> NUBE CONECTADA
                                         </p>
                                     </div>
                                 </div>
@@ -422,7 +436,7 @@
                                         disabled={isScanning || isRaining}
                                         className={`flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl transition border shadow-lg ${isScanning ? 'bg-indigo-900/50 border-indigo-400 animate-pulse' : 'bg-slate-800/80 border-slate-700 text-slate-300 hover:bg-slate-700'}`}>
                                         <span className="text-lg">{isScanning ? '⏳' : '📸'}</span>
-                                        <span className="text-[10px] font-black uppercase text-white tracking-wider">Escanear Clima</span>
+                                        <span className="text-[10px] font-black uppercase text-white tracking-wider">{isScanning ? 'Analizando...' : 'Escanear Clima'}</span>
                                     </button>
                                     <button 
                                         onClick={toggleRain} 
@@ -482,11 +496,10 @@
                             <div className="flex flex-col gap-4">
                                 <div className={`glass p-6 rounded-3xl border text-center relative overflow-hidden ${isDayShift ? 'bg-amber-500/5 border-amber-500/20' : 'bg-fuchsia-500/5 border-fuchsia-500/20'}`}>
                                     <p className={`text-[10px] font-black tracking-widest uppercase mb-1 relative z-10 ${isDayShift ? 'text-amber-400' : 'text-fuchsia-400'}`}>
-                                        {isDayShift ? 'Meta del Turno Diurno' : 'Vuelos Heredados a Turno Nocturno'}
+                                        {isDayShift ? 'Faltan en Turno Diurno' : 'Vuelos Heredados a Turno Nocturno'}
                                     </p>
-                                    <p className="text-xs text-slate-500 font-bold mb-3 relative z-10">Vuelos Restantes</p>
                                     <div className={`text-6xl font-black relative z-10 ${isDayShift ? 'text-amber-500' : 'text-fuchsia-500'}`}>
-                                        {isDayShift ? Math.max(0, DIURNAL_GOAL - flightsDoneDay) : Math.max(0, nightGoal - flightsDoneNight)}
+                                        {isDayShift ? missingDayFlights : Math.max(0, nightGoal - flightsDoneNight)}
                                     </div>
                                 </div>
 
