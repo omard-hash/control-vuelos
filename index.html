@@ -134,7 +134,7 @@
                         if (timeStr === "12:05" || timeStr === "00:05") speak("Alerta operativa. Es hora de actualizar y capturar la pantalla del clima O K To Fly para garantizar la seguridad del turno.");
                         if (timeStr === "07:50") speak("Atención. Junta operativa en 10 minutos. Preparar novedades.");
 
-                        // ALARMAS DE VUELO (10 y 5 minutos)
+                        // ALARMAS DE VUELO (10 y 5 minutos antes)
                         if (schedule && schedule.length > 0 && !isRaining) {
                             schedule.forEach(flight => {
                                 if (!flight.time) return;
@@ -170,7 +170,8 @@
             const unlockAudio = () => {
                 if (!audioUnlocked) {
                     setAudioUnlocked(true);
-                    speak("Sistema de voz activado y en línea.");
+                    let u = new SpeechSynthesisUtterance("");
+                    window.speechSynthesis.speak(u);
                 }
             };
 
@@ -208,12 +209,13 @@
                 e.target.value = ''; 
                 
                 if (!file || !settings.geminiKey) {
-                    setModal({ isOpen: true, title: "Falta Configuración", message: "Revisa que tu llave Gemini esté en el engrane.", type: "error" });
+                    setModal({ isOpen: true, title: "Falta Configuración", message: "Revisa que tu llave esté en el engrane.", type: "error" });
                     return;
                 }
 
                 setIsScanning(true);
-                speak("Analizando pronóstico del clima. Por favor espere.");
+                unlockAudio();
+                setTimeout(() => speak("Analizando pronóstico del clima. Por favor espere."), 500);
 
                 const reader = new FileReader();
                 reader.readAsDataURL(file);
@@ -228,10 +230,11 @@
                         const base64Data = reader.result.split(',')[1];
                         const mimeType = file.type || 'image/jpeg';
                         
+                        // Instrucción exacta que funcionaba en la V36
                         const payload = {
                             contents: [{
                                 parts: [
-                                    { text: "Analiza esta imagen del clima. Devuelve ÚNICAMENTE un arreglo JSON válido con este formato: [{\"time\":\"7:00am\", \"wind\":0}, {\"time\":\"12:00pm\", \"wind\":45}]. Regla CRÍTICA DE SEGURIDAD: Si el recuadro de la hora es color ROJO oscuro, wind es 45 (Suspendido). Si el recuadro es NARANJA, AMARILLO, CELESTE o BLANCO, wind es 0 (Libre). No leas los textos de ráfagas, solo guíate por el color de fondo. No incluyas markdown, responde solo con el JSON crudo." },
+                                    { text: "Analiza esta imagen del clima. Devuelve ÚNICAMENTE un arreglo JSON válido con este formato exacto: [{\"time\":\"7:00am\", \"wind\":0}, {\"time\":\"12:00pm\", \"wind\":45}]. Regla CRÍTICA: Guíate EXCLUSIVAMENTE por los colores de fondo de cada hora. Si el fondo es ROJO OSCURO, wind=45. Si el fondo es NARANJA, CELESTE, AMARILLO o BLANCO, wind=0. No leas textos, solo colores de fondo. Devuelve solo el JSON." },
                                     { inlineData: { mimeType: mimeType, data: base64Data } }
                                 ]
                             }],
@@ -240,9 +243,11 @@
                             }
                         };
 
-                        // PARCHE 404: Se usa gemini-1.5-flash y limpiamos espacios de la llave
+                        // Limpieza de espacios en blanco en la llave
                         const cleanKey = settings.geminiKey.trim();
-                        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${cleanKey}`, {
+                        
+                        // EL CEREBRO DE LA V36 (gemini-pro-vision), infalible.
+                        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-pro-vision:generateContent?key=${cleanKey}`, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify(payload)
@@ -254,14 +259,11 @@
 
                         const data = await response.json();
                         
-                        if (data.error) throw new Error(data.error.message);
                         if (!data.candidates || data.candidates.length === 0) {
-                            throw new Error("La IA no generó respuesta. Intenta de nuevo.");
+                            throw new Error("La IA no devolvió datos. Intenta de nuevo.");
                         }
 
                         let jsonStr = data.candidates[0].content.parts[0].text;
-                        
-                        // Limpieza Extrema (Quita texto basura como "```json" o "Aquí tienes...")
                         jsonStr = jsonStr.replace(/```json/gi, '').replace(/```/g, '').trim();
                         if (jsonStr.indexOf('[') !== -1 && jsonStr.lastIndexOf(']') !== -1) {
                             jsonStr = jsonStr.substring(jsonStr.indexOf('['), jsonStr.lastIndexOf(']') + 1);
@@ -271,7 +273,7 @@
                         try {
                             weatherData = JSON.parse(jsonStr);
                         } catch(parseErr) {
-                            throw new Error("La IA no devolvió un formato válido. Reintenta la imagen.");
+                            throw new Error("La IA incluyó texto no deseado. Vuelve a escanear la imagen.");
                         }
 
                         const windMap = {};
@@ -289,7 +291,7 @@
                         setWindDataMap(windMap);
                         updateData({ windDataMap: windMap });
 
-                        // Aleatoriedad Táctica
+                        // Aleatoriedad Táctica (±15 min en dinámicos)
                         const applyVariance = (timeStr, isForzoso = false) => {
                             if (isForzoso) return timeStr; 
                             let parts = timeStr.split(':');
@@ -303,13 +305,14 @@
                         };
 
                         let newSchedule = [];
+                        
                         const isSuspendedAt11 = windMap[11] >= 40;
                         const isSuspendedAt12 = windMap[12] >= 40 && !isSuspendedAt11;
                         const isSuspendedAt13 = windMap[13] >= 40 && !isSuspendedAt11 && !isSuspendedAt12;
 
                         if (isSuspendedAt11) {
                             newSchedule.push(
-                                { time: applyVariance("06:00"), type: "DINÁMICO", wind: windMap[6] || 0, hour24: 6 },
+                                { time: applyVariance("06:15"), type: "DINÁMICO", wind: windMap[6] || 0, hour24: 6 },
                                 { time: applyVariance("07:20", true), type: "FORZOSO", wind: windMap[7] || 0, hour24: 7 },
                                 { time: applyVariance("08:30"), type: "DINÁMICO", wind: windMap[8] || 0, hour24: 8 },
                                 { time: applyVariance("09:45"), type: "DINÁMICO", wind: windMap[9] || 0, hour24: 9 }
@@ -325,9 +328,9 @@
                         } else if (isSuspendedAt13) {
                             newSchedule.push(
                                 { time: applyVariance("07:20", true), type: "FORZOSO", wind: windMap[7] || 0, hour24: 7 },
-                                { time: applyVariance("08:40"), type: "DINÁMICO", wind: windMap[8] || 0, hour24: 8 },
-                                { time: applyVariance("10:00"), type: "DINÁMICO", wind: windMap[10] || 0, hour24: 10 },
-                                { time: applyVariance("11:10"), type: "DINÁMICO", wind: windMap[11] || 0, hour24: 11 },
+                                { time: applyVariance("08:35"), type: "DINÁMICO", wind: windMap[8] || 0, hour24: 8 },
+                                { time: applyVariance("09:50"), type: "DINÁMICO", wind: windMap[9] || 0, hour24: 9 },
+                                { time: applyVariance("11:00"), type: "DINÁMICO", wind: windMap[11] || 0, hour24: 11 },
                                 { time: applyVariance("12:15"), type: "DINÁMICO", wind: windMap[12] || 0, hour24: 12 }
                             );
                         } else {
@@ -346,7 +349,6 @@
                             { time: applyVariance("17:00", true), type: "FORZOSO", wind: windMap[17] || 0, hour24: 17 },
                             { time: applyVariance("18:30"), type: "DINÁMICO", wind: windMap[18] || 0, hour24: 18 },
                             
-                            // Bloque de Recuperación (4 Vuelos distribuidos hasta las 23:30)
                             { time: applyVariance("20:00"), type: "RECUPERACIÓN", wind: windMap[20] || 0, hour24: 20 },
                             { time: applyVariance("21:10", true), type: "FORZOSO", wind: windMap[21] || 0, hour24: 21 },
                             { time: applyVariance("22:20"), type: "RECUPERACIÓN", wind: windMap[22] || 0, hour24: 22 },
@@ -361,13 +363,12 @@
                         updateData({ schedule: finalSchedule });
                         
                         setIsScanning(false);
-                        speak("Itinerario táctico calculado con éxito.");
+                        speak("Itinerario táctico calculado con éxito. Listo para operar.");
 
                     } catch (err) {
-                        console.error("Error Catch:", err);
                         setIsScanning(false);
                         setModal({ isOpen: true, title: "Error en el Análisis", message: err.message, type: "error" });
-                        speak("Ocurrió un error en el análisis de la imagen. Reintente por favor.");
+                        speak("Error en el sistema. Revise la pantalla.");
                     }
                 };
             };
@@ -385,19 +386,15 @@
                 const updatedLogs = [newLog, ...flights].sort((a,b) => b.id - a.id);
                 setFlights(updatedLogs);
                 updateData({ flights: updatedLogs });
-                speak("Vuelo registrado exitosamente.");
+                speak("Vuelo registrado exitosamente en la bitácora.");
             };
 
             const toggleRain = () => {
                 const newRainingState = !isRaining;
                 setIsRaining(newRainingState);
                 updateData({ isRaining: newRainingState });
-                
-                if (newRainingState) {
-                    speak("Alerta. Condición de lluvia activada. Operaciones suspendidas.");
-                } else {
-                    speak("Lluvia finalizada. Operaciones reanudadas.");
-                }
+                if (newRainingState) { speak("Alerta. Condición de lluvia activada. Operaciones suspendidas."); } 
+                else { speak("Lluvia finalizada. Operaciones reanudadas."); }
             };
 
             const handleSaveSettings = (e) => {
@@ -414,7 +411,7 @@
                 <div className="min-h-screen p-4 md:p-8 pb-32 transition-colors duration-1000" onClick={unlockAudio}>
                     <div className="max-w-6xl mx-auto flex flex-col md:flex-row gap-6">
                         
-                        {/* COLUMNA IZQUIERDA */}
+                        {/* COLUMNA IZQUIERDA: Header e Itinerario */}
                         <div className="w-full md:w-2/3">
                             <div className="flex justify-between items-center mb-6">
                                 <div className="flex items-center gap-3">
@@ -424,7 +421,7 @@
                                     <div>
                                         <h1 className="text-xl font-black text-white tracking-wide uppercase">Dispatcher Pro</h1>
                                         <p className="text-xs text-indigo-400 font-bold tracking-widest uppercase flex items-center gap-2">
-                                            V50 MASTER <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span> NUBE CONECTADA
+                                            V52 CORE 36 <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span> CONECTADO
                                         </p>
                                     </div>
                                 </div>
@@ -439,7 +436,7 @@
                                     <p className="text-[10px] font-black tracking-widest text-indigo-400 uppercase mb-1">Turno en curso</p>
                                     <h2 className="text-2xl font-black text-white">{activeShift}</h2>
                                     <div className="mt-2 text-3xl font-mono font-bold text-white tracking-wider flex items-center gap-2">
-                                        {!audioUnlocked && <span className="text-[10px] animate-pulse text-amber-500 border border-amber-500/50 bg-amber-500/10 px-2 py-1 rounded absolute -top-4">🔇 Toca para Audio</span>}
+                                        {!audioUnlocked && <span className="text-[10px] animate-pulse text-amber-500 border border-amber-500/50 bg-amber-500/10 px-2 py-1 rounded absolute -top-4 cursor-pointer">🔇 Toca para Audio</span>}
                                         {currentTime.toLocaleTimeString('en-US', { hour12: false })}
                                     </div>
                                 </div>
@@ -476,7 +473,7 @@
                                 <div className="space-y-2">
                                     {schedule.length === 0 ? (
                                         <div className="text-center py-10 opacity-50 border border-dashed border-slate-700 rounded-xl">
-                                            <p className="text-sm font-bold text-slate-400">Sin datos de clima.</p>
+                                            <p className="text-sm font-bold text-slate-400">Sube la foto del clima para generar plan.</p>
                                         </div>
                                     ) : (
                                         schedule.filter(f => f.hour24 >= currentHour).map((flight, idx) => {
@@ -504,14 +501,14 @@
                             </div>
                         </div>
 
-                        {/* COLUMNA DERECHA: METAS GIGANTES */}
+                        {/* COLUMNA DERECHA: Metas Gigantes */}
                         <div className="w-full md:w-1/3 flex flex-col gap-6">
                             
                             <div className="flex flex-col gap-4">
                                 <div className={`glass p-6 rounded-3xl border text-center relative overflow-hidden shadow-2xl ${isDayShift ? 'bg-amber-500/10 border-amber-500/30' : 'bg-fuchsia-600/10 border-fuchsia-500/30'}`}>
                                     <div className={`absolute top-0 left-0 w-full h-1 ${isDayShift ? 'bg-amber-500' : 'bg-fuchsia-500'}`}></div>
-                                    <p className={`text-xs font-black tracking-widest uppercase mb-2 relative z-10 ${isDayShift ? 'text-amber-400' : 'text-fuchsia-400'}`}>
-                                        {isDayShift ? 'Vuelos Restantes del Turno' : 'Vuelos Heredados a Turno Nocturno'}
+                                    <p className={`text-[10px] font-black tracking-widest uppercase mb-2 relative z-10 ${isDayShift ? 'text-amber-400' : 'text-fuchsia-400'}`}>
+                                        {isDayShift ? 'Vuelos Restantes (Turno)' : 'Heredados a Turno Nocturno'}
                                     </p>
                                     <div className={`text-7xl font-black relative z-10 tracking-tighter ${isDayShift ? 'text-amber-500' : 'text-fuchsia-500 drop-shadow-[0_0_15px_rgba(217,70,239,0.5)]'}`}>
                                         {isDayShift ? missingDayFlights : Math.max(0, nightGoal - flightsDoneNight)}
@@ -541,7 +538,7 @@
                             </div>
 
                             <div className="glass rounded-3xl p-5 border border-slate-800 flex-1 min-h-[200px] flex flex-col">
-                                <h3 className="text-[11px] font-black tracking-widest text-slate-400 uppercase mb-4">Bitácora de Despegues</h3>
+                                <h3 className="text-[11px] font-black tracking-widest text-slate-400 uppercase mb-4">Bitácora de Hoy</h3>
                                 <div className="space-y-2 overflow-y-auto flex-1 scroll-hide">
                                     {todayFlightsTotal.length === 0 ? (
                                         <div className="text-center py-6 opacity-50 border border-dashed border-slate-700 rounded-xl">
@@ -551,7 +548,7 @@
                                         todayFlightsTotal.map((f, i) => (
                                             <div key={i} className="flex justify-between items-center p-3 rounded-xl bg-slate-800/40 border border-slate-700/50">
                                                 <span className="text-white font-bold text-xs">Despegue {f.time}</span>
-                                                <span className="text-[9px] font-bold text-emerald-400 bg-emerald-950/50 px-2 py-1 rounded border border-emerald-900/50">Viento: {f.wind}km/h</span>
+                                                <span className="text-[9px] font-bold text-emerald-400 bg-emerald-950/50 px-2 py-1 rounded border border-emerald-900/50">Viento: {f.wind}</span>
                                             </div>
                                         ))
                                     )}
@@ -570,19 +567,19 @@
                         </button>
                     </div>
 
-                    {/* SETTINGS MODAL */}
+                    {/* MODAL SETTINGS */}
                     {showSettings && (
                         <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
                             <div className="bg-slate-900 border border-slate-800 p-6 rounded-3xl w-full max-w-md shadow-2xl">
                                 <h3 className="text-xl font-black text-white mb-4">Configuración del Sistema</h3>
                                 <form onSubmit={handleSaveSettings} className="space-y-4">
                                     <div>
-                                        <label className="block text-xs font-bold text-slate-400 mb-1 uppercase tracking-wider">Gemini API Key</label>
-                                        <input type="text" name="geminiKey" defaultValue={settings.geminiKey} className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white font-mono text-sm outline-none" required />
+                                        <label className="block text-[10px] font-black text-slate-400 mb-1 uppercase tracking-wider">Gemini API Key</label>
+                                        <input type="text" name="geminiKey" defaultValue={settings.geminiKey} className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white font-mono text-xs outline-none focus:border-indigo-500" required placeholder="Pega aquí tu API Key de Google" />
                                     </div>
                                     <div>
-                                        <label className="block text-xs font-bold text-slate-400 mb-1 uppercase tracking-wider">Firebase Config (JSON)</label>
-                                        <textarea name="firebaseConfig" defaultValue={settings.firebaseConfig} className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white font-mono text-xs outline-none h-32" required></textarea>
+                                        <label className="block text-[10px] font-black text-slate-400 mb-1 uppercase tracking-wider">Firebase Config (JSON)</label>
+                                        <textarea name="firebaseConfig" defaultValue={settings.firebaseConfig} className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white font-mono text-[10px] outline-none focus:border-indigo-500 h-28" required></textarea>
                                     </div>
                                     <div className="flex gap-3 pt-4">
                                         <button type="button" onClick={() => setShowSettings(false)} className="flex-1 py-3 rounded-xl font-bold text-slate-300 bg-slate-800 hover:bg-slate-700">Cancelar</button>
@@ -593,12 +590,12 @@
                         </div>
                     )}
 
-                    {/* ALERTS MODAL */}
+                    {/* MODAL ALERTS */}
                     {modal.isOpen && (
                         <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
                             <div className={`border p-6 rounded-3xl w-full max-w-sm text-center shadow-2xl ${modal.type === 'error' ? 'bg-rose-950/90 border-rose-500' : 'bg-slate-900 border-indigo-500'}`}>
                                 <h3 className={`text-xl font-black mb-2 ${modal.type === 'error' ? 'text-rose-400' : 'text-white'}`}>{modal.title}</h3>
-                                <p className="text-slate-300 text-sm mb-6">{modal.message}</p>
+                                <p className="text-slate-300 text-xs mb-6 font-medium leading-relaxed">{modal.message}</p>
                                 <button onClick={() => setModal({ ...modal, isOpen: false })} className={`w-full py-3 rounded-xl font-bold text-white ${modal.type === 'error' ? 'bg-rose-600 hover:bg-rose-500' : 'bg-indigo-600 hover:bg-indigo-500'}`}>
                                     Entendido
                                 </button>
