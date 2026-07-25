@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dispatcher Pro - V42 Master</title>
+    <title>Dispatcher Pro - V60 Master</title>
     
     <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
@@ -51,22 +51,24 @@
             const [loggedFlightsCount, setLoggedFlightsCount] = useState(0);
             const totalFlightsTarget = 13;
 
-            // Variables de Lluvia y Clima
             const [isRaining, setIsRaining] = useState(false);
             const [windDataMap, setWindDataMap] = useState({});
 
             const [audioUnlocked, setAudioUnlocked] = useState(false);
             const audioUnlockedRef = useRef(false);
+            const flightsRef = useRef([]);
 
             useEffect(() => {
                 let unsubscribe = () => {};
 
-                // Iniciar sesión silenciosa para no ser bloqueados por las reglas de Firebase
                 firebase.auth().signInAnonymously().then(() => {
                     unsubscribe = db.collection('operaciones').doc('turno_actual').onSnapshot((doc) => {
                         if (doc.exists) {
                             const data = doc.data();
-                            if (data.flights) setFlights(data.flights);
+                            if (data.flights) {
+                                setFlights(data.flights);
+                                flightsRef.current = data.flights; // Mantenemos la ref actualizada para el timer
+                            }
                             if (data.loggedFlightsCount !== undefined) setLoggedFlightsCount(data.loggedFlightsCount);
                             if (data.isRaining !== undefined) setIsRaining(data.isRaining);
                             if (data.windDataMap) setWindDataMap(data.windDataMap);
@@ -113,42 +115,65 @@
                     const m = now.getMinutes();
                     const s = now.getSeconds();
 
-                    // Cálculo de Turno (Diurno 07:00-18:59, Nocturno 19:00-06:59)
-                    if (h >= 7 && h < 19) {
-                        setShiftName('Turno Diurno');
-                    } else {
-                        setShiftName('Turno Nocturno');
-                    }
+                    if (h >= 7 && h < 19) setShiftName('Turno Diurno');
+                    else setShiftName('Turno Nocturno');
                     
-                    // ALARMAS OPERATIVAS (Solo se disparan en el segundo 0 exacto)
                     if (s === 0) {
-                        // Alarma Junta 7:50 AM
+                        const timeStr = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+                        
                         if (h === 7 && m === 50) {
                             speak("Atención comandante. Es hora de la junta operativa de las siete cincuenta.");
                             setModal({ isOpen: true, title: '⏰ JUNTA OPERATIVA', message: 'Reunión de las 7:50 AM.', type: 'error' });
                         }
-                        // Alarma KPIs 12:00 PM
                         else if (h === 12 && m === 0) {
                             speak("Atención comandante. Es hora de elaborar los reportes K P I.");
                             setModal({ isOpen: true, title: '📊 ELABORACIÓN DE KPIs', message: 'Es la hora designada para la elaboración de los KPIs operativos.', type: 'error' });
                         }
-                        // Alarma Clima 12:05 PM
                         else if (h === 12 && m === 5) {
                             speak("Atención. Actualización de captura del clima requerida. Por favor confirme el ou kei to flai para garantizar condiciones adecuadas.");
-                            setModal({ isOpen: true, title: '🌤️ ACTUALIZAR CLIMA (Ok To Fly)', message: 'Es obligatorio actualizar la captura del clima y validar condiciones seguras para volar.', type: 'error' });
+                            setModal({ isOpen: true, title: '🌤️ ACTUALIZAR CLIMA', message: 'Validar condiciones seguras para volar.', type: 'error' });
                         }
-                        // Alarma Clima 12:05 AM
                         else if (h === 0 && m === 5) {
-                            speak("Atención. Actualización de captura del clima requerida. Por favor confirme el ou kei to flai para garantizar condiciones adecuadas.");
-                            setModal({ isOpen: true, title: '🌙 ACTUALIZAR CLIMA (Ok To Fly)', message: 'Es obligatorio actualizar la captura del clima y validar condiciones seguras para volar.', type: 'error' });
+                            speak("Atención. Actualización de captura del clima requerida. Por favor confirme el ou kei to flai.");
+                            setModal({ isOpen: true, title: '🌙 ACTUALIZAR CLIMA', message: 'Validar condiciones seguras para volar.', type: 'error' });
+                        }
+
+                        // LÓGICA 1: Alarmas 10 y 5 Minutos (Solo Vuelos NO Suspendidos)
+                        if (flightsRef.current && flightsRef.current.length > 0 && !isRaining) {
+                            flightsRef.current.forEach(flight => {
+                                if (flight.wind < 42) {
+                                    const parts = flight.time.split(':');
+                                    let fh = parseInt(parts[0]);
+                                    let fm = parseInt(parts[1]);
+                                    
+                                    let flightDate = new Date();
+                                    flightDate.setHours(fh, fm, 0, 0);
+                                    
+                                    let warn10 = new Date(flightDate.getTime() - 10 * 60000);
+                                    let w10H = String(warn10.getHours()).padStart(2, '0');
+                                    let w10M = String(warn10.getMinutes()).padStart(2, '0');
+    
+                                    let warn5 = new Date(flightDate.getTime() - 5 * 60000);
+                                    let w5H = String(warn5.getHours()).padStart(2, '0');
+                                    let w5M = String(warn5.getMinutes()).padStart(2, '0');
+                                    
+                                    if (timeStr === `${w10H}:${w10M}`) {
+                                        speak(`Atención piloto. Faltan 10 minutos para el vuelo programado a las ${flight.time}. Inicie el protocolo de preparación.`);
+                                    }
+                                    if (timeStr === `${w5H}:${w5M}`) {
+                                        speak(`Atención piloto. Faltan 5 minutos para el despegue de las ${flight.time}. Prepárese para salir a plataforma.`);
+                                    }
+                                }
+                            });
                         }
                     }
                 }, 1000);
                 return () => clearInterval(timer);
-            }, []);
+            }, [isRaining]);
 
             const handleImageUpload = (e) => {
                 const file = e.target.files[0];
+                e.target.value = null; // reset input
                 if (!file) return;
 
                 if (!geminiKey || geminiKey.trim() === '') {
@@ -171,13 +196,15 @@
                 
                 try {
                     const key = geminiKey.trim();
-                    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${key}`;
+                    // Usando el modelo actual oficial: 2.5-flash
+                    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${key}`;
                     
                     const payload = {
                         contents: [{
                             parts: [
-                                { text: "Analiza el clima. REGLA ESTRICTA 11:00am: Si solo dice 'UV' (ej. 'UV 10', 'Extremo UV 13') ES APTO PARA VOLAR, el viento es 0. Regla general: Si dice 'Apto para volar', viento es 0. Si dice 'Ráfagas fuertes' o vientos > 40, viento es 45. Devuelve JSON con 'hourlyData' teniendo 'time' (ej. '11:00am') y 'wind' numérico." },
-                                { inline_data: { mime_type: "image/jpeg", data: base64Image } }
+                                // LÓGICA 2: Lectura Clásica y Perfecta de Colores (No suspende en UV Naranja)
+                                { text: "Analiza esta imagen del clima de Airdata. Devuelve ÚNICAMENTE un arreglo JSON con formato exacto: {\"hourlyData\": [{\"time\":\"7:00am\", \"wind\":0}, {\"time\":\"12:00pm\", \"wind\":45}]}. Regla CRÍTICA 1: Guíate EXCLUSIVAMENTE por los colores. Si el fondo es ROJO, wind=45. Si el fondo es NARANJA, CELESTE, AMARILLO o BLANCO (aunque diga Ráfagas, UV, o Extremo), wind=0. Solo el JSON." },
+                                { inlineData: { mimeType: "image/jpeg", data: base64Image } }
                             ]
                         }]
                     };
@@ -188,12 +215,21 @@
                         body: JSON.stringify(payload)
                     });
 
-                    if (!response.ok) throw new Error("Error de conexión. Verifica tu llave API en Ajustes.");
+                    if (!response.ok) {
+                        const errData = await response.json().catch(() => ({}));
+                        const errMsg = (errData.error && errData.error.message) ? errData.error.message : response.statusText;
+                        throw new Error(`Error ${response.status}: ${errMsg}`);
+                    }
 
                     const data = await response.json();
                     let aiResponseText = data.candidates[0].content.parts[0].text;
-                    if (aiResponseText.startsWith('```json')) {
-                         aiResponseText = aiResponseText.replace(/```json\n?/, '').replace(/```\n?$/, '');
+                    
+                    // Limpiador agresivo
+                    aiResponseText = aiResponseText.replace(/```json/gi, '').replace(/```/g, '').trim();
+                    const startIdx = aiResponseText.indexOf('{');
+                    const endIdx = aiResponseText.lastIndexOf('}');
+                    if (startIdx !== -1 && endIdx !== -1) {
+                         aiResponseText = aiResponseText.substring(startIdx, endIdx + 1);
                     }
                     
                     const parsedData = JSON.parse(aiResponseText);
@@ -201,12 +237,12 @@
                          generateIntelligentSchedule(parsedData.hourlyData);
                          speak("Itinerario calculado con base en vientos detectados.");
                     } else {
-                         throw new Error("La IA devolvió un formato incorrecto.");
+                         throw new Error("La IA no devolvió el formato esperado.");
                     }
 
                 } catch (error) {
                     console.error("AI Error:", error);
-                    speak("Error al analizar el clima.");
+                    speak("Error al analizar el clima. Revisar recuadro en pantalla.");
                     setModal({ isOpen: true, title: 'Error de Análisis', message: error.message });
                     generateIntelligentSchedule([]); 
                 } finally {
@@ -220,10 +256,10 @@
 
                 if (hourlyWeatherData && hourlyWeatherData.length > 0) {
                      hourlyWeatherData.forEach(dataPoint => {
-                          let hourMatch = dataPoint.time.match(/(\d+):00([ap]m)/i);
+                          let hourMatch = dataPoint.time.match(/(\d+):?(\d*)?\s*([ap]m)/i);
                           if (hourMatch) {
                                let hour = parseInt(hourMatch[1]);
-                               let ampm = hourMatch[2].toLowerCase();
+                               let ampm = hourMatch[3].toLowerCase();
                                if (ampm === 'pm' && hour < 12) hour += 12;
                                if (ampm === 'am' && hour === 12) hour = 0;
                                windMap[hour] = dataPoint.wind;
@@ -234,51 +270,76 @@
                 setWindDataMap(windMap);
                 db.collection('operaciones').doc('turno_actual').set({ windDataMap: windMap }, { merge: true });
 
-                let newSchedule = [
-                    { time: "06:00", type: "FORZOSO", wind: windMap[6] || 0, hour24: 6 }
-                ];
+                // LÓGICA 3: Aleatoriedad Táctica (±15 min)
+                const applyVariance = (timeStr, isForzoso = false) => {
+                    if (isForzoso) return timeStr; 
+                    let parts = timeStr.split(':');
+                    let h = parseInt(parts[0]);
+                    let m = parseInt(parts[1]);
+                    let variance = Math.floor(Math.random() * 31) - 15; 
+                    let date = new Date(2026, 0, 1, h, m + variance);
+                    let newH = String(date.getHours()).padStart(2, '0');
+                    let newM = String(date.getMinutes()).padStart(2, '0');
+                    return `${newH}:${newM}`;
+                };
 
+                let newSchedule = [];
+                
+                // LÓGICA 4: Matemáticas de 4 y 5 vuelos
                 const isSuspendedAt11 = windMap[11] >= 40;
                 const isSuspendedAt12 = windMap[12] >= 40 && !isSuspendedAt11;
+                const isSuspendedAt13 = windMap[13] >= 40 && !isSuspendedAt11 && !isSuspendedAt12;
 
                 if (isSuspendedAt11) {
                     newSchedule.push(
-                        { time: "07:20", type: "FORZOSO", wind: windMap[7] || 0, hour24: 7 },
-                        { time: "08:30", type: "DINÁMICO", wind: windMap[8] || 0, hour24: 8 },
-                        { time: "09:45", type: "DINÁMICO", wind: windMap[9] || 0, hour24: 9 },
-                        { time: "11:00", type: "DINÁMICO", wind: windMap[11] || 45, hour24: 11 } 
+                        { time: applyVariance("06:15"), type: "DINÁMICO", wind: windMap[6] || 0, hour24: 6 },
+                        { time: applyVariance("07:20", true), type: "FORZOSO", wind: windMap[7] || 0, hour24: 7 },
+                        { time: applyVariance("08:30"), type: "DINÁMICO", wind: windMap[8] || 0, hour24: 8 },
+                        { time: applyVariance("09:45"), type: "DINÁMICO", wind: windMap[9] || 0, hour24: 9 }
                     );
                 } else if (isSuspendedAt12) {
                     newSchedule.push(
-                        { time: "07:20", type: "FORZOSO", wind: windMap[7] || 0, hour24: 7 },
-                        { time: "08:20", type: "DINÁMICO", wind: windMap[8] || 0, hour24: 8 },
-                        { time: "09:20", type: "DINÁMICO", wind: windMap[9] || 0, hour24: 9 },
-                        { time: "10:20", type: "DINÁMICO", wind: windMap[10] || 0, hour24: 10 },
-                        { time: "11:20", type: "DINÁMICO", wind: windMap[11] || 0, hour24: 11 },
-                        { time: "12:00", type: "DINÁMICO", wind: windMap[12] || 45, hour24: 12 } 
+                        { time: applyVariance("07:20", true), type: "FORZOSO", wind: windMap[7] || 0, hour24: 7 },
+                        { time: applyVariance("08:20"), type: "DINÁMICO", wind: windMap[8] || 0, hour24: 8 },
+                        { time: applyVariance("09:20"), type: "DINÁMICO", wind: windMap[9] || 0, hour24: 9 },
+                        { time: applyVariance("10:20"), type: "DINÁMICO", wind: windMap[10] || 0, hour24: 10 },
+                        { time: applyVariance("11:20"), type: "DINÁMICO", wind: windMap[11] || 0, hour24: 11 }
+                    );
+                } else if (isSuspendedAt13) {
+                    newSchedule.push(
+                        { time: applyVariance("07:20", true), type: "FORZOSO", wind: windMap[7] || 0, hour24: 7 },
+                        { time: applyVariance("08:35"), type: "DINÁMICO", wind: windMap[8] || 0, hour24: 8 },
+                        { time: applyVariance("09:50"), type: "DINÁMICO", wind: windMap[9] || 0, hour24: 9 },
+                        { time: applyVariance("11:00"), type: "DINÁMICO", wind: windMap[11] || 0, hour24: 11 },
+                        { time: applyVariance("12:15"), type: "DINÁMICO", wind: windMap[12] || 0, hour24: 12 }
                     );
                 } else {
                     newSchedule.push(
-                        { time: "07:20", type: "FORZOSO", wind: windMap[7] || 0, hour24: 7 },
-                        { time: "08:40", type: "DINÁMICO", wind: windMap[8] || 0, hour24: 8 },
-                        { time: "10:00", type: "DINÁMICO", wind: windMap[10] || 0, hour24: 10 },
-                        { time: "11:30", type: "DINÁMICO", wind: windMap[11] || 0, hour24: 11 },
-                        { time: "12:45", type: "DINÁMICO", wind: windMap[12] || 0, hour24: 12 }
+                        { time: applyVariance("07:20", true), type: "FORZOSO", wind: windMap[7] || 0, hour24: 7 },
+                        { time: applyVariance("08:40"), type: "DINÁMICO", wind: windMap[8] || 0, hour24: 8 },
+                        { time: applyVariance("10:00"), type: "DINÁMICO", wind: windMap[10] || 0, hour24: 10 },
+                        { time: applyVariance("11:30"), type: "DINÁMICO", wind: windMap[11] || 0, hour24: 11 },
+                        { time: applyVariance("12:45"), type: "DINÁMICO", wind: windMap[12] || 0, hour24: 12 }
                     );
                 }
 
                 newSchedule.push(
-                    { time: "14:00", type: "FORZOSO", wind: windMap[14] || 20, hour24: 14 },
-                    { time: "15:30", type: "DINÁMICO", wind: windMap[15] || 20, hour24: 15 },
-                    { time: "17:00", type: "FORZOSO", wind: windMap[17] || 20, hour24: 17 },
-                    { time: "18:30", type: "DINÁMICO", wind: windMap[18] || 0, hour24: 18 },
-                    { time: "20:00", type: "DINÁMICO", wind: windMap[20] || 0, hour24: 20 },
-                    { time: "21:30", type: "FORZOSO", wind: windMap[21] || 0, hour24: 21 },
-                    { time: "22:45", type: "DINÁMICO", wind: windMap[22] || 0, hour24: 22 }
+                    { time: applyVariance("14:00", true), type: "FORZOSO", wind: windMap[14] || 0, hour24: 14 },
+                    { time: applyVariance("15:30"), type: "DINÁMICO", wind: windMap[15] || 0, hour24: 15 },
+                    { time: applyVariance("17:00", true), type: "FORZOSO", wind: windMap[17] || 0, hour24: 17 },
+                    { time: applyVariance("18:30"), type: "DINÁMICO", wind: windMap[18] || 0, hour24: 18 },
+                    { time: applyVariance("20:00"), type: "DINÁMICO", wind: windMap[20] || 0, hour24: 20 },
+                    { time: applyVariance("21:30", true), type: "FORZOSO", wind: windMap[21] || 0, hour24: 21 },
+                    { time: applyVariance("22:45"), type: "DINÁMICO", wind: windMap[22] || 0, hour24: 22 }
                 );
                 
-                setFlights(newSchedule);
-                db.collection('operaciones').doc('turno_actual').set({ flights: newSchedule }, { merge: true });
+                // Mapeo final asegurando las suspensiones por viento real (rojo)
+                const finalSchedule = newSchedule.map(f => ({
+                    ...f, wind: windMap[f.hour24] >= 40 ? 45 : f.wind
+                }));
+
+                setFlights(finalSchedule);
+                db.collection('operaciones').doc('turno_actual').set({ flights: finalSchedule }, { merge: true });
             };
 
             const toggleRainProtocol = () => {
@@ -304,7 +365,6 @@
                     return;
                 }
 
-                // NUEVA REGLA: Límite máximo para el último vuelo son las 23:30 (11:30 PM)
                 const endTime = 23 * 60 + 30; 
                 const currentTimeInMins = currentHour * 60 + currentMinute + 15;
                 const timeWindow = endTime - currentTimeInMins;
@@ -362,7 +422,7 @@
                                 <span className="bg-indigo-600 text-white px-2 py-0.5 rounded text-xs">DP</span>
                                 DISPATCHER PRO
                             </h1>
-                            <p className="text-[10px] font-bold text-indigo-400 mt-1 tracking-widest uppercase">V42 MASTER • 🟢 NUBE CONECTADA</p>
+                            <p className="text-[10px] font-bold text-indigo-400 mt-1 tracking-widest uppercase">V60 MASTER • 🟢 NUBE CONECTADA</p>
                         </div>
                         <button 
                             onClick={(e) => { e.stopPropagation(); setSettingsOpen(true); }}
