@@ -10,7 +10,7 @@
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     
-    <!-- RESTAURADO A TU VERSIÓN ORIGINAL DE FIREBASE QUE SÍ TIENE PERMISOS -->
+    <!-- FIREBASE COMPAT (Manteniendo tu versión original para no tener problemas de permisos) -->
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore-compat.js"></script>
@@ -19,6 +19,10 @@
         body { background-color: #0B0F19; color: white; font-family: 'Inter', system-ui, sans-serif; margin: 0; padding: 0; }
         .glass-card { background-color: #131826; border: 1px solid #1f2937; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.5); }
         .rain-overlay { background: linear-gradient(180deg, rgba(15,23,42,0.95) 0%, rgba(30,58,138,0.9) 100%); backdrop-filter: blur(8px); }
+        /* Scrollbar personalizado para el panel admin */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: #0f172a; }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
     </style>
 </head>
 <body>
@@ -42,37 +46,43 @@
 
         const { useState, useEffect, useRef } = React;
 
-        // Filtro Súper Inteligente de Fechas: Analiza el texto para encontrar el día y mes
-        const isStringToday = (dateStr) => {
-            if (!dateStr) return false;
+        const isStringToday = (rawDateInfo) => {
+            if (!rawDateInfo) return false;
             
             const today = new Date();
             const d = today.getDate(); // ej: 27
             const m = today.getMonth() + 1; // ej: 7
+            const y = today.getFullYear(); // ej: 2026
+            const yShort = y.toString().slice(-2); // ej: 26
             
             const dPad = String(d).padStart(2, '0');
             const mPad = String(m).padStart(2, '0');
-            const s = dateStr.toLowerCase();
+            const s = rawDateInfo.toLowerCase();
 
-            // 1. Busca formatos numéricos comunes (ej. 27/07, 27-07, 07/27)
-            if (s.includes(`${dPad}/${mPad}`) || s.includes(`${dPad}-${mPad}`) || 
-                s.includes(`${mPad}/${dPad}`) || s.includes(`${mPad}-${dPad}`) ||
-                s.includes(`${d}/${m}/`) || s.includes(`${d}-${m}-`)) {
-                return true;
-            }
+            // Formatos exactos (YYYY-MM-DD, DD/MM/YYYY, etc)
+            const formats = [
+                `${y}-${mPad}-${dPad}`, `${y}/${mPad}/${dPad}`,
+                `${dPad}-${mPad}-${y}`, `${dPad}/${mPad}/${y}`,
+                `${mPad}-${dPad}-${y}`, `${mPad}/${dPad}/${y}`,
+                `${yShort}-${mPad}-${dPad}`, `${yShort}/${mPad}/${dPad}`,
+                `${dPad}-${mPad}-${yShort}`, `${dPad}/${mPad}/${yShort}`,
+                `${dPad}/${mPad}`, `${dPad}-${mPad}`,
+                `${mPad}/${dPad}`, `${mPad}-${dPad}`
+            ];
 
-            // 2. Busca formatos de texto (ej. 27 jul, 27 de julio)
+            if (formats.some(fmt => s.includes(fmt))) return true;
+
+            // Búsqueda por texto (ej. 27 jul, 27 de julio)
             const meses = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
             const months = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
-            
             const mes = meses[today.getMonth()];
             const month = months[today.getMonth()];
 
-            // Verifica que el número del día exista solo, y que tenga el mes
+            // Verifica que el número del día exista solo, y que tenga el texto del mes
             const hasDay = new RegExp(`\\b0?${d}\\b`).test(s);
-            const hasMonth = s.includes(mes) || s.includes(month);
+            const hasMonthText = s.includes(mes) || s.includes(month);
 
-            return (hasDay && hasMonth);
+            return (hasDay && hasMonthText);
         };
 
         function App() {
@@ -89,8 +99,10 @@
             const [operators, setOperators] = useState([]);
             const [currentOperator, setCurrentOperator] = useState('Sin asignar');
             const [isScanningCSV, setIsScanningCSV] = useState(false);
+            
             const operatorsRef = useRef([]);
             const currentOperatorRef = useRef('Sin asignar');
+            const authReady = useRef(false);
 
             const [loggedFlightsCount, setLoggedFlightsCount] = useState(0);
             const totalFlightsTarget = 13;
@@ -104,7 +116,6 @@
             const flightsRef = useRef([]);
             const isRainingRef = useRef(false);
             const loggedFlightsCountRef = useRef(0);
-            const authReady = useRef(false);
 
             useEffect(() => {
                 let unsubscribe = () => {};
@@ -195,13 +206,14 @@
                     if (h >= 7 && h < 19) setShiftName('Turno Diurno');
                     else setShiftName('Turno Nocturno');
                     
-                    // FILTRO DE OPERADORES
+                    // LÓGICA DE ASIGNACIÓN DE OPERADOR (Revisa cada segundo)
                     let foundOperator = 'Sin asignar';
                     const currentTotalMins = h * 60 + m;
 
                     if (operatorsRef.current && operatorsRef.current.length > 0) {
                         for (let op of operatorsRef.current) {
-                            let isTodayShift = op.dateStr ? isStringToday(op.dateStr) : true;
+                            // Validar si el turno pertenece al día de hoy usando rawDateInfo
+                            let isTodayShift = op.rawDateInfo ? isStringToday(op.rawDateInfo) : true;
 
                             if (isTodayShift) {
                                 let startParts = op.start.split(':');
@@ -210,8 +222,10 @@
                                 let endTotal = parseInt(endParts[0]) * 60 + parseInt(endParts[1]);
                                 
                                 if (startTotal <= endTotal) {
+                                    // Turno normal (ej. 07:00 a 15:00)
                                     if (currentTotalMins >= startTotal && currentTotalMins < endTotal) foundOperator = op.name;
                                 } else {
+                                    // Turno nocturno que cruza media noche (ej. 20:00 a 06:00)
                                     if (currentTotalMins >= startTotal || currentTotalMins < endTotal) foundOperator = op.name;
                                 }
                             }
@@ -275,6 +289,106 @@
                 return () => clearInterval(timer);
             }, []);
 
+            const handleCSVUpload = (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+
+                setIsScanningCSV(true);
+                const reader = new FileReader();
+                
+                reader.onload = (event) => {
+                    try {
+                        const text = event.target.result;
+                        const lines = text.split(/\r?\n/);
+                        const newOperators = [];
+                        let lastSeenDateContext = '';
+                        
+                        const firstLine = lines[0] || '';
+                        const delimiter = firstLine.includes(';') ? ';' : (firstLine.includes('\t') ? '\t' : ',');
+                        
+                        for (let i = 0; i < lines.length; i++) {
+                            let line = lines[i].trim();
+                            if (!line) continue;
+                            
+                            // ¿Esta fila parece contener un encabezado de fecha de Zoho?
+                            if (/\d{1,4}[\/\-]\d{1,2}[\/\-]\d{1,4}|\d{1,2}\s*[a-zA-Z]{3,}\s*\d{2,4}/i.test(line)) {
+                                lastSeenDateContext = line;
+                            }
+                            
+                            // Buscar las horas (Ej. 07:00 y 15:00)
+                            const timeRegex = /([01]?[0-9]|2[0-3]):([0-5][0-9])/g;
+                            let times = line.match(timeRegex);
+
+                            if (times && times.length >= 2) {
+                                // Buscar el nombre, ignorando los puestos
+                                const parts = line.split(delimiter).map(p => p.replace(/['"]/g, '').trim());
+                                let potentialName = '';
+                                
+                                parts.forEach(part => {
+                                    const lower = part.toLowerCase();
+                                    const isRoleOrHeader = ['especialista', 'rpas', 'os', 'nombre', 'hora', 'fecha', 'puesto', 'cargo', 'rol', 'turno', 'supervisor', 'entrada', 'salida', 'am', 'pm'].some(w => lower.includes(w));
+                                    const isDate = /\d{1,4}[\/\-]\d{1,2}/.test(part);
+                                    const isTime = timeRegex.test(part);
+                                    
+                                    // Si no es un puesto ni hora ni fecha, y tiene letras, debe ser el nombre
+                                    if (!isRoleOrHeader && !isTime && !isDate && /[a-zA-Z]/.test(part) && part.length > 2) {
+                                        if (!potentialName) potentialName = part; // Toma el primero que cumpla
+                                    }
+                                });
+                                
+                                if (!potentialName) potentialName = "Operador Registrado";
+
+                                newOperators.push({ 
+                                    name: potentialName, 
+                                    start: times[0], 
+                                    end: times[1],
+                                    // GUARDAMOS TODA LA FILA + EL ÚLTIMO ENCABEZADO DE FECHA
+                                    rawDateInfo: line + " " + lastSeenDateContext 
+                                });
+                            }
+                        }
+                        
+                        if (newOperators.length > 0) {
+                            // Guardamos todo el mes en Firebase
+                            db.collection('operaciones').doc('turno_actual').set({ operators: newOperators }, { merge: true });
+                            speak("Horarios actualizados exitosamente. Se aplicará el filtro inteligente.");
+                            setModal({ isOpen: true, title: 'Carga Exitosa', message: `Se importaron ${newOperators.length} turnos en total (El mes completo). El sistema solo te mostrará los que correspondan al día de hoy.`, type: 'success' });
+                        } else {
+                            throw new Error("No pude detectar horarios útiles. Revisa el archivo.");
+                        }
+                    } catch (error) {
+                        speak("Error al procesar el archivo CSV.");
+                        setModal({ isOpen: true, title: 'Error de Lectura', message: error.message, type: 'error' });
+                    } finally {
+                        setIsScanningCSV(false);
+                        document.getElementById('csv-upload').value = '';
+                    }
+                };
+                
+                reader.readAsText(file);
+            };
+
+            const handleRemoveOperator = (index, isTodayList = false) => {
+                let originalIndex = index;
+                
+                if (isTodayList) {
+                    const todaysOps = operators.filter(op => !op.rawDateInfo || isStringToday(op.rawDateInfo));
+                    const opToDelete = todaysOps[index];
+                    originalIndex = operators.findIndex(op => op === opToDelete);
+                }
+
+                if (originalIndex >= 0) {
+                    const updatedOps = operators.filter((_, i) => i !== originalIndex);
+                    db.collection('operaciones').doc('turno_actual').set({ operators: updatedOps }, { merge: true });
+                }
+            };
+
+            // Filtramos la lista global (ej 60 turnos) para mostrar SOLO LOS DE HOY en el panel
+            const todaysOperators = operators.filter(op => {
+                if(!op.rawDateInfo) return true;
+                return isStringToday(op.rawDateInfo);
+            });
+
             const handleImageUpload = (e) => {
                 const file = e.target.files[0];
                 if (!file) return;
@@ -327,7 +441,7 @@
                     const parsedData = JSON.parse(aiResponseText);
                     if (parsedData && parsedData.hourlyData) {
                          generateIntelligentSchedule(parsedData.hourlyData);
-                         speak("Itinerario calculado para lograr el objetivo de trece vuelos.");
+                         speak("Itinerario calculado para lograr el objetivo de trece vuelos diarios.");
                     } else {
                          throw new Error("La IA devolvió un formato incorrecto.");
                     }
@@ -462,111 +576,6 @@
                  }
             };
 
-            const handleCSVUpload = (e) => {
-                const file = e.target.files[0];
-                if (!file) return;
-
-                setIsScanningCSV(true);
-                const reader = new FileReader();
-                
-                reader.onload = (event) => {
-                    try {
-                        const text = event.target.result;
-                        const lines = text.split(/\r?\n/);
-                        const newOperators = [];
-                        
-                        const firstLine = lines[0] || '';
-                        const delimiter = firstLine.includes(';') ? ';' : (firstLine.includes('\t') ? '\t' : ',');
-                        
-                        // Expresión regular ultra flexible para atrapar CUALQUIER formato de fecha de Excel/Zoho
-                        const anyDateRegex = /\b\d{1,2}[\/\-]\d{1,2}(?:[\/\-]\d{2,4})?\b|\b\d{1,2}[\s\-\/]*(?:de\s*)?(?:ene|feb|mar|abr|may|jun|jul|ago|sep|oct|nov|dic|jan|apr|aug|dec)[a-z]*[\.\s\-\/]*(?:\d{2,4})?\b/i;
-
-                        for (let i = 0; i < lines.length; i++) {
-                            let line = lines[i].trim();
-                            if (!line) continue;
-                            
-                            const parts = line.split(delimiter).map(p => p.replace(/['"]/g, '').trim());
-                            let rowDateStr = '';
-
-                            parts.forEach(part => {
-                                const lowerPart = part.toLowerCase();
-                                if (anyDateRegex.test(lowerPart)) {
-                                    rowDateStr = lowerPart;
-                                }
-                            });
-
-                            if (!rowDateStr) continue; 
-                            
-                            const timeRegex = /([01]?[0-9]|2[0-3]):([0-5][0-9])/;
-                            let times = [];
-                            let possibleNames = [];
-
-                            parts.forEach(part => {
-                                const match = part.match(timeRegex);
-                                if (match) {
-                                    times.push(match[0]);
-                                } else if (isNaN(part) && part.length > 2) {
-                                    const lower = part.toLowerCase();
-                                    const isRoleOrHeader = ['especialista', 'rpas', 'os', 'nombre', 'hora', 'fecha', 'puesto', 'cargo', 'rol', 'turno', 'supervisor'].some(word => lower.includes(word));
-                                    
-                                    if (!isRoleOrHeader && !anyDateRegex.test(lower)) {
-                                        possibleNames.push(part);
-                                    }
-                                }
-                            });
-                            
-                            let potentialName = possibleNames.length > 0 ? possibleNames[0] : '';
-
-                            if (times.length >= 2 && potentialName) {
-                                newOperators.push({ 
-                                    name: potentialName, 
-                                    start: times[0], 
-                                    end: times[1],
-                                    dateStr: rowDateStr 
-                                });
-                            }
-                        }
-                        
-                        if (newOperators.length > 0) {
-                            db.collection('operaciones').doc('turno_actual').set({ operators: newOperators }, { merge: true });
-                            speak("Horarios del mes actualizados exitosamente en la base de datos.");
-                            setModal({ isOpen: true, title: 'Carga Mensual Exitosa', message: `Se importaron ${newOperators.length} turnos en total. El sistema mostrará cada día solo a los que correspondan.`, type: 'success' });
-                        } else {
-                            throw new Error("No pude detectar fechas y horarios útiles. Revisa el archivo.");
-                        }
-                    } catch (error) {
-                        speak("Error al procesar el archivo CSV.");
-                        setModal({ isOpen: true, title: 'Error de Lectura', message: error.message, type: 'error' });
-                    } finally {
-                        setIsScanningCSV(false);
-                        document.getElementById('csv-upload').value = '';
-                    }
-                };
-                
-                reader.readAsText(file);
-            };
-
-            const handleRemoveOperator = (index, isTodayList = false) => {
-                let originalIndex = index;
-                
-                if (isTodayList) {
-                    const todaysOps = operators.filter(op => !op.dateStr || isStringToday(op.dateStr));
-                    const opToDelete = todaysOps[index];
-                    originalIndex = operators.findIndex(op => op === opToDelete);
-                }
-
-                if (originalIndex >= 0) {
-                    const updatedOps = operators.filter((_, i) => i !== originalIndex);
-                    db.collection('operaciones').doc('turno_actual').set({ operators: updatedOps }, { merge: true });
-                }
-            };
-
-            // Filtrar operadores del panel para mostrar SOLO LOS DE HOY
-            const todaysOperators = operators.filter(op => {
-                if(!op.dateStr) return true;
-                return isStringToday(op.dateStr);
-            });
-
             return (
                 <div className="min-h-screen p-4 max-w-2xl mx-auto pb-24" onClick={unlockAudio}>
                     
@@ -658,7 +667,6 @@
                         </div>
                     )}
 
-                    {}
                     <div className={`glass-card p-5 rounded-2xl mb-6 relative ${isRaining ? 'opacity-50 pointer-events-none' : ''}`}>
                         {isRaining && <div className="absolute inset-0 rain-overlay rounded-2xl z-10 flex items-center justify-center text-center p-4">
                             <span className="text-white font-bold text-lg">Esperando que mejore el clima para calcular itinerario de {totalFlightsTarget - loggedFlightsCount} vuelos faltantes...</span>
@@ -726,6 +734,7 @@
                         </div>
                     )}
                     
+                    {}
                     {adminOpen && (
                         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4" onClick={(e) => e.stopPropagation()}>
                             <div className="bg-[#131826] border border-slate-800 rounded-2xl w-full max-w-md shadow-2xl p-6 max-h-[90vh] flex flex-col">
@@ -735,13 +744,13 @@
                                     
                                     <div className="bg-[#0f172a] p-4 rounded-xl border border-indigo-500/40 mb-4 shadow-[0_0_15px_rgba(79,70,229,0.1)]">
                                         <h3 className="text-xs font-bold text-indigo-300 uppercase tracking-widest mb-3 flex items-center gap-2">
-                                            📊 Carga del Mes Completo (CSV)
+                                            📊 CARGA DEL MES COMPLETO (CSV)
                                         </h3>
                                         <input type="file" id="csv-upload" accept=".csv" className="hidden" onChange={handleCSVUpload} />
                                         <button 
                                             onClick={() => document.getElementById('csv-upload').click()}
                                             disabled={isScanningCSV}
-                                            className={`w-full py-2.5 rounded-lg text-sm font-bold transition flex justify-center items-center gap-2 ${isScanningCSV ? 'bg-indigo-900/50 text-indigo-300 animate-pulse' : 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-md'}`}
+                                            className={`w-full py-3 rounded-lg text-sm font-bold transition flex justify-center items-center gap-2 ${isScanningCSV ? 'bg-indigo-900/50 text-indigo-300 animate-pulse' : 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-md'}`}
                                         >
                                             {isScanningCSV ? '⏳ Procesando...' : '📄 Subir Horario (.CSV)'}
                                         </button>
@@ -749,7 +758,7 @@
                                     </div>
 
                                     <div className="flex justify-between items-center mb-3">
-                                        <h3 className="text-xs font-bold text-slate-300 uppercase tracking-widest">Turnos filtrados (Solo de hoy)</h3>
+                                        <h3 className="text-xs font-bold text-slate-300 uppercase tracking-widest">TURNOS FILTRADOS (SOLO DE HOY)</h3>
                                         <span className="text-[9px] bg-slate-800 text-slate-400 px-2 py-0.5 rounded-full">Total en BD: {operators.length}</span>
                                     </div>
                                 </div>
@@ -781,6 +790,7 @@
                         </div>
                     )}
                     
+                    {}
                     {modal.isOpen && (
                         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4" onClick={(e) => e.stopPropagation()}>
                             <div className="bg-[#131826] border border-slate-800 rounded-2xl w-full max-w-sm shadow-2xl p-6">
