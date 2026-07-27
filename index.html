@@ -150,9 +150,7 @@
                     if (h >= 7 && h < 19) setShiftName('Turno Diurno');
                     else setShiftName('Turno Nocturno');
 
-                    // ==========================================
                     // CÁLCULO DE OPERADOR EN TURNO
-                    // ==========================================
                     const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
                     let yesterday = new Date(now);
                     yesterday.setDate(yesterday.getDate() - 1);
@@ -185,9 +183,7 @@
                     }
                     setCurrentOperator(prevOp => prevOp !== foundOp ? foundOp : prevOp);
 
-                    // ==========================================
                     // RESET DE MEDIANOCHE (00:00:00)
-                    // ==========================================
                     if (h === 0 && m === 0 && s === 0 && authReady.current) {
                         speak("Iniciando nuevo día operativo. Reiniciando contadores de vuelo a cero.");
                         db.collection('operaciones').doc('turno_actual').set({
@@ -199,9 +195,7 @@
                         });
                     }
                     
-                    // ==========================================
                     // ALARMAS POR MINUTO Y HORA EXACTA
-                    // ==========================================
                     if (s === 0) {
                         const timeStr = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
                         
@@ -261,8 +255,9 @@
                         let turnosExtraidos = [];
                         
                         const parseTimeStr = (tStr) => {
+                            if(!tStr) return null;
                             let match = tStr.match(/(\d{1,2})[:.](\d{2})\s*([ap]m)?/i);
-                            if(!match) return tStr;
+                            if(!match) return null;
                             let h = parseInt(match[1]);
                             let m = match[2];
                             let ampm = match[3] ? match[3].toLowerCase() : null;
@@ -271,91 +266,71 @@
                             return `${String(h).padStart(2, '0')}:${m}`;
                         };
 
-                        const cleanNameStr = (str) => {
-                            let c = str.replace(/Especialista|RPAS|OS|Audi|M[eé]xico|Turno|lun|mar|mi[eé]|jue|vie|s[aá]b|dom|Mon|Tue|Wed|Thu|Fri|Sat|Sun|Shift/gi, '');
-                            c = c.replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑ\s]/g, ' ').trim();
-                            // Tomamos la línea completa del nombre para que salga nombre y apellido
-                            return c; 
-                        };
-
-                        const timeRegex = /\b([01]?\d|2[0-3])[:.]([0-5]\d)(?:\s*[aApP][mM])?\b/g;
-
-                        const extraerFecha = (rowText, r, currentJson) => {
-                            let dateMatch = rowText.match(/\b(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})\b/) || 
-                                            rowText.match(/\b(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})\b/) ||
-                                            rowText.match(/\b(\d{1,2})\s+(ene|feb|mar|abr|may|jun|jul|ago|sep|oct|nov|dic)[a-z]*\s+(\d{4})\b/i);
-                            
-                            if (dateMatch) {
-                                if (dateMatch[1] && dateMatch[1].length === 4) return `${dateMatch[1]}-${String(dateMatch[2]).padStart(2,'0')}-${String(dateMatch[3]).padStart(2,'0')}`;
-                                else if (dateMatch[3] && dateMatch[3].length === 4) {
-                                    if(isNaN(dateMatch[2])) { 
-                                        const months = {jan:1,feb:2,mar:3,apr:4,abr:4,may:5,jun:6,jul:7,aug:8,ago:8,sep:9,oct:10,nov:11,dec:12,dic:12};
-                                        let m = months[dateMatch[2].toLowerCase().substring(0,3)] || 1;
-                                        return `${dateMatch[3]}-${String(m).padStart(2,'0')}-${String(dateMatch[1]).padStart(2,'0')}`;
-                                    }
-                                    return `${dateMatch[3]}-${String(dateMatch[2]).padStart(2,'0')}-${String(dateMatch[1]).padStart(2,'0')}`;
-                                }
+                        const extraerFechaInteligente = (texto, rowIdx, colIdx, grid) => {
+                            let matchStr = texto.match(/\b(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})\b/);
+                            if(matchStr) {
+                                let y = matchStr[3].length === 2 ? `20${matchStr[3]}` : matchStr[3];
+                                let m = matchStr[2]; let d = matchStr[1];
+                                if(parseInt(m) > 12) { let temp = m; m = d; d = temp; }
+                                return `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
                             }
-                            
-                            for (let lookUp = r; lookUp >= Math.max(0, r - 5); lookUp--) {
-                                let upRowText = currentJson[lookUp].join(' ');
-                                let dayMatch = upRowText.match(/\b(?:lun|mar|mi[eé]|jue|vie|s[aá]b|dom|mon|tue|wed|thu|fri|sat|sun)[^\d]*(\d{1,2})\b/i);
-                                if(dayMatch) return `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}-${String(dayMatch[1]).padStart(2, '0')}`;
+
+                            for(let r = rowIdx; r >= Math.max(0, rowIdx - 10); r--) {
+                                let celdaArriba = String(grid[r][colIdx]).trim();
+                                let matchDiaMes = celdaArriba.match(/\b(?:lun|mar|mi[eé]|jue|vie|s[aá]b|dom|mon|tue|wed|thu|fri|sat|sun)[^\d]*(\d{1,2})\b/i);
+                                if(matchDiaMes) {
+                                    let now = new Date();
+                                    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(matchDiaMes[1]).padStart(2, '0')}`;
+                                }
+                                let soloNumero = celdaArriba.match(/^(\d{1,2})$/);
+                                if(soloNumero && parseInt(soloNumero[1]) <= 31) {
+                                    let now = new Date();
+                                    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(soloNumero[1]).padStart(2, '0')}`;
+                                }
                             }
                             return null;
                         };
 
                         for (let r = 0; r < json.length; r++) {
                             let row = json[r];
-                            let rowText = row.join('  ');
-                            
                             for (let c = 0; c < row.length; c++) {
                                 let cellText = String(row[c]).trim();
                                 if (!cellText) continue;
 
-                                let timesInCell = cellText.match(timeRegex);
-                                if (timesInCell && timesInCell.length >= 2) {
-                                    let start = parseTimeStr(timesInCell[0]);
-                                    let end = parseTimeStr(timesInCell[1]);
+                                let timeRegex = /\b([01]?\d|2[0-3])[:.]([0-5]\d)(?:\s*[aApP][mM])?\b/g;
+                                let times = cellText.match(timeRegex);
+                                
+                                if (times && times.length >= 2) {
+                                    let start = parseTimeStr(times[0]);
+                                    let end = parseTimeStr(times[1]);
                                     
-                                    let rawName = cellText.split('\n').find(line => /[a-zA-Z]{3,}/.test(line) && !/\d/.test(line));
-                                    let name = cleanNameStr(rawName || cellText.split('\n')[0]); 
-                                    
-                                    if (!name || name.length < 3) {
-                                        for(let searchCol = 0; searchCol < row.length; searchCol++) {
-                                            if (searchCol !== c && String(row[searchCol]).length > 3 && !/\d/.test(row[searchCol])) {
-                                                name = cleanNameStr(String(row[searchCol]));
-                                                break;
+                                    let cleanName = "";
+                                    let lineas = cellText.split('\n');
+                                    for(let linea of lineas) {
+                                        if(/[a-zA-Z]{3,}/.test(linea) && !/\d/.test(linea)) {
+                                            let tempName = linea.replace(/Especialista|RPAS|OS|Audi|M[eé]xico|Turno|lun|mar|mi[eé]|jue|vie|s[aá]b|dom/gi, '').trim();
+                                            if(tempName.length > 3) {
+                                                cleanName = tempName; 
+                                                break; 
                                             }
                                         }
                                     }
 
-                                    let dateStr = extraerFecha(rowText, r, json);
-                                    
-                                    if (dateStr && name) {
-                                        turnosExtraidos.push({ date: dateStr, name: name, start: start, end: end });
+                                    if(!cleanName) {
+                                        for (let sc = 0; sc < row.length; sc++) {
+                                            let scText = String(row[sc]).trim();
+                                            if(scText.length > 3 && !/\d/.test(scText)) {
+                                                 let tempName = scText.replace(/Especialista|RPAS|OS|Audi|M[eé]xico|Turno/gi, '').trim();
+                                                 if(tempName.length > 3) { cleanName = tempName; break; }
+                                            }
+                                        }
                                     }
-                                }
-                            }
 
-                            if (rowText.match(timeRegex) && rowText.match(timeRegex).length >= 2) {
-                                let allTimes = rowText.match(timeRegex);
-                                let start = parseTimeStr(allTimes[0]);
-                                let end = parseTimeStr(allTimes[1]);
-                                
-                                let dateStr = extraerFecha(rowText, r, json);
-                                let name = "";
-                                
-                                for(let c=0; c<row.length; c++) {
-                                    let cellText = String(row[c]).trim();
-                                    if (cellText.length > 3 && /[a-zA-Z]/.test(cellText) && !/\d/.test(cellText)) {
-                                        let testName = cleanNameStr(cellText);
-                                        if (testName && testName.length > 3) { name = testName; break; }
+                                    let dateStr = extraerFechaInteligente(cellText, r, c, json);
+                                    
+                                    if (dateStr && cleanName && start && end) {
+                                        turnosExtraidos.push({ date: dateStr, name: cleanName, start: start, end: end });
                                     }
-                                }
-                                
-                                if (dateStr && name) {
-                                    turnosExtraidos.push({ date: dateStr, name: name, start, end });
                                 }
                             }
                         }
@@ -372,8 +347,8 @@
                             speak(`Carga exitosa. ${uniqueTurnos.length} turnos identificados.`);
                             setModal({ isOpen: true, title: '✅ Carga Exitosa', message: `El Omni-Scanner procesó el archivo.\n\nTurnos creados: ${uniqueTurnos.length}\n\nEl sistema asignará al piloto automáticamente.`, type: 'success' });
                         } else {
-                            speak("Error de lectura. Archivo vacío.");
-                            setModal({ isOpen: true, title: 'Diagnóstico de Archivo', message: `Filas analizadas: ${json.length}\nTurnos formados: 0\n\nEl sistema no pudo encontrar nombres o fechas válidas. Revisa que el archivo original no esté en blanco.`, type: 'error' });
+                            speak("Error de lectura. Archivo vacío o formato irreconocible.");
+                            setModal({ isOpen: true, title: 'Diagnóstico de Archivo', message: `Filas analizadas: ${json.length}\nHorarios detectados: 0\nTurnos formados: 0\n\nEl sistema no pudo encontrar nombres o fechas válidas junto a ellos. Revisa que el archivo original no esté en blanco.`, type: 'error' });
                         }
 
                     } catch (error) {
@@ -409,6 +384,7 @@
                 reader.readAsDataURL(file);
             };
 
+            // ESTA FUNCIÓN SE HA RESTAURADO EXACTAMENTE A TU ORIGINAL V42 MASTER (Solo se mejoró la limpieza del texto)
             const analyzeImageWithAI = async (base64Image) => {
                 setIsScanning(true);
                 speak("Analizando variables de viento e intervalos de lluvia...");
@@ -431,7 +407,9 @@
 
                     const data = await response.json();
                     let aiResponseText = data.candidates[0].content.parts[0].text;
-                    if (aiResponseText.startsWith('```json')) aiResponseText = aiResponseText.replace(/```json\n?/, '').replace(/```\n?$/, '');
+                    
+                    // Limpieza ultra robusta para evitar errores de parseo
+                    aiResponseText = aiResponseText.replace(/```json/ig, '').replace(/```/g, '').trim();
                     
                     const parsedData = JSON.parse(aiResponseText);
                     if (parsedData && parsedData.hourlyData) {
@@ -440,6 +418,7 @@
                     } else throw new Error("Formato IA incorrecto.");
 
                 } catch (error) {
+                    console.error("AI Parse Error:", error);
                     speak("Error al analizar el clima.");
                     generateIntelligentSchedule([]); 
                 } finally {
@@ -447,6 +426,7 @@
                 }
             };
 
+            // ESTA FUNCIÓN SE HA RESTAURADO EXACTAMENTE A TU ORIGINAL V42 MASTER
             const generateIntelligentSchedule = (hourlyWeatherData) => {
                 let windMap = {};
                 for(let i=0; i<24; i++) windMap[i] = 0;
@@ -686,7 +666,7 @@
                          </button>
                     </div>
 
-                    {}
+                    {/* Menús Modales */}
                     {adminOpen && (
                         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4" onClick={() => setAdminOpen(false)}>
                             <div className="bg-[#131826] border border-slate-800 rounded-2xl w-full max-w-md shadow-2xl p-6" onClick={e => e.stopPropagation()}>
@@ -700,7 +680,7 @@
                                         📅 CARGA INTELIGENTE (ZOHO CSV/XLSX)
                                     </h3>
                                     <p className="text-[10px] text-slate-400 mb-4 leading-relaxed">
-                                        Sube tu archivo (incluso si está desordenado). El Omni-Scanner encontrará fechas, horarios y nombres completos.
+                                        Sube tu archivo (incluso si está desordenado). El Escáner Profundo encontrará las fechas, tu nombre completo y armará tu turno.
                                     </p>
                                     <input type="file" id="excelUpload" accept=".csv, .xlsx" className="hidden" onChange={handleExcelUpload} />
                                     <button onClick={() => document.getElementById('excelUpload').click()} disabled={isUploading} className={`w-full font-bold py-3.5 rounded-lg text-sm shadow-[0_0_15px_rgba(79,70,229,0.3)] transition flex justify-center items-center gap-2 ${isUploading ? 'bg-indigo-800 text-indigo-300 cursor-not-allowed' : 'bg-indigo-600 hover:bg-indigo-500 text-white transform hover:scale-105'}`}>
