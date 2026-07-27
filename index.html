@@ -10,7 +10,10 @@
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     
-    <!-- FIREBASE COMPAT (Manteniendo tu versión original para no tener problemas de permisos) -->
+    <!-- LIBRERÍA PROFESIONAL PARA LEER EXCEL Y CSV (MATRICES) -->
+    <script src="https://unpkg.com/xlsx/dist/xlsx.full.min.js"></script>
+    
+    <!-- FIREBASE COMPAT (Tu conexión original segura) -->
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore-compat.js"></script>
@@ -19,7 +22,6 @@
         body { background-color: #0B0F19; color: white; font-family: 'Inter', system-ui, sans-serif; margin: 0; padding: 0; }
         .glass-card { background-color: #131826; border: 1px solid #1f2937; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.5); }
         .rain-overlay { background: linear-gradient(180deg, rgba(15,23,42,0.95) 0%, rgba(30,58,138,0.9) 100%); backdrop-filter: blur(8px); }
-        /* Scrollbar personalizado para el panel admin */
         ::-webkit-scrollbar { width: 6px; }
         ::-webkit-scrollbar-track { background: #0f172a; }
         ::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
@@ -46,45 +48,6 @@
 
         const { useState, useEffect, useRef } = React;
 
-        const isStringToday = (rawDateInfo) => {
-            if (!rawDateInfo) return false;
-            
-            const today = new Date();
-            const d = today.getDate(); // ej: 27
-            const m = today.getMonth() + 1; // ej: 7
-            const y = today.getFullYear(); // ej: 2026
-            const yShort = y.toString().slice(-2); // ej: 26
-            
-            const dPad = String(d).padStart(2, '0');
-            const mPad = String(m).padStart(2, '0');
-            const s = rawDateInfo.toLowerCase();
-
-            // Formatos exactos (YYYY-MM-DD, DD/MM/YYYY, etc)
-            const formats = [
-                `${y}-${mPad}-${dPad}`, `${y}/${mPad}/${dPad}`,
-                `${dPad}-${mPad}-${y}`, `${dPad}/${mPad}/${y}`,
-                `${mPad}-${dPad}-${y}`, `${mPad}/${dPad}/${y}`,
-                `${yShort}-${mPad}-${dPad}`, `${yShort}/${mPad}/${dPad}`,
-                `${dPad}-${mPad}-${yShort}`, `${dPad}/${mPad}/${yShort}`,
-                `${dPad}/${mPad}`, `${dPad}-${mPad}`,
-                `${mPad}/${dPad}`, `${mPad}-${dPad}`
-            ];
-
-            if (formats.some(fmt => s.includes(fmt))) return true;
-
-            // Búsqueda por texto (ej. 27 jul, 27 de julio)
-            const meses = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
-            const months = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
-            const mes = meses[today.getMonth()];
-            const month = months[today.getMonth()];
-
-            // Verifica que el número del día exista solo, y que tenga el texto del mes
-            const hasDay = new RegExp(`\\b0?${d}\\b`).test(s);
-            const hasMonthText = s.includes(mes) || s.includes(month);
-
-            return (hasDay && hasMonthText);
-        };
-
         function App() {
             const [currentTime, setCurrentTime] = useState(new Date());
             const [shiftName, setShiftName] = useState('Turno Diurno');
@@ -94,16 +57,6 @@
             const [geminiKey, setGeminiKey] = useState(localStorage.getItem('gemini_key') || '');
             const [modal, setModal] = useState({ isOpen: false, title: '', message: '', type: 'error' });
             
-            // Estados para Operadores
-            const [adminOpen, setAdminOpen] = useState(false);
-            const [operators, setOperators] = useState([]);
-            const [currentOperator, setCurrentOperator] = useState('Sin asignar');
-            const [isScanningCSV, setIsScanningCSV] = useState(false);
-            
-            const operatorsRef = useRef([]);
-            const currentOperatorRef = useRef('Sin asignar');
-            const authReady = useRef(false);
-
             const [loggedFlightsCount, setLoggedFlightsCount] = useState(0);
             const totalFlightsTarget = 13;
 
@@ -113,20 +66,27 @@
             const [audioUnlocked, setAudioUnlocked] = useState(false);
             const audioUnlockedRef = useRef(false);
             
+            // Estados para Administración del Mes
+            const [adminOpen, setAdminOpen] = useState(false);
+            const [allMonthShifts, setAllMonthShifts] = useState([]);
+            const [currentOperator, setCurrentOperator] = useState('Sin asignar');
+            
             const flightsRef = useRef([]);
             const isRainingRef = useRef(false);
-            const loggedFlightsCountRef = useRef(0);
+            const allMonthShiftsRef = useRef([]);
+            const authReady = useRef(false);
 
             useEffect(() => {
-                let unsubscribe = () => {};
+                let unsubscribeTurno = () => {};
+                let unsubscribeMes = () => {};
 
                 auth.signInAnonymously().then(() => {
                     authReady.current = true;
                     
-                    unsubscribe = db.collection('operaciones').doc('turno_actual').onSnapshot((doc) => {
+                    // 1. Escuchar los datos del turno actual (Vuelos, clima)
+                    unsubscribeTurno = db.collection('operaciones').doc('turno_actual').onSnapshot((doc) => {
                         if (doc.exists) {
                             const data = doc.data();
-                            
                             if (data.flights) {
                                 setFlights(data.flights);
                                 flightsRef.current = data.flights;
@@ -134,44 +94,29 @@
                                 setFlights([]);
                                 flightsRef.current = [];
                             }
-                            
-                            if (data.loggedFlightsCount !== undefined) {
-                                setLoggedFlightsCount(data.loggedFlightsCount);
-                                loggedFlightsCountRef.current = data.loggedFlightsCount;
-                            } else {
-                                setLoggedFlightsCount(0);
-                                loggedFlightsCountRef.current = 0;
-                            }
-                            
+                            if (data.loggedFlightsCount !== undefined) setLoggedFlightsCount(data.loggedFlightsCount);
                             if (data.isRaining !== undefined) {
                                 setIsRaining(data.isRaining);
                                 isRainingRef.current = data.isRaining;
                             }
-                            
                             if (data.windDataMap) setWindDataMap(data.windDataMap);
-                            
-                            if (data.operators) {
-                                setOperators(data.operators);
-                                operatorsRef.current = data.operators;
-                            } else {
-                                setOperators([]);
-                                operatorsRef.current = [];
-                            }
                         }
-                    }, (err) => {
-                        console.error("Error sincronizando datos:", err);
-                        setModal({ isOpen: true, title: 'Error de Conexión', message: 'No se pudo sincronizar con la base de datos.', type: 'error' });
-                    });
-                }).catch((error) => {
-                    console.error("Error Auth Firebase:", error);
-                });
+                    }, (err) => console.error("Error leyendo turno:", err));
 
-                return () => unsubscribe();
+                    // 2. Escuchar TODOS los turnos del mes subidos
+                    unsubscribeMes = db.collection('operaciones').doc('turnos_mes').onSnapshot((doc) => {
+                        if (doc.exists && doc.data().turnos) {
+                            setAllMonthShifts(doc.data().turnos);
+                            allMonthShiftsRef.current = doc.data().turnos;
+                        }
+                    }, (err) => console.error("Error leyendo mes:", err));
+
+                }).catch((error) => console.error("Error Auth:", error));
+
+                return () => { unsubscribeTurno(); unsubscribeMes(); };
             }, []);
 
-            useEffect(() => {
-                audioUnlockedRef.current = audioUnlocked;
-            }, [audioUnlocked]);
+            useEffect(() => { audioUnlockedRef.current = audioUnlocked; }, [audioUnlocked]);
 
             const speak = (text) => {
                 if (audioUnlockedRef.current && 'speechSynthesis' in window) {
@@ -187,7 +132,7 @@
                 if (!audioUnlocked) {
                     setAudioUnlocked(true);
                     audioUnlockedRef.current = true;
-                    const u = new SpeechSynthesisUtterance("Sistema activado.");
+                    const u = new SpeechSynthesisUtterance("Sistema de voz activado.");
                     u.lang = 'es-MX';
                     u.volume = 0.3;
                     window.speechSynthesis.speak(u);
@@ -205,41 +150,42 @@
 
                     if (h >= 7 && h < 19) setShiftName('Turno Diurno');
                     else setShiftName('Turno Nocturno');
+
+                    // ==========================================
+                    // MOTOR INTELIGENTE: ASIGNAR OPERADOR ACTUAL
+                    // ==========================================
+                    // Formato YYYY-MM-DD para cruzar con los datos
+                    const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+                    const currentMins = h * 60 + m;
                     
-                    // LÓGICA DE ASIGNACIÓN DE OPERADOR (Revisa cada segundo)
-                    let foundOperator = 'Sin asignar';
-                    const currentTotalMins = h * 60 + m;
+                    // Buscar en toda la base del mes si hay turnos para HOY
+                    const shiftsToday = allMonthShiftsRef.current.filter(shift => shift.date === todayStr);
+                    let foundOp = 'Sin asignar';
 
-                    if (operatorsRef.current && operatorsRef.current.length > 0) {
-                        for (let op of operatorsRef.current) {
-                            // Validar si el turno pertenece al día de hoy usando rawDateInfo
-                            let isTodayShift = op.rawDateInfo ? isStringToday(op.rawDateInfo) : true;
+                    if (shiftsToday.length > 0) {
+                        for (let shift of shiftsToday) {
+                            let startParts = shift.start.split(':');
+                            let endParts = shift.end.split(':');
+                            let startMins = parseInt(startParts[0]) * 60 + parseInt(startParts[1]);
+                            let endMins = parseInt(endParts[0]) * 60 + parseInt(endParts[1]);
 
-                            if (isTodayShift) {
-                                let startParts = op.start.split(':');
-                                let endParts = op.end.split(':');
-                                let startTotal = parseInt(startParts[0]) * 60 + parseInt(startParts[1]);
-                                let endTotal = parseInt(endParts[0]) * 60 + parseInt(endParts[1]);
-                                
-                                if (startTotal <= endTotal) {
-                                    // Turno normal (ej. 07:00 a 15:00)
-                                    if (currentTotalMins >= startTotal && currentTotalMins < endTotal) foundOperator = op.name;
-                                } else {
-                                    // Turno nocturno que cruza media noche (ej. 20:00 a 06:00)
-                                    if (currentTotalMins >= startTotal || currentTotalMins < endTotal) foundOperator = op.name;
-                                }
+                            if (startMins <= endMins) {
+                                // Turno normal (ej. 07:00 a 15:00)
+                                if (currentMins >= startMins && currentMins < endMins) foundOp = shift.name;
+                            } else {
+                                // Turno cruzado (ej. 20:00 a 06:00 del día siguiente)
+                                if (currentMins >= startMins || currentMins < endMins) foundOp = shift.name;
                             }
                         }
                     }
 
-                    if (currentOperatorRef.current !== foundOperator) {
-                        setCurrentOperator(foundOperator);
-                        currentOperatorRef.current = foundOperator;
-                    }
+                    setCurrentOperator(foundOp);
 
-                    // CORTE NOCTURNO ESTRICTO (12:00 AM)
+                    // ==========================================
+                    // CORTE DE CAJA A LAS 12:00 AM EXACTAS
+                    // ==========================================
                     if (h === 0 && m === 0 && s === 0 && authReady.current) {
-                        speak("Iniciando nuevo día de operaciones. Borrando bitácora de vuelos e inicializando contadores a cero.");
+                        speak("Iniciando nuevo día de operaciones. Reiniciando base de datos a cero.");
                         db.collection('operaciones').doc('turno_actual').set({
                             flights: [],
                             loggedFlightsCount: 0,
@@ -247,40 +193,32 @@
                             windDataMap: {}
                         }, { merge: true });
                     }
-
-                    // ALERTAS DE VOZ (Juntas, Clima, Vuelos)
+                    
+                    // ==========================================
+                    // ALARMAS Y AVISOS DE VUELO
+                    // ==========================================
                     if (s === 0) {
                         const timeStr = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
                         
-                        if (h === 7 && m === 50) {
-                            speak("Atención comandante. Es hora de la junta operativa de las siete cincuenta.");
-                            setModal({ isOpen: true, title: '⏰ JUNTA OPERATIVA', message: 'Reunión de las 7:50 AM.', type: 'error' });
-                        } else if (h === 12 && m === 0) {
-                            speak("Atención comandante. Es hora de elaborar los reportes K P I.");
-                            setModal({ isOpen: true, title: '📊 ELABORACIÓN DE KPIs', message: 'Hora de reportes.', type: 'error' });
-                        } else if ((h === 12 && m === 5) || (h === 0 && m === 5)) {
-                            speak("Atención. Actualización de captura del clima requerida.");
-                            setModal({ isOpen: true, title: '🌤️ ACTUALIZAR CLIMA', message: 'Obligatorio actualizar clima.', type: 'error' });
-                        }
+                        if (h === 7 && m === 50) speak("Atención comandante. Junta operativa en diez minutos.");
+                        else if (h === 12 && m === 0) speak("Atención. Hora de elaborar los reportes K P I.");
+                        else if ((h === 12 && m === 5) || (h === 0 && m === 5)) speak("Actualización de captura del clima requerida.");
 
                         if (flightsRef.current && flightsRef.current.length > 0 && !isRainingRef.current) {
                             flightsRef.current.forEach(flight => {
                                 if (flight.wind < 42) {
                                     const parts = flight.time.split(':');
-                                    let fh = parseInt(parts[0]);
-                                    let fm = parseInt(parts[1]);
                                     let flightDate = new Date();
-                                    flightDate.setHours(fh, fm, 0, 0);
+                                    flightDate.setHours(parseInt(parts[0]), parseInt(parts[1]), 0, 0);
                                     
                                     let warn10 = new Date(flightDate.getTime() - 10 * 60000);
                                     let warn5 = new Date(flightDate.getTime() - 5 * 60000);
                                     
-                                    if (timeStr === `${String(warn10.getHours()).padStart(2, '0')}:${String(warn10.getMinutes()).padStart(2, '0')}`) {
-                                        speak(`Atención piloto. Faltan 10 minutos para el vuelo de las ${flight.time}.`);
-                                    }
-                                    if (timeStr === `${String(warn5.getHours()).padStart(2, '0')}:${String(warn5.getMinutes()).padStart(2, '0')}`) {
-                                        speak(`Faltan 5 minutos para el despegue de las ${flight.time}. Salga a plataforma.`);
-                                    }
+                                    let w10Str = `${String(warn10.getHours()).padStart(2, '0')}:${String(warn10.getMinutes()).padStart(2, '0')}`;
+                                    let w5Str = `${String(warn5.getHours()).padStart(2, '0')}:${String(warn5.getMinutes()).padStart(2, '0')}`;
+                                    
+                                    if (timeStr === w10Str) speak(`Faltan 10 minutos para el vuelo de las ${flight.time}.`);
+                                    if (timeStr === w5Str) speak(`Faltan 5 minutos para el despegue de las ${flight.time}. Salga a plataforma.`);
                                 }
                             });
                         }
@@ -289,105 +227,153 @@
                 return () => clearInterval(timer);
             }, []);
 
-            const handleCSVUpload = (e) => {
+            const extractCleanName = (str) => {
+                if (!str || typeof str !== 'string') return "";
+                // Borramos basura típica de los puestos
+                let clean = str.replace(/Especialista|RPAS|OS|Turno|Horario|Puesto|Empleado/gi, '').trim();
+                // Extraemos solo el primer nombre/apellido real
+                let words = clean.split(/\s+/).filter(w => w.length > 2);
+                return words.length > 0 ? words[0] : "";
+            };
+
+            const parseFlexibleDate = (str) => {
+                if (!str) return null;
+                str = String(str).toLowerCase().trim();
+                
+                // Formato Excel (YYYY-MM-DD o DD/MM/YYYY)
+                let m1 = str.match(/(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})/);
+                if (m1) return `${m1[1]}-${m1[2].padStart(2,'0')}-${m1[3].padStart(2,'0')}`;
+                
+                let m2 = str.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})/);
+                if (m2) {
+                    let y = m2[3].length === 2 ? `20${m2[3]}` : m2[3];
+                    return `${y}-${m2[2].padStart(2,'0')}-${m2[1].padStart(2,'0')}`;
+                }
+
+                // Formato texto (ej. "27 Jul", "Mon 27 Jul 2026")
+                let textMatch = str.match(/(\d{1,2})\s*[\/\-]?\s*([a-z]{3,})/i);
+                if (textMatch) {
+                    let day = textMatch[1].padStart(2, '0');
+                    let monthStr = textMatch[2];
+                    let year = new Date().getFullYear();
+                    
+                    // Buscar si tiene año escondido
+                    let yearMatch = str.match(/\d{4}/);
+                    if (yearMatch) year = yearMatch[0];
+
+                    const monthMap = {ene:'01',jan:'01',feb:'02',mar:'03',abr:'04',apr:'04',may:'05',jun:'06',jul:'07',ago:'08',aug:'08',sep:'09',oct:'10',nov:'11',dic:'12',dec:'12'};
+                    let monthKey = Object.keys(monthMap).find(k => monthStr.includes(k));
+                    
+                    if (monthKey) {
+                        return `${year}-${monthMap[monthKey]}-${day}`;
+                    }
+                }
+                return null;
+            };
+
+            const extractTimes = (str) => {
+                let matches = [...String(str).matchAll(/(\d{1,2}):(\d{2})/g)];
+                if (matches.length >= 2) {
+                    return [
+                        `${matches[0][1].padStart(2,'0')}:${matches[0][2]}`,
+                        `${matches[1][1].padStart(2,'0')}:${matches[1][2]}`
+                    ];
+                }
+                return null;
+            };
+
+            const handleFileUpload = (e) => {
                 const file = e.target.files[0];
                 if (!file) return;
 
-                setIsScanningCSV(true);
+                speak("Analizando matriz del mes...");
                 const reader = new FileReader();
-                
-                reader.onload = (event) => {
+                reader.onload = (evt) => {
                     try {
-                        const text = event.target.result;
-                        const lines = text.split(/\r?\n/);
-                        const newOperators = [];
-                        let lastSeenDateContext = '';
+                        const data = new Uint8Array(evt.target.result);
+                        const workbook = window.XLSX.read(data, {type: 'array', cellDates: true});
+                        const firstSheetName = workbook.SheetNames[0];
+                        const worksheet = workbook.Sheets[firstSheetName];
                         
-                        const firstLine = lines[0] || '';
-                        const delimiter = firstLine.includes(';') ? ';' : (firstLine.includes('\t') ? '\t' : ',');
+                        // Convertimos la hoja a un array de arrays (Matriz)
+                        const rows = window.XLSX.utils.sheet_to_json(worksheet, {header: 1, raw: false});
                         
-                        for (let i = 0; i < lines.length; i++) {
-                            let line = lines[i].trim();
-                            if (!line) continue;
-                            
-                            // ¿Esta fila parece contener un encabezado de fecha de Zoho?
-                            if (/\d{1,4}[\/\-]\d{1,2}[\/\-]\d{1,4}|\d{1,2}\s*[a-zA-Z]{3,}\s*\d{2,4}/i.test(line)) {
-                                lastSeenDateContext = line;
-                            }
-                            
-                            // Buscar las horas (Ej. 07:00 y 15:00)
-                            const timeRegex = /([01]?[0-9]|2[0-3]):([0-5][0-9])/g;
-                            let times = line.match(timeRegex);
+                        let dateColumns = {}; // Mapea { indice_columna: '2026-07-27' }
+                        let parsedShifts = [];
 
-                            if (times && times.length >= 2) {
-                                // Buscar el nombre, ignorando los puestos
-                                const parts = line.split(delimiter).map(p => p.replace(/['"]/g, '').trim());
-                                let potentialName = '';
-                                
-                                parts.forEach(part => {
-                                    const lower = part.toLowerCase();
-                                    const isRoleOrHeader = ['especialista', 'rpas', 'os', 'nombre', 'hora', 'fecha', 'puesto', 'cargo', 'rol', 'turno', 'supervisor', 'entrada', 'salida', 'am', 'pm'].some(w => lower.includes(w));
-                                    const isDate = /\d{1,4}[\/\-]\d{1,2}/.test(part);
-                                    const isTime = timeRegex.test(part);
-                                    
-                                    // Si no es un puesto ni hora ni fecha, y tiene letras, debe ser el nombre
-                                    if (!isRoleOrHeader && !isTime && !isDate && /[a-zA-Z]/.test(part) && part.length > 2) {
-                                        if (!potentialName) potentialName = part; // Toma el primero que cumpla
-                                    }
-                                });
-                                
-                                if (!potentialName) potentialName = "Operador Registrado";
-
-                                newOperators.push({ 
-                                    name: potentialName, 
-                                    start: times[0], 
-                                    end: times[1],
-                                    // GUARDAMOS TODA LA FILA + EL ÚLTIMO ENCABEZADO DE FECHA
-                                    rawDateInfo: line + " " + lastSeenDateContext 
-                                });
-                            }
+                        // 1. Escanear las primeras 5 filas buscando fechas (Cabeceras de Zoho)
+                        for (let r = 0; r < Math.min(5, rows.length); r++) {
+                            const row = rows[r];
+                            if (!row) continue;
+                            row.forEach((cell, colIndex) => {
+                                let dateStr = parseFlexibleDate(cell);
+                                if (dateStr) {
+                                    dateColumns[colIndex] = dateStr;
+                                }
+                            });
                         }
-                        
-                        if (newOperators.length > 0) {
-                            // Guardamos todo el mes en Firebase
-                            db.collection('operaciones').doc('turno_actual').set({ operators: newOperators }, { merge: true });
-                            speak("Horarios actualizados exitosamente. Se aplicará el filtro inteligente.");
-                            setModal({ isOpen: true, title: 'Carga Exitosa', message: `Se importaron ${newOperators.length} turnos en total (El mes completo). El sistema solo te mostrará los que correspondan al día de hoy.`, type: 'success' });
+
+                        // 2. Si encontró fechas en columnas, cruzamos los datos hacia abajo
+                        if (Object.keys(dateColumns).length > 0) {
+                            for (let r = 0; r < rows.length; r++) {
+                                const row = rows[r];
+                                if (!row || row.length === 0) continue;
+                                
+                                // El nombre suele estar en la columna 0, 1 o 2.
+                                let rawName = String(row[0] || "") + " " + String(row[1] || "");
+                                let cleanName = extractCleanName(rawName);
+                                
+                                if (cleanName.length > 2) {
+                                    // Revisar todas las columnas que son fechas
+                                    Object.keys(dateColumns).forEach(colIndex => {
+                                        let cellData = row[colIndex];
+                                        if (cellData) {
+                                            let times = extractTimes(cellData);
+                                            if (times) {
+                                                parsedShifts.push({
+                                                    date: dateColumns[colIndex],
+                                                    name: cleanName,
+                                                    start: times[0],
+                                                    end: times[1]
+                                                });
+                                            }
+                                        }
+                                    });
+                                }
+                            }
                         } else {
-                            throw new Error("No pude detectar horarios útiles. Revisa el archivo.");
+                            // Si NO es una matriz, leerlo como lista simple (Nombre, Entrada, Salida)
+                            rows.forEach(row => {
+                                let rowStr = row.join(" ");
+                                let d = parseFlexibleDate(rowStr) || `${new Date().getFullYear()}-${String(new Date().getMonth()+1).padStart(2,'0')}-${String(new Date().getDate()).padStart(2,'0')}`;
+                                let t = extractTimes(rowStr);
+                                let n = extractCleanName(rowStr);
+                                if (t && n.length > 2) {
+                                    parsedShifts.push({ date: d, name: n, start: t[0], end: t[1] });
+                                }
+                            });
                         }
+
+                        if (parsedShifts.length > 0) {
+                            db.collection('operaciones').doc('turnos_mes').set({ turnos: parsedShifts });
+                            speak(`Carga exitosa. Se guardaron ${parsedShifts.length} turnos en la base de datos.`);
+                            setModal({ isOpen: true, title: '✅ Mes Cargado', message: `El sistema guardó ${parsedShifts.length} turnos para operar en automático.`, type: 'success' });
+                            setAdminOpen(false);
+                        } else {
+                            setModal({ isOpen: true, title: 'Formato Irreconocible', message: 'No se encontraron fechas válidas o nombres legibles en este archivo.', type: 'error' });
+                        }
+
                     } catch (error) {
-                        speak("Error al procesar el archivo CSV.");
-                        setModal({ isOpen: true, title: 'Error de Lectura', message: error.message, type: 'error' });
-                    } finally {
-                        setIsScanningCSV(false);
-                        document.getElementById('csv-upload').value = '';
+                        setModal({ isOpen: true, title: 'Error', message: error.message, type: 'error' });
                     }
                 };
-                
-                reader.readAsText(file);
+                reader.readAsArrayBuffer(file);
             };
 
-            const handleRemoveOperator = (index, isTodayList = false) => {
-                let originalIndex = index;
-                
-                if (isTodayList) {
-                    const todaysOps = operators.filter(op => !op.rawDateInfo || isStringToday(op.rawDateInfo));
-                    const opToDelete = todaysOps[index];
-                    originalIndex = operators.findIndex(op => op === opToDelete);
-                }
-
-                if (originalIndex >= 0) {
-                    const updatedOps = operators.filter((_, i) => i !== originalIndex);
-                    db.collection('operaciones').doc('turno_actual').set({ operators: updatedOps }, { merge: true });
-                }
+            const clearDB = () => {
+                db.collection('operaciones').doc('turnos_mes').set({ turnos: [] });
+                speak("Base de datos de horarios limpiada.");
             };
-
-            // Filtramos la lista global (ej 60 turnos) para mostrar SOLO LOS DE HOY en el panel
-            const todaysOperators = operators.filter(op => {
-                if(!op.rawDateInfo) return true;
-                return isStringToday(op.rawDateInfo);
-            });
 
             const handleImageUpload = (e) => {
                 const file = e.target.files[0];
@@ -418,38 +404,28 @@
                     const payload = {
                         contents: [{
                             parts: [
-                                { text: "Analiza el clima. REGLA ESTRICTA 11:00am: Si dice 'UV' ES APTO. Regla general: Si dice 'Apto para volar' o indica 'Lluvia' (ej. Lluvia 64%), considéralo APTO PARA VOLAR y el viento es 0 (el sistema organizará el vuelo asumiendo que podría no llover). Si dice 'Ráfagas fuertes' o vientos > 40, viento es 45. Devuelve JSON con 'hourlyData' teniendo 'time' (ej. '11:00am') y 'wind' numérico." },
+                                { text: "Analiza el clima. Si dice 'Lluvia 64%' o similar, tómalo como APTO y viento 0. Si dice 'Apto para volar', viento es 0. Si dice 'Ráfagas fuertes' o vientos > 40, viento es 45. Devuelve JSON con 'hourlyData' teniendo 'time' y 'wind' numérico." },
                                 { inline_data: { mime_type: "image/jpeg", data: base64Image } }
                             ]
                         }]
                     };
 
-                    const response = await fetch(url, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(payload)
-                    });
-
-                    if (!response.ok) throw new Error("Error de conexión. Verifica tu llave API en Ajustes.");
+                    const response = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+                    if (!response.ok) throw new Error("Error de conexión API.");
 
                     const data = await response.json();
                     let aiResponseText = data.candidates[0].content.parts[0].text;
-                    if (aiResponseText.startsWith('```json')) {
-                         aiResponseText = aiResponseText.replace(/```json\n?/, '').replace(/```\n?$/, '');
-                    }
+                    if (aiResponseText.startsWith('```json')) aiResponseText = aiResponseText.replace(/```json\n?/, '').replace(/```\n?$/, '');
                     
                     const parsedData = JSON.parse(aiResponseText);
                     if (parsedData && parsedData.hourlyData) {
                          generateIntelligentSchedule(parsedData.hourlyData);
-                         speak("Itinerario calculado para lograr el objetivo de trece vuelos diarios.");
-                    } else {
-                         throw new Error("La IA devolvió un formato incorrecto.");
-                    }
+                         speak("Itinerario de trece vuelos generado correctamente.");
+                    } else throw new Error("Formato incorrecto devuelto por IA.");
 
                 } catch (error) {
                     console.error("AI Error:", error);
                     speak("Error al analizar el clima.");
-                    setModal({ isOpen: true, title: 'Error de Análisis', message: error.message });
                     generateIntelligentSchedule([]); 
                 } finally {
                     setIsScanning(false);
@@ -460,50 +436,34 @@
                 let windMap = {};
                 for(let i=0; i<24; i++) windMap[i] = 0;
 
-                if (hourlyWeatherData && hourlyWeatherData.length > 0) {
-                     hourlyWeatherData.forEach(dataPoint => {
-                          let hourMatch = dataPoint.time.match(/(\d+):00([ap]m)/i);
-                          if (hourMatch) {
-                               let hour = parseInt(hourMatch[1]);
-                               let ampm = hourMatch[2].toLowerCase();
-                               if (ampm === 'pm' && hour < 12) hour += 12;
-                               if (ampm === 'am' && hour === 12) hour = 0;
-                               windMap[hour] = dataPoint.wind;
+                if (hourlyWeatherData) {
+                     hourlyWeatherData.forEach(dp => {
+                          let m = dp.time.match(/(\d+):00([ap]m)/i);
+                          if (m) {
+                               let hour = parseInt(m[1]);
+                               if (m[2].toLowerCase() === 'pm' && hour < 12) hour += 12;
+                               if (m[2].toLowerCase() === 'am' && hour === 12) hour = 0;
+                               windMap[hour] = dp.wind;
                           }
                      });
                 }
-
                 db.collection('operaciones').doc('turno_actual').set({ windDataMap: windMap }, { merge: true });
 
                 const applyVariance = (timeStr, isForzoso = false) => {
                     if (isForzoso) return timeStr; 
-                    let parts = timeStr.split(':');
-                    let h = parseInt(parts[0]);
-                    let m = parseInt(parts[1]);
-                    let variance = Math.floor(Math.random() * 31) - 15; 
-                    let date = new Date(2026, 0, 1, h, m + variance);
-                    let newH = String(date.getHours()).padStart(2, '0');
-                    let newM = String(date.getMinutes()).padStart(2, '0');
-                    return `${newH}:${newM}`;
+                    let p = timeStr.split(':');
+                    let d = new Date(2026, 0, 1, parseInt(p[0]), parseInt(p[1]) + (Math.floor(Math.random() * 31) - 15));
+                    return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
                 };
 
-                // META ESTRICTA 13 VUELOS DIARIOS
-                let baseTimes = [
-                    "07:20", "08:35", "09:50", "11:05", "12:20", "13:35", 
-                    "14:50", "16:05", "17:20", "18:35", "19:50", "21:05", "22:20"
-                ];
+                // Base para 13 vuelos
+                let baseTimes = ["07:20", "08:35", "09:50", "11:05", "12:20", "13:35", "14:50", "16:05", "17:20", "18:35", "19:50", "21:05", "22:20"];
                 
                 let newSchedule = baseTimes.map((timeStr, index) => {
                     let isForzoso = (index === 0 || index === 8 || index === 11);
                     let finalTime = applyVariance(timeStr, isForzoso);
-                    let hour24 = parseInt(finalTime.split(':')[0]);
-                    
-                    return {
-                        time: finalTime,
-                        type: isForzoso ? "FORZOSO" : "DINÁMICO",
-                        wind: windMap[hour24] >= 40 ? 45 : (windMap[hour24] || 0),
-                        hour24: hour24
-                    };
+                    let h24 = parseInt(finalTime.split(':')[0]);
+                    return { time: finalTime, type: isForzoso ? "FORZOSO" : "DINÁMICO", wind: windMap[h24] >= 40 ? 45 : (windMap[h24] || 0), hour24: h24 };
                 });
 
                 db.collection('operaciones').doc('turno_actual').set({ flights: newSchedule }, { merge: true });
@@ -512,69 +472,41 @@
             const toggleRainProtocol = () => {
                 const newState = !isRaining;
                 db.collection('operaciones').doc('turno_actual').set({ isRaining: newState }, { merge: true });
-
-                if (newState) {
-                    speak("Alerta. Operaciones suspendidas por lluvia local.");
-                } else {
-                    speak("Lluvia finalizada. Calculando itinerario para recuperar vuelos perdidos.");
-                    recalculateAfterRain();
-                }
+                if (newState) speak("Operaciones suspendidas por lluvia local."); 
+                else { speak("Lluvia finalizada. Reprogramando vuelos faltantes."); recalculateAfterRain(); }
             };
 
             const recalculateAfterRain = () => {
-                const currentHour = currentTime.getHours();
-                const currentMinute = currentTime.getMinutes();
                 const remaining = totalFlightsTarget - loggedFlightsCountRef.current;
-
-                if (remaining <= 0) {
-                    speak("Meta alcanzada. No se requieren vuelos adicionales hoy.");
-                    return;
-                }
-
-                const endTime = 23 * 60 + 30; // 23:30 límite
-                const currentTimeInMins = currentHour * 60 + currentMinute + 15; // 15 mins margen
-                const timeWindow = endTime - currentTimeInMins;
+                if (remaining <= 0) return;
                 
-                if (timeWindow <= 0) {
-                    speak("Fuera de horario operativo. No es posible reprogramar.");
-                    return;
-                }
+                const currentSlot = currentTime.getHours() * 60 + currentTime.getMinutes() + 15;
+                const timeWindow = (23 * 60 + 30) - currentSlot;
+                if (timeWindow <= 0) return;
 
                 const interval = Math.floor(timeWindow / remaining);
                 let newSchedule = [];
-                let currentSlot = currentTimeInMins;
+                let slot = currentSlot;
 
                 for (let i = 0; i < remaining; i++) {
-                    let h = Math.floor(currentSlot / 60);
-                    let m = Math.floor(currentSlot % 60);
-                    let timeStr = `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
-                    let windAtHour = windDataMap[h] || 0;
-
-                    newSchedule.push({
-                        time: timeStr,
-                        type: "REPROGRAMADO",
-                        wind: windAtHour >= 40 ? 45 : windAtHour,
-                        hour24: h
-                    });
-                    currentSlot += interval;
+                    let h = Math.floor(slot / 60);
+                    let m = Math.floor(slot % 60);
+                    newSchedule.push({ time: `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`, type: "REPROGRAMADO", wind: windDataMap[h] || 0, hour24: h });
+                    slot += interval;
                 }
-                
                 db.collection('operaciones').doc('turno_actual').set({ flights: newSchedule }, { merge: true });
             };
 
             const handleLogManualFlight = () => {
-                 if (isRaining) {
-                     setModal({ isOpen: true, title: 'Bloqueo por Lluvia', message: 'No puedes registrar despegues durante lluvia.', type: 'error' });
-                     return;
-                 }
+                 if (isRaining) return setModal({ isOpen: true, title: 'Lluvia', message: 'No puedes registrar despegues.', type: 'error' });
                  if (loggedFlightsCount < totalFlightsTarget) {
-                      const newCount = loggedFlightsCount + 1;
-                      db.collection('operaciones').doc('turno_actual').set({ loggedFlightsCount: newCount }, { merge: true });
-                      speak(`Vuelo registrado. Total del día, ${newCount} de 13.`);
-                 } else {
-                      speak("Meta diaria de vuelos completada.");
+                      db.collection('operaciones').doc('turno_actual').set({ loggedFlightsCount: loggedFlightsCount + 1 }, { merge: true });
                  }
             };
+
+            // Helpers UI
+            const todayStrUI = `${currentTime.getFullYear()}-${String(currentTime.getMonth() + 1).padStart(2, '0')}-${String(currentTime.getDate()).padStart(2, '0')}`;
+            const todayShiftsUI = allMonthShifts.filter(s => s.date === todayStrUI);
 
             return (
                 <div className="min-h-screen p-4 max-w-2xl mx-auto pb-24" onClick={unlockAudio}>
@@ -585,28 +517,17 @@
                                 <span className="bg-indigo-600 text-white px-2 py-0.5 rounded text-xs">DP</span>
                                 DISPATCHER PRO
                             </h1>
-                            <p className="text-[10px] font-bold text-indigo-400 mt-1 tracking-widest uppercase">V42 MASTER • 🟢 NUBE COMPAT</p>
+                            <p className="text-[10px] font-bold text-emerald-400 mt-1 tracking-widest uppercase">V42 MASTER • 🟢 AUTO ZOHO</p>
                         </div>
                         <div className="flex gap-2">
-                            <button 
-                                onClick={(e) => { e.stopPropagation(); setAdminOpen(true); }}
-                                className="bg-[#1f2937] hover:bg-[#374151] p-2.5 rounded-lg border border-slate-700 transition"
-                                title="Panel de Administración"
-                            >
-                                👨‍💼
-                            </button>
-                            <button 
-                                onClick={(e) => { e.stopPropagation(); setSettingsOpen(true); }}
-                                className="bg-[#1f2937] hover:bg-[#374151] p-2.5 rounded-lg border border-slate-700 transition"
-                            >
-                                ⚙️
-                            </button>
+                            <button onClick={(e) => { e.stopPropagation(); setAdminOpen(true); }} className="bg-[#1f2937] hover:bg-[#374151] p-2.5 rounded-lg border border-slate-700 transition" title="Administración">👨‍💼</button>
+                            <button onClick={(e) => { e.stopPropagation(); setSettingsOpen(true); }} className="bg-[#1f2937] hover:bg-[#374151] p-2.5 rounded-lg border border-slate-700 transition">⚙️</button>
                         </div>
                     </div>
 
                     {!audioUnlocked && (
                         <div className="bg-amber-500/20 border border-amber-500/50 text-amber-400 text-xs font-bold text-center p-2 rounded-lg mb-4 animate-pulse shadow-md">
-                            🔇 Toca la pantalla para activar el Asistente de Voz y Alertas
+                            🔇 Toca la pantalla para activar el Asistente de Voz
                         </div>
                     )}
 
@@ -626,7 +547,7 @@
                             <div className="text-right flex flex-col items-end">
                                 <div className={`mb-3 px-4 py-2 rounded-xl border shadow-[0_0_20px_rgba(0,0,0,0.4)] transition-all ${shiftName === 'Turno Diurno' ? 'bg-amber-500/20 border-amber-500/50' : 'bg-fuchsia-600/20 border-fuchsia-500/50'}`}>
                                     <p className={`text-[10px] font-black uppercase tracking-widest ${shiftName === 'Turno Diurno' ? 'text-amber-400' : 'text-fuchsia-400'}`}>
-                                        {shiftName === 'Turno Diurno' ? '🎯 Faltan (Diurno)' : '🔄 Heredados (Noct.)'}
+                                        🎯 {shiftName === 'Turno Diurno' ? 'Faltan (Diurno)' : 'Heredados'}
                                     </p>
                                     <div className="text-2xl font-black text-white drop-shadow-md text-right mt-0.5">
                                         {shiftName === 'Turno Diurno' ? Math.max(0, 7 - loggedFlightsCount) : Math.max(0, 13 - loggedFlightsCount)}
@@ -638,45 +559,30 @@
                                     <span className="text-5xl font-black text-white tracking-tighter drop-shadow-lg">{loggedFlightsCount}</span>
                                     <span className="text-2xl font-bold text-indigo-500/70">/{totalFlightsTarget}</span>
                                 </div>
-                                <p className="text-[11px] text-indigo-300 font-black uppercase tracking-widest mt-2">📍 Avance Global</p>
                             </div>
                         </div>
                         
                         <div className="grid grid-cols-2 gap-3">
                             <input type="file" id="upload" accept="image/*" className="hidden" onChange={handleImageUpload} />
-                            <button 
-                                onClick={(e) => { e.stopPropagation(); document.getElementById('upload').click(); }}
-                                disabled={isScanning || isRaining}
-                                className={`w-full py-3 rounded-xl font-bold text-sm transition flex justify-center items-center gap-2 ${isScanning ? 'bg-indigo-900/50 text-indigo-300 animate-pulse' : isRaining ? 'bg-slate-800 text-slate-600 cursor-not-allowed' : 'bg-[#1e293b] hover:bg-[#334155] text-white border border-slate-700'}`}
-                            >
+                            <button onClick={(e) => { e.stopPropagation(); document.getElementById('upload').click(); }} disabled={isScanning || isRaining} className={`w-full py-3 rounded-xl font-bold text-sm transition flex justify-center items-center gap-2 ${isScanning ? 'bg-indigo-900/50 text-indigo-300 animate-pulse' : isRaining ? 'bg-slate-800 text-slate-600 cursor-not-allowed' : 'bg-[#1e293b] hover:bg-[#334155] text-white border border-slate-700'}`}>
                                 {isScanning ? '⏳ Analizando...' : '📸 ESCANEAR CLIMA'}
                             </button>
-                            
-                            <button 
-                                onClick={(e) => { e.stopPropagation(); toggleRainProtocol(); }}
-                                className={`w-full py-3 rounded-xl font-bold text-sm transition flex justify-center items-center gap-2 ${isRaining ? 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-[0_0_15px_rgba(16,185,129,0.4)]' : 'bg-rose-900/40 hover:bg-rose-900/60 text-rose-400 border border-rose-900'}`}
-                            >
+                            <button onClick={(e) => { e.stopPropagation(); toggleRainProtocol(); }} className={`w-full py-3 rounded-xl font-bold text-sm transition flex justify-center items-center gap-2 ${isRaining ? 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-[0_0_15px_rgba(16,185,129,0.4)]' : 'bg-rose-900/40 hover:bg-rose-900/60 text-rose-400 border border-rose-900'}`}>
                                 {isRaining ? '☀️ REANUDAR' : '🌧️ DECLARAR LLUVIA'}
                             </button>
                         </div>
                     </div>
 
-                    {isRaining && (
-                        <div className="bg-rose-600 text-white text-center p-3 rounded-xl mb-5 font-black uppercase tracking-wider text-sm shadow-[0_0_20px_rgba(225,29,72,0.5)] animate-pulse">
-                            ⚠️ OPERACIONES SUSPENDIDAS POR LLUVIA ⚠️
-                        </div>
-                    )}
-
                     <div className={`glass-card p-5 rounded-2xl mb-6 relative ${isRaining ? 'opacity-50 pointer-events-none' : ''}`}>
                         {isRaining && <div className="absolute inset-0 rain-overlay rounded-2xl z-10 flex items-center justify-center text-center p-4">
-                            <span className="text-white font-bold text-lg">Esperando que mejore el clima para calcular itinerario de {totalFlightsTarget - loggedFlightsCount} vuelos faltantes...</span>
+                            <span className="text-white font-bold text-lg">Esperando que mejore el clima...</span>
                         </div>}
 
                         <p className="text-[10px] font-bold tracking-widest text-slate-400 uppercase mb-3">🗓️ Plan Restante (Calculado)</p>
                         
                         {flights.length === 0 ? (
                             <div className="text-center py-6 text-xs font-bold text-slate-500">
-                                Sube una captura para generar el itinerario de vuelos.
+                                Sube una captura para generar el itinerario.
                             </div>
                         ) : (
                             <div className="space-y-2.5">
@@ -685,7 +591,7 @@
                                         <div>
                                             <div className="text-lg font-black text-white tracking-wide">{f.time}</div>
                                             <div className={`text-[10px] font-bold mt-0.5 uppercase tracking-wider flex items-center gap-1 ${f.wind >= 42 ? 'text-rose-500' : 'text-emerald-400'}`}>
-                                                {f.wind >= 42 ? `🚫 Suspendido (${f.wind} km/h)` : `✅ Libre (${f.wind} km/h)`}
+                                                {f.wind >= 42 ? `🚫 Suspendido` : `✅ Libre`}
                                             </div>
                                         </div>
                                         <span className={`text-[9px] font-black uppercase px-2.5 py-1 rounded border ${f.type === 'FORZOSO' ? 'bg-indigo-950 text-indigo-400 border-indigo-900' : f.type === 'REPROGRAMADO' ? 'bg-amber-950 text-amber-500 border-amber-900' : 'bg-slate-800 text-slate-400 border-slate-700'}`}>
@@ -698,106 +604,85 @@
                     </div>
 
                     <div className="fixed bottom-0 left-0 w-full p-4 bg-gradient-to-t from-[#0B0F19] via-[#0B0F19] to-transparent flex justify-center z-40 pointer-events-none">
-                         <button 
-                             onClick={(e) => { e.stopPropagation(); handleLogManualFlight(); }}
-                             disabled={isRaining}
-                             className={`pointer-events-auto w-full max-w-xs font-black py-3.5 rounded-xl transition transform hover:scale-105 ${isRaining ? 'bg-slate-800 text-slate-600' : 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-[0_0_20px_rgba(79,70,229,0.4)]'}`}
-                         >
+                         <button onClick={(e) => { e.stopPropagation(); handleLogManualFlight(); }} disabled={isRaining} className={`pointer-events-auto w-full max-w-xs font-black py-3.5 rounded-xl transition transform hover:scale-105 ${isRaining ? 'bg-slate-800 text-slate-600' : 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-[0_0_20px_rgba(79,70,229,0.4)]'}`}>
                              ✈️ REGISTRAR DESPEGUE AHORA
                          </button>
                     </div>
 
-                    {}
-                    {settingsOpen && (
-                        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4" onClick={(e) => e.stopPropagation()}>
-                            <div className="bg-[#131826] border border-slate-800 rounded-2xl w-full max-w-sm shadow-2xl p-6">
-                                <h2 className="text-lg font-black text-white mb-4">⚙️ Ajustes</h2>
-                                
-                                <div className="mb-5">
-                                    <label className="block text-[10px] font-bold tracking-widest text-slate-400 uppercase mb-2">
-                                        Llave Gemini API
-                                    </label>
-                                    <input 
-                                        type="password" 
-                                        value={geminiKey} 
-                                        onChange={e => setGeminiKey(e.target.value)}
-                                        placeholder="AQ. o AIzaSy..."
-                                        className="w-full bg-[#1e293b] border border-slate-700 rounded-lg p-2.5 text-white focus:border-indigo-500 outline-none transition font-mono text-xs"
-                                    />
-                                </div>
-
-                                <div className="flex gap-2">
-                                    <button onClick={() => setSettingsOpen(false)} className="flex-1 bg-slate-800 hover:bg-slate-700 text-white font-bold py-2.5 rounded-lg text-xs border border-slate-700">Cerrar</button>
-                                    <button onClick={() => { localStorage.setItem('gemini_key', geminiKey); setSettingsOpen(false); speak("Llave guardada exitosamente."); }} className="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2.5 rounded-lg text-xs">Guardar</button>
-                                </div>
-                            </div>
-                        </div>
-                    )}
-                    
-                    {}
+                    {/* MODAL DE ADMINISTRADOR PARA EL MES */}
                     {adminOpen && (
-                        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4" onClick={(e) => e.stopPropagation()}>
-                            <div className="bg-[#131826] border border-slate-800 rounded-2xl w-full max-w-md shadow-2xl p-6 max-h-[90vh] flex flex-col">
-                                <div>
-                                    <h2 className="text-lg font-black text-white mb-1 flex items-center gap-2">👨‍💼 Administración</h2>
-                                    <p className="text-xs text-slate-400 mb-5">Gestión de Horarios de Operadores</p>
-                                    
-                                    <div className="bg-[#0f172a] p-4 rounded-xl border border-indigo-500/40 mb-4 shadow-[0_0_15px_rgba(79,70,229,0.1)]">
-                                        <h3 className="text-xs font-bold text-indigo-300 uppercase tracking-widest mb-3 flex items-center gap-2">
-                                            📊 CARGA DEL MES COMPLETO (CSV)
-                                        </h3>
-                                        <input type="file" id="csv-upload" accept=".csv" className="hidden" onChange={handleCSVUpload} />
-                                        <button 
-                                            onClick={() => document.getElementById('csv-upload').click()}
-                                            disabled={isScanningCSV}
-                                            className={`w-full py-3 rounded-lg text-sm font-bold transition flex justify-center items-center gap-2 ${isScanningCSV ? 'bg-indigo-900/50 text-indigo-300 animate-pulse' : 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-md'}`}
-                                        >
-                                            {isScanningCSV ? '⏳ Procesando...' : '📄 Subir Horario (.CSV)'}
-                                        </button>
-                                        <p className="text-[9px] text-slate-400 mt-2 text-center">Sube el mes entero. El sistema guardará todo<br/>pero solo mostrará los turnos del día actual.</p>
-                                    </div>
-
-                                    <div className="flex justify-between items-center mb-3">
-                                        <h3 className="text-xs font-bold text-slate-300 uppercase tracking-widest">TURNOS FILTRADOS (SOLO DE HOY)</h3>
-                                        <span className="text-[9px] bg-slate-800 text-slate-400 px-2 py-0.5 rounded-full">Total en BD: {operators.length}</span>
-                                    </div>
+                        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4" onClick={() => setAdminOpen(false)}>
+                            <div className="bg-[#131826] border border-slate-800 rounded-2xl w-full max-w-md shadow-2xl p-6" onClick={e => e.stopPropagation()}>
+                                <div className="flex justify-between items-center mb-4">
+                                    <h2 className="text-lg font-black text-white flex items-center gap-2">👨‍💼 Administración</h2>
+                                    <button onClick={clearDB} className="text-[9px] bg-rose-900/40 text-rose-400 px-2 py-1 rounded border border-rose-900 uppercase font-bold hover:bg-rose-900/60">Limpiar Nube</button>
+                                </div>
+                                
+                                <div className="bg-indigo-900/20 border border-indigo-500/30 p-4 rounded-xl mb-6 text-center">
+                                    <h3 className="text-xs font-black tracking-widest text-indigo-400 uppercase mb-2">
+                                        📅 CARGA INTELIGENTE DEL MES (ZOHO)
+                                    </h3>
+                                    <p className="text-[10px] text-slate-400 mb-4 leading-relaxed">
+                                        Sube el archivo de Excel o CSV original de Zoho Shifts. El sistema procesará toda la cuadrícula (fechas vs nombres) y asignará operadores automáticamente cada día del mes.
+                                    </p>
+                                    <input type="file" id="monthUpload" accept=".csv, .xls, .xlsx" className="hidden" onChange={handleFileUpload} />
+                                    <button onClick={() => document.getElementById('monthUpload').click()} className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-3.5 rounded-lg text-sm shadow-[0_0_15px_rgba(79,70,229,0.3)] transition transform hover:scale-105">
+                                        📄 Subir Archivo Zoho (.CSV / .XLSX)
+                                    </button>
                                 </div>
 
-                                <div className="overflow-y-auto flex-1 mb-4 bg-[#0f172a] p-3 rounded-xl border border-slate-800 min-h-[150px]">
-                                    {todaysOperators.length === 0 ? (
-                                        <p className="text-xs text-slate-500 text-center py-6">No hay turnos programados para el día de hoy.</p>
-                                    ) : (
-                                        <div className="space-y-2">
-                                            {todaysOperators.map((op, idx) => (
-                                                <div key={idx} className="flex justify-between items-center bg-[#1e293b] p-3 rounded-lg border border-slate-700">
-                                                    <div>
-                                                        <p className="font-bold text-sm text-white">{op.name}</p>
-                                                        <p className="text-[10px] text-slate-400">{op.start} hrs - {op.end} hrs</p>
-                                                    </div>
-                                                    <button onClick={() => handleRemoveOperator(idx, true)} className="bg-rose-900/50 hover:bg-rose-900 text-rose-400 px-3 py-1.5 rounded-lg transition text-xs font-bold">
-                                                        Eliminar
-                                                    </button>
-                                                </div>
-                                            ))}
+                                <div className="flex justify-between items-center mb-3">
+                                    <p className="text-[10px] font-bold tracking-widest text-emerald-400 uppercase">Turnos de Hoy ({todayStrUI})</p>
+                                    <span className="text-[10px] bg-slate-800 text-slate-300 px-2 py-0.5 rounded font-bold border border-slate-700">Total Nube: {allMonthShifts.length}</span>
+                                </div>
+
+                                <div className="space-y-2 mb-6 max-h-48 overflow-y-auto pr-1">
+                                    {todayShiftsUI.length === 0 ? (
+                                        <div className="text-center py-6 bg-[#0f172a] rounded-xl border border-slate-800 text-xs text-slate-500">
+                                            No hay turnos registrados para hoy. Sube el archivo del mes.
                                         </div>
+                                    ) : (
+                                        todayShiftsUI.map((op, i) => (
+                                            <div key={i} className="flex justify-between items-center bg-[#0f172a] p-3 rounded-lg border border-slate-800">
+                                                <div>
+                                                    <p className="font-bold text-white text-sm">{op.name}</p>
+                                                    <p className="text-[10px] text-slate-400">{op.start} - {op.end}</p>
+                                                </div>
+                                            </div>
+                                        ))
                                     )}
                                 </div>
 
-                                <button onClick={() => setAdminOpen(false)} className="w-full bg-slate-700 hover:bg-slate-600 text-white font-bold py-3 rounded-lg text-sm transition mt-auto">
+                                <button onClick={() => setAdminOpen(false)} className="w-full bg-slate-800 hover:bg-slate-700 text-white font-bold py-3 rounded-xl border border-slate-700 transition">
                                     Cerrar Panel
                                 </button>
                             </div>
                         </div>
                     )}
-                    
-                    {}
-                    {modal.isOpen && (
+
+                    {settingsOpen && (
                         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4" onClick={(e) => e.stopPropagation()}>
                             <div className="bg-[#131826] border border-slate-800 rounded-2xl w-full max-w-sm shadow-2xl p-6">
+                                <h2 className="text-lg font-black text-white mb-4">⚙️ Ajustes</h2>
+                                <div className="mb-5">
+                                    <label className="block text-[10px] font-bold tracking-widest text-slate-400 uppercase mb-2">Llave Gemini API (Clima)</label>
+                                    <input type="password" value={geminiKey} onChange={e => setGeminiKey(e.target.value)} placeholder="AIzaSy..." className="w-full bg-[#1e293b] border border-slate-700 rounded-lg p-2.5 text-white outline-none font-mono text-xs" />
+                                </div>
+                                <div className="flex gap-2">
+                                    <button onClick={() => setSettingsOpen(false)} className="flex-1 bg-slate-800 hover:bg-slate-700 text-white font-bold py-2.5 rounded-lg text-xs border border-slate-700">Cerrar</button>
+                                    <button onClick={() => { localStorage.setItem('gemini_key', geminiKey); setSettingsOpen(false); speak("Llave guardada."); }} className="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2.5 rounded-lg text-xs">Guardar</button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                    
+                    {modal.isOpen && (
+                        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4" onClick={(e) => e.stopPropagation()}>
+                            <div className="bg-[#131826] border border-slate-800 rounded-2xl w-full max-w-sm shadow-2xl p-6 text-center">
                                 <h2 className="text-lg font-black text-white mb-2">{modal.title}</h2>
                                 <p className="text-slate-300 text-sm mb-6">{modal.message}</p>
-                                <button onClick={() => setModal({ ...modal, isOpen: false })} className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2.5 rounded-lg text-xs">
-                                    Entendido
+                                <button onClick={() => setModal({ ...modal, isOpen: false })} className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-3 rounded-lg text-xs">
+                                    Aceptar
                                 </button>
                             </div>
                         </div>
