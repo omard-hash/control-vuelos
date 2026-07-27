@@ -275,6 +275,18 @@
                                 return `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
                             }
 
+                            // Buscar en la misma fila en otras columnas
+                            for(let c = 0; c < grid[rowIdx].length; c++) {
+                                let cellText = String(grid[rowIdx][c]).trim();
+                                let match = cellText.match(/\b(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})\b/);
+                                if(match) {
+                                    let y = match[3].length === 2 ? `20${match[3]}` : match[3];
+                                    let m = match[2]; let d = match[1];
+                                    if(parseInt(m) > 12) { let temp = m; m = d; d = temp; }
+                                    return `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+                                }
+                            }
+
                             for(let r = rowIdx; r >= Math.max(0, rowIdx - 10); r--) {
                                 let celdaArriba = String(grid[r][colIdx]).trim();
                                 let matchDiaMes = celdaArriba.match(/\b(?:lun|mar|mi[eé]|jue|vie|s[aá]b|dom|mon|tue|wed|thu|fri|sat|sun)[^\d]*(\d{1,2})\b/i);
@@ -305,23 +317,26 @@
                                     let end = parseTimeStr(times[1]);
                                     
                                     let cleanName = "";
-                                    let lineas = cellText.split('\n');
-                                    for(let linea of lineas) {
-                                        if(/[a-zA-Z]{3,}/.test(linea) && !/\d/.test(linea)) {
-                                            let tempName = linea.replace(/Especialista|RPAS|OS|Audi|M[eé]xico|Turno|lun|mar|mi[eé]|jue|vie|s[aá]b|dom/gi, '').trim();
-                                            if(tempName.length > 3) {
-                                                cleanName = tempName; 
-                                                break; 
-                                            }
+                                    
+                                    // Buscar nombre en la misma fila (Ignorar fechas y horas puras)
+                                    for (let sc = 0; sc < row.length; sc++) {
+                                        let scText = String(row[sc]).trim();
+                                        if (scText.length > 5 && !/\d/.test(scText) && !scText.toLowerCase().includes('especialista') && !scText.toLowerCase().includes('audi')) {
+                                            cleanName = scText;
+                                            break;
                                         }
                                     }
-
+                                    
+                                    // Respaldo por si está en la misma celda multilinea
                                     if(!cleanName) {
-                                        for (let sc = 0; sc < row.length; sc++) {
-                                            let scText = String(row[sc]).trim();
-                                            if(scText.length > 3 && !/\d/.test(scText)) {
-                                                 let tempName = scText.replace(/Especialista|RPAS|OS|Audi|M[eé]xico|Turno/gi, '').trim();
-                                                 if(tempName.length > 3) { cleanName = tempName; break; }
+                                        let lineas = cellText.split('\n');
+                                        for(let linea of lineas) {
+                                            if(/[a-zA-Z]{3,}/.test(linea) && !/\d/.test(linea)) {
+                                                let tempName = linea.replace(/Especialista|RPAS|OS|Audi|M[eé]xico|Turno|lun|mar|mi[eé]|jue|vie|s[aá]b|dom/gi, '').trim();
+                                                if(tempName.length > 5) {
+                                                    cleanName = tempName; 
+                                                    break; 
+                                                }
                                             }
                                         }
                                     }
@@ -384,7 +399,7 @@
                 reader.readAsDataURL(file);
             };
 
-            // ESTA FUNCIÓN SE HA RESTAURADO EXACTAMENTE A TU ORIGINAL V42 MASTER (Solo se mejoró la limpieza del texto)
+            // SE HA RESTAURADO EXACTAMENTE LA VERSIÓN V42 MASTER QUE FUNCIONABA PERFECTO
             const analyzeImageWithAI = async (base64Image) => {
                 setIsScanning(true);
                 speak("Analizando variables de viento e intervalos de lluvia...");
@@ -403,30 +418,48 @@
                     };
 
                     const response = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-                    if (!response.ok) throw new Error("Error de conexión con la IA.");
+                    if (!response.ok) {
+                        const errData = await response.json().catch(()=>({}));
+                        throw new Error(errData.error?.message || "Error HTTP al conectar con Gemini.");
+                    }
 
                     const data = await response.json();
+                    if (!data.candidates || data.candidates.length === 0) throw new Error("Google rechazó la solicitud (Cuota agotada o imagen inválida).");
+                    
                     let aiResponseText = data.candidates[0].content.parts[0].text;
                     
-                    // Limpieza ultra robusta para evitar errores de parseo
+                    // Limpieza ultra robusta para evitar errores de parseo (ORIGINAL)
                     aiResponseText = aiResponseText.replace(/```json/ig, '').replace(/```/g, '').trim();
                     
-                    const parsedData = JSON.parse(aiResponseText);
+                    let parsedData;
+                    try {
+                        parsedData = JSON.parse(aiResponseText);
+                    } catch (e) {
+                         throw new Error("La IA no devolvió el formato JSON correcto. Reintenta subir la captura.");
+                    }
+
                     if (parsedData && parsedData.hourlyData) {
                          generateIntelligentSchedule(parsedData.hourlyData);
                          speak("Itinerario estrictamente balanceado a trece vuelos.");
-                    } else throw new Error("Formato IA incorrecto.");
+                    } else throw new Error("Formato IA incorrecto, falta hourlyData.");
 
                 } catch (error) {
                     console.error("AI Parse Error:", error);
                     speak("Error al analizar el clima.");
+                    // Ventana de diagnóstico por si hay problemas de cuota o de key
+                    setModal({ 
+                        isOpen: true, 
+                        title: 'Diagnóstico IA', 
+                        message: `Detalle: ${error.message}\n\n1. Revisa tu Llave (⚙️) y que no tenga espacios.\n2. Reintenta subir la imagen.`, 
+                        type: 'error' 
+                    });
                     generateIntelligentSchedule([]); 
                 } finally {
                     setIsScanning(false);
                 }
             };
 
-            // ESTA FUNCIÓN SE HA RESTAURADO EXACTAMENTE A TU ORIGINAL V42 MASTER
+            // EXACTAMENTE COMO EN EL V42 MASTER
             const generateIntelligentSchedule = (hourlyWeatherData) => {
                 let windMap = {};
                 for(let i=0; i<24; i++) windMap[i] = 0;
@@ -589,7 +622,7 @@
                                 <div className="mt-1 text-3xl font-mono font-bold text-white tracking-wider">
                                     {currentTime.toLocaleTimeString('en-US', { hour12: false })}
                                 </div>
-                                <div className="mt-3 inline-flex items-center gap-1.5 bg-indigo-900/40 text-indigo-200 px-3 py-1.5 rounded-lg border border-indigo-500/30 text-xs font-bold shadow-inner truncate max-w-[200px]">
+                                <div className="mt-3 inline-flex items-center gap-1.5 bg-indigo-900/40 text-indigo-200 px-3 py-1.5 rounded-lg border border-indigo-500/30 text-xs font-bold shadow-inner truncate max-w-[250px]">
                                     <span className="text-indigo-400">👨‍✈️ PILOTO:</span> {currentOperator}
                                 </div>
                             </div>
@@ -615,7 +648,7 @@
                         <div className="grid grid-cols-2 gap-3 mb-3">
                             <input type="file" id="uploadWeather" accept="image/*" className="hidden" onChange={handleImageUpload} />
                             <button onClick={(e) => { e.stopPropagation(); document.getElementById('uploadWeather').click(); }} disabled={isScanning || isRaining || isFoggy} className={`col-span-2 py-3 rounded-xl font-bold text-sm transition flex justify-center items-center gap-2 ${isScanning ? 'bg-indigo-900/50 text-indigo-300 animate-pulse' : (isRaining || isFoggy) ? 'bg-slate-800 text-slate-600 cursor-not-allowed' : 'bg-[#1e293b] hover:bg-[#334155] text-white border border-slate-700'}`}>
-                                {isScanning ? '⏳ Analizando...' : '📸 ESCANEAR CLIMA (13 VUELOS)'}
+                                {isScanning ? '⏳ Analizando IA...' : '📸 ESCANEAR CLIMA (13 VUELOS)'}
                             </button>
                             
                             <button onClick={(e) => { e.stopPropagation(); toggleRainProtocol(); }} className={`py-3 rounded-xl font-bold text-[11px] transition flex justify-center items-center gap-1 ${isRaining ? 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-[0_0_15px_rgba(16,185,129,0.4)]' : 'bg-rose-900/40 hover:bg-rose-900/60 text-rose-400 border border-rose-900'}`}>
@@ -680,7 +713,7 @@
                                         📅 CARGA INTELIGENTE (ZOHO CSV/XLSX)
                                     </h3>
                                     <p className="text-[10px] text-slate-400 mb-4 leading-relaxed">
-                                        Sube tu archivo (incluso si está desordenado). El Escáner Profundo encontrará las fechas, tu nombre completo y armará tu turno.
+                                        Sube tu archivo. El escáner sacará el nombre completo ignorando puestos como "Especialista".
                                     </p>
                                     <input type="file" id="excelUpload" accept=".csv, .xlsx" className="hidden" onChange={handleExcelUpload} />
                                     <button onClick={() => document.getElementById('excelUpload').click()} disabled={isUploading} className={`w-full font-bold py-3.5 rounded-lg text-sm shadow-[0_0_15px_rgba(79,70,229,0.3)] transition flex justify-center items-center gap-2 ${isUploading ? 'bg-indigo-800 text-indigo-300 cursor-not-allowed' : 'bg-indigo-600 hover:bg-indigo-500 text-white transform hover:scale-105'}`}>
