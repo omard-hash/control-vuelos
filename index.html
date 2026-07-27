@@ -11,7 +11,10 @@
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     
-    <!-- FIREBASE COMPAT (Tu conexión original y segura v10) -->
+    <!-- Lector de Excel / CSV (SheetJS) -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+    
+    <!-- FIREBASE COMPAT (Conexión Original V10) -->
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore-compat.js"></script>
@@ -70,12 +73,13 @@
             const [adminOpen, setAdminOpen] = useState(false);
             const [allMonthShifts, setAllMonthShifts] = useState([]);
             const [currentOperator, setCurrentOperator] = useState('Sin asignar');
-            const [isUploadingPDF, setIsUploadingPDF] = useState(false);
+            const [isUploading, setIsUploading] = useState(false);
             
-            // Referencias para usarlas en intervalos y callbacks sin problemas de renderizado
+            // Referencias para usarlas en intervalos sin problemas de renderizado
             const flightsRef = useRef([]);
             const isRainingRef = useRef(false);
             const allMonthShiftsRef = useRef([]);
+            const loggedFlightsCountRef = useRef(0);
             const authReady = useRef(false);
 
             useEffect(() => {
@@ -92,11 +96,11 @@
                             if (data.flights) {
                                 setFlights(data.flights);
                                 flightsRef.current = data.flights;
-                            } else {
-                                setFlights([]);
-                                flightsRef.current = [];
                             }
-                            if (data.loggedFlightsCount !== undefined) setLoggedFlightsCount(data.loggedFlightsCount);
+                            if (data.loggedFlightsCount !== undefined) {
+                                setLoggedFlightsCount(data.loggedFlightsCount);
+                                loggedFlightsCountRef.current = data.loggedFlightsCount;
+                            }
                             if (data.isRaining !== undefined) {
                                 setIsRaining(data.isRaining);
                                 isRainingRef.current = data.isRaining;
@@ -105,11 +109,14 @@
                         }
                     }, (err) => console.error("Error leyendo turno:", err));
 
-                    // 2. Escuchar TODOS los turnos del mes subidos desde Excel/PDF
+                    // 2. Escuchar TODOS los turnos del mes subidos desde CSV/XLSX
                     unsubscribeMes = db.collection('operaciones').doc('turnos_mes').onSnapshot((doc) => {
                         if (doc.exists && doc.data().turnos) {
                             setAllMonthShifts(doc.data().turnos);
                             allMonthShiftsRef.current = doc.data().turnos;
+                        } else {
+                            setAllMonthShifts([]);
+                            allMonthShiftsRef.current = [];
                         }
                     }, (err) => console.error("Error leyendo mes:", err));
 
@@ -170,10 +177,10 @@
                             let endMins = parseInt(endParts[0]) * 60 + parseInt(endParts[1]);
 
                             if (startMins <= endMins) {
-                                // Turno normal (ej. 07:00 a 15:00)
+                                // Turno normal (ej. 07:00 a 19:00)
                                 if (currentMins >= startMins && currentMins < endMins) foundOp = shift.name;
                             } else {
-                                // Turno cruzado (ej. 18:50 a 07:00 del día siguiente)
+                                // Turno nocturno (ej. 18:50 a 07:00 del día siguiente)
                                 if (currentMins >= startMins || currentMins < endMins) foundOp = shift.name;
                             }
                         }
@@ -190,7 +197,7 @@
                             loggedFlightsCount: 0,
                             isRaining: false,
                             windDataMap: {}
-                        }, { merge: true });
+                        });
                     }
                     
                     // ==========================================
@@ -226,101 +233,103 @@
                 return () => clearInterval(timer);
             }, []);
 
-            const handlePDFUpload = async (e) => {
+            const handleExcelUpload = (e) => {
                 const file = e.target.files[0];
                 if (!file) return;
 
-                if (!geminiKey || geminiKey.trim() === '') {
-                    setModal({ isOpen: true, title: 'Falta Llave API', message: 'Abre los ajustes (⚙️) y pega tu llave de Gemini para poder leer PDFs.', type: 'error' });
-                    return;
-                }
+                setIsUploading(true);
+                const reader = new FileReader();
 
-                setIsUploadingPDF(true);
-                speak("Leyendo documento PDF con Inteligencia Artificial...");
-
-                try {
-                    const reader = new FileReader();
-                    reader.readAsDataURL(file);
-                    
-                    reader.onload = async () => {
-                        const base64Data = reader.result.split(',')[1];
+                reader.onload = (evt) => {
+                    try {
+                        const data = evt.target.result;
+                        // Usar SheetJS para leer el archivo binario (.xlsx o .csv)
+                        const workbook = XLSX.read(data, { type: 'binary' });
+                        const sheet = workbook.Sheets[workbook.SheetNames[0]];
+                        const json = XLSX.utils.sheet_to_json(sheet, { header: 1 });
                         
-                        const key = geminiKey.trim();
-                        // Nota: Usamos gemini-1.5-flash porque es mejor para documentos
-                        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${key}`;
-                        
-                        const prompt = `
-Analiza este documento PDF que contiene un horario de turnos (tipo calendario).
-Tu tarea es extraer TODOS los turnos para todos los días y devolverlos en un formato JSON estricto.
+                        let turnosExtraidos = [];
+                        let defaultMonth = new Date().getMonth() + 1;
+                        let defaultYear = new Date().getFullYear();
 
-Reglas de extracción:
-1. Identifica el mes y el año (parece ser Julio 2026).
-2. Cada celda del calendario representa un día.
-3. Dentro de cada celda hay nombres y horarios.
-4. Ignora textos como "Especialista RPAS OS", "Audi México", "Turno", "Horario". Solo quiero el nombre de la persona (ej. "Omar Anton", "Jonathan Ro", "Jairo Añorve", "Cesar Danie").
-5. Extrae la hora de inicio y fin (ej. "06:50" y "19:00", o "18:50" y "07:00").
-6. Formatea la fecha como YYYY-MM-DD (ej. "2026-07-27" para el 27 de julio).
-7. Devuelve SOLO un JSON válido con esta estructura:
-{
-  "turnos": [
-    { "date": "2026-07-01", "name": "Cesar Danie", "start": "06:50", "end": "19:00" },
-    { "date": "2026-07-01", "name": "Jonathan Ro", "start": "18:50", "end": "07:00" },
-    ...
-  ]
-}
-No incluyas markdown (como \`\`\`json), solo el JSON puro. Asegúrate de procesar todos los días del mes que aparezcan en el calendario.
-`;
-
-                        const payload = {
-                            contents: [{
-                                parts: [
-                                    { text: prompt },
-                                    { inline_data: { mime_type: "application/pdf", data: base64Data } }
-                                ]
-                            }]
-                        };
-
-                        const response = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-                        
-                        if (!response.ok) {
-                             const errorData = await response.json();
-                             throw new Error(`Error API: ${errorData.error?.message || response.statusText}`);
+                        // 1. Extraer Mes y Año de la parte superior del documento (ej. 01/07/2026-31/07/2026)
+                        const fullText = json.flat().join(' ');
+                        const dateRangeMatch = fullText.match(/(\d{2})\/(\d{2})\/(\d{4})/);
+                        if (dateRangeMatch) {
+                            defaultMonth = parseInt(dateRangeMatch[2]);
+                            defaultYear = parseInt(dateRangeMatch[3]);
                         }
 
-                        const data = await response.json();
-                        let aiResponseText = data.candidates[0].content.parts[0].text;
-                        
-                        // Limpiar markdown si Gemini lo incluye a pesar de las instrucciones
-                        aiResponseText = aiResponseText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
-                        
-                        let parsedData;
-                        try {
-                            parsedData = JSON.parse(aiResponseText);
-                        } catch (parseError) {
-                            console.error("Error parseando JSON de Gemini:", aiResponseText);
-                            throw new Error("Gemini no devolvió un formato JSON válido.");
+                        // 2. Escáner Profundo de Cuadrícula
+                        for (let r = 0; r < json.length; r++) {
+                            let row = json[r];
+                            if (!row) continue;
+
+                            for (let c = 0; c < row.length; c++) {
+                                let cellValue = row[c];
+                                if (typeof cellValue === 'string') {
+                                    // Buscar patrón de horario "06:50-19:00 Nombre"
+                                    let timeMatch = cellValue.match(/(\d{2}:\d{2})\s*-\s*(\d{2}:\d{2})\s*([A-Za-zÁÉÍÓÚáéíóúñÑ ]+)/);
+                                    
+                                    if (timeMatch) {
+                                        let start = timeMatch[1];
+                                        let end = timeMatch[2];
+                                        let rawName = timeMatch[3].trim();
+                                        
+                                        // Limpiar títulos largos de Zoho
+                                        rawName = rawName.replace(/Especialista.*/gi, '').replace(/Audi.*/gi, '').replace(/RPAS.*/gi, '').trim();
+                                        // Dejar solo nombre y un apellido por limpieza
+                                        let cleanName = rawName.split(/\s+/).slice(0, 2).join(' ');
+
+                                        // Buscar el número del DÍA mirando HACIA ARRIBA en la misma columna
+                                        let day = null;
+                                        for (let lookUpRow = r - 1; lookUpRow >= 0; lookUpRow--) {
+                                            let upCell = json[lookUpRow][c];
+                                            if (upCell) {
+                                                // Convertir a texto por si viene como número en Excel
+                                                let cellText = String(upCell).replace(/[a-zA-Z]/g, '').trim();
+                                                let possibleDay = parseInt(cellText);
+                                                
+                                                if (!isNaN(possibleDay) && possibleDay >= 1 && possibleDay <= 31) {
+                                                    day = possibleDay;
+                                                    break;
+                                                }
+                                            }
+                                        }
+                                        
+                                        if (day) {
+                                            let dateStr = `${defaultYear}-${String(defaultMonth).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                                            turnosExtraidos.push({
+                                                date: dateStr,
+                                                name: cleanName,
+                                                start: start,
+                                                end: end
+                                            });
+                                        }
+                                    }
+                                }
+                            }
                         }
 
-                        if (parsedData && parsedData.turnos && parsedData.turnos.length > 0) {
-                            db.collection('operaciones').doc('turnos_mes').set({ turnos: parsedData.turnos });
-                            speak(`Lectura de PDF exitosa. Se guardaron ${parsedData.turnos.length} turnos.`);
-                            setModal({ isOpen: true, title: '✅ PDF Procesado', message: `Se extrajeron ${parsedData.turnos.length} turnos exitosamente usando IA.`, type: 'success' });
+                        if (turnosExtraidos.length > 0) {
+                            db.collection('operaciones').doc('turnos_mes').set({ turnos: turnosExtraidos });
+                            speak(`Documento analizado. Se cargaron ${turnosExtraidos.length} turnos exitosamente.`);
+                            setModal({ isOpen: true, title: '✅ Carga Exitosa', message: `Se extrajeron ${turnosExtraidos.length} turnos de la cuadrícula.\nRecuerda revisar que hayas subido el mes correcto.`, type: 'success' });
                         } else {
-                            throw new Error("No se encontraron turnos en la respuesta de la IA.");
+                            speak("El sistema no logró encontrar turnos en este documento.");
+                            setModal({ isOpen: true, title: 'Formato Irreconocible', message: 'No se encontraron horarios válidos (ej. 07:00 - 15:00) ni fechas en columnas.', type: 'error' });
                         }
-                        setIsUploadingPDF(false);
-                    };
-                    
-                    reader.onerror = (error) => {
-                        throw new Error("Error al leer el archivo localmente.");
-                    }
 
-                } catch (error) {
-                    console.error("PDF Upload Error:", error);
-                    setIsUploadingPDF(false);
-                    speak("Error al analizar el PDF.");
-                    setModal({ isOpen: true, title: 'Error de Lectura PDF', message: error.message, type: 'error' });
-                }
+                    } catch (error) {
+                        console.error("Error parseando Excel/CSV:", error);
+                        setModal({ isOpen: true, title: 'Error de Archivo', message: 'No se pudo leer el archivo. Intenta exportarlo nuevamente.', type: 'error' });
+                    } finally {
+                        setIsUploading(false);
+                    }
+                };
+                
+                // Lee el archivo de manera binaria para que SheetJS pueda procesarlo
+                reader.readAsBinaryString(file);
             };
 
             const clearDB = () => {
@@ -430,7 +439,7 @@ No incluyas markdown (como \`\`\`json), solo el JSON puro. Asegúrate de procesa
             };
 
             const recalculateAfterRain = () => {
-                const remaining = totalFlightsTarget - loggedFlightsCountRef?.current || (totalFlightsTarget - loggedFlightsCount);
+                const remaining = totalFlightsTarget - loggedFlightsCountRef.current;
                 if (remaining <= 0) return;
                 
                 const currentSlot = currentTime.getHours() * 60 + currentTime.getMinutes() + 15;
@@ -469,7 +478,7 @@ No incluyas markdown (como \`\`\`json), solo el JSON puro. Asegúrate de procesa
                                 <span className="bg-indigo-600 text-white px-2 py-0.5 rounded text-xs">DP</span>
                                 DISPATCHER PRO
                             </h1>
-                            <p className="text-[10px] font-bold text-emerald-400 mt-1 tracking-widest uppercase">V42 MASTER • 🟢 AUTO ZOHO PDF</p>
+                            <p className="text-[10px] font-bold text-emerald-400 mt-1 tracking-widest uppercase">V42 MASTER • 🟢 AUTO ZOHO CSV</p>
                         </div>
                         <div className="flex gap-2">
                             <button onClick={(e) => { e.stopPropagation(); setAdminOpen(true); }} className="bg-[#1f2937] hover:bg-[#374151] p-2.5 rounded-lg border border-slate-700 transition" title="Administración">👨‍💼</button>
@@ -572,26 +581,26 @@ No incluyas markdown (como \`\`\`json), solo el JSON puro. Asegúrate de procesa
                                 
                                 <div className="bg-indigo-900/20 border border-indigo-500/30 p-4 rounded-xl mb-6 text-center">
                                     <h3 className="text-xs font-black tracking-widest text-indigo-400 uppercase mb-2">
-                                        📅 CARGA INTELIGENTE DEL MES (PDF ZOHO)
+                                        📅 CARGA INTELIGENTE DEL MES (ZOHO)
                                     </h3>
                                     <p className="text-[10px] text-slate-400 mb-4 leading-relaxed">
-                                        Sube el archivo <strong>PDF original</strong> exportado de Zoho Shifts. El sistema usará IA para leer el calendario, extraer los turnos y asignarlos automáticamente todo el mes.
+                                        Sube el archivo de Excel (.xlsx) o CSV original de Zoho Shifts. El sistema procesará toda la cuadrícula y asignará operadores automáticamente todo el mes.
                                     </p>
-                                    <input type="file" id="pdfUpload" accept="application/pdf" className="hidden" onChange={handlePDFUpload} />
-                                    <button onClick={() => document.getElementById('pdfUpload').click()} disabled={isUploadingPDF} className={`w-full font-bold py-3.5 rounded-lg text-sm shadow-[0_0_15px_rgba(79,70,229,0.3)] transition flex justify-center items-center gap-2 ${isUploadingPDF ? 'bg-indigo-800 text-indigo-300 cursor-not-allowed' : 'bg-indigo-600 hover:bg-indigo-500 text-white transform hover:scale-105'}`}>
-                                        {isUploadingPDF ? '⏳ Leyendo PDF con IA...' : '📄 Subir Horario Mensual (.PDF)'}
+                                    <input type="file" id="excelUpload" accept=".csv, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel" className="hidden" onChange={handleExcelUpload} />
+                                    <button onClick={() => document.getElementById('excelUpload').click()} disabled={isUploading} className={`w-full font-bold py-3.5 rounded-lg text-sm shadow-[0_0_15px_rgba(79,70,229,0.3)] transition flex justify-center items-center gap-2 ${isUploading ? 'bg-indigo-800 text-indigo-300 cursor-not-allowed' : 'bg-indigo-600 hover:bg-indigo-500 text-white transform hover:scale-105'}`}>
+                                        {isUploading ? '⏳ Analizando cuadrícula...' : '📄 Subir Horario Mensual (.CSV o .XLSX)'}
                                     </button>
                                 </div>
 
                                 <div className="flex justify-between items-center mb-3">
                                     <p className="text-[10px] font-bold tracking-widest text-emerald-400 uppercase">Turnos de Hoy ({todayStrUI})</p>
-                                    <span className="text-[10px] bg-slate-800 text-slate-300 px-2 py-0.5 rounded font-bold border border-slate-700">Total Nube: {allMonthShifts.length}</span>
+                                    <span className="text-[10px] bg-slate-800 text-slate-300 px-2 py-0.5 rounded font-bold border border-slate-700">Total en BD: {allMonthShifts.length}</span>
                                 </div>
 
                                 <div className="space-y-2 mb-6 max-h-48 overflow-y-auto pr-1">
                                     {todayShiftsUI.length === 0 ? (
                                         <div className="text-center py-6 bg-[#0f172a] rounded-xl border border-slate-800 text-xs text-slate-500">
-                                            No hay turnos registrados para hoy. Sube el PDF del mes.
+                                            No hay turnos registrados para hoy. Revisa haber subido el mes correcto.
                                         </div>
                                     ) : (
                                         todayShiftsUI.map((op, i) => (
@@ -618,7 +627,7 @@ No incluyas markdown (como \`\`\`json), solo el JSON puro. Asegúrate de procesa
                             <div className="bg-[#131826] border border-slate-800 rounded-2xl w-full max-w-sm shadow-2xl p-6">
                                 <h2 className="text-lg font-black text-white mb-4">⚙️ Ajustes</h2>
                                 <div className="mb-5">
-                                    <label className="block text-[10px] font-bold tracking-widest text-slate-400 uppercase mb-2">Llave Gemini API</label>
+                                    <label className="block text-[10px] font-bold tracking-widest text-slate-400 uppercase mb-2">Llave Gemini API (Para escaneo de Clima)</label>
                                     <input type="password" value={geminiKey} onChange={e => setGeminiKey(e.target.value)} placeholder="AIzaSy..." className="w-full bg-[#1e293b] border border-slate-700 rounded-lg p-2.5 text-white outline-none font-mono text-xs" />
                                 </div>
                                 <div className="flex gap-2">
