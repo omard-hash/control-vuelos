@@ -11,9 +11,6 @@
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     
-    <!-- LIBRERÍA PROFESIONAL PARA LEER EXCEL Y CSV (MATRICES) -->
-    <script src="https://unpkg.com/xlsx/dist/xlsx.full.min.js"></script>
-    
     <!-- FIREBASE COMPAT (Tu conexión original y segura v10) -->
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-auth-compat.js"></script>
@@ -73,6 +70,7 @@
             const [adminOpen, setAdminOpen] = useState(false);
             const [allMonthShifts, setAllMonthShifts] = useState([]);
             const [currentOperator, setCurrentOperator] = useState('Sin asignar');
+            const [isUploadingPDF, setIsUploadingPDF] = useState(false);
             
             // Referencias para usarlas en intervalos y callbacks sin problemas de renderizado
             const flightsRef = useRef([]);
@@ -107,7 +105,7 @@
                         }
                     }, (err) => console.error("Error leyendo turno:", err));
 
-                    // 2. Escuchar TODOS los turnos del mes subidos desde Excel
+                    // 2. Escuchar TODOS los turnos del mes subidos desde Excel/PDF
                     unsubscribeMes = db.collection('operaciones').doc('turnos_mes').onSnapshot((doc) => {
                         if (doc.exists && doc.data().turnos) {
                             setAllMonthShifts(doc.data().turnos);
@@ -175,7 +173,7 @@
                                 // Turno normal (ej. 07:00 a 15:00)
                                 if (currentMins >= startMins && currentMins < endMins) foundOp = shift.name;
                             } else {
-                                // Turno cruzado (ej. 20:00 a 06:00 del día siguiente)
+                                // Turno cruzado (ej. 18:50 a 07:00 del día siguiente)
                                 if (currentMins >= startMins || currentMins < endMins) foundOp = shift.name;
                             }
                         }
@@ -228,163 +226,101 @@
                 return () => clearInterval(timer);
             }, []);
 
-            const extractCleanName = (str) => {
-                if (!str || typeof str !== 'string') return "";
-                let clean = str.replace(/Especialista|RPAS|OS|Turno|Horario|Puesto|Empleado|Piloto/gi, '').trim();
-                clean = clean.replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑ\s]/g, '').trim(); 
-                let words = clean.split(/\s+/).filter(w => w.length > 2);
-                return words.length > 0 ? words.slice(0, 2).join(" ") : ""; 
-            };
-
-            const extractTimes = (str) => {
-                if (!str || typeof str !== 'string') return null;
-                const regex = /(\d{1,2}):(\d{2})\s*(am|pm)?/gi;
-                let matches = [...str.matchAll(regex)];
-                if (matches.length >= 2) {
-                    const parseTime = (h, m, ampm) => {
-                        let hInt = parseInt(h, 10);
-                        if (ampm) {
-                            if (ampm.toLowerCase() === 'pm' && hInt < 12) hInt += 12;
-                            if (ampm.toLowerCase() === 'am' && hInt === 12) hInt = 0;
-                        }
-                        return `${String(hInt).padStart(2,'0')}:${m}`;
-                    };
-                    return [
-                        parseTime(matches[0][1], matches[0][2], matches[0][3]),
-                        parseTime(matches[1][1], matches[1][2], matches[1][3])
-                    ];
-                }
-                return null;
-            };
-
-            const handleFileUpload = (e) => {
+            const handlePDFUpload = async (e) => {
                 const file = e.target.files[0];
                 if (!file) return;
 
-                speak("Analizando matriz de Excel a profundidad...");
-                const reader = new FileReader();
-                reader.onload = (evt) => {
-                    try {
-                        const data = new Uint8Array(evt.target.result);
-                        const workbook = window.XLSX.read(data, {type: 'array', cellDates: true});
-                        const firstSheetName = workbook.SheetNames[0];
-                        const worksheet = workbook.Sheets[firstSheetName];
+                if (!geminiKey || geminiKey.trim() === '') {
+                    setModal({ isOpen: true, title: 'Falta Llave API', message: 'Abre los ajustes (⚙️) y pega tu llave de Gemini para poder leer PDFs.', type: 'error' });
+                    return;
+                }
+
+                setIsUploadingPDF(true);
+                speak("Leyendo documento PDF con Inteligencia Artificial...");
+
+                try {
+                    const reader = new FileReader();
+                    reader.readAsDataURL(file);
+                    
+                    reader.onload = async () => {
+                        const base64Data = reader.result.split(',')[1];
                         
-                        // Doble lectura para cruzar fechas puras y texto
-                        const rowsRaw = window.XLSX.utils.sheet_to_json(worksheet, {header: 1, raw: true});
-                        const rowsText = window.XLSX.utils.sheet_to_json(worksheet, {header: 1, raw: false});
+                        const key = geminiKey.trim();
+                        // Nota: Usamos gemini-1.5-flash porque es mejor para documentos
+                        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${key}`;
                         
-                        let parsedShifts = [];
+                        const prompt = `
+Analiza este documento PDF que contiene un horario de turnos (tipo calendario).
+Tu tarea es extraer TODOS los turnos para todos los días y devolverlos en un formato JSON estricto.
 
-                        const parseDateCell = (rawCell, textCell) => {
-                            if (rawCell instanceof Date && !isNaN(rawCell)) {
-                                return `${rawCell.getFullYear()}-${String(rawCell.getMonth() + 1).padStart(2, '0')}-${String(rawCell.getDate()).padStart(2, '0')}`;
-                            }
-                            let str = String(textCell || rawCell).toLowerCase().trim();
-                            if (!str || str.length < 3) return null;
+Reglas de extracción:
+1. Identifica el mes y el año (parece ser Julio 2026).
+2. Cada celda del calendario representa un día.
+3. Dentro de cada celda hay nombres y horarios.
+4. Ignora textos como "Especialista RPAS OS", "Audi México", "Turno", "Horario". Solo quiero el nombre de la persona (ej. "Omar Anton", "Jonathan Ro", "Jairo Añorve", "Cesar Danie").
+5. Extrae la hora de inicio y fin (ej. "06:50" y "19:00", o "18:50" y "07:00").
+6. Formatea la fecha como YYYY-MM-DD (ej. "2026-07-27" para el 27 de julio).
+7. Devuelve SOLO un JSON válido con esta estructura:
+{
+  "turnos": [
+    { "date": "2026-07-01", "name": "Cesar Danie", "start": "06:50", "end": "19:00" },
+    { "date": "2026-07-01", "name": "Jonathan Ro", "start": "18:50", "end": "07:00" },
+    ...
+  ]
+}
+No incluyas markdown (como \`\`\`json), solo el JSON puro. Asegúrate de procesar todos los días del mes que aparezcan en el calendario.
+`;
 
-                            let m1 = str.match(/(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})/);
-                            if (m1) return `${m1[1]}-${m1[2].padStart(2,'0')}-${m1[3].padStart(2,'0')}`;
-
-                            let m2 = str.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})/);
-                            if (m2) {
-                                let y = m2[3].length === 2 ? `20${m2[3]}` : m2[3];
-                                let p1 = parseInt(m2[1]);
-                                let p2 = parseInt(m2[2]);
-                                let d = p1 > 12 ? p1 : (p2 > 12 ? p2 : p1); 
-                                let m = p1 > 12 ? p2 : (p2 > 12 ? p1 : p2);
-                                return `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
-                            }
-
-                            let textMatch = str.match(/(\d{1,2})\s*[\/\-]?\s*([a-z]{3,})/i);
-                            if (textMatch) {
-                                let d = textMatch[1].padStart(2, '0');
-                                let mStr = textMatch[2];
-                                let y = new Date().getFullYear();
-                                const monthMap = {ene:'01',jan:'01',feb:'02',mar:'03',abr:'04',apr:'04',may:'05',jun:'06',jul:'07',ago:'08',aug:'08',sep:'09',oct:'10',nov:'11',dic:'12',dec:'12'};
-                                let mKey = Object.keys(monthMap).find(k => mStr.includes(k));
-                                if (mKey) return `${y}-${monthMap[mKey]}-${d}`;
-                            }
-                            return null;
+                        const payload = {
+                            contents: [{
+                                parts: [
+                                    { text: prompt },
+                                    { inline_data: { mime_type: "application/pdf", data: base64Data } }
+                                ]
+                            }]
                         };
 
-                        const findDate = (rowIndex, colIndex) => {
-                            for(let c = 0; c < rowsText[rowIndex].length; c++) {
-                                if (c !== colIndex && rowsText[rowIndex][c]) {
-                                    let d = parseDateCell(rowsRaw[rowIndex][c], rowsText[rowIndex][c]);
-                                    if (d) return d;
-                                }
-                            }
-                            for (let r = rowIndex - 1; r >= 0; r--) {
-                                if (rowsText[r] && rowsText[r][colIndex]) {
-                                    let d = parseDateCell(rowsRaw[r][colIndex], rowsText[r][colIndex]);
-                                    if (d) return d;
-                                }
-                            }
-                            return null;
-                        };
-
-                        const findName = (rowIndex, colIndex) => {
-                            for (let c = 0; c < colIndex; c++) {
-                                if (rowsText[rowIndex] && rowsText[rowIndex][c]) {
-                                    let n = extractCleanName(rowsText[rowIndex][c]);
-                                    if (n.length > 2) return n;
-                                }
-                            }
-                            return null;
-                        };
-
-                        for (let r = 0; r < rowsText.length; r++) {
-                            if (!rowsText[r]) continue;
-                            for (let c = 0; c < rowsText[r].length; c++) {
-                                let textCell = rowsText[r][c];
-                                if (!textCell) continue;
-
-                                let times = extractTimes(textCell);
-                                if (times) {
-                                    let dateStr = findDate(r, c);
-                                    let nameStr = findName(r, c);
-
-                                    // Fallback Si la fecha es solo un número (ej. Zoho Shifts pone 27)
-                                    if (!dateStr) {
-                                        for (let upRow = r - 1; upRow >= 0; upRow--) {
-                                            let headerVal = String(rowsText[upRow][c] || "").trim();
-                                            if (/^\d{1,2}$/.test(headerVal)) {
-                                                let day = headerVal.padStart(2, '0');
-                                                let y = new Date().getFullYear();
-                                                let m = String(new Date().getMonth() + 1).padStart(2, '0');
-                                                dateStr = `${y}-${m}-${day}`;
-                                                break;
-                                            }
-                                        }
-                                    }
-
-                                    if (dateStr && nameStr) {
-                                        parsedShifts.push({
-                                            date: dateStr,
-                                            name: nameStr,
-                                            start: times[0],
-                                            end: times[1]
-                                        });
-                                    }
-                                }
-                            }
+                        const response = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+                        
+                        if (!response.ok) {
+                             const errorData = await response.json();
+                             throw new Error(`Error API: ${errorData.error?.message || response.statusText}`);
                         }
 
-                        if (parsedShifts.length > 0) {
-                            db.collection('operaciones').doc('turnos_mes').set({ turnos: parsedShifts });
-                            speak(`Lectura exitosa. Se extrajeron ${parsedShifts.length} turnos.`);
-                            setModal({ isOpen: true, title: '✅ Matriz Procesada', message: `El sistema extrajo exitosamente ${parsedShifts.length} turnos del archivo Zoho y los guardó en la nube.`, type: 'success' });
-                            setAdminOpen(false);
+                        const data = await response.json();
+                        let aiResponseText = data.candidates[0].content.parts[0].text;
+                        
+                        // Limpiar markdown si Gemini lo incluye a pesar de las instrucciones
+                        aiResponseText = aiResponseText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+                        
+                        let parsedData;
+                        try {
+                            parsedData = JSON.parse(aiResponseText);
+                        } catch (parseError) {
+                            console.error("Error parseando JSON de Gemini:", aiResponseText);
+                            throw new Error("Gemini no devolvió un formato JSON válido.");
+                        }
+
+                        if (parsedData && parsedData.turnos && parsedData.turnos.length > 0) {
+                            db.collection('operaciones').doc('turnos_mes').set({ turnos: parsedData.turnos });
+                            speak(`Lectura de PDF exitosa. Se guardaron ${parsedData.turnos.length} turnos.`);
+                            setModal({ isOpen: true, title: '✅ PDF Procesado', message: `Se extrajeron ${parsedData.turnos.length} turnos exitosamente usando IA.`, type: 'success' });
                         } else {
-                            setModal({ isOpen: true, title: 'Formato Irreconocible', message: 'El sistema no logró encontrar fechas o nombres compatibles. Asegúrate de que las celdas tengan horarios válidos (ej. 07:00 - 15:00).', type: 'error' });
+                            throw new Error("No se encontraron turnos en la respuesta de la IA.");
                         }
-
-                    } catch (error) {
-                        setModal({ isOpen: true, title: 'Error de Lectura', message: error.message, type: 'error' });
+                        setIsUploadingPDF(false);
+                    };
+                    
+                    reader.onerror = (error) => {
+                        throw new Error("Error al leer el archivo localmente.");
                     }
-                };
-                reader.readAsArrayBuffer(file);
+
+                } catch (error) {
+                    console.error("PDF Upload Error:", error);
+                    setIsUploadingPDF(false);
+                    speak("Error al analizar el PDF.");
+                    setModal({ isOpen: true, title: 'Error de Lectura PDF', message: error.message, type: 'error' });
+                }
             };
 
             const clearDB = () => {
@@ -416,7 +352,7 @@
                 
                 try {
                     const key = geminiKey.trim();
-                    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${key}`;
+                    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${key}`;
                     
                     const payload = {
                         contents: [{
@@ -533,7 +469,7 @@
                                 <span className="bg-indigo-600 text-white px-2 py-0.5 rounded text-xs">DP</span>
                                 DISPATCHER PRO
                             </h1>
-                            <p className="text-[10px] font-bold text-emerald-400 mt-1 tracking-widest uppercase">V42 MASTER • 🟢 NUBE COMPAT V10</p>
+                            <p className="text-[10px] font-bold text-emerald-400 mt-1 tracking-widest uppercase">V42 MASTER • 🟢 AUTO ZOHO PDF</p>
                         </div>
                         <div className="flex gap-2">
                             <button onClick={(e) => { e.stopPropagation(); setAdminOpen(true); }} className="bg-[#1f2937] hover:bg-[#374151] p-2.5 rounded-lg border border-slate-700 transition" title="Administración">👨‍💼</button>
@@ -547,7 +483,6 @@
                         </div>
                     )}
 
-                    {}
                     <div className="glass-card p-5 rounded-2xl mb-5 relative overflow-hidden">
                         <div className="flex justify-between items-start mb-6">
                             <div>
@@ -580,8 +515,8 @@
                         </div>
                         
                         <div className="grid grid-cols-2 gap-3">
-                            <input type="file" id="upload" accept="image/*" className="hidden" onChange={handleImageUpload} />
-                            <button onClick={(e) => { e.stopPropagation(); document.getElementById('upload').click(); }} disabled={isScanning || isRaining} className={`w-full py-3 rounded-xl font-bold text-sm transition flex justify-center items-center gap-2 ${isScanning ? 'bg-indigo-900/50 text-indigo-300 animate-pulse' : isRaining ? 'bg-slate-800 text-slate-600 cursor-not-allowed' : 'bg-[#1e293b] hover:bg-[#334155] text-white border border-slate-700'}`}>
+                            <input type="file" id="uploadWeather" accept="image/*" className="hidden" onChange={handleImageUpload} />
+                            <button onClick={(e) => { e.stopPropagation(); document.getElementById('uploadWeather').click(); }} disabled={isScanning || isRaining} className={`w-full py-3 rounded-xl font-bold text-sm transition flex justify-center items-center gap-2 ${isScanning ? 'bg-indigo-900/50 text-indigo-300 animate-pulse' : isRaining ? 'bg-slate-800 text-slate-600 cursor-not-allowed' : 'bg-[#1e293b] hover:bg-[#334155] text-white border border-slate-700'}`}>
                                 {isScanning ? '⏳ Analizando...' : '📸 ESCANEAR CLIMA'}
                             </button>
                             <button onClick={(e) => { e.stopPropagation(); toggleRainProtocol(); }} className={`w-full py-3 rounded-xl font-bold text-sm transition flex justify-center items-center gap-2 ${isRaining ? 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-[0_0_15px_rgba(16,185,129,0.4)]' : 'bg-rose-900/40 hover:bg-rose-900/60 text-rose-400 border border-rose-900'}`}>
@@ -590,7 +525,6 @@
                         </div>
                     </div>
 
-                    {}
                     <div className={`glass-card p-5 rounded-2xl mb-6 relative ${isRaining ? 'opacity-50 pointer-events-none' : ''}`}>
                         {isRaining && <div className="absolute inset-0 rain-overlay rounded-2xl z-10 flex items-center justify-center text-center p-4">
                             <span className="text-white font-bold text-lg">Esperando que mejore el clima...</span>
@@ -627,8 +561,7 @@
                          </button>
                     </div>
 
-                    {}
-                    {/* MODAL DE ADMINISTRADOR PARA EL MES */}
+                    {/* MODAL DE ADMINISTRADOR */}
                     {adminOpen && (
                         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4" onClick={() => setAdminOpen(false)}>
                             <div className="bg-[#131826] border border-slate-800 rounded-2xl w-full max-w-md shadow-2xl p-6" onClick={e => e.stopPropagation()}>
@@ -639,14 +572,14 @@
                                 
                                 <div className="bg-indigo-900/20 border border-indigo-500/30 p-4 rounded-xl mb-6 text-center">
                                     <h3 className="text-xs font-black tracking-widest text-indigo-400 uppercase mb-2">
-                                        📅 CARGA INTELIGENTE DEL MES (ZOHO)
+                                        📅 CARGA INTELIGENTE DEL MES (PDF ZOHO)
                                     </h3>
                                     <p className="text-[10px] text-slate-400 mb-4 leading-relaxed">
-                                        Sube el archivo de Excel o CSV original de Zoho Shifts. El sistema procesará toda la cuadrícula (fechas vs nombres) y asignará operadores automáticamente cada día del mes.
+                                        Sube el archivo <strong>PDF original</strong> exportado de Zoho Shifts. El sistema usará IA para leer el calendario, extraer los turnos y asignarlos automáticamente todo el mes.
                                     </p>
-                                    <input type="file" id="monthUpload" accept=".csv, .xls, .xlsx" className="hidden" onChange={handleFileUpload} />
-                                    <button onClick={() => document.getElementById('monthUpload').click()} className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-3.5 rounded-lg text-sm shadow-[0_0_15px_rgba(79,70,229,0.3)] transition transform hover:scale-105">
-                                        📄 Subir Archivo Zoho (.XLSX / .CSV)
+                                    <input type="file" id="pdfUpload" accept="application/pdf" className="hidden" onChange={handlePDFUpload} />
+                                    <button onClick={() => document.getElementById('pdfUpload').click()} disabled={isUploadingPDF} className={`w-full font-bold py-3.5 rounded-lg text-sm shadow-[0_0_15px_rgba(79,70,229,0.3)] transition flex justify-center items-center gap-2 ${isUploadingPDF ? 'bg-indigo-800 text-indigo-300 cursor-not-allowed' : 'bg-indigo-600 hover:bg-indigo-500 text-white transform hover:scale-105'}`}>
+                                        {isUploadingPDF ? '⏳ Leyendo PDF con IA...' : '📄 Subir Horario Mensual (.PDF)'}
                                     </button>
                                 </div>
 
@@ -658,7 +591,7 @@
                                 <div className="space-y-2 mb-6 max-h-48 overflow-y-auto pr-1">
                                     {todayShiftsUI.length === 0 ? (
                                         <div className="text-center py-6 bg-[#0f172a] rounded-xl border border-slate-800 text-xs text-slate-500">
-                                            No hay turnos para hoy. Si acabas de subir el archivo, asegúrate de que tiene las fechas correctas.
+                                            No hay turnos registrados para hoy. Sube el PDF del mes.
                                         </div>
                                     ) : (
                                         todayShiftsUI.map((op, i) => (
@@ -679,13 +612,13 @@
                         </div>
                     )}
 
-                    {}
+                    {/* MODAL DE AJUSTES */}
                     {settingsOpen && (
                         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4" onClick={(e) => e.stopPropagation()}>
                             <div className="bg-[#131826] border border-slate-800 rounded-2xl w-full max-w-sm shadow-2xl p-6">
                                 <h2 className="text-lg font-black text-white mb-4">⚙️ Ajustes</h2>
                                 <div className="mb-5">
-                                    <label className="block text-[10px] font-bold tracking-widest text-slate-400 uppercase mb-2">Llave Gemini API (Clima)</label>
+                                    <label className="block text-[10px] font-bold tracking-widest text-slate-400 uppercase mb-2">Llave Gemini API</label>
                                     <input type="password" value={geminiKey} onChange={e => setGeminiKey(e.target.value)} placeholder="AIzaSy..." className="w-full bg-[#1e293b] border border-slate-700 rounded-lg p-2.5 text-white outline-none font-mono text-xs" />
                                 </div>
                                 <div className="flex gap-2">
@@ -696,6 +629,7 @@
                         </div>
                     )}
                     
+                    {/* MODAL GENERAL DE MENSAJES */}
                     {modal.isOpen && (
                         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4" onClick={(e) => e.stopPropagation()}>
                             <div className="bg-[#131826] border border-slate-800 rounded-2xl w-full max-w-sm shadow-2xl p-6 text-center">
