@@ -24,7 +24,7 @@
         import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // Configuración Firebase (Compatible con Canvas y externa)
+        // Configuración Firebase
         const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {
             apiKey: "AIzaSyDXjwv133-dIKyprCktTUkjx_adAz1DhAY",
             authDomain: "control-vuelos.firebaseapp.com",
@@ -39,7 +39,7 @@
         const auth = getAuth(app);
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-dispatcher';
 
-        // Exponemos las funciones para que React/Babel pueda usarlas globalmente
+        // Exponemos funciones para React
         window.FB_Db = db;
         window.FB_Auth = auth;
         window.FB_AppId = appId;
@@ -71,13 +71,10 @@
             const [geminiKey, setGeminiKey] = useState(localStorage.getItem('gemini_key') || '');
             const [modal, setModal] = useState({ isOpen: false, title: '', message: '', type: 'error' });
             
-            // Estados para Operadores y PDFs
+            // Estados para Operadores
             const [adminOpen, setAdminOpen] = useState(false);
             const [operators, setOperators] = useState([]);
             const [currentOperator, setCurrentOperator] = useState('Sin asignar');
-            const [newOpName, setNewOpName] = useState('');
-            const [newOpStart, setNewOpStart] = useState('');
-            const [newOpEnd, setNewOpEnd] = useState('');
             const [isScanningCSV, setIsScanningCSV] = useState(false);
             const operatorsRef = useRef([]);
             const currentOperatorRef = useRef('Sin asignar');
@@ -91,7 +88,7 @@
             const [audioUnlocked, setAudioUnlocked] = useState(false);
             const audioUnlockedRef = useRef(false);
             
-            // Referencias para el temporizador y Firebase
+            // Referencias
             const flightsRef = useRef([]);
             const isRainingRef = useRef(false);
             const loggedFlightsCountRef = useRef(0);
@@ -110,7 +107,6 @@
                         
                         authReady.current = true;
                         
-                        // Lectura en tiempo real
                         unsubscribe = window.FB_onSnapshot(getSharedDocRef(), (docSnap) => {
                             if (docSnap.exists()) {
                                 const data = docSnap.data();
@@ -144,7 +140,7 @@
                                 }
                             }
                         }, (err) => {
-                            console.error("Error sincronizando datos en tiempo real:", err);
+                            console.error("Error sincronizando datos:", err);
                         });
                         
                     } catch (error) {
@@ -193,7 +189,6 @@
                     if (h >= 7 && h < 19) setShiftName('Turno Diurno');
                     else setShiftName('Turno Nocturno');
                     
-                    // Cálculo de Operador en Turno
                     let foundOperator = 'Sin asignar';
                     const currentTotalMins = h * 60 + m;
                     if (operatorsRef.current && operatorsRef.current.length > 0) {
@@ -226,7 +221,6 @@
                         }, { merge: false });
                     }
 
-                    // Alarmas (ejecución por minuto)
                     if (s === 0) {
                         const timeStr = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
                         
@@ -241,7 +235,6 @@
                             setModal({ isOpen: true, title: '🌤️ ACTUALIZAR CLIMA', message: 'Es obligatorio actualizar la captura del clima y validar condiciones seguras para volar.', type: 'error' });
                         }
 
-                        // Alarmas 10 y 5 min antes de vuelo
                         if (flightsRef.current && flightsRef.current.length > 0 && !isRainingRef.current) {
                             flightsRef.current.forEach(flight => {
                                 if (flight.wind < 42) {
@@ -297,7 +290,6 @@
                     const payload = {
                         contents: [{
                             parts: [
-                                // REGLAS ESTRICTAS: La IA asume la probabilidad de lluvia como apta para priorizar vuelos.
                                 { text: "Analiza el clima. REGLA ESTRICTA 11:00am: Si dice 'UV' ES APTO. Regla general: Si dice 'Apto para volar' o indica 'Lluvia' (ej. Lluvia 64%), considéralo APTO PARA VOLAR y el viento es 0 (el sistema organizará el vuelo asumiendo que podría no llover). Si dice 'Ráfagas fuertes' o vientos > 40, viento es 45. Devuelve JSON con 'hourlyData' teniendo 'time' (ej. '11:00am') y 'wind' numérico." },
                                 { inline_data: { mime_type: "image/jpeg", data: base64Image } }
                             ]
@@ -367,7 +359,6 @@
                     return `${newH}:${newM}`;
                 };
 
-                // META ESTRICTA: Siempre 13 vuelos
                 let baseTimes = [
                     "07:20", "08:35", "09:50", "11:05", "12:20", "13:35", 
                     "14:50", "16:05", "17:20", "18:35", "19:50", "21:05", "22:20"
@@ -411,7 +402,7 @@
                     return;
                 }
 
-                const endTime = 23 * 60 + 30; // Terminan operaciones a las 23:30
+                const endTime = 23 * 60 + 30; 
                 const currentTimeInMins = currentHour * 60 + currentMinute + 15;
                 const timeWindow = endTime - currentTimeInMins;
                 
@@ -466,10 +457,9 @@
                 reader.onload = (event) => {
                     try {
                         const text = event.target.result;
-                        const lines = text.split(/\r?\n/); // Soporta saltos de línea Windows y Mac
+                        const lines = text.split(/\r?\n/);
                         const newOperators = [];
                         
-                        // Detectar si usan coma, punto y coma, o tabulador
                         const firstLine = lines[0] || '';
                         const delimiter = firstLine.includes(';') ? ';' : (firstLine.includes('\t') ? '\t' : ',');
                         
@@ -477,28 +467,29 @@
                             let line = lines[i].trim();
                             if (!line) continue;
                             
-                            // Quitar comillas que algunos Excel ponen
                             line = line.replace(/['"]/g, '');
                             const parts = line.split(delimiter).map(p => p.trim());
                             
-                            // Expresión regular para buscar horas tipo 07:00, 15:30
                             const timeRegex = /([01]?[0-9]|2[0-3]):([0-5][0-9])/;
                             let times = [];
-                            let potentialName = '';
+                            let possibleNames = [];
 
                             parts.forEach(part => {
                                 const match = part.match(timeRegex);
                                 if (match) {
                                     times.push(match[0]);
-                                } else if (isNaN(part) && part.length > 2 && !part.toLowerCase().includes('nombre') && !part.toLowerCase().includes('hora') && !part.toLowerCase().includes('fecha')) {
-                                    // Asumir que el texto más largo es el nombre (ignorar cabeceras)
-                                    if (part.length > potentialName.length) {
-                                        potentialName = part;
+                                } else if (isNaN(part) && part.length > 3) {
+                                    const lower = part.toLowerCase();
+                                    const isRoleOrHeader = ['nombre', 'hora', 'fecha', 'especialista', 'rpas', 'os', 'puesto', 'cargo', 'rol', 'turno', 'supervisor'].some(word => lower.includes(word));
+                                    
+                                    if (!isRoleOrHeader) {
+                                        possibleNames.push(part);
                                     }
                                 }
                             });
                             
-                            // Si encontramos al menos 2 horas (entrada y salida) y un nombre, lo agregamos
+                            let potentialName = possibleNames.length > 0 ? possibleNames[0] : '';
+
                             if (times.length >= 2 && potentialName) {
                                 newOperators.push({ name: potentialName, start: times[0], end: times[1] });
                             }
@@ -507,12 +498,12 @@
                         if (newOperators.length > 0) {
                             window.FB_setDoc(getSharedDocRef(), { operators: newOperators }, { merge: true });
                             speak("Horarios actualizados exitosamente en la base de datos.");
-                            setModal({ isOpen: true, title: 'Carga Exitosa', message: `Se detectaron e importaron ${newOperators.length} turnos desde tu archivo.`, type: 'success' });
+                            setModal({ isOpen: true, title: 'Carga Exitosa', message: `Se detectaron e importaron ${newOperators.length} turnos desde tu archivo CSV.`, type: 'success' });
                         } else {
-                            throw new Error("No pude detectar nombres y horarios (HH:MM). Abre tu archivo y verifica que tenga nombres y horas legibles.");
+                            throw new Error("No pude detectar nombres y horarios (HH:MM). Abre tu archivo y verifica que tenga nombres reales y horas legibles.");
                         }
                     } catch (error) {
-                        speak("Error al procesar el archivo C S V.");
+                        speak("Error al procesar el archivo CSV.");
                         setModal({ isOpen: true, title: 'Error de Lectura CSV', message: error.message, type: 'error' });
                     } finally {
                         setIsScanningCSV(false);
@@ -686,6 +677,7 @@
                         </div>
                     )}
                     
+                    {}
                     {adminOpen && (
                         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4" onClick={(e) => e.stopPropagation()}>
                             <div className="bg-[#131826] border border-slate-800 rounded-2xl w-full max-w-md shadow-2xl p-6 max-h-[90vh] overflow-y-auto">
@@ -735,6 +727,7 @@
                         </div>
                     )}
                     
+                    {}
                     {modal.isOpen && (
                         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4" onClick={(e) => e.stopPropagation()}>
                             <div className="bg-[#131826] border border-slate-800 rounded-2xl w-full max-w-sm shadow-2xl p-6">
