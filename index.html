@@ -14,7 +14,7 @@
     <!-- Lector de Excel / CSV (SheetJS) -->
     <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
     
-    <!-- FIREBASE COMPAT (Conexión Original V10) -->
+    <!-- FIREBASE COMPAT (Conexión Original V10 para mantener permisos) -->
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore-compat.js"></script>
@@ -185,7 +185,9 @@
                             }
                         }
                     }
-                    setCurrentOperator(foundOp);
+                    
+                    // Actualizar el estado si cambió el operador (para no renderizar de más)
+                    setCurrentOperator(prevOp => prevOp !== foundOp ? foundOp : prevOp);
 
                     // ==========================================
                     // CORTE DE CAJA A LAS 12:00 AM EXACTAS
@@ -243,7 +245,6 @@
                 reader.onload = (evt) => {
                     try {
                         const data = evt.target.result;
-                        // Usar SheetJS para leer el archivo binario (.xlsx o .csv)
                         const workbook = XLSX.read(data, { type: 'binary' });
                         const sheet = workbook.Sheets[workbook.SheetNames[0]];
                         const json = XLSX.utils.sheet_to_json(sheet, { header: 1 });
@@ -252,61 +253,119 @@
                         let defaultMonth = new Date().getMonth() + 1;
                         let defaultYear = new Date().getFullYear();
 
-                        // 1. Extraer Mes y Año de la parte superior del documento (ej. 01/07/2026-31/07/2026)
-                        const fullText = json.flat().join(' ');
-                        const dateRangeMatch = fullText.match(/(\d{2})\/(\d{2})\/(\d{4})/);
+                        // 1. Extraer Mes y Año general del documento completo
+                        const fullText = json.map(row => row.join(' ')).join(' ');
+                        const dateRangeMatch = fullText.match(/(\d{2})[\/\-](\d{2})[\/\-](\d{4})/);
                         if (dateRangeMatch) {
+                            // Asumimos formato DD/MM/YYYY o similar (Zoho exporta con el mes y año en las cabeceras)
                             defaultMonth = parseInt(dateRangeMatch[2]);
                             defaultYear = parseInt(dateRangeMatch[3]);
                         }
 
-                        // 2. Escáner Profundo de Cuadrícula
+                        // 2. MODO 1: ESCÁNER PROFUNDO DE CUADRÍCULA (Modo Calendario)
                         for (let r = 0; r < json.length; r++) {
                             let row = json[r];
                             if (!row) continue;
 
                             for (let c = 0; c < row.length; c++) {
                                 let cellValue = row[c];
-                                if (typeof cellValue === 'string') {
-                                    // Buscar patrón de horario "06:50-19:00 Nombre"
-                                    let timeMatch = cellValue.match(/(\d{2}:\d{2})\s*-\s*(\d{2}:\d{2})\s*([A-Za-zÁÉÍÓÚáéíóúñÑ ]+)/);
+                                if (!cellValue) continue;
+                                let cellText = String(cellValue);
+                                
+                                let lines = cellText.split('\n');
+                                
+                                for (let i = 0; i < lines.length; i++) {
+                                    let line = lines[i].trim();
+                                    // Buscar hora (ej. 06:50 - 19:00 o 18:50 - 07:00)
+                                    let timeMatch = line.match(/(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})/);
                                     
                                     if (timeMatch) {
                                         let start = timeMatch[1];
                                         let end = timeMatch[2];
-                                        let rawName = timeMatch[3].trim();
                                         
-                                        // Limpiar títulos largos de Zoho
-                                        rawName = rawName.replace(/Especialista.*/gi, '').replace(/Audi.*/gi, '').replace(/RPAS.*/gi, '').trim();
-                                        // Dejar solo nombre y un apellido por limpieza
-                                        let cleanName = rawName.split(/\s+/).slice(0, 2).join(' ');
+                                        // Buscar nombre en la misma celda (o en la siguiente si la celda solo tiene horas)
+                                        let rawName = line.replace(timeMatch[0], '').trim();
+                                        if (!rawName && i + 1 < lines.length) rawName = lines[i+1].trim();
+                                        if (!rawName && r + 1 < json.length && json[r+1][c]) {
+                                            rawName = String(json[r+1][c]).split('\n')[0].trim();
+                                        }
+                                        
+                                        // Filtro Estricto: Limpiar puestos y títulos basura
+                                        rawName = rawName.replace(/Especialista.*/gi, '').replace(/Audi.*/gi, '').replace(/RPAS.*/gi, '').replace(/OS/gi, '').replace(/[-]/g, '').trim();
+                                        let cleanName = rawName.split(/\s+/).slice(0, 2).join(' '); // Tomar máximo 2 palabras (Nombre y Apellido)
+                                        if (!cleanName || cleanName.length < 2) cleanName = "Operador";
 
-                                        // Buscar el número del DÍA mirando HACIA ARRIBA en la misma columna
+                                        // Buscar el Día en celdas superiores de la misma columna
                                         let day = null;
                                         for (let lookUpRow = r - 1; lookUpRow >= 0; lookUpRow--) {
                                             let upCell = json[lookUpRow][c];
                                             if (upCell) {
-                                                // Convertir a texto por si viene como número en Excel
-                                                let cellText = String(upCell).replace(/[a-zA-Z]/g, '').trim();
-                                                let possibleDay = parseInt(cellText);
-                                                
-                                                if (!isNaN(possibleDay) && possibleDay >= 1 && possibleDay <= 31) {
-                                                    day = possibleDay;
-                                                    break;
+                                                let upText = String(upCell).trim();
+                                                if (!upText.match(/\d{1,2}:\d{2}/) && !upText.match(/Especialista/i)) {
+                                                    // Detecta "27", "05", etc. solos en la celda superior
+                                                    let numMatch = upText.match(/^0?([1-9]|[12]\d|3[01])$/);
+                                                    if (numMatch) {
+                                                        day = parseInt(numMatch[1]);
+                                                        break;
+                                                    }
+                                                    // Detecta "Mon 27", "27 Lun", "01/07", etc.
+                                                    let textMatch = upText.match(/(?:lun|mar|mié|jue|vie|sáb|dom|mon|tue|wed|thu|fri|sat|sun)[^\d]*([1-9]|[12]\d|3[01])/i);
+                                                    if (!textMatch) textMatch = upText.match(/([1-9]|[12]\d|3[01])[^\d]*(?:lun|mar|mié|jue|vie|sáb|dom|mon|tue|wed|thu|fri|sat|sun)/i);
+                                                    if (textMatch) {
+                                                        day = parseInt(textMatch[1]);
+                                                        break;
+                                                    }
                                                 }
                                             }
                                         }
                                         
                                         if (day) {
+                                            // Formatear la fecha al estándar ISO YYYY-MM-DD
                                             let dateStr = `${defaultYear}-${String(defaultMonth).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-                                            turnosExtraidos.push({
-                                                date: dateStr,
-                                                name: cleanName,
-                                                start: start,
-                                                end: end
-                                            });
+                                            turnosExtraidos.push({ date: dateStr, name: cleanName, start: start, end: end });
                                         }
                                     }
+                                }
+                            }
+                        }
+
+                        // 3. MODO 2: ESCÁNER DE LISTA (Respaldo si el Modo Calendario falla por formato CSV plano)
+                        if (turnosExtraidos.length === 0) {
+                            for (let r = 0; r < json.length; r++) {
+                                let row = json[r];
+                                let rowStr = row.join(' ');
+                                
+                                let timeMatch = rowStr.match(/(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})/);
+                                let dateMatch = rowStr.match(/(\d{2})[\/\-](\d{2})[\/\-](\d{4})/);
+                                
+                                if (timeMatch && dateMatch) {
+                                    let possibleNames = row.filter(cell => {
+                                        let s = String(cell);
+                                        return !s.match(/(\d{2})[\/\-](\d{2})[\/\-](\d{4})/) &&
+                                               !s.match(/(\d{1,2}:\d{2})/) &&
+                                               !s.match(/Especialista/i) &&
+                                               !s.match(/RPAS/i) &&
+                                               !s.match(/Audi/i) &&
+                                               s.trim().length > 2;
+                                    });
+                                    
+                                    let rawName = possibleNames.length > 0 ? possibleNames[0].trim() : "Operador";
+                                    let cleanName = rawName.split(/\s+/).slice(0, 2).join(' ');
+                                    
+                                    let p1 = parseInt(dateMatch[1]);
+                                    let p2 = parseInt(dateMatch[2]);
+                                    let y = dateMatch[3];
+                                    let m = p2;
+                                    let d = p1;
+                                    // Adivinar si es MM/DD o DD/MM
+                                    if (p1 <= 12 && p2 > 12) { m = p1; d = p2; }
+                                    
+                                    turnosExtraidos.push({
+                                        date: `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`,
+                                        name: cleanName,
+                                        start: timeMatch[1],
+                                        end: timeMatch[2]
+                                    });
                                 }
                             }
                         }
@@ -314,9 +373,9 @@
                         if (turnosExtraidos.length > 0) {
                             db.collection('operaciones').doc('turnos_mes').set({ turnos: turnosExtraidos });
                             speak(`Documento analizado. Se cargaron ${turnosExtraidos.length} turnos exitosamente.`);
-                            setModal({ isOpen: true, title: '✅ Carga Exitosa', message: `Se extrajeron ${turnosExtraidos.length} turnos de la cuadrícula.\nRecuerda revisar que hayas subido el mes correcto.`, type: 'success' });
+                            setModal({ isOpen: true, title: '✅ Carga Exitosa', message: `Se extrajeron ${turnosExtraidos.length} turnos de la cuadrícula.\nYa puedes cerrar este panel.`, type: 'success' });
                         } else {
-                            speak("El sistema no logró encontrar turnos en este documento.");
+                            speak("El sistema no logró encontrar turnos válidos.");
                             setModal({ isOpen: true, title: 'Formato Irreconocible', message: 'No se encontraron horarios válidos (ej. 07:00 - 15:00) ni fechas en columnas.', type: 'error' });
                         }
 
@@ -325,10 +384,11 @@
                         setModal({ isOpen: true, title: 'Error de Archivo', message: 'No se pudo leer el archivo. Intenta exportarlo nuevamente.', type: 'error' });
                     } finally {
                         setIsUploading(false);
+                        // Resetear el input file para poder subir el mismo archivo de nuevo si se desea
+                        e.target.value = null;
                     }
                 };
                 
-                // Lee el archivo de manera binaria para que SheetJS pueda procesarlo
                 reader.readAsBinaryString(file);
             };
 
@@ -418,7 +478,7 @@
                     return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
                 };
 
-                // Base para asegurar 13 vuelos
+                // Base para asegurar exactamente 13 vuelos en el día
                 let baseTimes = ["07:20", "08:35", "09:50", "11:05", "12:20", "13:35", "14:50", "16:05", "17:20", "18:35", "19:50", "21:05", "22:20"];
                 
                 let newSchedule = baseTimes.map((timeStr, index) => {
@@ -442,8 +502,8 @@
                 const remaining = totalFlightsTarget - loggedFlightsCountRef.current;
                 if (remaining <= 0) return;
                 
-                const currentSlot = currentTime.getHours() * 60 + currentTime.getMinutes() + 15;
-                const timeWindow = (23 * 60 + 30) - currentSlot;
+                const currentSlot = currentTime.getHours() * 60 + currentTime.getMinutes() + 15; // Dar 15 min de margen
+                const timeWindow = (23 * 60 + 30) - currentSlot; // Límite hasta las 23:30
                 if (timeWindow <= 0) return;
 
                 const interval = Math.floor(timeWindow / remaining);
@@ -466,6 +526,7 @@
                  }
             };
 
+            // Filtrar los turnos correspondientes al día actual para mostrarlos en el modal de admin
             const todayStrUI = `${currentTime.getFullYear()}-${String(currentTime.getMonth() + 1).padStart(2, '0')}-${String(currentTime.getDate()).padStart(2, '0')}`;
             const todayShiftsUI = allMonthShifts.filter(s => s.date === todayStrUI);
 
@@ -570,7 +631,7 @@
                          </button>
                     </div>
 
-                    {/* MODAL DE ADMINISTRADOR */}
+                    {}
                     {adminOpen && (
                         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4" onClick={() => setAdminOpen(false)}>
                             <div className="bg-[#131826] border border-slate-800 rounded-2xl w-full max-w-md shadow-2xl p-6" onClick={e => e.stopPropagation()}>
@@ -584,7 +645,7 @@
                                         📅 CARGA INTELIGENTE DEL MES (ZOHO)
                                     </h3>
                                     <p className="text-[10px] text-slate-400 mb-4 leading-relaxed">
-                                        Sube el archivo de Excel (.xlsx) o CSV original de Zoho Shifts. El sistema procesará toda la cuadrícula y asignará operadores automáticamente todo el mes.
+                                        Sube el archivo de Excel (.xlsx) o CSV original de Zoho Shifts. El sistema procesará toda la cuadrícula y asignará operadores automáticamente cada día.
                                     </p>
                                     <input type="file" id="excelUpload" accept=".csv, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel" className="hidden" onChange={handleExcelUpload} />
                                     <button onClick={() => document.getElementById('excelUpload').click()} disabled={isUploading} className={`w-full font-bold py-3.5 rounded-lg text-sm shadow-[0_0_15px_rgba(79,70,229,0.3)] transition flex justify-center items-center gap-2 ${isUploading ? 'bg-indigo-800 text-indigo-300 cursor-not-allowed' : 'bg-indigo-600 hover:bg-indigo-500 text-white transform hover:scale-105'}`}>
@@ -621,7 +682,7 @@
                         </div>
                     )}
 
-                    {/* MODAL DE AJUSTES */}
+                    {}
                     {settingsOpen && (
                         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4" onClick={(e) => e.stopPropagation()}>
                             <div className="bg-[#131826] border border-slate-800 rounded-2xl w-full max-w-sm shadow-2xl p-6">
@@ -638,12 +699,11 @@
                         </div>
                     )}
                     
-                    {/* MODAL GENERAL DE MENSAJES */}
                     {modal.isOpen && (
                         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4" onClick={(e) => e.stopPropagation()}>
                             <div className="bg-[#131826] border border-slate-800 rounded-2xl w-full max-w-sm shadow-2xl p-6 text-center">
                                 <h2 className="text-lg font-black text-white mb-2">{modal.title}</h2>
-                                <p className="text-slate-300 text-sm mb-6">{modal.message}</p>
+                                <p className="text-slate-300 text-sm mb-6 whitespace-pre-line">{modal.message}</p>
                                 <button onClick={() => setModal({ ...modal, isOpen: false })} className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-3 rounded-lg text-xs">
                                     Aceptar
                                 </button>
