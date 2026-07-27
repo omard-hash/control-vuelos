@@ -10,10 +10,6 @@
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     
-    <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-auth-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore-compat.js"></script>
-    
     <style>
         body { background-color: #0B0F19; color: white; font-family: 'Inter', system-ui, sans-serif; margin: 0; padding: 0; }
         .glass-card { background-color: #131826; border: 1px solid #1f2937; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.5); }
@@ -23,8 +19,14 @@
 <body>
     <div id="root"></div>
 
-    <script type="text/babel">
-        const firebaseConfig = {
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // Obteniendo variables globales de entorno para sincronización compartida
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'dispatcher-pro-default';
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {
             apiKey: "AIzaSyDXjwv133-dIKyprCktTUkjx_adAz1DhAY",
             authDomain: "control-vuelos.firebaseapp.com",
             projectId: "control-vuelos",
@@ -32,11 +34,42 @@
             messagingSenderId: "756032981781",
             appId: "1:756032981781:web:451641e72abe3692c0771c"
         };
-        if (!firebase.apps.length) {
-            firebase.initializeApp(firebaseConfig);
-        }
-        const db = firebase.firestore();
 
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        // Exponer funciones globales para ser usadas por React/Babel
+        window.db = db;
+        window.auth = auth;
+        window.FB_doc = doc;
+        window.FB_setDoc = setDoc;
+        window.FB_onSnapshot = onSnapshot;
+        window.FB_appId = appId;
+
+        // Regla 3: Autenticación antes de cualquier consulta a base de datos
+        async function initApp() {
+            const token = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+            try {
+                if (token) {
+                    await signInWithCustomToken(auth, token);
+                } else {
+                    await signInAnonymously(auth);
+                }
+                console.log("Autenticación completada. Iniciando app...");
+                // Iniciar React solo cuando Firebase esté listo y autenticado
+                window.renderApp();
+            } catch (e) {
+                console.error("Error en autenticación:", e);
+                // Intentar renderizar de todas formas por si es modo offline
+                window.renderApp();
+            }
+        }
+
+        initApp();
+    </script>
+
+    <script type="text/babel">
         const { useState, useEffect, useRef } = React;
 
         function App() {
@@ -60,29 +93,52 @@
             // Referencias para el temporizador
             const flightsRef = useRef([]);
             const isRainingRef = useRef(false);
+            const loggedFlightsCountRef = useRef(0);
+
+            // Helper para la referencia del documento compartido (multi-sitio en tiempo real)
+            const getSharedDocRef = () => {
+                // Utilizando los paths estrictos y públicos compartidos
+                return window.FB_doc(window.db, 'artifacts', window.FB_appId, 'public', 'data', 'operaciones', 'turno_actual');
+            };
 
             useEffect(() => {
-                let unsubscribe = () => {};
+                if (!window.auth.currentUser) return; // Asegurar que hay usuario autenticado
 
-                firebase.auth().signInAnonymously().then(() => {
-                    unsubscribe = db.collection('operaciones').doc('turno_actual').onSnapshot((doc) => {
-                        if (doc.exists) {
-                            const data = doc.data();
-                            if (data.flights) {
-                                setFlights(data.flights);
-                                flightsRef.current = data.flights; // Mantenemos la ref actualizada
-                            }
-                            if (data.loggedFlightsCount !== undefined) setLoggedFlightsCount(data.loggedFlightsCount);
-                            if (data.isRaining !== undefined) {
-                                setIsRaining(data.isRaining);
-                                isRainingRef.current = data.isRaining;
-                            }
-                            if (data.windDataMap) setWindDataMap(data.windDataMap);
+                const docRef = getSharedDocRef();
+                
+                // onSnapshot mantiene sincronizados todos los sitios conectados en tiempo real
+                const unsubscribe = window.FB_onSnapshot(docRef, (docSnap) => {
+                    if (docSnap.exists()) {
+                        const data = docSnap.data();
+                        
+                        if (data.flights) {
+                            setFlights(data.flights);
+                            flightsRef.current = data.flights; 
+                        } else {
+                            setFlights([]);
+                            flightsRef.current = [];
                         }
-                    }, (err) => {
-                        console.error("Error leyendo datos:", err);
-                    });
-                }).catch((error) => console.error("Error Auth:", error));
+
+                        if (data.loggedFlightsCount !== undefined) {
+                            setLoggedFlightsCount(data.loggedFlightsCount);
+                            loggedFlightsCountRef.current = data.loggedFlightsCount;
+                        } else {
+                            setLoggedFlightsCount(0);
+                            loggedFlightsCountRef.current = 0;
+                        }
+
+                        if (data.isRaining !== undefined) {
+                            setIsRaining(data.isRaining);
+                            isRainingRef.current = data.isRaining;
+                        }
+
+                        if (data.windDataMap) {
+                            setWindDataMap(data.windDataMap);
+                        }
+                    }
+                }, (err) => {
+                    console.error("Error leyendo datos en tiempo real:", err);
+                });
 
                 return () => unsubscribe();
             }, []);
@@ -130,8 +186,21 @@
                     if (s === 0) {
                         const timeStr = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
                         
-                        // Alarmas Estáticas
-                        if (h === 7 && m === 50) {
+                        // ===== CORTE DE 12 AM (MEDIANOCHE) =====
+                        if (h === 0 && m === 0) {
+                            speak("Atención. Reiniciando acumulados diarios. Cambio de día en el sistema.");
+                            setModal({ isOpen: true, title: '🔄 CORTE DE MEDIANOCHE', message: 'Se ha reiniciado el acumulado de vuelos y el sistema está listo para el nuevo día.', type: 'error' });
+                            
+                            // Borra los vuelos en Firebase para todos los sitios conectados
+                            window.FB_setDoc(getSharedDocRef(), {
+                                loggedFlightsCount: 0,
+                                flights: [],
+                                isRaining: false,
+                                windDataMap: {}
+                            }, { merge: true });
+                        }
+                        // =======================================
+                        else if (h === 7 && m === 50) {
                             speak("Atención comandante. Es hora de la junta operativa de las siete cincuenta.");
                             setModal({ isOpen: true, title: '⏰ JUNTA OPERATIVA', message: 'Reunión de las 7:50 AM.', type: 'error' });
                         }
@@ -267,8 +336,9 @@
                      });
                 }
 
+                // Guardamos en estado local temporal y en la base de datos
                 setWindDataMap(windMap);
-                db.collection('operaciones').doc('turno_actual').set({ windDataMap: windMap }, { merge: true });
+                window.FB_setDoc(getSharedDocRef(), { windDataMap: windMap }, { merge: true });
 
                 // LÓGICA DE ALEATORIEDAD (+- 15 MIN)
                 const applyVariance = (timeStr, isForzoso = false) => {
@@ -338,16 +408,14 @@
                     ...f, wind: windMap[f.hour24] >= 40 ? 45 : f.wind
                 }));
 
-                setFlights(finalSchedule);
-                flightsRef.current = finalSchedule;
-                db.collection('operaciones').doc('turno_actual').set({ flights: finalSchedule }, { merge: true });
+                // Enviamos a la BD compartida
+                window.FB_setDoc(getSharedDocRef(), { flights: finalSchedule }, { merge: true });
             };
 
             const toggleRainProtocol = () => {
                 const newState = !isRaining;
-                setIsRaining(newState);
-                isRainingRef.current = newState;
-                db.collection('operaciones').doc('turno_actual').set({ isRaining: newState }, { merge: true });
+                // Enviamos estado de lluvia al servidor compartido
+                window.FB_setDoc(getSharedDocRef(), { isRaining: newState }, { merge: true });
 
                 if (newState) {
                     speak("Alerta. Operaciones suspendidas por lluvia local.");
@@ -360,7 +428,7 @@
             const recalculateAfterRain = () => {
                 const currentHour = currentTime.getHours();
                 const currentMinute = currentTime.getMinutes();
-                const remaining = totalFlightsTarget - loggedFlightsCount;
+                const remaining = totalFlightsTarget - loggedFlightsCountRef.current;
 
                 if (remaining <= 0) {
                     speak("Meta alcanzada. No se requieren vuelos adicionales hoy.");
@@ -395,9 +463,8 @@
                     currentSlot += interval;
                 }
                 
-                setFlights(newSchedule);
-                flightsRef.current = newSchedule;
-                db.collection('operaciones').doc('turno_actual').set({ flights: newSchedule }, { merge: true });
+                // Sincronizar en la BD compartida
+                window.FB_setDoc(getSharedDocRef(), { flights: newSchedule }, { merge: true });
             };
 
             const handleLogManualFlight = () => {
@@ -405,10 +472,11 @@
                      setModal({ isOpen: true, title: 'Bloqueo por Lluvia', message: 'No puedes registrar despegues durante el protocolo de lluvia.', type: 'error' });
                      return;
                  }
-                 if (loggedFlightsCount < totalFlightsTarget) {
-                      const newCount = loggedFlightsCount + 1;
-                      setLoggedFlightsCount(newCount);
-                      db.collection('operaciones').doc('turno_actual').set({ loggedFlightsCount: newCount }, { merge: true });
+                 if (loggedFlightsCountRef.current < totalFlightsTarget) {
+                      const newCount = loggedFlightsCountRef.current + 1;
+                      
+                      // Actualizar en el servidor para que todos lo vean
+                      window.FB_setDoc(getSharedDocRef(), { loggedFlightsCount: newCount }, { merge: true });
                       speak(`Vuelo registrado. Total del día, ${newCount} de 13.`);
                  } else {
                       speak("Meta diaria de vuelos completada.");
@@ -577,8 +645,10 @@
             );
         }
 
-        const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(<App />);
+        window.renderApp = () => {
+            const root = ReactDOM.createRoot(document.getElementById('root'));
+            root.render(<App />);
+        };
     </script>
 </body>
 </html>
