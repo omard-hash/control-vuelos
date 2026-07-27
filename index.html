@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dispatcher Pro - V42 Master</title>
     
+    <!-- Librerías de React y Tailwind -->
     <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -13,7 +14,7 @@
     <!-- LIBRERÍA PROFESIONAL PARA LEER EXCEL Y CSV (MATRICES) -->
     <script src="https://unpkg.com/xlsx/dist/xlsx.full.min.js"></script>
     
-    <!-- FIREBASE COMPAT (Tu conexión original segura) -->
+    <!-- FIREBASE COMPAT (Tu conexión original y segura v10) -->
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore-compat.js"></script>
@@ -49,6 +50,7 @@
         const { useState, useEffect, useRef } = React;
 
         function App() {
+            // Estados principales de la UI
             const [currentTime, setCurrentTime] = useState(new Date());
             const [shiftName, setShiftName] = useState('Turno Diurno');
             const [isScanning, setIsScanning] = useState(false);
@@ -57,12 +59,13 @@
             const [geminiKey, setGeminiKey] = useState(localStorage.getItem('gemini_key') || '');
             const [modal, setModal] = useState({ isOpen: false, title: '', message: '', type: 'error' });
             
+            // Estados Operativos
             const [loggedFlightsCount, setLoggedFlightsCount] = useState(0);
             const totalFlightsTarget = 13;
-
             const [isRaining, setIsRaining] = useState(false);
             const [windDataMap, setWindDataMap] = useState({});
 
+            // Estados de Audio
             const [audioUnlocked, setAudioUnlocked] = useState(false);
             const audioUnlockedRef = useRef(false);
             
@@ -71,6 +74,7 @@
             const [allMonthShifts, setAllMonthShifts] = useState([]);
             const [currentOperator, setCurrentOperator] = useState('Sin asignar');
             
+            // Referencias para usarlas en intervalos y callbacks sin problemas de renderizado
             const flightsRef = useRef([]);
             const isRainingRef = useRef(false);
             const allMonthShiftsRef = useRef([]);
@@ -83,7 +87,7 @@
                 auth.signInAnonymously().then(() => {
                     authReady.current = true;
                     
-                    // 1. Escuchar los datos del turno actual (Vuelos, clima)
+                    // 1. Escuchar los datos del turno actual (Vuelos, clima) en tiempo real
                     unsubscribeTurno = db.collection('operaciones').doc('turno_actual').onSnapshot((doc) => {
                         if (doc.exists) {
                             const data = doc.data();
@@ -103,7 +107,7 @@
                         }
                     }, (err) => console.error("Error leyendo turno:", err));
 
-                    // 2. Escuchar TODOS los turnos del mes subidos
+                    // 2. Escuchar TODOS los turnos del mes subidos desde Excel
                     unsubscribeMes = db.collection('operaciones').doc('turnos_mes').onSnapshot((doc) => {
                         if (doc.exists && doc.data().turnos) {
                             setAllMonthShifts(doc.data().turnos);
@@ -154,11 +158,9 @@
                     // ==========================================
                     // MOTOR INTELIGENTE: ASIGNAR OPERADOR ACTUAL
                     // ==========================================
-                    // Formato YYYY-MM-DD para cruzar con los datos
                     const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
                     const currentMins = h * 60 + m;
                     
-                    // Buscar en toda la base del mes si hay turnos para HOY
                     const shiftsToday = allMonthShiftsRef.current.filter(shift => shift.date === todayStr);
                     let foundOp = 'Sin asignar';
 
@@ -178,7 +180,6 @@
                             }
                         }
                     }
-
                     setCurrentOperator(foundOp);
 
                     // ==========================================
@@ -229,54 +230,28 @@
 
             const extractCleanName = (str) => {
                 if (!str || typeof str !== 'string') return "";
-                // Borramos basura típica de los puestos
-                let clean = str.replace(/Especialista|RPAS|OS|Turno|Horario|Puesto|Empleado/gi, '').trim();
-                // Extraemos solo el primer nombre/apellido real
+                let clean = str.replace(/Especialista|RPAS|OS|Turno|Horario|Puesto|Empleado|Piloto/gi, '').trim();
+                clean = clean.replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑ\s]/g, '').trim(); 
                 let words = clean.split(/\s+/).filter(w => w.length > 2);
-                return words.length > 0 ? words[0] : "";
-            };
-
-            const parseFlexibleDate = (str) => {
-                if (!str) return null;
-                str = String(str).toLowerCase().trim();
-                
-                // Formato Excel (YYYY-MM-DD o DD/MM/YYYY)
-                let m1 = str.match(/(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})/);
-                if (m1) return `${m1[1]}-${m1[2].padStart(2,'0')}-${m1[3].padStart(2,'0')}`;
-                
-                let m2 = str.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})/);
-                if (m2) {
-                    let y = m2[3].length === 2 ? `20${m2[3]}` : m2[3];
-                    return `${y}-${m2[2].padStart(2,'0')}-${m2[1].padStart(2,'0')}`;
-                }
-
-                // Formato texto (ej. "27 Jul", "Mon 27 Jul 2026")
-                let textMatch = str.match(/(\d{1,2})\s*[\/\-]?\s*([a-z]{3,})/i);
-                if (textMatch) {
-                    let day = textMatch[1].padStart(2, '0');
-                    let monthStr = textMatch[2];
-                    let year = new Date().getFullYear();
-                    
-                    // Buscar si tiene año escondido
-                    let yearMatch = str.match(/\d{4}/);
-                    if (yearMatch) year = yearMatch[0];
-
-                    const monthMap = {ene:'01',jan:'01',feb:'02',mar:'03',abr:'04',apr:'04',may:'05',jun:'06',jul:'07',ago:'08',aug:'08',sep:'09',oct:'10',nov:'11',dic:'12',dec:'12'};
-                    let monthKey = Object.keys(monthMap).find(k => monthStr.includes(k));
-                    
-                    if (monthKey) {
-                        return `${year}-${monthMap[monthKey]}-${day}`;
-                    }
-                }
-                return null;
+                return words.length > 0 ? words.slice(0, 2).join(" ") : ""; 
             };
 
             const extractTimes = (str) => {
-                let matches = [...String(str).matchAll(/(\d{1,2}):(\d{2})/g)];
+                if (!str || typeof str !== 'string') return null;
+                const regex = /(\d{1,2}):(\d{2})\s*(am|pm)?/gi;
+                let matches = [...str.matchAll(regex)];
                 if (matches.length >= 2) {
+                    const parseTime = (h, m, ampm) => {
+                        let hInt = parseInt(h, 10);
+                        if (ampm) {
+                            if (ampm.toLowerCase() === 'pm' && hInt < 12) hInt += 12;
+                            if (ampm.toLowerCase() === 'am' && hInt === 12) hInt = 0;
+                        }
+                        return `${String(hInt).padStart(2,'0')}:${m}`;
+                    };
                     return [
-                        `${matches[0][1].padStart(2,'0')}:${matches[0][2]}`,
-                        `${matches[1][1].padStart(2,'0')}:${matches[1][2]}`
+                        parseTime(matches[0][1], matches[0][2], matches[0][3]),
+                        parseTime(matches[1][1], matches[1][2], matches[1][3])
                     ];
                 }
                 return null;
@@ -286,7 +261,7 @@
                 const file = e.target.files[0];
                 if (!file) return;
 
-                speak("Analizando matriz del mes...");
+                speak("Analizando matriz de Excel a profundidad...");
                 const reader = new FileReader();
                 reader.onload = (evt) => {
                     try {
@@ -295,76 +270,118 @@
                         const firstSheetName = workbook.SheetNames[0];
                         const worksheet = workbook.Sheets[firstSheetName];
                         
-                        // Convertimos la hoja a un array de arrays (Matriz)
-                        const rows = window.XLSX.utils.sheet_to_json(worksheet, {header: 1, raw: false});
+                        // Doble lectura para cruzar fechas puras y texto
+                        const rowsRaw = window.XLSX.utils.sheet_to_json(worksheet, {header: 1, raw: true});
+                        const rowsText = window.XLSX.utils.sheet_to_json(worksheet, {header: 1, raw: false});
                         
-                        let dateColumns = {}; // Mapea { indice_columna: '2026-07-27' }
                         let parsedShifts = [];
 
-                        // 1. Escanear las primeras 5 filas buscando fechas (Cabeceras de Zoho)
-                        for (let r = 0; r < Math.min(5, rows.length); r++) {
-                            const row = rows[r];
-                            if (!row) continue;
-                            row.forEach((cell, colIndex) => {
-                                let dateStr = parseFlexibleDate(cell);
-                                if (dateStr) {
-                                    dateColumns[colIndex] = dateStr;
-                                }
-                            });
-                        }
+                        const parseDateCell = (rawCell, textCell) => {
+                            if (rawCell instanceof Date && !isNaN(rawCell)) {
+                                return `${rawCell.getFullYear()}-${String(rawCell.getMonth() + 1).padStart(2, '0')}-${String(rawCell.getDate()).padStart(2, '0')}`;
+                            }
+                            let str = String(textCell || rawCell).toLowerCase().trim();
+                            if (!str || str.length < 3) return null;
 
-                        // 2. Si encontró fechas en columnas, cruzamos los datos hacia abajo
-                        if (Object.keys(dateColumns).length > 0) {
-                            for (let r = 0; r < rows.length; r++) {
-                                const row = rows[r];
-                                if (!row || row.length === 0) continue;
-                                
-                                // El nombre suele estar en la columna 0, 1 o 2.
-                                let rawName = String(row[0] || "") + " " + String(row[1] || "");
-                                let cleanName = extractCleanName(rawName);
-                                
-                                if (cleanName.length > 2) {
-                                    // Revisar todas las columnas que son fechas
-                                    Object.keys(dateColumns).forEach(colIndex => {
-                                        let cellData = row[colIndex];
-                                        if (cellData) {
-                                            let times = extractTimes(cellData);
-                                            if (times) {
-                                                parsedShifts.push({
-                                                    date: dateColumns[colIndex],
-                                                    name: cleanName,
-                                                    start: times[0],
-                                                    end: times[1]
-                                                });
-                                            }
-                                        }
-                                    });
+                            let m1 = str.match(/(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})/);
+                            if (m1) return `${m1[1]}-${m1[2].padStart(2,'0')}-${m1[3].padStart(2,'0')}`;
+
+                            let m2 = str.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})/);
+                            if (m2) {
+                                let y = m2[3].length === 2 ? `20${m2[3]}` : m2[3];
+                                let p1 = parseInt(m2[1]);
+                                let p2 = parseInt(m2[2]);
+                                let d = p1 > 12 ? p1 : (p2 > 12 ? p2 : p1); 
+                                let m = p1 > 12 ? p2 : (p2 > 12 ? p1 : p2);
+                                return `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+                            }
+
+                            let textMatch = str.match(/(\d{1,2})\s*[\/\-]?\s*([a-z]{3,})/i);
+                            if (textMatch) {
+                                let d = textMatch[1].padStart(2, '0');
+                                let mStr = textMatch[2];
+                                let y = new Date().getFullYear();
+                                const monthMap = {ene:'01',jan:'01',feb:'02',mar:'03',abr:'04',apr:'04',may:'05',jun:'06',jul:'07',ago:'08',aug:'08',sep:'09',oct:'10',nov:'11',dic:'12',dec:'12'};
+                                let mKey = Object.keys(monthMap).find(k => mStr.includes(k));
+                                if (mKey) return `${y}-${monthMap[mKey]}-${d}`;
+                            }
+                            return null;
+                        };
+
+                        const findDate = (rowIndex, colIndex) => {
+                            for(let c = 0; c < rowsText[rowIndex].length; c++) {
+                                if (c !== colIndex && rowsText[rowIndex][c]) {
+                                    let d = parseDateCell(rowsRaw[rowIndex][c], rowsText[rowIndex][c]);
+                                    if (d) return d;
                                 }
                             }
-                        } else {
-                            // Si NO es una matriz, leerlo como lista simple (Nombre, Entrada, Salida)
-                            rows.forEach(row => {
-                                let rowStr = row.join(" ");
-                                let d = parseFlexibleDate(rowStr) || `${new Date().getFullYear()}-${String(new Date().getMonth()+1).padStart(2,'0')}-${String(new Date().getDate()).padStart(2,'0')}`;
-                                let t = extractTimes(rowStr);
-                                let n = extractCleanName(rowStr);
-                                if (t && n.length > 2) {
-                                    parsedShifts.push({ date: d, name: n, start: t[0], end: t[1] });
+                            for (let r = rowIndex - 1; r >= 0; r--) {
+                                if (rowsText[r] && rowsText[r][colIndex]) {
+                                    let d = parseDateCell(rowsRaw[r][colIndex], rowsText[r][colIndex]);
+                                    if (d) return d;
                                 }
-                            });
+                            }
+                            return null;
+                        };
+
+                        const findName = (rowIndex, colIndex) => {
+                            for (let c = 0; c < colIndex; c++) {
+                                if (rowsText[rowIndex] && rowsText[rowIndex][c]) {
+                                    let n = extractCleanName(rowsText[rowIndex][c]);
+                                    if (n.length > 2) return n;
+                                }
+                            }
+                            return null;
+                        };
+
+                        for (let r = 0; r < rowsText.length; r++) {
+                            if (!rowsText[r]) continue;
+                            for (let c = 0; c < rowsText[r].length; c++) {
+                                let textCell = rowsText[r][c];
+                                if (!textCell) continue;
+
+                                let times = extractTimes(textCell);
+                                if (times) {
+                                    let dateStr = findDate(r, c);
+                                    let nameStr = findName(r, c);
+
+                                    // Fallback Si la fecha es solo un número (ej. Zoho Shifts pone 27)
+                                    if (!dateStr) {
+                                        for (let upRow = r - 1; upRow >= 0; upRow--) {
+                                            let headerVal = String(rowsText[upRow][c] || "").trim();
+                                            if (/^\d{1,2}$/.test(headerVal)) {
+                                                let day = headerVal.padStart(2, '0');
+                                                let y = new Date().getFullYear();
+                                                let m = String(new Date().getMonth() + 1).padStart(2, '0');
+                                                dateStr = `${y}-${m}-${day}`;
+                                                break;
+                                            }
+                                        }
+                                    }
+
+                                    if (dateStr && nameStr) {
+                                        parsedShifts.push({
+                                            date: dateStr,
+                                            name: nameStr,
+                                            start: times[0],
+                                            end: times[1]
+                                        });
+                                    }
+                                }
+                            }
                         }
 
                         if (parsedShifts.length > 0) {
                             db.collection('operaciones').doc('turnos_mes').set({ turnos: parsedShifts });
-                            speak(`Carga exitosa. Se guardaron ${parsedShifts.length} turnos en la base de datos.`);
-                            setModal({ isOpen: true, title: '✅ Mes Cargado', message: `El sistema guardó ${parsedShifts.length} turnos para operar en automático.`, type: 'success' });
+                            speak(`Lectura exitosa. Se extrajeron ${parsedShifts.length} turnos.`);
+                            setModal({ isOpen: true, title: '✅ Matriz Procesada', message: `El sistema extrajo exitosamente ${parsedShifts.length} turnos del archivo Zoho y los guardó en la nube.`, type: 'success' });
                             setAdminOpen(false);
                         } else {
-                            setModal({ isOpen: true, title: 'Formato Irreconocible', message: 'No se encontraron fechas válidas o nombres legibles en este archivo.', type: 'error' });
+                            setModal({ isOpen: true, title: 'Formato Irreconocible', message: 'El sistema no logró encontrar fechas o nombres compatibles. Asegúrate de que las celdas tengan horarios válidos (ej. 07:00 - 15:00).', type: 'error' });
                         }
 
                     } catch (error) {
-                        setModal({ isOpen: true, title: 'Error', message: error.message, type: 'error' });
+                        setModal({ isOpen: true, title: 'Error de Lectura', message: error.message, type: 'error' });
                     }
                 };
                 reader.readAsArrayBuffer(file);
@@ -456,7 +473,7 @@
                     return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
                 };
 
-                // Base para 13 vuelos
+                // Base para asegurar 13 vuelos
                 let baseTimes = ["07:20", "08:35", "09:50", "11:05", "12:20", "13:35", "14:50", "16:05", "17:20", "18:35", "19:50", "21:05", "22:20"];
                 
                 let newSchedule = baseTimes.map((timeStr, index) => {
@@ -477,7 +494,7 @@
             };
 
             const recalculateAfterRain = () => {
-                const remaining = totalFlightsTarget - loggedFlightsCountRef.current;
+                const remaining = totalFlightsTarget - loggedFlightsCountRef?.current || (totalFlightsTarget - loggedFlightsCount);
                 if (remaining <= 0) return;
                 
                 const currentSlot = currentTime.getHours() * 60 + currentTime.getMinutes() + 15;
@@ -498,13 +515,12 @@
             };
 
             const handleLogManualFlight = () => {
-                 if (isRaining) return setModal({ isOpen: true, title: 'Lluvia', message: 'No puedes registrar despegues.', type: 'error' });
+                 if (isRaining) return setModal({ isOpen: true, title: 'Lluvia', message: 'No puedes registrar despegues en lluvia.', type: 'error' });
                  if (loggedFlightsCount < totalFlightsTarget) {
                       db.collection('operaciones').doc('turno_actual').set({ loggedFlightsCount: loggedFlightsCount + 1 }, { merge: true });
                  }
             };
 
-            // Helpers UI
             const todayStrUI = `${currentTime.getFullYear()}-${String(currentTime.getMonth() + 1).padStart(2, '0')}-${String(currentTime.getDate()).padStart(2, '0')}`;
             const todayShiftsUI = allMonthShifts.filter(s => s.date === todayStrUI);
 
@@ -517,7 +533,7 @@
                                 <span className="bg-indigo-600 text-white px-2 py-0.5 rounded text-xs">DP</span>
                                 DISPATCHER PRO
                             </h1>
-                            <p className="text-[10px] font-bold text-emerald-400 mt-1 tracking-widest uppercase">V42 MASTER • 🟢 AUTO ZOHO</p>
+                            <p className="text-[10px] font-bold text-emerald-400 mt-1 tracking-widest uppercase">V42 MASTER • 🟢 NUBE COMPAT V10</p>
                         </div>
                         <div className="flex gap-2">
                             <button onClick={(e) => { e.stopPropagation(); setAdminOpen(true); }} className="bg-[#1f2937] hover:bg-[#374151] p-2.5 rounded-lg border border-slate-700 transition" title="Administración">👨‍💼</button>
@@ -531,6 +547,7 @@
                         </div>
                     )}
 
+                    {}
                     <div className="glass-card p-5 rounded-2xl mb-5 relative overflow-hidden">
                         <div className="flex justify-between items-start mb-6">
                             <div>
@@ -573,6 +590,7 @@
                         </div>
                     </div>
 
+                    {}
                     <div className={`glass-card p-5 rounded-2xl mb-6 relative ${isRaining ? 'opacity-50 pointer-events-none' : ''}`}>
                         {isRaining && <div className="absolute inset-0 rain-overlay rounded-2xl z-10 flex items-center justify-center text-center p-4">
                             <span className="text-white font-bold text-lg">Esperando que mejore el clima...</span>
@@ -609,6 +627,7 @@
                          </button>
                     </div>
 
+                    {}
                     {/* MODAL DE ADMINISTRADOR PARA EL MES */}
                     {adminOpen && (
                         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4" onClick={() => setAdminOpen(false)}>
@@ -627,7 +646,7 @@
                                     </p>
                                     <input type="file" id="monthUpload" accept=".csv, .xls, .xlsx" className="hidden" onChange={handleFileUpload} />
                                     <button onClick={() => document.getElementById('monthUpload').click()} className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-3.5 rounded-lg text-sm shadow-[0_0_15px_rgba(79,70,229,0.3)] transition transform hover:scale-105">
-                                        📄 Subir Archivo Zoho (.CSV / .XLSX)
+                                        📄 Subir Archivo Zoho (.XLSX / .CSV)
                                     </button>
                                 </div>
 
@@ -639,7 +658,7 @@
                                 <div className="space-y-2 mb-6 max-h-48 overflow-y-auto pr-1">
                                     {todayShiftsUI.length === 0 ? (
                                         <div className="text-center py-6 bg-[#0f172a] rounded-xl border border-slate-800 text-xs text-slate-500">
-                                            No hay turnos registrados para hoy. Sube el archivo del mes.
+                                            No hay turnos para hoy. Si acabas de subir el archivo, asegúrate de que tiene las fechas correctas.
                                         </div>
                                     ) : (
                                         todayShiftsUI.map((op, i) => (
@@ -660,6 +679,7 @@
                         </div>
                     )}
 
+                    {}
                     {settingsOpen && (
                         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4" onClick={(e) => e.stopPropagation()}>
                             <div className="bg-[#131826] border border-slate-800 rounded-2xl w-full max-w-sm shadow-2xl p-6">
