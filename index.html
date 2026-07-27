@@ -39,7 +39,7 @@
         const auth = getAuth(app);
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-dispatcher';
 
-        // Exponemos las funciones para que React/Babel pueda usarlas
+        // Exponemos las funciones para que React/Babel pueda usarlas globalmente
         window.FB_Db = db;
         window.FB_Auth = auth;
         window.FB_AppId = appId;
@@ -54,7 +54,6 @@
     <script type="text/babel">
         const { useState, useEffect, useRef } = React;
 
-        // Función para obtener la referencia del documento compartido según el entorno
         const getSharedDocRef = () => {
             if (typeof __app_id !== 'undefined') {
                 return window.FB_doc(window.FB_Db, 'artifacts', window.FB_AppId, 'public', 'data', 'operaciones', 'turno_actual');
@@ -72,6 +71,17 @@
             const [geminiKey, setGeminiKey] = useState(localStorage.getItem('gemini_key') || '');
             const [modal, setModal] = useState({ isOpen: false, title: '', message: '', type: 'error' });
             
+            // Estados para Operadores y PDFs
+            const [adminOpen, setAdminOpen] = useState(false);
+            const [operators, setOperators] = useState([]);
+            const [currentOperator, setCurrentOperator] = useState('Sin asignar');
+            const [newOpName, setNewOpName] = useState('');
+            const [newOpStart, setNewOpStart] = useState('');
+            const [newOpEnd, setNewOpEnd] = useState('');
+            const [isScanningPDF, setIsScanningPDF] = useState(false);
+            const operatorsRef = useRef([]);
+            const currentOperatorRef = useRef('Sin asignar');
+
             const [loggedFlightsCount, setLoggedFlightsCount] = useState(0);
             const totalFlightsTarget = 13;
 
@@ -92,7 +102,6 @@
 
                 const initFirebase = async () => {
                     try {
-                        // REGLA 3: Autenticación obligatoria antes de consultar
                         if (window.FB_initialAuthToken) {
                             await window.FB_signInWithCustomToken(window.FB_Auth, window.FB_initialAuthToken);
                         } else {
@@ -101,9 +110,11 @@
                         
                         authReady.current = true;
                         
+                        // Lectura en tiempo real
                         unsubscribe = window.FB_onSnapshot(getSharedDocRef(), (docSnap) => {
                             if (docSnap.exists()) {
                                 const data = docSnap.data();
+                                
                                 if (data.flights) {
                                     setFlights(data.flights);
                                     flightsRef.current = data.flights;
@@ -123,6 +134,14 @@
                                 }
                                 
                                 if (data.windDataMap) setWindDataMap(data.windDataMap);
+                                
+                                if (data.operators) {
+                                    setOperators(data.operators);
+                                    operatorsRef.current = data.operators;
+                                } else {
+                                    setOperators([]);
+                                    operatorsRef.current = [];
+                                }
                             }
                         }, (err) => {
                             console.error("Error sincronizando datos en tiempo real:", err);
@@ -133,9 +152,7 @@
                     }
                 };
 
-                // Esperamos un momento para asegurar que las variables globales del módulo se cargaron
                 setTimeout(initFirebase, 500);
-
                 return () => unsubscribe();
             }, []);
 
@@ -173,13 +190,32 @@
                     const m = now.getMinutes();
                     const s = now.getSeconds();
 
-                    if (h >= 7 && h < 19) {
-                        setShiftName('Turno Diurno');
-                    } else {
-                        setShiftName('Turno Nocturno');
-                    }
+                    if (h >= 7 && h < 19) setShiftName('Turno Diurno');
+                    else setShiftName('Turno Nocturno');
                     
-                    // CORTE NOCTURNO: A LAS 12:00 AM EXACTAMENTE SE REINICIAN LOS DATOS
+                    // Cálculo de Operador en Turno
+                    let foundOperator = 'Sin asignar';
+                    const currentTotalMins = h * 60 + m;
+                    if (operatorsRef.current && operatorsRef.current.length > 0) {
+                        for (let op of operatorsRef.current) {
+                            let startParts = op.start.split(':');
+                            let endParts = op.end.split(':');
+                            let startTotal = parseInt(startParts[0]) * 60 + parseInt(startParts[1]);
+                            let endTotal = parseInt(endParts[0]) * 60 + parseInt(endParts[1]);
+                            
+                            if (startTotal <= endTotal) {
+                                if (currentTotalMins >= startTotal && currentTotalMins < endTotal) foundOperator = op.name;
+                            } else {
+                                if (currentTotalMins >= startTotal || currentTotalMins < endTotal) foundOperator = op.name;
+                            }
+                        }
+                    }
+                    if (currentOperatorRef.current !== foundOperator) {
+                        setCurrentOperator(foundOperator);
+                        currentOperatorRef.current = foundOperator;
+                    }
+
+                    // CORTE NOCTURNO (12:00 AM)
                     if (h === 0 && m === 0 && s === 0 && authReady.current) {
                         speak("Iniciando nuevo día de operaciones. Borrando bitácora de vuelos e inicializando contadores a cero.");
                         window.FB_setDoc(getSharedDocRef(), {
@@ -190,51 +226,39 @@
                         }, { merge: false });
                     }
 
+                    // Alarmas (ejecución por minuto)
                     if (s === 0) {
                         const timeStr = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
                         
-                        // Alarmas Estáticas
                         if (h === 7 && m === 50) {
                             speak("Atención comandante. Es hora de la junta operativa de las siete cincuenta.");
                             setModal({ isOpen: true, title: '⏰ JUNTA OPERATIVA', message: 'Reunión de las 7:50 AM.', type: 'error' });
-                        }
-                        else if (h === 12 && m === 0) {
+                        } else if (h === 12 && m === 0) {
                             speak("Atención comandante. Es hora de elaborar los reportes K P I.");
                             setModal({ isOpen: true, title: '📊 ELABORACIÓN DE KPIs', message: 'Es la hora designada para la elaboración de los KPIs operativos.', type: 'error' });
-                        }
-                        else if (h === 12 && m === 5) {
-                            speak("Atención. Actualización de captura del clima requerida. Por favor confirme el ou kei to flai para garantizar condiciones adecuadas.");
+                        } else if ((h === 12 && m === 5) || (h === 0 && m === 5)) {
+                            speak("Atención. Actualización de captura del clima requerida. Por favor confirme el ou kei to flai.");
                             setModal({ isOpen: true, title: '🌤️ ACTUALIZAR CLIMA', message: 'Es obligatorio actualizar la captura del clima y validar condiciones seguras para volar.', type: 'error' });
                         }
-                        else if (h === 0 && m === 5) {
-                            speak("Atención. Actualización de captura del clima requerida. Por favor confirme el ou kei to flai para garantizar condiciones adecuadas.");
-                            setModal({ isOpen: true, title: '🌙 ACTUALIZAR CLIMA', message: 'Es obligatorio actualizar la captura del clima y validar condiciones seguras para volar.', type: 'error' });
-                        }
 
-                        // Alarmas Dinámicas de Vuelo (10 y 5 minutos antes)
+                        // Alarmas 10 y 5 min antes de vuelo
                         if (flightsRef.current && flightsRef.current.length > 0 && !isRainingRef.current) {
                             flightsRef.current.forEach(flight => {
                                 if (flight.wind < 42) {
                                     const parts = flight.time.split(':');
                                     let fh = parseInt(parts[0]);
                                     let fm = parseInt(parts[1]);
-                                    
                                     let flightDate = new Date();
                                     flightDate.setHours(fh, fm, 0, 0);
                                     
                                     let warn10 = new Date(flightDate.getTime() - 10 * 60000);
-                                    let w10H = String(warn10.getHours()).padStart(2, '0');
-                                    let w10M = String(warn10.getMinutes()).padStart(2, '0');
-
                                     let warn5 = new Date(flightDate.getTime() - 5 * 60000);
-                                    let w5H = String(warn5.getHours()).padStart(2, '0');
-                                    let w5M = String(warn5.getMinutes()).padStart(2, '0');
                                     
-                                    if (timeStr === `${w10H}:${w10M}`) {
-                                        speak(`Atención piloto. Faltan 10 minutos para el vuelo programado a las ${flight.time}. Inicie el protocolo de preparación.`);
+                                    if (timeStr === `${String(warn10.getHours()).padStart(2, '0')}:${String(warn10.getMinutes()).padStart(2, '0')}`) {
+                                        speak(`Atención piloto. Faltan 10 minutos para el vuelo de las ${flight.time}. Inicie protocolo.`);
                                     }
-                                    if (timeStr === `${w5H}:${w5M}`) {
-                                        speak(`Atención piloto. Faltan 5 minutos para el despegue de las ${flight.time}. Prepárese para salir a plataforma.`);
+                                    if (timeStr === `${String(warn5.getHours()).padStart(2, '0')}:${String(warn5.getMinutes()).padStart(2, '0')}`) {
+                                        speak(`Faltan 5 minutos para el despegue de las ${flight.time}. Salga a plataforma.`);
                                     }
                                 }
                             });
@@ -273,7 +297,7 @@
                     const payload = {
                         contents: [{
                             parts: [
-                                // REGLAS ESTRICTAS: La IA asume la probabilidad de lluvia como apta.
+                                // REGLAS ESTRICTAS: La IA asume la probabilidad de lluvia como apta para priorizar vuelos.
                                 { text: "Analiza el clima. REGLA ESTRICTA 11:00am: Si dice 'UV' ES APTO. Regla general: Si dice 'Apto para volar' o indica 'Lluvia' (ej. Lluvia 64%), considéralo APTO PARA VOLAR y el viento es 0 (el sistema organizará el vuelo asumiendo que podría no llover). Si dice 'Ráfagas fuertes' o vientos > 40, viento es 45. Devuelve JSON con 'hourlyData' teniendo 'time' (ej. '11:00am') y 'wind' numérico." },
                                 { inline_data: { mime_type: "image/jpeg", data: base64Image } }
                             ]
@@ -297,7 +321,7 @@
                     const parsedData = JSON.parse(aiResponseText);
                     if (parsedData && parsedData.hourlyData) {
                          generateIntelligentSchedule(parsedData.hourlyData);
-                         speak("Itinerario calculado para lograr objetivo de trece vuelos.");
+                         speak("Itinerario calculado para lograr el objetivo de trece vuelos.");
                     } else {
                          throw new Error("La IA devolvió un formato incorrecto.");
                     }
@@ -329,7 +353,6 @@
                      });
                 }
 
-                setWindDataMap(windMap);
                 window.FB_setDoc(getSharedDocRef(), { windDataMap: windMap }, { merge: true });
 
                 const applyVariance = (timeStr, isForzoso = false) => {
@@ -344,7 +367,7 @@
                     return `${newH}:${newM}`;
                 };
 
-                // META ESTRICTA: 13 vuelos acomodados en el día.
+                // META ESTRICTA: Siempre 13 vuelos
                 let baseTimes = [
                     "07:20", "08:35", "09:50", "11:05", "12:20", "13:35", 
                     "14:50", "16:05", "17:20", "18:35", "19:50", "21:05", "22:20"
@@ -363,14 +386,11 @@
                     };
                 });
 
-                // Enviamos a la BD compartida
                 window.FB_setDoc(getSharedDocRef(), { flights: newSchedule }, { merge: true });
             };
 
             const toggleRainProtocol = () => {
                 const newState = !isRaining;
-                
-                // Actualizamos DB primero (por el realtime listener esto actualizará UI automáticamente)
                 window.FB_setDoc(getSharedDocRef(), { isRaining: newState }, { merge: true });
 
                 if (newState) {
@@ -436,6 +456,83 @@
                  }
             };
 
+            const handlePDFUpload = (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+
+                if (!geminiKey || geminiKey.trim() === '') {
+                    speak("Falta la llave de la inteligencia artificial.");
+                    setModal({ isOpen: true, title: 'Falta la Llave', message: 'Abre los ajustes (⚙️) y pega tu llave API para usar esta función.' });
+                    return;
+                }
+                
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    const base64Data = event.target.result.split(',')[1];
+                    analyzePDFWithAI(base64Data);
+                };
+                reader.readAsDataURL(file);
+            };
+
+            const analyzePDFWithAI = async (base64PDF) => {
+                setIsScanningPDF(true);
+                speak("Analizando documento de horarios...");
+                
+                try {
+                    const key = geminiKey.trim();
+                    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${key}`;
+                    
+                    const payload = {
+                        contents: [{
+                            parts: [
+                                { text: "Eres un asistente de operaciones. Analiza este documento PDF que contiene un horario. Extrae los nombres de los operadores con su respectiva hora de entrada y salida. Devuelve ÚNICAMENTE un arreglo JSON con este formato estricto: [{\"name\": \"Nombre del Operador\", \"start\": \"HH:MM\", \"end\": \"HH:MM\"}]. Usa el formato de 24 horas (ej. 07:00, 22:30). No incluyas ningún otro texto o marcadores Markdown fuera del JSON." },
+                                { inline_data: { mime_type: "application/pdf", data: base64PDF } }
+                            ]
+                        }]
+                    };
+
+                    const response = await fetch(url, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+
+                    if (!response.ok) throw new Error("Error de conexión. Verifica tu llave API.");
+
+                    const data = await response.json();
+                    let aiResponseText = data.candidates[0].content.parts[0].text;
+                    
+                    if (aiResponseText.startsWith('```json')) {
+                         aiResponseText = aiResponseText.replace(/```json\n?/, '').replace(/```\n?$/, '');
+                    } else if (aiResponseText.startsWith('```')) {
+                         aiResponseText = aiResponseText.replace(/```\n?/, '').replace(/```\n?$/, '');
+                    }
+                    
+                    const parsedData = JSON.parse(aiResponseText.trim());
+                    
+                    if (Array.isArray(parsedData) && parsedData.length > 0) {
+                         window.FB_setDoc(getSharedDocRef(), { operators: parsedData }, { merge: true });
+                         speak("Horarios actualizados exitosamente en la nube.");
+                         setModal({ isOpen: true, title: 'Carga Exitosa', message: `Se detectaron e importaron ${parsedData.length} turnos correctamente.`, type: 'success' });
+                    } else {
+                         throw new Error("No se encontraron formatos de horarios válidos en el PDF.");
+                    }
+
+                } catch (error) {
+                    console.error("AI Error (PDF):", error);
+                    speak("Hubo un error al procesar el archivo P D F.");
+                    setModal({ isOpen: true, title: 'Error de Lectura PDF', message: 'No se pudo leer el PDF. Asegúrate de que tenga texto legible y no sea una imagen escaneada borrosa. Detalle: ' + error.message });
+                } finally {
+                    setIsScanningPDF(false);
+                    document.getElementById('pdf-upload').value = '';
+                }
+            };
+
+            const handleRemoveOperator = (index) => {
+                const updatedOps = operators.filter((_, i) => i !== index);
+                window.FB_setDoc(getSharedDocRef(), { operators: updatedOps }, { merge: true });
+            };
+
             return (
                 <div className="min-h-screen p-4 max-w-2xl mx-auto pb-24" onClick={unlockAudio}>
                     
@@ -447,12 +544,21 @@
                             </h1>
                             <p className="text-[10px] font-bold text-indigo-400 mt-1 tracking-widest uppercase">V42 MASTER • 🟢 NUBE V11 ACTIVA</p>
                         </div>
-                        <button 
-                            onClick={(e) => { e.stopPropagation(); setSettingsOpen(true); }}
-                            className="bg-[#1f2937] hover:bg-[#374151] p-2.5 rounded-lg border border-slate-700 transition"
-                        >
-                            ⚙️
-                        </button>
+                        <div className="flex gap-2">
+                            <button 
+                                onClick={(e) => { e.stopPropagation(); setAdminOpen(true); }}
+                                className="bg-[#1f2937] hover:bg-[#374151] p-2.5 rounded-lg border border-slate-700 transition"
+                                title="Panel de Administración"
+                            >
+                                👨‍💼
+                            </button>
+                            <button 
+                                onClick={(e) => { e.stopPropagation(); setSettingsOpen(true); }}
+                                className="bg-[#1f2937] hover:bg-[#374151] p-2.5 rounded-lg border border-slate-700 transition"
+                            >
+                                ⚙️
+                            </button>
+                        </div>
                     </div>
 
                     {!audioUnlocked && (
@@ -462,7 +568,6 @@
                     )}
 
                     <div className="glass-card p-5 rounded-2xl mb-5 relative overflow-hidden">
-                        
                         <div className="flex justify-between items-start mb-6">
                             <div>
                                 <p className="text-[10px] font-bold tracking-widest text-slate-400 uppercase mb-1">{shiftName}</p>
@@ -470,10 +575,12 @@
                                 <div className="mt-1 text-3xl font-mono font-bold text-white tracking-wider">
                                     {currentTime.toLocaleTimeString('en-US', { hour12: false })}
                                 </div>
+                                <div className="mt-3 inline-flex items-center gap-1.5 bg-indigo-900/40 text-indigo-200 px-3 py-1.5 rounded-lg border border-indigo-500/30 text-xs font-bold shadow-inner">
+                                    <span className="text-indigo-400">👨‍✈️ OP:</span> {currentOperator}
+                                </div>
                             </div>
 
                             <div className="text-right flex flex-col items-end">
-                                
                                 <div className={`mb-3 px-4 py-2 rounded-xl border shadow-[0_0_20px_rgba(0,0,0,0.4)] transition-all ${shiftName === 'Turno Diurno' ? 'bg-amber-500/20 border-amber-500/50' : 'bg-fuchsia-600/20 border-fuchsia-500/50'}`}>
                                     <p className={`text-[10px] font-black uppercase tracking-widest ${shiftName === 'Turno Diurno' ? 'text-amber-400' : 'text-fuchsia-400'}`}>
                                         {shiftName === 'Turno Diurno' ? '🎯 Faltan (Diurno)' : '🔄 Heredados (Noct.)'}
@@ -557,6 +664,7 @@
                          </button>
                     </div>
 
+                    {}
                     {settingsOpen && (
                         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4" onClick={(e) => e.stopPropagation()}>
                             <div className="bg-[#131826] border border-slate-800 rounded-2xl w-full max-w-sm shadow-2xl p-6">
@@ -579,6 +687,55 @@
                                     <button onClick={() => setSettingsOpen(false)} className="flex-1 bg-slate-800 hover:bg-slate-700 text-white font-bold py-2.5 rounded-lg text-xs border border-slate-700">Cerrar</button>
                                     <button onClick={() => { localStorage.setItem('gemini_key', geminiKey); setSettingsOpen(false); speak("Llave guardada exitosamente."); }} className="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2.5 rounded-lg text-xs">Guardar</button>
                                 </div>
+                            </div>
+                        </div>
+                    )}
+                    
+                    {adminOpen && (
+                        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4" onClick={(e) => e.stopPropagation()}>
+                            <div className="bg-[#131826] border border-slate-800 rounded-2xl w-full max-w-md shadow-2xl p-6 max-h-[90vh] overflow-y-auto">
+                                <h2 className="text-lg font-black text-white mb-1 flex items-center gap-2">👨‍💼 Administración</h2>
+                                <p className="text-xs text-slate-400 mb-5">Gestión de Horarios de Operadores</p>
+                                
+                                <div className="bg-[#0f172a] p-4 rounded-xl border border-indigo-500/40 mb-4 shadow-[0_0_15px_rgba(79,70,229,0.1)]">
+                                    <h3 className="text-xs font-bold text-indigo-300 uppercase tracking-widest mb-3 flex items-center gap-2">
+                                        🤖 Carga Inteligente (PDF)
+                                    </h3>
+                                    <input type="file" id="pdf-upload" accept="application/pdf" className="hidden" onChange={handlePDFUpload} />
+                                    <button 
+                                        onClick={() => document.getElementById('pdf-upload').click()}
+                                        disabled={isScanningPDF}
+                                        className={`w-full py-2.5 rounded-lg text-sm font-bold transition flex justify-center items-center gap-2 ${isScanningPDF ? 'bg-indigo-900/50 text-indigo-300 animate-pulse' : 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-md'}`}
+                                    >
+                                        {isScanningPDF ? '⏳ Extrayendo Turnos...' : '📄 Subir Horario (PDF)'}
+                                    </button>
+                                    <p className="text-[9px] text-slate-400 mt-2 text-center">La IA leerá el PDF y asignará los turnos en automático.</p>
+                                </div>
+
+                                <div className="mb-6 bg-[#0f172a] p-4 rounded-xl border border-slate-800">
+                                    <h3 className="text-xs font-bold text-slate-300 uppercase tracking-widest mb-3">Operadores Registrados</h3>
+                                    {operators.length === 0 ? (
+                                        <p className="text-xs text-slate-500 text-center py-2">No hay operadores registrados</p>
+                                    ) : (
+                                        <div className="space-y-2">
+                                            {operators.map((op, idx) => (
+                                                <div key={idx} className="flex justify-between items-center bg-[#1e293b] p-3 rounded-lg border border-slate-700">
+                                                    <div>
+                                                        <p className="font-bold text-sm text-white">{op.name}</p>
+                                                        <p className="text-[10px] text-slate-400">{op.start} hrs - {op.end} hrs</p>
+                                                    </div>
+                                                    <button onClick={() => handleRemoveOperator(idx)} className="bg-rose-900/50 hover:bg-rose-900 text-rose-400 px-3 py-1.5 rounded-lg transition text-xs font-bold">
+                                                        Eliminar
+                                                    </button>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+
+                                <button onClick={() => setAdminOpen(false)} className="w-full bg-slate-700 hover:bg-slate-600 text-white font-bold py-3 rounded-lg text-sm transition">
+                                    Cerrar Panel
+                                </button>
                             </div>
                         </div>
                     )}
