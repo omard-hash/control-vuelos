@@ -70,7 +70,7 @@
             const [modal, setModal] = useState({ isOpen: false, title: '', message: '', type: 'error' });
             
             const [loggedFlightsCount, setLoggedFlightsCount] = useState(0);
-            const totalFlightsTarget = 13;
+            const totalFlightsTarget = 16; // NUEVA META: 16 Vuelos diarios para cubrir madrugada y todo el día
 
             const [isRaining, setIsRaining] = useState(false);
             const [isFoggy, setIsFoggy] = useState(false);
@@ -168,10 +168,10 @@
                 let newSchedule = [...futureForzoso];
 
                 if (neededDynamic > 0) {
-                    const endTime = 23 * 60 + 30; // Fin de operaciones
-                    let startTime = currentMins + 15; // Iniciar planeación 15 mins a futuro
+                    const endTime = 23 * 60 + 45; 
+                    let startTime = currentMins + 15; 
                     
-                    // Respetar Junta Operativa de Shopfloor (07:50 a 08:15)
+                    // Respetar Junta Operativa de Shopfloor
                     if (startTime >= 7 * 60 + 50 && startTime < 8 * 60 + 15) {
                         startTime = 8 * 60 + 15;
                     }
@@ -182,27 +182,29 @@
                         let currentSlot = startTime;
 
                         for (let i = 0; i < neededDynamic; i++) {
-                            // Si cae en horario de Shopfloor, saltarlo
-                            if (currentSlot >= 7 * 60 + 50 && currentSlot < 8 * 60 + 15) {
-                                currentSlot = 8 * 60 + 15;
+                            // FACTOR ALEATORIO EN RECÁLCULO: Variar +/- 12 mins para no ser robots
+                            let randomVariance = Math.floor(Math.random() * 25) - 12; 
+                            let slotWithVariance = currentSlot + randomVariance;
+
+                            if (slotWithVariance >= 7 * 60 + 50 && slotWithVariance < 8 * 60 + 15) {
+                                slotWithVariance = 8 * 60 + 15;
                             }
 
-                            // Evitar chocar con vuelos FORZOSOS (Dar margen de 25 mins)
+                            // Evitar colisión con Forzosos
                             let isTooClose = true;
                             let safetyCounter = 0;
                             while (isTooClose && safetyCounter < 10) {
                                 isTooClose = futureForzoso.some(ff => {
                                     let [fh, fm] = ff.time.split(':').map(Number);
-                                    return Math.abs((fh * 60 + fm) - currentSlot) < 25; 
+                                    return Math.abs((fh * 60 + fm) - slotWithVariance) < 25; 
                                 });
-                                if (isTooClose) currentSlot += 25;
+                                if (isTooClose) slotWithVariance += 30;
                                 safetyCounter++;
                             }
 
-                            let h = Math.floor(currentSlot / 60);
-                            let m = Math.floor(currentSlot % 60);
+                            let h = Math.floor(slotWithVariance / 60);
+                            let m = Math.floor(slotWithVariance % 60);
                             
-                            // Límite a las 23:59
                             if (h >= 24) { h = 23; m = 45; }
 
                             let timeStr = `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
@@ -215,14 +217,12 @@
                     }
                 }
 
-                // Ordenar cronológicamente
                 newSchedule.sort((a, b) => {
                     let [ah, am] = a.time.split(':').map(Number);
                     let [bh, bm] = b.time.split(':').map(Number);
                     return (ah * 60 + am) - (bh * 60 + bm);
                 });
 
-                // Conservar los vuelos pasados para mantener historial
                 const pastFlights = flightsRef.current.filter(f => {
                     const [fh, fm] = f.time.split(':').map(Number);
                     return (fh * 60 + fm) < currentMins;
@@ -247,7 +247,7 @@
                     if (h >= 7 && h < 19) { setShiftName('Turno Diurno'); } 
                     else { setShiftName('Turno Nocturno'); }
                     
-                    // Localizar Operador
+                    // Lógica para asignar Operador en Turno según Zoho
                     const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
                     let yesterday = new Date(now);
                     yesterday.setDate(yesterday.getDate() - 1);
@@ -275,7 +275,7 @@
                     }
                     setCurrentOperator(prevOp => prevOp !== foundOp ? foundOp : prevOp);
 
-                    // Reset Medianoche
+                    // Reset de Medianoche
                     if (h === 0 && m === 0 && s === 0 && authReady.current) {
                         speak("Iniciando nuevo día operativo. Reiniciando contadores.");
                         db.collection('operaciones').doc('turno_actual').set({
@@ -283,13 +283,13 @@
                         });
                     }
 
-                    // En el segundo 0, verificar alarmas y demoras
+                    // Acciones en el segundo 0
                     if (s === 0) {
                         const timeStr = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
                         
-                        // Alarmas Operativas
+                        // Alarmas Estáticas (Juntas y Clima)
                         if (h === 7 && m === 50) {
-                            speak("Atención comandante. Es hora de la junta operativa de shopfloor. Las operaciones de vuelo quedan en pausa hasta las ocho quince.");
+                            speak("Atención comandante. Es hora de la junta operativa de shopfloor. Las operaciones quedan en pausa hasta las ocho quince.");
                             setModal({ isOpen: true, title: '⏰ JUNTA OPERATIVA', message: 'Reunión Shopfloor de 07:50 AM a 08:15 AM. Vuelos en pausa.', type: 'error' });
                         }
                         else if (h === 12 && m === 0) {
@@ -297,11 +297,11 @@
                             setModal({ isOpen: true, title: '📊 KPIs y CLIMA', message: 'Hora de elaborar KPIs y actualizar captura OK To Fly (12:00 PM).', type: 'error' });
                         }
                         else if (h === 0 && m === 5) {
-                            speak("Atención. Actualización de captura del clima requerida. Por favor confirme el ou kei to flai para garantizar condiciones adecuadas.");
+                            speak("Atención. Actualización de captura del clima requerida. Por favor confirme el ou kei to flai para garantizar condiciones adecuadas de madrugada.");
                             setModal({ isOpen: true, title: '🌙 ACTUALIZAR CLIMA', message: 'Obligatorio validar condiciones seguras OK To Fly (12:05 AM).', type: 'error' });
                         }
 
-                        // Alarma Fotográfica
+                        // Alarma Fotográfica (Clima Adverso)
                         if (m === 0) {
                             const currentWind = windDataMapRef.current[h] || 0;
                             const isAdverseWeather = isRainingRef.current || isFoggyRef.current || currentWind >= 40;
@@ -310,7 +310,7 @@
                             }
                         }
 
-                        // Avisos prevuelo (10 y 5 minutos antes)
+                        // Avisos Prevuelo Inteligentes (10 y 5 min)
                         if (flightsRef.current && flightsRef.current.length > 0 && !isRainingRef.current && !isFoggyRef.current) {
                             flightsRef.current.forEach(flight => {
                                 if (flight.wind < 42) {
@@ -339,18 +339,16 @@
                             });
                         }
 
-                        // RECÁLCULO DINÁMICO POR DEMORA ("Si no vuelo, recalcula")
+                        // RECÁLCULO DINÁMICO POR DEMORA AUTOMÁTICO
                         if (authReady.current) {
                             const remainingTarget = totalFlightsTarget - loggedFlightsCountRef.current;
-                            // Contar cuántos vuelos restan programados en el futuro
                             const futureScheduled = flightsRef.current.filter(f => {
                                 const [fh, fm] = f.time.split(':').map(Number);
                                 return (fh * 60 + fm) >= currentMins - 15; 
                             });
 
-                            // Si se nos "pasó" un horario de vuelo sin registrar (futureScheduled.length disminuyó)
                             if (futureScheduled.length < remainingTarget && remainingTarget > 0 && !isRainingRef.current && !isFoggyRef.current) {
-                                speak("Se ha detectado un retraso operativo. Recalculando itinerario para cumplir la cuota del día.");
+                                speak("Se ha detectado un retraso operativo. Recalculando itinerario para asegurar la meta de vuelos.");
                                 recalculateRemaining();
                             }
                         }
@@ -424,7 +422,7 @@
 
                     if (parsedData && parsedData.hourlyData) {
                          generateIntelligentSchedule(parsedData.hourlyData);
-                         speak("Itinerario calculado con base en vientos y condiciones operativas.");
+                         speak("Itinerario diario calculado. Aleatoriedad activa.");
                     } else {
                          throw new Error("La IA no incluyó el arreglo hourlyData.");
                     }
@@ -461,16 +459,31 @@
                 setWindDataMap(windMap); setRainDataMap(rainMap);
                 db.collection('operaciones').doc('turno_actual').set({ windDataMap: windMap, rainDataMap: rainMap }, { merge: true });
 
+                // FACTOR SORPRESA (Aleatoriedad +- 25 min para vuelos dinámicos)
                 const applyVariance = (timeStr, isForzoso = false) => {
-                    if (isForzoso) return timeStr; 
+                    if (isForzoso) return timeStr; // Forzosos INAMOVIBLES
+                    
                     let parts = timeStr.split(':');
                     let h = parseInt(parts[0]);
                     let m = parseInt(parts[1]);
-                    let variance = Math.floor(Math.random() * 31) - 15; 
+                    
+                    // Número aleatorio entre -20 y +25 minutos
+                    let variance = Math.floor(Math.random() * 46) - 20; 
                     let date = new Date(2026, 0, 1, h, m + variance);
-                    let newH = String(date.getHours()).padStart(2, '0');
-                    let newM = String(date.getMinutes()).padStart(2, '0');
-                    return `${newH}:${newM}`;
+                    
+                    // Proteger junta Shopfloor
+                    let testMins = date.getHours() * 60 + date.getMinutes();
+                    if (testMins >= 7*60+50 && testMins <= 8*60+15) {
+                        date.setMinutes(date.getMinutes() + 30);
+                    }
+
+                    let newH = date.getHours();
+                    let newM = date.getMinutes();
+                    
+                    // Evitar que el azar aviente un vuelo al día siguiente
+                    if (newH < h && h >= 22) { newH = 23; newM = 50; }
+
+                    return `${String(newH).padStart(2, '0')}:${String(newM).padStart(2, '0')}`;
                 };
 
                 const isSuspendedAt11 = windMap[11] >= 40;
@@ -479,25 +492,35 @@
                 let baseSchedule = [];
 
                 if (isSuspendedAt11) {
-                    // COMPRESIÓN: 5 vuelos de 6am a 11am
+                    // COMPRESIÓN MÁXIMA: 5 vuelos entre 6am y 11am (Obligatorio)
                     baseSchedule = [
+                        { time: "00:30", type: "DINÁMICO", isForzoso: false },
+                        { time: "02:00", type: "DINÁMICO", isForzoso: false },
+                        { time: "03:30", type: "DINÁMICO", isForzoso: false },
+                        { time: "05:00", type: "DINÁMICO", isForzoso: false },
+                        // Mañana Comprimida (5 vuelos)
                         { time: "06:00", type: "FORZOSO", isForzoso: true },
                         { time: "07:20", type: "FORZOSO", isForzoso: true },
                         { time: "08:30", type: "DINÁMICO", isForzoso: false },
                         { time: "09:20", type: "DINÁMICO", isForzoso: false },
                         { time: "10:15", type: "DINÁMICO", isForzoso: false },
+                        // Tarde y Noche
                         { time: "14:00", type: "FORZOSO", isForzoso: true },
                         { time: "15:30", type: "DINÁMICO", isForzoso: false },
                         { time: "17:00", type: "FORZOSO", isForzoso: true },
                         { time: "18:15", type: "DINÁMICO", isForzoso: false },
-                        { time: "19:30", type: "DINÁMICO", isForzoso: false },
-                        { time: "20:30", type: "DINÁMICO", isForzoso: false },
+                        { time: "20:00", type: "DINÁMICO", isForzoso: false },
                         { time: "21:30", type: "FORZOSO", isForzoso: true },
-                        { time: "22:45", type: "DINÁMICO", isForzoso: false }
+                        { time: "23:00", type: "DINÁMICO", isForzoso: false }
                     ];
                 } else if (isSuspendedAt12) {
-                    // COMPRESIÓN: 6 a 7 vuelos de 6am a 12/1pm
+                    // COMPRESIÓN MEDIA: 6 a 7 vuelos entre 6am y 1pm
                     baseSchedule = [
+                        { time: "00:30", type: "DINÁMICO", isForzoso: false },
+                        { time: "02:00", type: "DINÁMICO", isForzoso: false },
+                        { time: "03:30", type: "DINÁMICO", isForzoso: false },
+                        { time: "04:45", type: "DINÁMICO", isForzoso: false },
+                        // Mañana
                         { time: "06:00", type: "FORZOSO", isForzoso: true },
                         { time: "07:20", type: "FORZOSO", isForzoso: true },
                         { time: "08:30", type: "DINÁMICO", isForzoso: false },
@@ -505,29 +528,38 @@
                         { time: "10:30", type: "DINÁMICO", isForzoso: false },
                         { time: "11:30", type: "DINÁMICO", isForzoso: false },
                         { time: "12:45", type: "DINÁMICO", isForzoso: false },
+                        // Tarde
                         { time: "14:00", type: "FORZOSO", isForzoso: true },
                         { time: "15:30", type: "DINÁMICO", isForzoso: false },
                         { time: "17:00", type: "FORZOSO", isForzoso: true },
                         { time: "19:00", type: "DINÁMICO", isForzoso: false },
                         { time: "21:30", type: "FORZOSO", isForzoso: true },
-                        { time: "22:45", type: "DINÁMICO", isForzoso: false }
+                        { time: "23:00", type: "DINÁMICO", isForzoso: false }
                     ];
                 } else {
-                    // DÍA NORMAL con Forzosos
+                    // DÍA NORMAL COMPLETO (24 HRS ~ CADA 1.5H CON FORZOSOS Y FACTOR SORPRESA)
                     baseSchedule = [
+                        // Madrugada
+                        { time: "00:30", type: "DINÁMICO", isForzoso: false },
+                        { time: "02:00", type: "DINÁMICO", isForzoso: false },
+                        { time: "03:30", type: "DINÁMICO", isForzoso: false },
+                        { time: "05:00", type: "DINÁMICO", isForzoso: false },
+                        // Mañana
                         { time: "06:00", type: "FORZOSO", isForzoso: true },
                         { time: "07:20", type: "FORZOSO", isForzoso: true },
                         { time: "08:45", type: "DINÁMICO", isForzoso: false },
                         { time: "10:15", type: "DINÁMICO", isForzoso: false },
                         { time: "11:45", type: "DINÁMICO", isForzoso: false },
                         { time: "13:00", type: "DINÁMICO", isForzoso: false },
+                        // Tarde
                         { time: "14:00", type: "FORZOSO", isForzoso: true },
                         { time: "15:30", type: "DINÁMICO", isForzoso: false },
                         { time: "17:00", type: "FORZOSO", isForzoso: true },
                         { time: "18:30", type: "DINÁMICO", isForzoso: false },
                         { time: "20:00", type: "DINÁMICO", isForzoso: false },
+                        // Noche
                         { time: "21:30", type: "FORZOSO", isForzoso: true },
-                        { time: "22:45", type: "DINÁMICO", isForzoso: false }
+                        { time: "23:00", type: "DINÁMICO", isForzoso: false }
                     ];
                 }
                 
@@ -541,6 +573,13 @@
                         rainProb: rainMap[hour24] || 0, 
                         hour24: hour24 
                     };
+                });
+
+                // Ordenar cronológicamente por si el azar invirtió algo
+                finalSchedule.sort((a, b) => {
+                    let [ah, am] = a.time.split(':').map(Number);
+                    let [bh, bm] = b.time.split(':').map(Number);
+                    return (ah * 60 + am) - (bh * 60 + bm);
                 });
 
                 setFlights(finalSchedule);
@@ -579,7 +618,6 @@
             const handleExcelUpload = (e) => {
                 const file = e.target.files[0];
                 if (!file) return;
-
                 setIsUploading(true);
                 const reader = new FileReader();
 
@@ -589,19 +627,10 @@
                         const workbook = XLSX.read(data, { type: 'array' });
                         const sheetName = workbook.SheetNames[0];
                         const sheet = workbook.Sheets[sheetName];
-                        
                         let json = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "" });
+                        
                         let turnosExtraidos = [];
-                        let parseados = 0;
-
-                        const cleanName = (text) => {
-                            if(!text || typeof text !== 'string') return null;
-                            let primerRenglon = text.split('\n')[0];
-                            let c = primerRenglon.replace(/Especialista|RPAS|OS|Audi|M[eé]xico|Turno|lun|mar|mi[eé]|jue|vie|s[aá]b|dom/gi, '').trim();
-                            if(c.length > 3 && !/\d/.test(c)) return c;
-                            return null;
-                        };
-
+                        
                         const extractDate = (text) => {
                             let match = text.match(/\b(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})\b/);
                             if(match) {
@@ -612,75 +641,63 @@
                             }
                             return null;
                         };
-
                         const formatTime = (tStr) => {
                             if(!tStr) return null;
                             let match = tStr.match(/(\d{1,2})[:.](\d{2})\s*([ap]m)?/i);
                             if(!match) return null;
-                            let h = parseInt(match[1]);
-                            let m = match[2];
+                            let h = parseInt(match[1]); let m = match[2];
                             let ampm = match[3] ? match[3].toLowerCase() : null;
                             if(ampm === 'pm' && h < 12) h += 12;
                             if(ampm === 'am' && h === 12) h = 0;
                             return `${String(h).padStart(2, '0')}:${m}`;
                         };
+                        const cleanName = (text) => {
+                            if(!text || typeof text !== 'string') return null;
+                            let primerRenglon = text.split('\n')[0];
+                            let c = primerRenglon.replace(/Especialista|RPAS|OS|Audi|M[eé]xico|Turno|lun|mar|mi[eé]|jue|vie|s[aá]b|dom/gi, '').trim();
+                            if(c.length > 3 && !/\d/.test(c)) return c;
+                            return null;
+                        };
 
-                        for(let r=0; r<json.length; r++) {
+                        // Lector Universal Zoho
+                        for (let r=0; r<json.length; r++) {
                             let row = json[r];
-                            let combinedText = row.join(" | ");
-                            let timeMatches = combinedText.match(/\b([01]?\d|2[0-3])[:.]([0-5]\d)(?:\s*[aApP][mM])?\b/g);
+                            let rowText = row.join(" | ");
                             
-                            if (timeMatches && timeMatches.length >= 2) {
-                                let start = formatTime(timeMatches[0]);
-                                let end = formatTime(timeMatches[1]);
-                                let dateStr = null;
-                                let name = null;
+                            let times = [];
+                            for (let c=0; c<row.length; c++) {
+                                let t = formatTime(String(row[c]));
+                                if (t) times.push({time: t, col: c});
+                            }
 
-                                for(let i = Math.max(0, r - 5); i <= Math.min(json.length - 1, r + 2); i++) {
-                                    let probeText = json[i].join(" | ");
-                                    if(!dateStr) dateStr = extractDate(probeText);
-                                    if(!name) {
-                                        for(let cell of json[i]) {
-                                            let n = cleanName(String(cell));
-                                            if(n) { name = n; break; }
+                            if (times.length >= 2) {
+                                let start = times[0].time;
+                                let end = times[times.length-1].time;
+                                let dateStr = extractDate(rowText);
+                                let name = null;
+                                
+                                for(let c=0; c<row.length; c++) {
+                                    if (c === times[0].col || c === times[times.length-1].col) continue;
+                                    let n = cleanName(String(row[c]));
+                                    if (n) { name = n; break; }
+                                }
+                                
+                                if(!dateStr || !name) {
+                                    for(let i = Math.max(0, r - 5); i <= Math.min(json.length - 1, r + 2); i++) {
+                                        let probeText = json[i].join(" | ");
+                                        if(!dateStr) dateStr = extractDate(probeText);
+                                        if(!name) {
+                                            for(let cell of json[i]) {
+                                                let n = cleanName(String(cell));
+                                                if(n && n !== start && n !== end) { name = n; break; }
+                                            }
                                         }
+                                        if(dateStr && name) break;
                                     }
-                                    if(dateStr && name) break;
                                 }
 
                                 if(start && end && dateStr && name) {
                                     turnosExtraidos.push({ date: dateStr, name: name, start: start, end: end });
-                                    parseados++;
-                                }
-                            }
-                        }
-
-                        if (turnosExtraidos.length === 0) {
-                            for(let r=0; r<json.length; r++) {
-                                let row = json[r];
-                                let rowText = row.join(" ");
-                                
-                                let times = [];
-                                for (let cell of row) {
-                                    let t = formatTime(String(cell));
-                                    if (t) times.push(t);
-                                }
-                                
-                                if (times.length >= 2) {
-                                    let start = times[0];
-                                    let end = times[1];
-                                    let dateStr = extractDate(rowText);
-                                    let name = null;
-                                    
-                                    for(let cell of row) {
-                                        let n = cleanName(String(cell));
-                                        if (n) { name = n; break; }
-                                    }
-                                    
-                                    if(start && end && dateStr && name) {
-                                        turnosExtraidos.push({ date: dateStr, name: name, start: start, end: end });
-                                        parseados++;
-                                    }
                                 }
                             }
                         }
@@ -697,30 +714,24 @@
                             speak(`Carga exitosa. ${uniqueTurnos.length} turnos guardados.`);
                             setModal({ isOpen: true, title: '✅ Carga Exitosa', message: `Turnos detectados: ${uniqueTurnos.length}`, type: 'success' });
                         } else {
-                            setModal({ isOpen: true, title: 'Diagnóstico de Archivo', message: `El sistema no detectó turnos válidos.` });
+                            setModal({ isOpen: true, title: 'Diagnóstico de Archivo', message: `Filas leídas: ${json.length}\nEl sistema no detectó turnos combinados válidos.` });
                         }
-
                     } catch (error) {
                         setModal({ isOpen: true, title: 'Error Crítico', message: 'El archivo está corrupto.', type: 'error' });
                     } finally {
-                        setIsUploading(false);
-                        e.target.value = null;
+                        setIsUploading(false); e.target.value = null;
                     }
                 };
                 reader.readAsArrayBuffer(file);
             };
 
-            const clearDB = () => {
-                db.collection('operaciones').doc('turnos_mes').set({ turnos: [] });
-                speak("Base de datos de operadores limpiada.");
-            };
+            const clearDB = () => { db.collection('operaciones').doc('turnos_mes').set({ turnos: [] }); speak("Base de datos limpia."); };
 
             const todayStrUI = `${currentTime.getFullYear()}-${String(currentTime.getMonth() + 1).padStart(2, '0')}-${String(currentTime.getDate()).padStart(2, '0')}`;
             const todayShiftsUI = allMonthShifts.filter(s => s.date === todayStrUI);
-
             const currentTotalMins = currentTime.getHours() * 60 + currentTime.getMinutes();
             
-            // Ocultar vuelos que ya pasaron
+            // Ocultar vuelos que ya pasaron (+15 min de gracia)
             const futureFlights = flights.filter(f => {
                 const [h, m] = f.time.split(':').map(Number);
                 const flightMins = h * 60 + m;
@@ -744,7 +755,7 @@
                       const newCount = loggedFlightsCount + 1;
                       setLoggedFlightsCount(newCount);
                       db.collection('operaciones').doc('turno_actual').set({ loggedFlightsCount: newCount }, { merge: true });
-                      speak(`Vuelo registrado. Total del día, ${newCount} de 13.`);
+                      speak(`Vuelo registrado. Total global, ${newCount} de ${totalFlightsTarget}.`);
                  } else {
                       speak("Meta diaria de vuelos completada.");
                  }
@@ -755,7 +766,7 @@
                       const newCount = loggedFlightsCount - 1;
                       setLoggedFlightsCount(newCount);
                       db.collection('operaciones').doc('turno_actual').set({ loggedFlightsCount: newCount }, { merge: true });
-                      speak("Registro eliminado exitosamente.");
+                      speak("Registro eliminado.");
                  }
             };
 
@@ -801,7 +812,7 @@
                                         {shiftName === 'Turno Diurno' ? '🎯 Faltan (Diurno)' : '🔄 Heredados (Noct.)'}
                                     </p>
                                     <div className="text-2xl font-black text-white drop-shadow-md text-right mt-0.5">
-                                        {shiftName === 'Turno Diurno' ? Math.max(0, 7 - loggedFlightsCount) : Math.max(0, 13 - loggedFlightsCount)}
+                                        {shiftName === 'Turno Diurno' ? Math.max(0, 9 - loggedFlightsCount) : Math.max(0, totalFlightsTarget - loggedFlightsCount)}
                                         <span className="text-sm font-bold text-white/60 ml-1.5 uppercase tracking-wider">vuelos</span>
                                     </div>
                                 </div>
@@ -810,7 +821,7 @@
                                     <span className="text-5xl font-black text-white tracking-tighter drop-shadow-lg">{loggedFlightsCount}</span>
                                     <span className="text-2xl font-bold text-indigo-500/70">/{totalFlightsTarget}</span>
                                 </div>
-                                <p className="text-[11px] text-indigo-300 font-black uppercase tracking-widest mt-2">📍 Avance Global</p>
+                                <p className="text-[11px] text-indigo-300 font-black uppercase tracking-widest mt-2">📍 Avance Global 24H</p>
                             </div>
                         </div>
                         
@@ -821,7 +832,7 @@
                                 disabled={isScanning || isRaining || isFoggy}
                                 className={`col-span-2 py-3 rounded-xl font-bold text-sm transition flex justify-center items-center gap-2 ${isScanning ? 'bg-indigo-900/50 text-indigo-300 animate-pulse' : (isRaining || isFoggy) ? 'bg-slate-800 text-slate-600 cursor-not-allowed' : 'bg-[#1e293b] hover:bg-[#334155] text-white border border-slate-700'}`}
                             >
-                                {isScanning ? '⏳ Analizando...' : '📸 ESCANEAR CLIMA (13 VUELOS)'}
+                                {isScanning ? '⏳ Analizando...' : '📸 ESCANEAR CLIMA (ITINERARIO MÁSTER)'}
                             </button>
                             
                             <button 
@@ -844,7 +855,7 @@
                             </div>
                         )}
 
-                        <p className="text-[10px] font-bold tracking-widest text-slate-400 uppercase mb-3">🗓️ Plan Restante (Calculado)</p>
+                        <p className="text-[10px] font-bold tracking-widest text-slate-400 uppercase mb-3">🗓️ Plan Restante (Calculado Dinámico)</p>
                         
                         {flights.length === 0 ? (
                             <div className="text-center py-6 text-xs font-bold text-slate-500">
@@ -852,7 +863,7 @@
                             </div>
                         ) : futureFlights.length === 0 ? (
                             <div className="text-center py-6 text-xs font-bold text-emerald-500">
-                                ¡Plan del día completado! Ya no hay vuelos programados.
+                                ¡Plan del día completado! Ya no hay vuelos programados en lo que resta del día.
                             </div>
                         ) : (
                             <div className="space-y-2.5">
@@ -869,6 +880,7 @@
                                                 {f.type}
                                             </span>
                                         </div>
+                                        {/* ALERTA DE PROBABILIDAD DE LLUVIA (NO SUSPENDE EL VUELO) */}
                                         {f.rainProb > 0 && f.wind < 42 && (
                                             <div className="mt-2 bg-blue-900/30 border border-blue-500/30 text-blue-300 text-[10px] font-bold px-2 py-1 rounded w-fit uppercase tracking-wider flex items-center gap-1">
                                                 ☔ {f.rainProb}% Prob. Lluvia (Precaución)
@@ -923,7 +935,7 @@
                                 <div className="space-y-2 mb-6 max-h-48 overflow-y-auto pr-1">
                                     {todayShiftsUI.length === 0 ? (
                                         <div className="text-center py-6 bg-[#0f172a] rounded-xl border border-slate-800 text-xs text-slate-500">
-                                            No hay turnos registrados para hoy. Sube el archivo del mes.
+                                            No hay turnos registrados para hoy.
                                         </div>
                                     ) : (
                                         todayShiftsUI.map((op, i) => (
@@ -937,9 +949,7 @@
                                     )}
                                 </div>
 
-                                <button onClick={() => setAdminOpen(false)} className="w-full bg-slate-800 hover:bg-slate-700 text-white font-bold py-3 rounded-xl border border-slate-700 transition">
-                                    Cerrar Panel
-                                </button>
+                                <button onClick={() => setAdminOpen(false)} className="w-full bg-slate-800 hover:bg-slate-700 text-white font-bold py-3 rounded-xl border border-slate-700 transition">Cerrar Panel</button>
                             </div>
                         </div>
                     )}
