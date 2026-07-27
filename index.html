@@ -78,7 +78,7 @@
             const [newOpName, setNewOpName] = useState('');
             const [newOpStart, setNewOpStart] = useState('');
             const [newOpEnd, setNewOpEnd] = useState('');
-            const [isScanningPDF, setIsScanningPDF] = useState(false);
+            const [isScanningCSV, setIsScanningCSV] = useState(false);
             const operatorsRef = useRef([]);
             const currentOperatorRef = useRef('Sin asignar');
 
@@ -456,76 +456,53 @@
                  }
             };
 
-            const handlePDFUpload = (e) => {
+            const handleCSVUpload = (e) => {
                 const file = e.target.files[0];
                 if (!file) return;
 
-                if (!geminiKey || geminiKey.trim() === '') {
-                    speak("Falta la llave de la inteligencia artificial.");
-                    setModal({ isOpen: true, title: 'Falta la Llave', message: 'Abre los ajustes (⚙️) y pega tu llave API para usar esta función.' });
-                    return;
-                }
-                
+                setIsScanningCSV(true);
                 const reader = new FileReader();
-                reader.onload = (event) => {
-                    const base64Data = event.target.result.split(',')[1];
-                    analyzePDFWithAI(base64Data);
-                };
-                reader.readAsDataURL(file);
-            };
-
-            const analyzePDFWithAI = async (base64PDF) => {
-                setIsScanningPDF(true);
-                speak("Analizando documento de horarios...");
                 
-                try {
-                    const key = geminiKey.trim();
-                    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${key}`;
-                    
-                    const payload = {
-                        contents: [{
-                            parts: [
-                                { text: "Eres un asistente de operaciones. Analiza este documento PDF que contiene un horario. Extrae los nombres de los operadores con su respectiva hora de entrada y salida. Devuelve ÚNICAMENTE un arreglo JSON con este formato estricto: [{\"name\": \"Nombre del Operador\", \"start\": \"HH:MM\", \"end\": \"HH:MM\"}]. Usa el formato de 24 horas (ej. 07:00, 22:30). No incluyas ningún otro texto o marcadores Markdown fuera del JSON." },
-                                { inline_data: { mime_type: "application/pdf", data: base64PDF } }
-                            ]
-                        }]
-                    };
-
-                    const response = await fetch(url, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(payload)
-                    });
-
-                    if (!response.ok) throw new Error("Error de conexión. Verifica tu llave API.");
-
-                    const data = await response.json();
-                    let aiResponseText = data.candidates[0].content.parts[0].text;
-                    
-                    if (aiResponseText.startsWith('```json')) {
-                         aiResponseText = aiResponseText.replace(/```json\n?/, '').replace(/```\n?$/, '');
-                    } else if (aiResponseText.startsWith('```')) {
-                         aiResponseText = aiResponseText.replace(/```\n?/, '').replace(/```\n?$/, '');
+                reader.onload = (event) => {
+                    try {
+                        const text = event.target.result;
+                        const lines = text.split('\n');
+                        const newOperators = [];
+                        
+                        for (let i = 0; i < lines.length; i++) {
+                            const line = lines[i].trim();
+                            if (!line) continue;
+                            
+                            const parts = line.split(',');
+                            if (parts.length >= 3) {
+                                const name = parts[0].trim();
+                                const start = parts[1].trim();
+                                const end = parts[2].trim();
+                                
+                                // Validar que tenga el formato de hora HH:MM y no sea la cabecera
+                                if (name.toLowerCase() !== 'nombre' && start.includes(':') && end.includes(':')) {
+                                    newOperators.push({ name, start, end });
+                                }
+                            }
+                        }
+                        
+                        if (newOperators.length > 0) {
+                            window.FB_setDoc(getSharedDocRef(), { operators: newOperators }, { merge: true });
+                            speak("Horarios actualizados exitosamente en la base de datos.");
+                            setModal({ isOpen: true, title: 'Carga Exitosa', message: `Se importaron ${newOperators.length} turnos desde el CSV.`, type: 'success' });
+                        } else {
+                            throw new Error("No se encontraron datos válidos. El formato debe ser: Nombre, Entrada, Salida (ej. Juan, 07:00, 15:00).");
+                        }
+                    } catch (error) {
+                        speak("Error al procesar el archivo C S V.");
+                        setModal({ isOpen: true, title: 'Error de Lectura CSV', message: error.message, type: 'error' });
+                    } finally {
+                        setIsScanningCSV(false);
+                        document.getElementById('csv-upload').value = '';
                     }
-                    
-                    const parsedData = JSON.parse(aiResponseText.trim());
-                    
-                    if (Array.isArray(parsedData) && parsedData.length > 0) {
-                         window.FB_setDoc(getSharedDocRef(), { operators: parsedData }, { merge: true });
-                         speak("Horarios actualizados exitosamente en la nube.");
-                         setModal({ isOpen: true, title: 'Carga Exitosa', message: `Se detectaron e importaron ${parsedData.length} turnos correctamente.`, type: 'success' });
-                    } else {
-                         throw new Error("No se encontraron formatos de horarios válidos en el PDF.");
-                    }
-
-                } catch (error) {
-                    console.error("AI Error (PDF):", error);
-                    speak("Hubo un error al procesar el archivo P D F.");
-                    setModal({ isOpen: true, title: 'Error de Lectura PDF', message: 'No se pudo leer el PDF. Asegúrate de que tenga texto legible y no sea una imagen escaneada borrosa. Detalle: ' + error.message });
-                } finally {
-                    setIsScanningPDF(false);
-                    document.getElementById('pdf-upload').value = '';
-                }
+                };
+                
+                reader.readAsText(file);
             };
 
             const handleRemoveOperator = (index) => {
@@ -699,17 +676,17 @@
                                 
                                 <div className="bg-[#0f172a] p-4 rounded-xl border border-indigo-500/40 mb-4 shadow-[0_0_15px_rgba(79,70,229,0.1)]">
                                     <h3 className="text-xs font-bold text-indigo-300 uppercase tracking-widest mb-3 flex items-center gap-2">
-                                        🤖 Carga Inteligente (PDF)
+                                        📊 Carga Rápida (CSV)
                                     </h3>
-                                    <input type="file" id="pdf-upload" accept="application/pdf" className="hidden" onChange={handlePDFUpload} />
+                                    <input type="file" id="csv-upload" accept=".csv" className="hidden" onChange={handleCSVUpload} />
                                     <button 
-                                        onClick={() => document.getElementById('pdf-upload').click()}
-                                        disabled={isScanningPDF}
-                                        className={`w-full py-2.5 rounded-lg text-sm font-bold transition flex justify-center items-center gap-2 ${isScanningPDF ? 'bg-indigo-900/50 text-indigo-300 animate-pulse' : 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-md'}`}
+                                        onClick={() => document.getElementById('csv-upload').click()}
+                                        disabled={isScanningCSV}
+                                        className={`w-full py-2.5 rounded-lg text-sm font-bold transition flex justify-center items-center gap-2 ${isScanningCSV ? 'bg-indigo-900/50 text-indigo-300 animate-pulse' : 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-md'}`}
                                     >
-                                        {isScanningPDF ? '⏳ Extrayendo Turnos...' : '📄 Subir Horario (PDF)'}
+                                        {isScanningCSV ? '⏳ Procesando...' : '📄 Subir Horario (.CSV)'}
                                     </button>
-                                    <p className="text-[9px] text-slate-400 mt-2 text-center">La IA leerá el PDF y asignará los turnos en automático.</p>
+                                    <p className="text-[9px] text-slate-400 mt-2 text-center">El archivo debe tener 3 columnas:<br/><b>Nombre, Entrada (HH:MM), Salida (HH:MM)</b></p>
                                 </div>
 
                                 <div className="mb-6 bg-[#0f172a] p-4 rounded-xl border border-slate-800">
