@@ -14,7 +14,7 @@
     <!-- Lector de Excel / CSV Robusto (SheetJS) -->
     <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
     
-    <!-- FIREBASE COMPAT (Manteniendo V10 para asegurar permisos de tu base de datos) -->
+    <!-- FIREBASE COMPAT (V10 para asegurar permisos) -->
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore-compat.js"></script>
@@ -23,6 +23,7 @@
         body { background-color: #0B0F19; color: white; font-family: 'Inter', system-ui, sans-serif; margin: 0; padding: 0; }
         .glass-card { background-color: #131826; border: 1px solid #1f2937; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.5); }
         .rain-overlay { background: linear-gradient(180deg, rgba(15,23,42,0.95) 0%, rgba(30,58,138,0.9) 100%); backdrop-filter: blur(8px); }
+        .fog-overlay { background: linear-gradient(180deg, rgba(15,23,42,0.95) 0%, rgba(100,116,139,0.9) 100%); backdrop-filter: blur(14px); }
         ::-webkit-scrollbar { width: 6px; }
         ::-webkit-scrollbar-track { background: #0f172a; }
         ::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
@@ -61,6 +62,7 @@
             const [loggedFlightsCount, setLoggedFlightsCount] = useState(0);
             const totalFlightsTarget = 13;
             const [isRaining, setIsRaining] = useState(false);
+            const [isFoggy, setIsFoggy] = useState(false); // Estado para la neblina
             const [windDataMap, setWindDataMap] = useState({});
 
             const [audioUnlocked, setAudioUnlocked] = useState(false);
@@ -73,6 +75,8 @@
             
             const flightsRef = useRef([]);
             const isRainingRef = useRef(false);
+            const isFoggyRef = useRef(false);
+            const windDataMapRef = useRef({});
             const allMonthShiftsRef = useRef([]);
             const loggedFlightsCountRef = useRef(0);
             const authReady = useRef(false);
@@ -89,8 +93,11 @@
                             const data = doc.data();
                             if (data.flights) { setFlights(data.flights); flightsRef.current = data.flights; }
                             if (data.loggedFlightsCount !== undefined) { setLoggedFlightsCount(data.loggedFlightsCount); loggedFlightsCountRef.current = data.loggedFlightsCount; }
+                            
                             if (data.isRaining !== undefined) { setIsRaining(data.isRaining); isRainingRef.current = data.isRaining; }
-                            if (data.windDataMap) setWindDataMap(data.windDataMap);
+                            if (data.isFoggy !== undefined) { setIsFoggy(data.isFoggy); isFoggyRef.current = data.isFoggy; }
+                            
+                            if (data.windDataMap) { setWindDataMap(data.windDataMap); windDataMapRef.current = data.windDataMap; }
                         }
                     });
 
@@ -187,18 +194,33 @@
                             flights: [],
                             loggedFlightsCount: 0,
                             isRaining: false,
+                            isFoggy: false,
                             windDataMap: {}
                         });
                     }
                     
+                    // ==========================================
+                    // ALARMAS POR MINUTO Y HORA EXACTA
+                    // ==========================================
                     if (s === 0) {
                         const timeStr = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
                         
+                        // Rutinas
                         if (h === 7 && m === 50) speak("Junta operativa en diez minutos.");
                         else if (h === 12 && m === 0) speak("Hora de elaborar reportes K P I.");
                         else if ((h === 12 && m === 5) || (h === 0 && m === 5)) speak("Actualización de captura del clima requerida.");
 
-                        if (flightsRef.current && flightsRef.current.length > 0 && !isRainingRef.current) {
+                        // Recordatorio de Evidencias de Clima (Cada hora en punto)
+                        if (m === 0) {
+                            const currentWind = windDataMapRef.current[h] || 0;
+                            const isAdverseWeather = isRainingRef.current || isFoggyRef.current || currentWind >= 42;
+                            if (isAdverseWeather) {
+                                speak("Atención piloto. Es hora de tomar evidencia fotográfica de las condiciones meteorológicas.");
+                            }
+                        }
+
+                        // Próximos despegues
+                        if (flightsRef.current && flightsRef.current.length > 0 && !isRainingRef.current && !isFoggyRef.current) {
                             flightsRef.current.forEach(flight => {
                                 if (flight.wind < 42) {
                                     const parts = flight.time.split(':');
@@ -236,17 +258,7 @@
                         const sheet = workbook.Sheets[sheetName];
                         
                         let json = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "" });
-
-                        // Respaldo crudo para CSV problemáticos de Zoho
-                        if (json.length > 0 && json[0].length <= 2 && file.name.toLowerCase().endsWith('.csv')) {
-                            const rawText = new TextDecoder("utf-8").decode(data);
-                            const delimiter = rawText.includes(';') ? ';' : (rawText.includes('\t') ? '\t' : ',');
-                            const rows = rawText.split(/\r?\n/);
-                            json = rows.map(r => r.split(delimiter).map(cell => cell.replace(/^"|"$/g, '').trim()));
-                        }
-
                         let turnosExtraidos = [];
-                        let timesFound = 0; 
                         
                         const parseTimeStr = (tStr) => {
                             let match = tStr.match(/(\d{1,2})[:.](\d{2})\s*([ap]m)?/i);
@@ -262,95 +274,92 @@
                         const cleanNameStr = (str) => {
                             let c = str.replace(/Especialista|RPAS|OS|Audi|M[eé]xico|Turno|lun|mar|mi[eé]|jue|vie|s[aá]b|dom|Mon|Tue|Wed|Thu|Fri|Sat|Sun|Shift/gi, '');
                             c = c.replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑ\s]/g, ' ').trim();
-                            // Tomamos todas las palabras que forman el nombre para no cortarlo
-                            let parts = c.split(/\s+/).filter(p => p.length > 1);
-                            return parts.join(' '); 
+                            // Tomamos la línea completa del nombre para que salga nombre y apellido
+                            return c; 
                         };
 
                         const timeRegex = /\b([01]?\d|2[0-3])[:.]([0-5]\d)(?:\s*[aApP][mM])?\b/g;
 
-                        // MODO 1: Cuadrícula (Celdas unidas)
+                        const extraerFecha = (rowText, r, currentJson) => {
+                            let dateMatch = rowText.match(/\b(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})\b/) || 
+                                            rowText.match(/\b(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})\b/) ||
+                                            rowText.match(/\b(\d{1,2})\s+(ene|feb|mar|abr|may|jun|jul|ago|sep|oct|nov|dic)[a-z]*\s+(\d{4})\b/i);
+                            
+                            if (dateMatch) {
+                                if (dateMatch[1] && dateMatch[1].length === 4) return `${dateMatch[1]}-${String(dateMatch[2]).padStart(2,'0')}-${String(dateMatch[3]).padStart(2,'0')}`;
+                                else if (dateMatch[3] && dateMatch[3].length === 4) {
+                                    if(isNaN(dateMatch[2])) { 
+                                        const months = {jan:1,feb:2,mar:3,apr:4,abr:4,may:5,jun:6,jul:7,aug:8,ago:8,sep:9,oct:10,nov:11,dec:12,dic:12};
+                                        let m = months[dateMatch[2].toLowerCase().substring(0,3)] || 1;
+                                        return `${dateMatch[3]}-${String(m).padStart(2,'0')}-${String(dateMatch[1]).padStart(2,'0')}`;
+                                    }
+                                    return `${dateMatch[3]}-${String(dateMatch[2]).padStart(2,'0')}-${String(dateMatch[1]).padStart(2,'0')}`;
+                                }
+                            }
+                            
+                            for (let lookUp = r; lookUp >= Math.max(0, r - 5); lookUp--) {
+                                let upRowText = currentJson[lookUp].join(' ');
+                                let dayMatch = upRowText.match(/\b(?:lun|mar|mi[eé]|jue|vie|s[aá]b|dom|mon|tue|wed|thu|fri|sat|sun)[^\d]*(\d{1,2})\b/i);
+                                if(dayMatch) return `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}-${String(dayMatch[1]).padStart(2, '0')}`;
+                            }
+                            return null;
+                        };
+
                         for (let r = 0; r < json.length; r++) {
                             let row = json[r];
+                            let rowText = row.join('  ');
+                            
                             for (let c = 0; c < row.length; c++) {
                                 let cellText = String(row[c]).trim();
                                 if (!cellText) continue;
 
                                 let timesInCell = cellText.match(timeRegex);
-                                
                                 if (timesInCell && timesInCell.length >= 2) {
-                                    timesFound++;
                                     let start = parseTimeStr(timesInCell[0]);
                                     let end = parseTimeStr(timesInCell[1]);
-
-                                    let name = cleanNameStr(cellText.split('\n')[0]); 
-                                    if (!name && c > 0) name = cleanNameStr(String(json[r][0] || '').split('\n')[0]);
                                     
-                                    let day = null, month = new Date().getMonth() + 1, year = new Date().getFullYear();
+                                    let rawName = cellText.split('\n').find(line => /[a-zA-Z]{3,}/.test(line) && !/\d/.test(line));
+                                    let name = cleanNameStr(rawName || cellText.split('\n')[0]); 
                                     
-                                    for (let lookUp = r - 1; lookUp >= 0; lookUp--) {
-                                        let upCell = String(json[lookUp][c] || '').trim();
-                                        let dateMatch = upCell.match(/(\d{1,2})\s*[\/\-]\s*(\d{1,2})\s*[\/\-]\s*(\d{4})/);
-                                        if(dateMatch) { day = parseInt(dateMatch[1]); month = parseInt(dateMatch[2]); year = parseInt(dateMatch[3]); break; }
-                                        
-                                        let dayMatch = upCell.match(/^(?:lun|mar|mi[eé]|jue|vie|s[aá]b|dom|mon|tue|wed|thu|fri|sat|sun)[^\d]*(\d{1,2})$/i) || upCell.match(/^(\d{1,2})$/);
-                                        if(dayMatch) { day = parseInt(dayMatch[1]); break; }
-                                    }
-
-                                    if (day && name) {
-                                        turnosExtraidos.push({ date: `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`, name: name, start: start, end: end });
-                                    }
-                                }
-                            }
-                        }
-
-                        // MODO 2: Lista (Celdas separadas por comas/columnas)
-                        if (turnosExtraidos.length === 0) {
-                            for (let r = 0; r < json.length; r++) {
-                                let rowText = json[r].join('  ');
-                                let timesInRow = rowText.match(timeRegex);
-                                
-                                if (timesInRow && timesInRow.length >= 2) {
-                                    timesFound++;
-                                    let start = parseTimeStr(timesInRow[0]);
-                                    let end = parseTimeStr(timesInRow[1]);
-
-                                    let dateStr = null;
-                                    let dateMatch = rowText.match(/\b(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})\b/) || 
-                                                    rowText.match(/\b(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})\b/) ||
-                                                    rowText.match(/\b(\d{1,2})\s+(ene|feb|mar|abr|may|jun|jul|ago|sep|oct|nov|dic|jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s+(\d{4})\b/i);
-                                    
-                                    if (dateMatch) {
-                                        if (dateMatch[1] && dateMatch[1].length === 4) { 
-                                            dateStr = `${dateMatch[1]}-${String(dateMatch[2]).padStart(2,'0')}-${String(dateMatch[3]).padStart(2,'0')}`;
-                                        } else if (dateMatch[3] && dateMatch[3].length === 4) {
-                                            if(isNaN(dateMatch[2])) { 
-                                                const months = {jan:1,feb:2,mar:3,apr:4,abr:4,may:5,jun:6,jul:7,aug:8,ago:8,sep:9,oct:10,nov:11,dec:12,dic:12};
-                                                let m = months[dateMatch[2].toLowerCase().substring(0,3)] || 1;
-                                                dateStr = `${dateMatch[3]}-${String(m).padStart(2,'0')}-${String(dateMatch[1]).padStart(2,'0')}`;
-                                            } else { 
-                                                dateStr = `${dateMatch[3]}-${String(dateMatch[2]).padStart(2,'0')}-${String(dateMatch[1]).padStart(2,'0')}`;
+                                    if (!name || name.length < 3) {
+                                        for(let searchCol = 0; searchCol < row.length; searchCol++) {
+                                            if (searchCol !== c && String(row[searchCol]).length > 3 && !/\d/.test(row[searchCol])) {
+                                                name = cleanNameStr(String(row[searchCol]));
+                                                break;
                                             }
                                         }
                                     }
 
-                                    let name = "";
-                                    for(let c=0; c<json[r].length; c++) {
-                                        let cellText = String(json[r][c]).trim();
-                                        if (cellText.length > 2 && /[a-zA-Z]/.test(cellText) && !/\d{2,}/.test(cellText) && !/^(?:lun|mar|mié|jue|vie|sáb|dom|Especialista|RPAS)/i.test(cellText)) {
-                                            let testName = cleanNameStr(cellText);
-                                            if (testName) { name = testName; break; }
-                                        }
-                                    }
-
+                                    let dateStr = extraerFecha(rowText, r, json);
+                                    
                                     if (dateStr && name) {
-                                        turnosExtraidos.push({ date: dateStr, name: name, start, end });
+                                        turnosExtraidos.push({ date: dateStr, name: name, start: start, end: end });
                                     }
+                                }
+                            }
+
+                            if (rowText.match(timeRegex) && rowText.match(timeRegex).length >= 2) {
+                                let allTimes = rowText.match(timeRegex);
+                                let start = parseTimeStr(allTimes[0]);
+                                let end = parseTimeStr(allTimes[1]);
+                                
+                                let dateStr = extraerFecha(rowText, r, json);
+                                let name = "";
+                                
+                                for(let c=0; c<row.length; c++) {
+                                    let cellText = String(row[c]).trim();
+                                    if (cellText.length > 3 && /[a-zA-Z]/.test(cellText) && !/\d/.test(cellText)) {
+                                        let testName = cleanNameStr(cellText);
+                                        if (testName && testName.length > 3) { name = testName; break; }
+                                    }
+                                }
+                                
+                                if (dateStr && name) {
+                                    turnosExtraidos.push({ date: dateStr, name: name, start, end });
                                 }
                             }
                         }
 
-                        // Eliminar duplicados
                         const uniqueTurnos = [];
                         const seen = new Set();
                         turnosExtraidos.forEach(t => {
@@ -358,30 +367,22 @@
                             if(!seen.has(id)) { seen.add(id); uniqueTurnos.push(t); }
                         });
 
-                        // Resultado
                         if (uniqueTurnos.length > 0) {
                             db.collection('operaciones').doc('turnos_mes').set({ turnos: uniqueTurnos });
-                            speak(`Carga de calendario exitosa. ${uniqueTurnos.length} turnos identificados.`);
-                            setModal({ isOpen: true, title: '✅ Carga Exitosa', message: `El Motor Inteligente analizó el archivo.\n\nTurnos extraídos: ${uniqueTurnos.length}\n\nEl sistema asignará al piloto automáticamente.`, type: 'success' });
+                            speak(`Carga exitosa. ${uniqueTurnos.length} turnos identificados.`);
+                            setModal({ isOpen: true, title: '✅ Carga Exitosa', message: `El Omni-Scanner procesó el archivo.\n\nTurnos creados: ${uniqueTurnos.length}\n\nEl sistema asignará al piloto automáticamente.`, type: 'success' });
                         } else {
-                            speak("Error de lectura del archivo de sistema.");
-                            setModal({ 
-                                isOpen: true, 
-                                title: 'Diagnóstico de Archivo', 
-                                message: `Filas analizadas: ${json.length}\nHorarios detectados: ${timesFound}\nTurnos formados: ${uniqueTurnos.length}\n\nEl sistema encontró ${timesFound} horarios, pero no pudo encontrar nombres o fechas válidas junto a ellos. Revisa que el archivo original no esté en blanco.`, 
-                                type: 'error' 
-                            });
+                            speak("Error de lectura. Archivo vacío.");
+                            setModal({ isOpen: true, title: 'Diagnóstico de Archivo', message: `Filas analizadas: ${json.length}\nTurnos formados: 0\n\nEl sistema no pudo encontrar nombres o fechas válidas. Revisa que el archivo original no esté en blanco.`, type: 'error' });
                         }
 
                     } catch (error) {
-                        console.error("Error leyendo archivo:", error);
-                        setModal({ isOpen: true, title: 'Error Crítico', message: 'El archivo está corrupto, dañado, o no se pudo decodificar.', type: 'error' });
+                        setModal({ isOpen: true, title: 'Error Crítico', message: 'El archivo está corrupto o protegido.', type: 'error' });
                     } finally {
                         setIsUploading(false);
                         e.target.value = null;
                     }
                 };
-                
                 reader.readAsArrayBuffer(file);
             };
 
@@ -439,7 +440,6 @@
                     } else throw new Error("Formato IA incorrecto.");
 
                 } catch (error) {
-                    console.error("AI Error:", error);
                     speak("Error al analizar el clima.");
                     generateIntelligentSchedule([]); 
                 } finally {
@@ -509,11 +509,34 @@
             const toggleRainProtocol = () => {
                 const newState = !isRaining;
                 db.collection('operaciones').doc('turno_actual').set({ isRaining: newState }, { merge: true });
-                if (newState) speak("Operaciones suspendidas por lluvia. Despegues bloqueados."); 
-                else { speak("Lluvia finalizada. Reprogramando vuelos faltantes."); recalculateAfterRain(); }
+                if (newState) {
+                    speak("Operaciones suspendidas por lluvia. Despegues bloqueados."); 
+                } else {
+                    if (isFoggy) {
+                        speak("Lluvia finalizada, pero se mantiene la suspensión por baja visibilidad.");
+                    } else {
+                        speak("Lluvia finalizada. Reprogramando vuelos faltantes."); 
+                        recalculateAfterWeather();
+                    }
+                }
             };
 
-            const recalculateAfterRain = () => {
+            const toggleFogProtocol = () => {
+                const newState = !isFoggy;
+                db.collection('operaciones').doc('turno_actual').set({ isFoggy: newState }, { merge: true });
+                if (newState) {
+                    speak("Operaciones suspendidas por baja visibilidad. Despegues bloqueados.");
+                } else {
+                    if (isRaining) {
+                        speak("Visibilidad restablecida, pero se mantiene la suspensión por lluvia.");
+                    } else {
+                        speak("Visibilidad restablecida. Reprogramando vuelos faltantes.");
+                        recalculateAfterWeather();
+                    }
+                }
+            };
+
+            const recalculateAfterWeather = () => {
                 const remaining = totalFlightsTarget - loggedFlightsCountRef.current;
                 if (remaining <= 0) return;
                 
@@ -535,7 +558,9 @@
             };
 
             const handleLogManualFlight = () => {
-                 if (isRaining) return setModal({ isOpen: true, title: 'Lluvia', message: 'No puedes registrar despegues en lluvia.', type: 'error' });
+                 if (isRaining || isFoggy) {
+                     return setModal({ isOpen: true, title: 'Operación Suspendida', message: 'No puedes registrar despegues durante condiciones meteorológicas adversas.', type: 'error' });
+                 }
                  if (loggedFlightsCount < totalFlightsTarget) {
                       db.collection('operaciones').doc('turno_actual').set({ loggedFlightsCount: loggedFlightsCount + 1 }, { merge: true });
                       speak(`Vuelo registrado exitosamente.`);
@@ -544,6 +569,14 @@
 
             const todayStrUI = `${currentTime.getFullYear()}-${String(currentTime.getMonth() + 1).padStart(2, '0')}-${String(currentTime.getDate()).padStart(2, '0')}`;
             const todayShiftsUI = allMonthShifts.filter(s => s.date === todayStrUI);
+
+            const getOverlayContent = () => {
+                if (isRaining && isFoggy) return { text: "Suspendido: Lluvia y Neblina", style: "rain-overlay" };
+                if (isRaining) return { text: "Esperando que mejore el clima (Lluvia)...", style: "rain-overlay" };
+                if (isFoggy) return { text: "Esperando visibilidad (Neblina)...", style: "fog-overlay" };
+                return null;
+            };
+            const activeOverlay = getOverlayContent();
 
             return (
                 <div className="min-h-screen p-4 max-w-2xl mx-auto pb-24" onClick={unlockAudio}>
@@ -576,7 +609,7 @@
                                 <div className="mt-1 text-3xl font-mono font-bold text-white tracking-wider">
                                     {currentTime.toLocaleTimeString('en-US', { hour12: false })}
                                 </div>
-                                <div className="mt-3 inline-flex items-center gap-1.5 bg-indigo-900/40 text-indigo-200 px-3 py-1.5 rounded-lg border border-indigo-500/30 text-xs font-bold shadow-inner">
+                                <div className="mt-3 inline-flex items-center gap-1.5 bg-indigo-900/40 text-indigo-200 px-3 py-1.5 rounded-lg border border-indigo-500/30 text-xs font-bold shadow-inner truncate max-w-[200px]">
                                     <span className="text-indigo-400">👨‍✈️ PILOTO:</span> {currentOperator}
                                 </div>
                             </div>
@@ -599,21 +632,28 @@
                             </div>
                         </div>
                         
-                        <div className="grid grid-cols-2 gap-3">
+                        <div className="grid grid-cols-2 gap-3 mb-3">
                             <input type="file" id="uploadWeather" accept="image/*" className="hidden" onChange={handleImageUpload} />
-                            <button onClick={(e) => { e.stopPropagation(); document.getElementById('uploadWeather').click(); }} disabled={isScanning || isRaining} className={`w-full py-3 rounded-xl font-bold text-sm transition flex justify-center items-center gap-2 ${isScanning ? 'bg-indigo-900/50 text-indigo-300 animate-pulse' : isRaining ? 'bg-slate-800 text-slate-600 cursor-not-allowed' : 'bg-[#1e293b] hover:bg-[#334155] text-white border border-slate-700'}`}>
-                                {isScanning ? '⏳ Analizando...' : '📸 ESCANEAR CLIMA'}
+                            <button onClick={(e) => { e.stopPropagation(); document.getElementById('uploadWeather').click(); }} disabled={isScanning || isRaining || isFoggy} className={`col-span-2 py-3 rounded-xl font-bold text-sm transition flex justify-center items-center gap-2 ${isScanning ? 'bg-indigo-900/50 text-indigo-300 animate-pulse' : (isRaining || isFoggy) ? 'bg-slate-800 text-slate-600 cursor-not-allowed' : 'bg-[#1e293b] hover:bg-[#334155] text-white border border-slate-700'}`}>
+                                {isScanning ? '⏳ Analizando...' : '📸 ESCANEAR CLIMA (13 VUELOS)'}
                             </button>
-                            <button onClick={(e) => { e.stopPropagation(); toggleRainProtocol(); }} className={`w-full py-3 rounded-xl font-bold text-sm transition flex justify-center items-center gap-2 ${isRaining ? 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-[0_0_15px_rgba(16,185,129,0.4)]' : 'bg-rose-900/40 hover:bg-rose-900/60 text-rose-400 border border-rose-900'}`}>
-                                {isRaining ? '☀️ REANUDAR' : '🌧️ DECLARAR LLUVIA'}
+                            
+                            <button onClick={(e) => { e.stopPropagation(); toggleRainProtocol(); }} className={`py-3 rounded-xl font-bold text-[11px] transition flex justify-center items-center gap-1 ${isRaining ? 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-[0_0_15px_rgba(16,185,129,0.4)]' : 'bg-rose-900/40 hover:bg-rose-900/60 text-rose-400 border border-rose-900'}`}>
+                                {isRaining ? '☀️ QUITAR LLUVIA' : '🌧️ LLUVIA'}
+                            </button>
+
+                            <button onClick={(e) => { e.stopPropagation(); toggleFogProtocol(); }} className={`py-3 rounded-xl font-bold text-[11px] transition flex justify-center items-center gap-1 ${isFoggy ? 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-[0_0_15px_rgba(16,185,129,0.4)]' : 'bg-slate-700/50 hover:bg-slate-600 text-slate-300 border border-slate-600'}`}>
+                                {isFoggy ? '☀️ QUITAR NEBLINA' : '🌫️ NEBLINA'}
                             </button>
                         </div>
                     </div>
 
-                    <div className={`glass-card p-5 rounded-2xl mb-6 relative ${isRaining ? 'opacity-50 pointer-events-none' : ''}`}>
-                        {isRaining && <div className="absolute inset-0 rain-overlay rounded-2xl z-10 flex items-center justify-center text-center p-4">
-                            <span className="text-white font-bold text-lg">Esperando que mejore el clima...</span>
-                        </div>}
+                    <div className={`glass-card p-5 rounded-2xl mb-6 relative ${(isRaining || isFoggy) ? 'opacity-50 pointer-events-none' : ''}`}>
+                        {activeOverlay && (
+                            <div className={`absolute inset-0 ${activeOverlay.style} rounded-2xl z-10 flex items-center justify-center text-center p-4`}>
+                                <span className="text-white font-bold text-lg">{activeOverlay.text}</span>
+                            </div>
+                        )}
 
                         <p className="text-[10px] font-bold tracking-widest text-slate-400 uppercase mb-3">🗓️ Plan Restante (Calculado)</p>
                         
@@ -641,7 +681,7 @@
                     </div>
 
                     <div className="fixed bottom-0 left-0 w-full p-4 bg-gradient-to-t from-[#0B0F19] via-[#0B0F19] to-transparent flex justify-center z-40 pointer-events-none">
-                         <button onClick={(e) => { e.stopPropagation(); handleLogManualFlight(); }} disabled={isRaining} className={`pointer-events-auto w-full max-w-xs font-black py-3.5 rounded-xl transition transform hover:scale-105 ${isRaining ? 'bg-slate-800 text-slate-600' : 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-[0_0_20px_rgba(79,70,229,0.4)]'}`}>
+                         <button onClick={(e) => { e.stopPropagation(); handleLogManualFlight(); }} disabled={isRaining || isFoggy} className={`pointer-events-auto w-full max-w-xs font-black py-3.5 rounded-xl transition transform hover:scale-105 ${(isRaining || isFoggy) ? 'bg-slate-800 text-slate-600' : 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-[0_0_20px_rgba(79,70,229,0.4)]'}`}>
                              ✈️ REGISTRAR DESPEGUE AHORA
                          </button>
                     </div>
@@ -660,7 +700,7 @@
                                         📅 CARGA INTELIGENTE (ZOHO CSV/XLSX)
                                     </h3>
                                     <p className="text-[10px] text-slate-400 mb-4 leading-relaxed">
-                                        Sube tu archivo (incluso si está desordenado). El Escáner Profundo encontrará fechas, horarios y nombres de forma automática.
+                                        Sube tu archivo (incluso si está desordenado). El Omni-Scanner encontrará fechas, horarios y nombres completos.
                                     </p>
                                     <input type="file" id="excelUpload" accept=".csv, .xlsx" className="hidden" onChange={handleExcelUpload} />
                                     <button onClick={() => document.getElementById('excelUpload').click()} disabled={isUploading} className={`w-full font-bold py-3.5 rounded-lg text-sm shadow-[0_0_15px_rgba(79,70,229,0.3)] transition flex justify-center items-center gap-2 ${isUploading ? 'bg-indigo-800 text-indigo-300 cursor-not-allowed' : 'bg-indigo-600 hover:bg-indigo-500 text-white transform hover:scale-105'}`}>
@@ -682,7 +722,7 @@
                                         todayShiftsUI.map((op, i) => (
                                             <div key={i} className="flex justify-between items-center bg-[#0f172a] p-3 rounded-lg border border-slate-800">
                                                 <div>
-                                                    <p className="font-bold text-white text-sm">{op.name}</p>
+                                                    <p className="font-bold text-white text-sm truncate max-w-[200px]">{op.name}</p>
                                                     <p className="text-[10px] text-slate-400">{op.start} - {op.end}</p>
                                                 </div>
                                             </div>
