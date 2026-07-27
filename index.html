@@ -57,8 +57,15 @@
             const [settingsOpen, setSettingsOpen] = useState(false);
             const [geminiKey, setGeminiKey] = useState(localStorage.getItem('gemini_key') || '');
             
-            // ¡AQUÍ ESTÁ LA CORRECCIÓN! Por defecto usamos 3.6-flash
-            const [geminiModel, setGeminiModel] = useState(localStorage.getItem('gemini_model') || 'gemini-3.6-flash');
+            // Autocorrección: Si el navegador guardó el modelo 1.5 por error, lo forzamos al 3.6 automáticamente
+            const [geminiModel, setGeminiModel] = useState(() => {
+                const savedModel = localStorage.getItem('gemini_model');
+                if (!savedModel || savedModel.includes('1.5')) {
+                    localStorage.setItem('gemini_model', 'gemini-3.6-flash');
+                    return 'gemini-3.6-flash';
+                }
+                return savedModel;
+            });
             
             const [modal, setModal] = useState({ isOpen: false, title: '', message: '', type: 'error' });
             
