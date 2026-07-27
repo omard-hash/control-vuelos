@@ -5,16 +5,16 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dispatcher Pro - V42 Master</title>
     
-    <!-- Librerías de React y Tailwind -->
+    <!-- Librerías React y Tailwind -->
     <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     
-    <!-- Lector de Excel / CSV (SheetJS) -->
+    <!-- Lector de Excel / CSV Robusto -->
     <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
     
-    <!-- FIREBASE COMPAT (Conexión Original V10 para mantener permisos) -->
+    <!-- FIREBASE COMPAT (Manteniendo V10 para asegurar permisos) -->
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore-compat.js"></script>
@@ -32,6 +32,7 @@
     <div id="root"></div>
 
     <script type="text/babel">
+        // CONFIGURACIÓN FIREBASE V10
         const firebaseConfig = {
             apiKey: "AIzaSyDXjwv133-dIKyprCktTUkjx_adAz1DhAY",
             authDomain: "control-vuelos.firebaseapp.com",
@@ -50,7 +51,7 @@
         const { useState, useEffect, useRef } = React;
 
         function App() {
-            // Estados principales de la UI
+            // Estados Principales
             const [currentTime, setCurrentTime] = useState(new Date());
             const [shiftName, setShiftName] = useState('Turno Diurno');
             const [isScanning, setIsScanning] = useState(false);
@@ -65,11 +66,11 @@
             const [isRaining, setIsRaining] = useState(false);
             const [windDataMap, setWindDataMap] = useState({});
 
-            // Estados de Audio
+            // Audio
             const [audioUnlocked, setAudioUnlocked] = useState(false);
             const audioUnlockedRef = useRef(false);
             
-            // Estados para Administración del Mes
+            // Estados del Mes
             const [adminOpen, setAdminOpen] = useState(false);
             const [allMonthShifts, setAllMonthShifts] = useState([]);
             const [currentOperator, setCurrentOperator] = useState('Sin asignar');
@@ -89,27 +90,18 @@
                 auth.signInAnonymously().then(() => {
                     authReady.current = true;
                     
-                    // 1. Escuchar turno actual
+                    // Escuchar Turno Actual
                     unsubscribeTurno = db.collection('operaciones').doc('turno_actual').onSnapshot((doc) => {
                         if (doc.exists) {
                             const data = doc.data();
-                            if (data.flights) {
-                                setFlights(data.flights);
-                                flightsRef.current = data.flights;
-                            }
-                            if (data.loggedFlightsCount !== undefined) {
-                                setLoggedFlightsCount(data.loggedFlightsCount);
-                                loggedFlightsCountRef.current = data.loggedFlightsCount;
-                            }
-                            if (data.isRaining !== undefined) {
-                                setIsRaining(data.isRaining);
-                                isRainingRef.current = data.isRaining;
-                            }
+                            if (data.flights) { setFlights(data.flights); flightsRef.current = data.flights; }
+                            if (data.loggedFlightsCount !== undefined) { setLoggedFlightsCount(data.loggedFlightsCount); loggedFlightsCountRef.current = data.loggedFlightsCount; }
+                            if (data.isRaining !== undefined) { setIsRaining(data.isRaining); isRainingRef.current = data.isRaining; }
                             if (data.windDataMap) setWindDataMap(data.windDataMap);
                         }
-                    }, (err) => console.error("Error leyendo turno:", err));
+                    });
 
-                    // 2. Escuchar TODO el mes de la nube
+                    // Escuchar Todo el Mes
                     unsubscribeMes = db.collection('operaciones').doc('turnos_mes').onSnapshot((doc) => {
                         if (doc.exists && doc.data().turnos) {
                             setAllMonthShifts(doc.data().turnos);
@@ -118,9 +110,9 @@
                             setAllMonthShifts([]);
                             allMonthShiftsRef.current = [];
                         }
-                    }, (err) => console.error("Error leyendo mes:", err));
+                    });
 
-                }).catch((error) => console.error("Error Auth:", error));
+                });
 
                 return () => { unsubscribeTurno(); unsubscribeMes(); };
             }, []);
@@ -141,7 +133,7 @@
                 if (!audioUnlocked) {
                     setAudioUnlocked(true);
                     audioUnlockedRef.current = true;
-                    const u = new SpeechSynthesisUtterance("Sistema activado.");
+                    const u = new SpeechSynthesisUtterance("Sistema de asistencia de voz en línea.");
                     u.lang = 'es-MX';
                     u.volume = 0.1;
                     window.speechSynthesis.speak(u);
@@ -161,7 +153,7 @@
                     else setShiftName('Turno Nocturno');
 
                     // ==========================================
-                    // MOTOR INTELIGENTE: ASIGNAR OPERADOR ACTUAL
+                    // CÁLCULO DE OPERADOR EN TURNO
                     // ==========================================
                     const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
                     const currentMins = h * 60 + m;
@@ -177,22 +169,19 @@
                             let endMins = parseInt(endParts[0]) * 60 + parseInt(endParts[1]);
 
                             if (startMins <= endMins) {
-                                // Turno normal de día
                                 if (currentMins >= startMins && currentMins < endMins) foundOp = shift.name;
                             } else {
-                                // Turno cruzado (ej. 18:50 a 07:00 del día siguiente)
                                 if (currentMins >= startMins || currentMins < endMins) foundOp = shift.name;
                             }
                         }
                     }
-                    
                     setCurrentOperator(prevOp => prevOp !== foundOp ? foundOp : prevOp);
 
                     // ==========================================
-                    // CORTE DE CAJA (12:00 AM)
+                    // RESET DE MEDIANOCHE (00:00:00)
                     // ==========================================
                     if (h === 0 && m === 0 && s === 0 && authReady.current) {
-                        speak("Iniciando nuevo día de operaciones. Reiniciando contadores.");
+                        speak("Iniciando nuevo día operativo. Reiniciando contadores de vuelo a cero.");
                         db.collection('operaciones').doc('turno_actual').set({
                             flights: [],
                             loggedFlightsCount: 0,
@@ -202,13 +191,13 @@
                     }
                     
                     // ==========================================
-                    // ALARMAS Y AVISOS DE VUELO
+                    // AVISOS DE VUELO
                     // ==========================================
                     if (s === 0) {
                         const timeStr = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
                         
                         if (h === 7 && m === 50) speak("Junta operativa en diez minutos.");
-                        else if (h === 12 && m === 0) speak("Hora de elaborar los reportes K P I.");
+                        else if (h === 12 && m === 0) speak("Hora de elaborar reportes K P I.");
                         else if ((h === 12 && m === 5) || (h === 0 && m === 5)) speak("Actualización de captura del clima requerida.");
 
                         if (flightsRef.current && flightsRef.current.length > 0 && !isRainingRef.current) {
@@ -224,8 +213,8 @@
                                     let w10Str = `${String(warn10.getHours()).padStart(2, '0')}:${String(warn10.getMinutes()).padStart(2, '0')}`;
                                     let w5Str = `${String(warn5.getHours()).padStart(2, '0')}:${String(warn5.getMinutes()).padStart(2, '0')}`;
                                     
-                                    if (timeStr === w10Str) speak(`10 minutos para el vuelo de las ${flight.time}.`);
-                                    if (timeStr === w5Str) speak(`5 minutos para despegue. Salga a plataforma.`);
+                                    if (timeStr === w10Str) speak(`Atención piloto, 10 minutos para el vuelo de las ${flight.time}.`);
+                                    if (timeStr === w5Str) speak(`Atención, 5 minutos para despegue. Proceda a plataforma.`);
                                 }
                             });
                         }
@@ -234,6 +223,9 @@
                 return () => clearInterval(timer);
             }, []);
 
+            // ==========================================
+            // LECTOR DE ARCHIVOS - MOTOR "QUIRÚRGICO"
+            // ==========================================
             const handleExcelUpload = (e) => {
                 const file = e.target.files[0];
                 if (!file) return;
@@ -243,25 +235,37 @@
 
                 reader.onload = (evt) => {
                     try {
-                        const data = evt.target.result;
-                        const workbook = XLSX.read(data, { type: 'binary' });
-                        const sheet = workbook.Sheets[workbook.SheetNames[0]];
-                        const json = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+                        let data = evt.target.result;
+                        let json = [];
                         
-                        let turnosExtraidos = [];
-                        let defaultMonth = new Date().getMonth() + 1;
-                        let defaultYear = new Date().getFullYear();
-
-                        // 1. Extraer Mes y Año globales del documento por si las dudas
-                        const fullText = json.map(row => row.join(' ')).join(' ');
-                        const dateRegex = /(?:(\d{2})[\/\-])?(\d{2})[\/\-](\d{4})/;
-                        const dateMatch = fullText.match(dateRegex);
-                        if (dateMatch) {
-                            defaultMonth = parseInt(dateMatch[2]);
-                            defaultYear = parseInt(dateMatch[3]);
+                        // PARCHE 1: Pre-Lectura para CSV con puntos y comas (;)
+                        if (file.name.toLowerCase().endsWith('.csv')) {
+                            const rawString = evt.target.result; // El archivo como texto puro
+                            let delimiter = rawString.includes(';') ? ';' : (rawString.includes('\t') ? '\t' : ',');
+                            let rows = rawString.split(/\r?\n/);
+                            json = rows.map(r => r.split(delimiter).map(cell => cell.replace(/^"|"$/g, '').trim()));
+                        } else {
+                            // Lectura normal para Excel (.xlsx)
+                            const workbook = XLSX.read(data, { type: 'binary', raw: false });
+                            const sheet = workbook.Sheets[workbook.SheetNames[0]];
+                            json = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "" });
                         }
 
-                        // 2. MODO TERMINATOR: Analizar cada celda del archivo buscando horarios
+                        let turnosExtraidos = [];
+                        let timesFound = 0; // Para diagnóstico
+                        
+                        // Mes y Año por defecto
+                        let defaultMonth = new Date().getMonth() + 1;
+                        let defaultYear = new Date().getFullYear();
+                        
+                        const fullTextStr = json.map(row => row.join(' ')).join(' ');
+                        let globalDateMatch = fullTextStr.match(/(\d{2})[\/\-](\d{2})[\/\-](\d{4})/);
+                        if (globalDateMatch) {
+                            defaultMonth = parseInt(globalDateMatch[2]);
+                            defaultYear = parseInt(globalDateMatch[3]);
+                        }
+
+                        // ESCANEO CELDA POR CELDA
                         for (let r = 0; r < json.length; r++) {
                             let row = json[r];
                             if (!row) continue;
@@ -271,98 +275,67 @@
                                 if (!cellValue) continue;
                                 let cellText = String(cellValue).trim();
 
-                                // Expresión regular Súper Amplia: Encuentra "06:50 - 19:00" o "6:50 a 19:00"
-                                let timeMatch = cellText.match(/(\d{1,2}:\d{2})\s*[-aA]\s*(\d{1,2}:\d{2})/);
+                                // Buscar un patrón de hora estricto (ej. 06:50 - 19:00 o 06:50-19:00)
+                                let timeMatch = cellText.match(/(\d{1,2}[:.]\d{2})\s*[-aA\/_]\s*(\d{1,2}[:.]\d{2})/);
 
                                 if (timeMatch) {
-                                    let start = timeMatch[1];
-                                    let end = timeMatch[2];
+                                    timesFound++;
+                                    let start = timeMatch[1].replace('.', ':');
+                                    let end = timeMatch[2].replace('.', ':');
 
-                                    // ===== EXTRAER EL NOMBRE =====
-                                    // Limpiar la hora de la celda para ver qué queda
+                                    // PARCHE 2: Separar el nombre con "bisturí" (split('\n'))
                                     let rawName = cellText.replace(timeMatch[0], '').trim();
                                     
-                                    // Si todo estaba pegado en la misma celda con saltos de línea (típico CSV de Zoho)
-                                    let lines = rawName.split(/\r?\n/);
-                                    rawName = lines[0].trim(); // Tomar primera linea restante
+                                    // Tomar solo la primera línea de texto sobrante (ignorar puestos que están abajo)
+                                    let cleanName = rawName.split(/\r?\n/)[0].trim();
 
-                                    // Si no hay nombre útil, buscar en las celdas de abajo o de la izquierda
-                                    if (!rawName || rawName.match(/Especialista|Audi|OS/i) || rawName.length < 3) {
-                                        let foundName = "";
-                                        // Buscar abajo hasta 2 filas
-                                        for(let i=1; i<=2; i++) {
-                                            if (json[r+i] && json[r+i][c]) {
-                                                let downText = String(json[r+i][c]).trim();
-                                                // Que sea largo, no sea una hora, no sea "Especialista"
-                                                if (downText.length > 2 && !downText.match(/\d{2}:\d{2}/) && !downText.match(/Especialista|Audi|OS/i)) {
-                                                    foundName = downText; 
-                                                    break;
-                                                }
-                                            }
-                                        }
-                                        // Si no, buscar izquierda
-                                        if(!foundName && c > 0 && json[r][c-1]) {
-                                             let leftText = String(json[r][c-1]).trim();
-                                             if (leftText.length > 2 && !leftText.match(/\d{2}:\d{2}/) && !leftText.match(/Especialista|Audi|OS/i)) {
-                                                 foundName = leftText;
-                                             }
-                                        }
-                                        rawName = foundName;
+                                    // Si el nombre sigue vacío, buscar en la celda de la derecha
+                                    if (!cleanName && c + 1 < row.length) {
+                                        cleanName = String(json[r][c+1]).split(/\r?\n/)[0].trim();
                                     }
 
-                                    // Super Filtro de Limpieza
-                                    let cleanName = rawName
+                                    // Limpieza extrema de basura
+                                    cleanName = cleanName
                                         .replace(/Especialista.*/gi, '')
                                         .replace(/Audi.*/gi, '')
                                         .replace(/RPAS.*/gi, '')
-                                        .replace(/OS/gi, '')
-                                        .replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑ\s]/g, '') // Quitar números y basuritas
+                                        .replace(/OS\b/gi, '')
+                                        .replace(/\d{1,2}:\d{2}/g, '')
+                                        .replace(/[-_]/g, ' ')
+                                        .replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑ\s]/g, '') // Solo letras
+                                        .replace(/\s+/g, ' ')
                                         .trim();
 
                                     // Dejar máximo Nombre y Primer Apellido
-                                    let nameParts = cleanName.split(/\s+/).filter(p => p.length > 2);
+                                    let nameParts = cleanName.split(' ').filter(p => p.length > 2);
                                     cleanName = nameParts.slice(0, 2).join(' ') || "Operador";
 
-                                    // ===== EXTRAER LA FECHA =====
+                                    // Buscar la FECHA mirando hacia arriba en la columna
                                     let day = null;
                                     
-                                    // 1. Mirar hacia ARRIBA en la columna (Modo Calendario)
                                     for (let lookUpRow = r - 1; lookUpRow >= 0; lookUpRow--) {
-                                        let upCell = json[lookUpRow] ? json[lookUpRow][c] : null;
-                                        if (upCell) {
-                                            let upText = String(upCell).trim();
-                                            // Match exacto "27"
-                                            if (/^\s*0?[1-9]|[12]\d|3[01]\s*$/.test(upText)) { 
-                                                day = parseInt(upText); break; 
-                                            }
-                                            // Match corto "Mon 27" o "27 Lun"
-                                            let textMatch = upText.match(/[^\d]*([1-9]|[12]\d|3[01])\b/);
-                                            if (textMatch && upText.length < 15) { 
-                                                day = parseInt(textMatch[1]); break; 
-                                            }
-                                            // Match Completo "27/07/2026"
-                                            let fullDateMatch = upText.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
-                                            if (fullDateMatch) { 
-                                                day = parseInt(fullDateMatch[1]); 
-                                                defaultMonth = parseInt(fullDateMatch[2]); 
-                                                defaultYear = parseInt(fullDateMatch[3]); 
-                                                break; 
-                                            }
+                                        let upCell = json[lookUpRow][c];
+                                        if (!upCell) continue;
+                                        let upText = String(upCell).trim();
+                                        
+                                        // Detectar "27", "01", "15" exactos
+                                        if (/^0?([1-9]|[12]\d|3[01])$/.test(upText)) {
+                                            day = parseInt(upText);
+                                            break;
                                         }
+                                        
+                                        // Detectar "Lun 27" o "27 Lun"
+                                        let tMatch = upText.match(/^(?:lun|mar|mi[eé]|jue|vie|s[aá]b|dom)[^\d]*([1-9]|[12]\d|3[01])$/i) || upText.match(/^([1-9]|[12]\d|3[01])[^\d]*(?:lun|mar|mi[eé]|jue|vie|s[aá]b|dom)$/i);
+                                        if (tMatch) { day = parseInt(tMatch[1]); break; }
                                     }
 
-                                    // 2. Si falló arriba, buscar en la MISMA fila (Modo Lista CSV)
+                                    // Si no la encontró arriba, buscar en la misma fila completa (Modo Lista)
                                     if (!day) {
-                                        let rowStr = row.join(' '); // Unir toda la fila en texto
-                                        let fullDateMatch = rowStr.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
-                                        if (fullDateMatch) {
-                                            day = parseInt(fullDateMatch[1]);
-                                            defaultMonth = parseInt(fullDateMatch[2]);
-                                            defaultYear = parseInt(fullDateMatch[3]);
-                                        }
+                                        let rowStr = row.join(' ');
+                                        let fDate = rowStr.match(/(?:^|\s)(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})(?:\s|$)/);
+                                        if (fDate) { day = parseInt(fDate[1]); defaultMonth = parseInt(fDate[2]); defaultYear = parseInt(fDate[3]); }
                                     }
 
-                                    // 3. Guardar el turno si encontramos una fecha (día)
                                     if (day) {
                                         let dateStr = `${defaultYear}-${String(defaultMonth).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
                                         turnosExtraidos.push({ date: dateStr, name: cleanName, start: start, end: end });
@@ -371,51 +344,58 @@
                             }
                         }
 
-                        // Filtrar duplicados (Si Zoho fusionó celdas, a veces un turno se lee 2 veces)
+                        // Eliminar duplicados
                         const uniqueTurnos = [];
                         const seen = new Set();
                         turnosExtraidos.forEach(t => {
                             const id = `${t.date}-${t.name}-${t.start}`;
-                            if(!seen.has(id)) {
-                                seen.add(id);
-                                uniqueTurnos.push(t);
-                            }
+                            if(!seen.has(id)) { seen.add(id); uniqueTurnos.push(t); }
                         });
 
-                        // Resultado Final
+                        // Resultado del Escaneo
                         if (uniqueTurnos.length > 0) {
                             db.collection('operaciones').doc('turnos_mes').set({ turnos: uniqueTurnos });
-                            speak(`Carga de ${uniqueTurnos.length} turnos exitosa.`);
-                            setModal({ isOpen: true, title: '✅ Carga Exitosa', message: `El escáner profundo encontró ${uniqueTurnos.length} turnos para este mes.\n\nEl sistema cambiará al operador correspondiente automáticamente.`, type: 'success' });
+                            speak(`Calendario escaneado. ${uniqueTurnos.length} turnos guardados.`);
+                            setModal({ isOpen: true, title: '✅ Carga Exitosa', message: `El motor procesó tu archivo correctamente y guardó ${uniqueTurnos.length} turnos.\n\nEl sistema cambiará al operador asignado según el reloj.`, type: 'success' });
                         } else {
-                            speak("El sistema no logró encontrar turnos.");
-                            setModal({ isOpen: true, title: 'Archivo Vacío', message: 'El escáner leyó el archivo pero no pudo encontrar patrones de Hora (ej. 07:00 - 15:00) y Fechas juntos. Revisa tu exportación.', type: 'error' });
+                            // DIAGNÓSTICO DE ERROR
+                            speak("Error. No se pudo armar el calendario.");
+                            setModal({ 
+                                isOpen: true, 
+                                title: 'Diagnóstico de Archivo', 
+                                message: `Filas analizadas: ${json.length}\nHorarios detectados: ${timesFound}\n\nEl sistema encontró ${timesFound} horarios, pero no pudo encontrar el NÚMERO DE DÍA (ej. 27) arriba de ellos.\nPor favor, verifica que tu archivo tenga los días en la parte superior.`, 
+                                type: 'error' 
+                            });
                         }
 
                     } catch (error) {
-                        console.error("Error parseando Excel/CSV:", error);
-                        setModal({ isOpen: true, title: 'Error Crítico', message: 'El archivo está corrupto o protegido.', type: 'error' });
+                        console.error("Error leyendo archivo:", error);
+                        setModal({ isOpen: true, title: 'Error del Lector', message: 'El archivo está corrupto o protegido.', type: 'error' });
                     } finally {
                         setIsUploading(false);
-                        e.target.value = null; // Reset input
+                        e.target.value = null;
                     }
                 };
                 
-                reader.readAsBinaryString(file);
+                if (file.name.toLowerCase().endsWith('.csv')) reader.readAsText(file);
+                else reader.readAsBinaryString(file);
             };
 
             const clearDB = () => {
                 db.collection('operaciones').doc('turnos_mes').set({ turnos: [] });
-                speak("Base de datos de horarios limpiada.");
+                speak("Base de datos limpiada.");
             };
 
+            // ==========================================
+            // ESCANEO DEL CLIMA (GEMINI) Y VUELOS
+            // ==========================================
             const handleImageUpload = (e) => {
                 const file = e.target.files[0];
                 if (!file) return;
 
                 if (!geminiKey || geminiKey.trim() === '') {
                     speak("Falta la llave de la inteligencia artificial.");
-                    setModal({ isOpen: true, title: 'Falta la Llave', message: 'Abre los ajustes (⚙️) y pega tu llave API.' });
+                    setModal({ isOpen: true, title: 'Falta la Llave', message: 'Abre los ajustes (⚙️) y pega tu llave API de Gemini.' });
                     return;
                 }
                 
@@ -429,7 +409,7 @@
 
             const analyzeImageWithAI = async (base64Image) => {
                 setIsScanning(true);
-                speak("Analizando clima...");
+                speak("Analizando variables de viento e intervalos de lluvia...");
                 
                 try {
                     const key = geminiKey.trim();
@@ -438,14 +418,14 @@
                     const payload = {
                         contents: [{
                             parts: [
-                                { text: "Analiza el clima. REGLA ESTRICTA 11:00am: Si solo dice 'UV' (ej. 'UV 10', 'Extremo UV 13') ES APTO PARA VOLAR, viento 0. Regla general: Si dice 'Apto para volar', viento 0. Si dice 'Ráfagas fuertes' o vientos > 40, viento 45. Si dice 'Lluvia 64%' o similar, trátalo como viento 0. Devuelve JSON con 'hourlyData' teniendo 'time' (ej. '11:00am') y 'wind' numérico." },
+                                { text: "Analiza el clima. REGLA ESTRICTA 11:00am: Si solo dice 'UV' (ej. 'UV 10') ES APTO PARA VOLAR, viento 0. Regla general: Si dice 'Apto para volar', viento 0. Si dice 'Lluvia 64%' o 'Lluvia 70%', asume viento 0 (SE PERMITE PROGRAMAR). Si dice 'Ráfagas fuertes' o vientos > 40, viento 45. Devuelve JSON con 'hourlyData' teniendo 'time' (ej. '11:00am') y 'wind' numérico." },
                                 { inline_data: { mime_type: "image/jpeg", data: base64Image } }
                             ]
                         }]
                     };
 
                     const response = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-                    if (!response.ok) throw new Error("Error de conexión API.");
+                    if (!response.ok) throw new Error("Error de conexión con la IA.");
 
                     const data = await response.json();
                     let aiResponseText = data.candidates[0].content.parts[0].text;
@@ -454,8 +434,8 @@
                     const parsedData = JSON.parse(aiResponseText);
                     if (parsedData && parsedData.hourlyData) {
                          generateIntelligentSchedule(parsedData.hourlyData);
-                         speak("Itinerario de trece vuelos generado.");
-                    } else throw new Error("Formato incorrecto devuelto por IA.");
+                         speak("Itinerario estrictamente balanceado a trece vuelos.");
+                    } else throw new Error("La IA no devolvió el formato esperado.");
 
                 } catch (error) {
                     console.error("AI Error:", error);
@@ -493,6 +473,7 @@
                     return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
                 };
 
+                // GENERAR EXACTAMENTE 13 VUELOS
                 let newSchedule = [];
                 const isSuspendedAt11 = windMap[11] >= 40;
                 const isSuspendedAt12 = windMap[12] >= 40 && !isSuspendedAt11;
@@ -508,7 +489,19 @@
                     newSchedule.push({ time: applyVariance("07:20", true), type: "FORZOSO", wind: windMap[7] || 0, hour24: 7 }, { time: applyVariance("08:40"), type: "DINÁMICO", wind: windMap[8] || 0, hour24: 8 }, { time: applyVariance("10:00"), type: "DINÁMICO", wind: windMap[10] || 0, hour24: 10 }, { time: applyVariance("11:30"), type: "DINÁMICO", wind: windMap[11] || 0, hour24: 11 }, { time: applyVariance("12:45"), type: "DINÁMICO", wind: windMap[12] || 0, hour24: 12 });
                 }
 
-                newSchedule.push({ time: applyVariance("14:00", true), type: "FORZOSO", wind: windMap[14] || 0, hour24: 14 }, { time: applyVariance("15:30"), type: "DINÁMICO", wind: windMap[15] || 0, hour24: 15 }, { time: applyVariance("17:00", true), type: "FORZOSO", wind: windMap[17] || 0, hour24: 17 }, { time: applyVariance("18:30"), type: "DINÁMICO", wind: windMap[18] || 0, hour24: 18 }, { time: applyVariance("20:00"), type: "DINÁMICO", wind: windMap[20] || 0, hour24: 20 }, { time: applyVariance("21:30", true), type: "FORZOSO", wind: windMap[21] || 0, hour24: 21 }, { time: applyVariance("22:45"), type: "DINÁMICO", wind: windMap[22] || 0, hour24: 22 });
+                // Asegurar los 13 espacios (faltan 8)
+                let remainingSpaces = 13 - newSchedule.length;
+                let startPM = 14; 
+                let endPM = 22; 
+                let interval = (endPM - startPM) / remainingSpaces;
+                
+                for(let i=0; i<remainingSpaces; i++) {
+                    let h = Math.floor(startPM + (i * interval));
+                    let m = Math.floor(((startPM + (i * interval)) % 1) * 60);
+                    let forceStr = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+                    let isF = (h === 14 || h === 17 || h === 21);
+                    newSchedule.push({ time: applyVariance(forceStr, isF), type: isF ? "FORZOSO" : "DINÁMICO", wind: windMap[h] || 0, hour24: h });
+                }
                 
                 const finalSchedule = newSchedule.map(f => ({ ...f, wind: windMap[f.hour24] >= 40 ? 45 : f.wind }));
                 db.collection('operaciones').doc('turno_actual').set({ flights: finalSchedule }, { merge: true });
@@ -517,8 +510,8 @@
             const toggleRainProtocol = () => {
                 const newState = !isRaining;
                 db.collection('operaciones').doc('turno_actual').set({ isRaining: newState }, { merge: true });
-                if (newState) speak("Operaciones suspendidas por lluvia local."); 
-                else { speak("Lluvia finalizada. Reprogramando vuelos."); recalculateAfterRain(); }
+                if (newState) speak("Operaciones suspendidas por lluvia. Despegues bloqueados."); 
+                else { speak("Lluvia finalizada. Reprogramando vuelos faltantes para alcanzar meta de trece."); recalculateAfterRain(); }
             };
 
             const recalculateAfterRain = () => {
@@ -546,16 +539,18 @@
                  if (isRaining) return setModal({ isOpen: true, title: 'Lluvia', message: 'No puedes registrar despegues en lluvia.', type: 'error' });
                  if (loggedFlightsCount < totalFlightsTarget) {
                       db.collection('operaciones').doc('turno_actual').set({ loggedFlightsCount: loggedFlightsCount + 1 }, { merge: true });
+                      speak(`Vuelo registrado exitosamente.`);
                  }
             };
 
-            // Filtrado de visualización en panel admin
+            // UI del Admin
             const todayStrUI = `${currentTime.getFullYear()}-${String(currentTime.getMonth() + 1).padStart(2, '0')}-${String(currentTime.getDate()).padStart(2, '0')}`;
             const todayShiftsUI = allMonthShifts.filter(s => s.date === todayStrUI);
 
             return (
                 <div className="min-h-screen p-4 max-w-2xl mx-auto pb-24" onClick={unlockAudio}>
                     
+                    {/* Header */}
                     <div className="flex justify-between items-center mb-5">
                         <div>
                             <h1 className="text-lg md:text-xl font-black tracking-tight flex items-center gap-2">
@@ -576,6 +571,7 @@
                         </div>
                     )}
 
+                    {/* Tarjeta Principal */}
                     <div className="glass-card p-5 rounded-2xl mb-5 relative overflow-hidden">
                         <div className="flex justify-between items-start mb-6">
                             <div>
@@ -618,6 +614,7 @@
                         </div>
                     </div>
 
+                    {/* Vuelos */}
                     <div className={`glass-card p-5 rounded-2xl mb-6 relative ${isRaining ? 'opacity-50 pointer-events-none' : ''}`}>
                         {isRaining && <div className="absolute inset-0 rain-overlay rounded-2xl z-10 flex items-center justify-center text-center p-4">
                             <span className="text-white font-bold text-lg">Esperando que mejore el clima...</span>
@@ -627,7 +624,7 @@
                         
                         {flights.length === 0 ? (
                             <div className="text-center py-6 text-xs font-bold text-slate-500">
-                                Sube una captura para generar el itinerario.
+                                Sube una captura para generar el itinerario de 13 vuelos.
                             </div>
                         ) : (
                             <div className="space-y-2.5">
@@ -648,13 +645,14 @@
                         )}
                     </div>
 
+                    {/* Botón Flotante */}
                     <div className="fixed bottom-0 left-0 w-full p-4 bg-gradient-to-t from-[#0B0F19] via-[#0B0F19] to-transparent flex justify-center z-40 pointer-events-none">
                          <button onClick={(e) => { e.stopPropagation(); handleLogManualFlight(); }} disabled={isRaining} className={`pointer-events-auto w-full max-w-xs font-black py-3.5 rounded-xl transition transform hover:scale-105 ${isRaining ? 'bg-slate-800 text-slate-600' : 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-[0_0_20px_rgba(79,70,229,0.4)]'}`}>
                              ✈️ REGISTRAR DESPEGUE AHORA
                          </button>
                     </div>
 
-                    {}
+                    {/* MODAL ADMIN */}
                     {adminOpen && (
                         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4" onClick={() => setAdminOpen(false)}>
                             <div className="bg-[#131826] border border-slate-800 rounded-2xl w-full max-w-md shadow-2xl p-6" onClick={e => e.stopPropagation()}>
@@ -665,14 +663,14 @@
                                 
                                 <div className="bg-indigo-900/20 border border-indigo-500/30 p-4 rounded-xl mb-6 text-center">
                                     <h3 className="text-xs font-black tracking-widest text-indigo-400 uppercase mb-2">
-                                        📅 CARGA INTELIGENTE (ZOHO CSV/XLSX)
+                                        📅 CARGA INTELIGENTE DEL MES (ZOHO)
                                     </h3>
                                     <p className="text-[10px] text-slate-400 mb-4 leading-relaxed">
-                                        Sube tu archivo (incluso si se ve desordenado). El Escáner Profundo encontrará fechas, horas y limpiará los nombres automáticamente.
+                                        Sube el archivo de Excel (.xlsx) o CSV exportado de Zoho Shifts. El sistema procesará el calendario automáticamente.
                                     </p>
                                     <input type="file" id="excelUpload" accept=".csv, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel" className="hidden" onChange={handleExcelUpload} />
                                     <button onClick={() => document.getElementById('excelUpload').click()} disabled={isUploading} className={`w-full font-bold py-3.5 rounded-lg text-sm shadow-[0_0_15px_rgba(79,70,229,0.3)] transition flex justify-center items-center gap-2 ${isUploading ? 'bg-indigo-800 text-indigo-300 cursor-not-allowed' : 'bg-indigo-600 hover:bg-indigo-500 text-white transform hover:scale-105'}`}>
-                                        {isUploading ? '⏳ Escaneando archivo...' : '📄 Subir Horario Mensual'}
+                                        {isUploading ? '⏳ Analizando archivo...' : '📄 Subir Horarios (CSV / XLSX)'}
                                     </button>
                                 </div>
 
@@ -684,7 +682,7 @@
                                 <div className="space-y-2 mb-6 max-h-48 overflow-y-auto pr-1">
                                     {todayShiftsUI.length === 0 ? (
                                         <div className="text-center py-6 bg-[#0f172a] rounded-xl border border-slate-800 text-xs text-slate-500">
-                                            No hay turnos para la fecha actual.
+                                            No hay turnos registrados para hoy.
                                         </div>
                                     ) : (
                                         todayShiftsUI.map((op, i) => (
@@ -705,12 +703,13 @@
                         </div>
                     )}
 
+                    {/* MODAL SETTINGS */}
                     {settingsOpen && (
                         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4" onClick={(e) => e.stopPropagation()}>
                             <div className="bg-[#131826] border border-slate-800 rounded-2xl w-full max-w-sm shadow-2xl p-6">
                                 <h2 className="text-lg font-black text-white mb-4">⚙️ Ajustes</h2>
                                 <div className="mb-5">
-                                    <label className="block text-[10px] font-bold tracking-widest text-slate-400 uppercase mb-2">Llave Gemini API (Para escaneo de Clima)</label>
+                                    <label className="block text-[10px] font-bold tracking-widest text-slate-400 uppercase mb-2">Llave Gemini API (Clima)</label>
                                     <input type="password" value={geminiKey} onChange={e => setGeminiKey(e.target.value)} placeholder="AIzaSy..." className="w-full bg-[#1e293b] border border-slate-700 rounded-lg p-2.5 text-white outline-none font-mono text-xs" />
                                 </div>
                                 <div className="flex gap-2">
@@ -721,13 +720,14 @@
                         </div>
                     )}
                     
+                    {/* MODAL MENSAJES */}
                     {modal.isOpen && (
-                        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4" onClick={(e) => e.stopPropagation()}>
+                        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-[60] p-4" onClick={(e) => e.stopPropagation()}>
                             <div className="bg-[#131826] border border-slate-800 rounded-2xl w-full max-w-sm shadow-2xl p-6 text-center">
                                 <h2 className="text-lg font-black text-white mb-2">{modal.title}</h2>
-                                <p className="text-slate-300 text-sm mb-6 whitespace-pre-line">{modal.message}</p>
-                                <button onClick={() => setModal({ ...modal, isOpen: false })} className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-3 rounded-lg text-xs">
-                                    Aceptar
+                                <p className="text-slate-300 text-sm mb-6 whitespace-pre-line leading-relaxed">{modal.message}</p>
+                                <button onClick={() => setModal({ ...modal, isOpen: false })} className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-3 rounded-lg text-sm">
+                                    Entendido
                                 </button>
                             </div>
                         </div>
