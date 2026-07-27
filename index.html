@@ -147,7 +147,6 @@
                     // CÁLCULO DE OPERADOR EN TURNO
                     // ==========================================
                     const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-                    // Buscar turnos que cruzan medianoche (ej. de ayer)
                     let yesterday = new Date(now);
                     yesterday.setDate(yesterday.getDate() - 1);
                     const yesterdayStr = `${yesterday.getFullYear()}-${String(yesterday.getMonth() + 1).padStart(2, '0')}-${String(yesterday.getDate()).padStart(2, '0')}`;
@@ -165,16 +164,14 @@
                             let endMins = parseInt(endParts[0]) * 60 + parseInt(endParts[1]);
 
                             if (startMins <= endMins) {
-                                // Turno normal de día
                                 if (shift.date === todayStr && currentMins >= startMins && currentMins < endMins) {
                                     foundOp = shift.name;
                                 }
                             } else {
-                                // Turno que cruza la medianoche (ej. 19:00 a 07:00)
                                 if (shift.date === todayStr && currentMins >= startMins) {
-                                    foundOp = shift.name; // Es hoy en la noche
+                                    foundOp = shift.name; 
                                 } else if (shift.date === yesterdayStr && currentMins < endMins) {
-                                    foundOp = shift.name; // Es hoy en la madrugada (turno de ayer)
+                                    foundOp = shift.name; 
                                 }
                             }
                         }
@@ -240,7 +237,7 @@
                         
                         let json = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "" });
 
-                        // Respaldo por si Zoho exporta el CSV separado por punto y coma (;)
+                        // Respaldo crudo para CSV problemáticos de Zoho
                         if (json.length > 0 && json[0].length <= 2 && file.name.toLowerCase().endsWith('.csv')) {
                             const rawText = new TextDecoder("utf-8").decode(data);
                             const delimiter = rawText.includes(';') ? ';' : (rawText.includes('\t') ? '\t' : ',');
@@ -251,7 +248,6 @@
                         let turnosExtraidos = [];
                         let timesFound = 0; 
                         
-                        // Parseador de Horas am/pm a 24h
                         const parseTimeStr = (tStr) => {
                             let match = tStr.match(/(\d{1,2})[:.](\d{2})\s*([ap]m)?/i);
                             if(!match) return tStr;
@@ -263,20 +259,17 @@
                             return `${String(h).padStart(2, '0')}:${m}`;
                         };
 
-                        // Limpiador de Nombres (Corta la basura)
                         const cleanNameStr = (str) => {
-                            let c = str.replace(/Especialista|RPAS|OS|Audi|México|Turno|lun|mar|mié|jue|vie|sáb|dom|Mon|Tue|Wed|Thu|Fri|Sat|Sun|Shift/gi, '');
-                            c = c.replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑ\s]/g, '').trim();
-                            let parts = c.split(/\s+/).filter(p => p.length > 2);
-                            return parts.slice(0, 2).join(' ');
+                            let c = str.replace(/Especialista|RPAS|OS|Audi|M[eé]xico|Turno|lun|mar|mi[eé]|jue|vie|s[aá]b|dom|Mon|Tue|Wed|Thu|Fri|Sat|Sun|Shift/gi, '');
+                            c = c.replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑ\s]/g, ' ').trim();
+                            // Tomamos todas las palabras que forman el nombre para no cortarlo
+                            let parts = c.split(/\s+/).filter(p => p.length > 1);
+                            return parts.join(' '); 
                         };
 
-                        // Expresión Regular Universal para buscar horas
                         const timeRegex = /\b([01]?\d|2[0-3])[:.]([0-5]\d)(?:\s*[aApP][mM])?\b/g;
 
-                        // =========================================================================
-                        // ESTRATEGIA 1: Modo Cuadrícula (PDF Style) - Varias horas en una misma celda
-                        // =========================================================================
+                        // MODO 1: Cuadrícula (Celdas unidas)
                         for (let r = 0; r < json.length; r++) {
                             let row = json[r];
                             for (let c = 0; c < row.length; c++) {
@@ -285,18 +278,16 @@
 
                                 let timesInCell = cellText.match(timeRegex);
                                 
-                                // Si una celda tiene 2 horas juntas (ej. 06:50 - 19:00)
                                 if (timesInCell && timesInCell.length >= 2) {
                                     timesFound++;
                                     let start = parseTimeStr(timesInCell[0]);
                                     let end = parseTimeStr(timesInCell[1]);
 
-                                    let name = cleanNameStr(cellText);
-                                    if (!name && c > 0) name = cleanNameStr(String(json[r][0] || ''));
+                                    let name = cleanNameStr(cellText.split('\n')[0]); 
+                                    if (!name && c > 0) name = cleanNameStr(String(json[r][0] || '').split('\n')[0]);
                                     
                                     let day = null, month = new Date().getMonth() + 1, year = new Date().getFullYear();
                                     
-                                    // Buscar fecha hacia arriba
                                     for (let lookUp = r - 1; lookUp >= 0; lookUp--) {
                                         let upCell = String(json[lookUp][c] || '').trim();
                                         let dateMatch = upCell.match(/(\d{1,2})\s*[\/\-]\s*(\d{1,2})\s*[\/\-]\s*(\d{4})/);
@@ -313,47 +304,39 @@
                             }
                         }
 
-                        // =========================================================================
-                        // ESTRATEGIA 2: Modo Lista (CSV Exportado) - Horas separadas en columnas distintas
-                        // =========================================================================
+                        // MODO 2: Lista (Celdas separadas por comas/columnas)
                         if (turnosExtraidos.length === 0) {
                             for (let r = 0; r < json.length; r++) {
-                                let row = json[r];
-                                // Unimos toda la fila en un solo texto gigante para escanearla sin importar en qué columna caigan los datos
-                                let rowText = row.join('  ');
-                                
+                                let rowText = json[r].join('  ');
                                 let timesInRow = rowText.match(timeRegex);
                                 
-                                // Si en toda la fila (ej: Columna C y Columna D) encontró 2 horas
                                 if (timesInRow && timesInRow.length >= 2) {
                                     timesFound++;
                                     let start = parseTimeStr(timesInRow[0]);
                                     let end = parseTimeStr(timesInRow[1]);
 
-                                    // Buscar la fecha en cualquier parte de la fila
                                     let dateStr = null;
                                     let dateMatch = rowText.match(/\b(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})\b/) || 
                                                     rowText.match(/\b(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})\b/) ||
                                                     rowText.match(/\b(\d{1,2})\s+(ene|feb|mar|abr|may|jun|jul|ago|sep|oct|nov|dic|jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s+(\d{4})\b/i);
                                     
                                     if (dateMatch) {
-                                        if (dateMatch[1] && dateMatch[1].length === 4) { // YYYY-MM-DD
+                                        if (dateMatch[1] && dateMatch[1].length === 4) { 
                                             dateStr = `${dateMatch[1]}-${String(dateMatch[2]).padStart(2,'0')}-${String(dateMatch[3]).padStart(2,'0')}`;
                                         } else if (dateMatch[3] && dateMatch[3].length === 4) {
-                                            if(isNaN(dateMatch[2])) { // DD-MMM-YYYY
+                                            if(isNaN(dateMatch[2])) { 
                                                 const months = {jan:1,feb:2,mar:3,apr:4,abr:4,may:5,jun:6,jul:7,aug:8,ago:8,sep:9,oct:10,nov:11,dec:12,dic:12};
                                                 let m = months[dateMatch[2].toLowerCase().substring(0,3)] || 1;
                                                 dateStr = `${dateMatch[3]}-${String(m).padStart(2,'0')}-${String(dateMatch[1]).padStart(2,'0')}`;
-                                            } else { // DD-MM-YYYY
+                                            } else { 
                                                 dateStr = `${dateMatch[3]}-${String(dateMatch[2]).padStart(2,'0')}-${String(dateMatch[1]).padStart(2,'0')}`;
                                             }
                                         }
                                     }
 
-                                    // Buscar el nombre (Cualquier celda que tenga letras y no sea solo números)
                                     let name = "";
-                                    for(let c=0; c<row.length; c++) {
-                                        let cellText = String(row[c]).trim();
+                                    for(let c=0; c<json[r].length; c++) {
+                                        let cellText = String(json[r][c]).trim();
                                         if (cellText.length > 2 && /[a-zA-Z]/.test(cellText) && !/\d{2,}/.test(cellText) && !/^(?:lun|mar|mié|jue|vie|sáb|dom|Especialista|RPAS)/i.test(cellText)) {
                                             let testName = cleanNameStr(cellText);
                                             if (testName) { name = testName; break; }
@@ -379,13 +362,13 @@
                         if (uniqueTurnos.length > 0) {
                             db.collection('operaciones').doc('turnos_mes').set({ turnos: uniqueTurnos });
                             speak(`Carga de calendario exitosa. ${uniqueTurnos.length} turnos identificados.`);
-                            setModal({ isOpen: true, title: '✅ Carga Exitosa', message: `El Motor Inteligente analizó el archivo.\n\nTurnos extraídos: ${uniqueTurnos.length}\n\nEl sistema asignará al operador automáticamente según el reloj interno.`, type: 'success' });
+                            setModal({ isOpen: true, title: '✅ Carga Exitosa', message: `El Motor Inteligente analizó el archivo.\n\nTurnos extraídos: ${uniqueTurnos.length}\n\nEl sistema asignará al piloto automáticamente.`, type: 'success' });
                         } else {
                             speak("Error de lectura del archivo de sistema.");
                             setModal({ 
                                 isOpen: true, 
-                                title: 'Diagnóstico de Archivo (Modo Avanzado)', 
-                                message: `Filas analizadas: ${json.length}\nHorarios detectados: ${timesFound}\nTurnos formados: ${uniqueTurnos.length}\n\nEl sistema identificó ${timesFound} horas, pero no pudo asociarlas con una fecha válida o un nombre en la misma fila/celda. Verifica las columnas de tu exportación.`, 
+                                title: 'Diagnóstico de Archivo', 
+                                message: `Filas analizadas: ${json.length}\nHorarios detectados: ${timesFound}\nTurnos formados: ${uniqueTurnos.length}\n\nEl sistema encontró ${timesFound} horarios, pero no pudo encontrar nombres o fechas válidas junto a ellos. Revisa que el archivo original no esté en blanco.`, 
                                 type: 'error' 
                             });
                         }
@@ -594,7 +577,7 @@
                                     {currentTime.toLocaleTimeString('en-US', { hour12: false })}
                                 </div>
                                 <div className="mt-3 inline-flex items-center gap-1.5 bg-indigo-900/40 text-indigo-200 px-3 py-1.5 rounded-lg border border-indigo-500/30 text-xs font-bold shadow-inner">
-                                    <span className="text-indigo-400">👨‍✈️ OP:</span> {currentOperator}
+                                    <span className="text-indigo-400">👨‍✈️ PILOTO:</span> {currentOperator}
                                 </div>
                             </div>
 
@@ -674,14 +657,14 @@
                                 
                                 <div className="bg-indigo-900/20 border border-indigo-500/30 p-4 rounded-xl mb-6 text-center">
                                     <h3 className="text-xs font-black tracking-widest text-indigo-400 uppercase mb-2">
-                                        📅 CARGA INTELIGENTE (ZOHO)
+                                        📅 CARGA INTELIGENTE (ZOHO CSV/XLSX)
                                     </h3>
                                     <p className="text-[10px] text-slate-400 mb-4 leading-relaxed">
-                                        El Omni-Scanner analizará la estructura (Lista o Cuadrícula) de forma automática.
+                                        Sube tu archivo (incluso si está desordenado). El Escáner Profundo encontrará fechas, horarios y nombres de forma automática.
                                     </p>
                                     <input type="file" id="excelUpload" accept=".csv, .xlsx" className="hidden" onChange={handleExcelUpload} />
                                     <button onClick={() => document.getElementById('excelUpload').click()} disabled={isUploading} className={`w-full font-bold py-3.5 rounded-lg text-sm shadow-[0_0_15px_rgba(79,70,229,0.3)] transition flex justify-center items-center gap-2 ${isUploading ? 'bg-indigo-800 text-indigo-300 cursor-not-allowed' : 'bg-indigo-600 hover:bg-indigo-500 text-white transform hover:scale-105'}`}>
-                                        {isUploading ? '⏳ Procesando Archivo...' : '📄 Subir Horario (.CSV / .XLSX)'}
+                                        {isUploading ? '⏳ Procesando Archivo...' : '📄 Subir Horario Zoho (.CSV / .XLSX)'}
                                     </button>
                                 </div>
 
@@ -693,7 +676,7 @@
                                 <div className="space-y-2 mb-6 max-h-48 overflow-y-auto pr-1">
                                     {todayShiftsUI.length === 0 ? (
                                         <div className="text-center py-6 bg-[#0f172a] rounded-xl border border-slate-800 text-xs text-slate-500">
-                                            No hay turnos para hoy.
+                                            No hay turnos registrados para hoy. Sube el archivo del mes.
                                         </div>
                                     ) : (
                                         todayShiftsUI.map((op, i) => (
