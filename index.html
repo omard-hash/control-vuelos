@@ -24,8 +24,7 @@
         import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // Obteniendo variables globales de entorno para sincronización compartida
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'dispatcher-pro-default';
+        // Configuración Firebase (Compatible con Canvas y externa)
         const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {
             apiKey: "AIzaSyDXjwv133-dIKyprCktTUkjx_adAz1DhAY",
             authDomain: "control-vuelos.firebaseapp.com",
@@ -34,43 +33,35 @@
             messagingSenderId: "756032981781",
             appId: "1:756032981781:web:451641e72abe3692c0771c"
         };
-
+        
         const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
         const db = getFirestore(app);
+        const auth = getAuth(app);
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-dispatcher';
 
-        // Exponer funciones globales para ser usadas por React/Babel
-        window.db = db;
-        window.auth = auth;
+        // Exponemos las funciones para que React/Babel pueda usarlas
+        window.FB_Db = db;
+        window.FB_Auth = auth;
+        window.FB_AppId = appId;
         window.FB_doc = doc;
         window.FB_setDoc = setDoc;
         window.FB_onSnapshot = onSnapshot;
-        window.FB_appId = appId;
-
-        // Regla 3: Autenticación antes de cualquier consulta a base de datos
-        async function initApp() {
-            const token = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
-            try {
-                if (token) {
-                    await signInWithCustomToken(auth, token);
-                } else {
-                    await signInAnonymously(auth);
-                }
-                console.log("Autenticación completada. Iniciando app...");
-                // Iniciar React solo cuando Firebase esté listo y autenticado
-                window.renderApp();
-            } catch (e) {
-                console.error("Error en autenticación:", e);
-                // Intentar renderizar de todas formas por si es modo offline
-                window.renderApp();
-            }
-        }
-
-        initApp();
+        window.FB_signInAnonymously = signInAnonymously;
+        window.FB_signInWithCustomToken = signInWithCustomToken;
+        window.FB_initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
     </script>
 
     <script type="text/babel">
         const { useState, useEffect, useRef } = React;
+
+        // Función para obtener la referencia del documento compartido según el entorno
+        const getSharedDocRef = () => {
+            if (typeof __app_id !== 'undefined') {
+                return window.FB_doc(window.FB_Db, 'artifacts', window.FB_AppId, 'public', 'data', 'operaciones', 'turno_actual');
+            } else {
+                return window.FB_doc(window.FB_Db, 'operaciones', 'turno_actual');
+            }
+        };
 
         function App() {
             const [currentTime, setCurrentTime] = useState(new Date());
@@ -90,55 +81,60 @@
             const [audioUnlocked, setAudioUnlocked] = useState(false);
             const audioUnlockedRef = useRef(false);
             
-            // Referencias para el temporizador
+            // Referencias para el temporizador y Firebase
             const flightsRef = useRef([]);
             const isRainingRef = useRef(false);
             const loggedFlightsCountRef = useRef(0);
-
-            // Helper para la referencia del documento compartido (multi-sitio en tiempo real)
-            const getSharedDocRef = () => {
-                // Utilizando los paths estrictos y públicos compartidos
-                return window.FB_doc(window.db, 'artifacts', window.FB_appId, 'public', 'data', 'operaciones', 'turno_actual');
-            };
+            const authReady = useRef(false);
 
             useEffect(() => {
-                if (!window.auth.currentUser) return; // Asegurar que hay usuario autenticado
+                let unsubscribe = () => {};
 
-                const docRef = getSharedDocRef();
-                
-                // onSnapshot mantiene sincronizados todos los sitios conectados en tiempo real
-                const unsubscribe = window.FB_onSnapshot(docRef, (docSnap) => {
-                    if (docSnap.exists()) {
-                        const data = docSnap.data();
+                const initFirebase = async () => {
+                    try {
+                        // REGLA 3: Autenticación obligatoria antes de consultar
+                        if (window.FB_initialAuthToken) {
+                            await window.FB_signInWithCustomToken(window.FB_Auth, window.FB_initialAuthToken);
+                        } else {
+                            await window.FB_signInAnonymously(window.FB_Auth);
+                        }
                         
-                        if (data.flights) {
-                            setFlights(data.flights);
-                            flightsRef.current = data.flights; 
-                        } else {
-                            setFlights([]);
-                            flightsRef.current = [];
-                        }
-
-                        if (data.loggedFlightsCount !== undefined) {
-                            setLoggedFlightsCount(data.loggedFlightsCount);
-                            loggedFlightsCountRef.current = data.loggedFlightsCount;
-                        } else {
-                            setLoggedFlightsCount(0);
-                            loggedFlightsCountRef.current = 0;
-                        }
-
-                        if (data.isRaining !== undefined) {
-                            setIsRaining(data.isRaining);
-                            isRainingRef.current = data.isRaining;
-                        }
-
-                        if (data.windDataMap) {
-                            setWindDataMap(data.windDataMap);
-                        }
+                        authReady.current = true;
+                        
+                        unsubscribe = window.FB_onSnapshot(getSharedDocRef(), (docSnap) => {
+                            if (docSnap.exists()) {
+                                const data = docSnap.data();
+                                if (data.flights) {
+                                    setFlights(data.flights);
+                                    flightsRef.current = data.flights;
+                                } else {
+                                    setFlights([]);
+                                    flightsRef.current = [];
+                                }
+                                
+                                if (data.loggedFlightsCount !== undefined) {
+                                    setLoggedFlightsCount(data.loggedFlightsCount);
+                                    loggedFlightsCountRef.current = data.loggedFlightsCount;
+                                }
+                                
+                                if (data.isRaining !== undefined) {
+                                    setIsRaining(data.isRaining);
+                                    isRainingRef.current = data.isRaining;
+                                }
+                                
+                                if (data.windDataMap) setWindDataMap(data.windDataMap);
+                            }
+                        }, (err) => {
+                            console.error("Error sincronizando datos en tiempo real:", err);
+                        });
+                        
+                    } catch (error) {
+                        console.error("Error Auth Firebase:", error);
                     }
-                }, (err) => {
-                    console.error("Error leyendo datos en tiempo real:", err);
-                });
+                };
+
+                // Esperamos un momento para asegurar que las variables globales del módulo se cargaron
+                setTimeout(initFirebase, 500);
 
                 return () => unsubscribe();
             }, []);
@@ -183,24 +179,22 @@
                         setShiftName('Turno Nocturno');
                     }
                     
+                    // CORTE NOCTURNO: A LAS 12:00 AM EXACTAMENTE SE REINICIAN LOS DATOS
+                    if (h === 0 && m === 0 && s === 0 && authReady.current) {
+                        speak("Iniciando nuevo día de operaciones. Borrando bitácora de vuelos e inicializando contadores a cero.");
+                        window.FB_setDoc(getSharedDocRef(), {
+                            flights: [],
+                            loggedFlightsCount: 0,
+                            isRaining: false,
+                            windDataMap: {}
+                        }, { merge: false });
+                    }
+
                     if (s === 0) {
                         const timeStr = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
                         
-                        // ===== CORTE DE 12 AM (MEDIANOCHE) =====
-                        if (h === 0 && m === 0) {
-                            speak("Atención. Reiniciando acumulados diarios. Cambio de día en el sistema.");
-                            setModal({ isOpen: true, title: '🔄 CORTE DE MEDIANOCHE', message: 'Se ha reiniciado el acumulado de vuelos y el sistema está listo para el nuevo día.', type: 'error' });
-                            
-                            // Borra los vuelos en Firebase para todos los sitios conectados
-                            window.FB_setDoc(getSharedDocRef(), {
-                                loggedFlightsCount: 0,
-                                flights: [],
-                                isRaining: false,
-                                windDataMap: {}
-                            }, { merge: true });
-                        }
-                        // =======================================
-                        else if (h === 7 && m === 50) {
+                        // Alarmas Estáticas
+                        if (h === 7 && m === 50) {
                             speak("Atención comandante. Es hora de la junta operativa de las siete cincuenta.");
                             setModal({ isOpen: true, title: '⏰ JUNTA OPERATIVA', message: 'Reunión de las 7:50 AM.', type: 'error' });
                         }
@@ -274,14 +268,13 @@
                 
                 try {
                     const key = geminiKey.trim();
-                    // SE MANTIENE EL MODELO EXACTO DE LA V42 QUE SÍ FUNCIONA
                     const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${key}`;
                     
                     const payload = {
                         contents: [{
                             parts: [
-                                // REGLAS ESTRICTAS DE LA V42
-                                { text: "Analiza el clima. REGLA ESTRICTA 11:00am: Si solo dice 'UV' (ej. 'UV 10', 'Extremo UV 13') ES APTO PARA VOLAR, el viento es 0. Regla general: Si dice 'Apto para volar', viento es 0. Si dice 'Ráfagas fuertes' o vientos > 40, viento es 45. Devuelve JSON con 'hourlyData' teniendo 'time' (ej. '11:00am') y 'wind' numérico." },
+                                // REGLAS ESTRICTAS: La IA asume la probabilidad de lluvia como apta.
+                                { text: "Analiza el clima. REGLA ESTRICTA 11:00am: Si dice 'UV' ES APTO. Regla general: Si dice 'Apto para volar' o indica 'Lluvia' (ej. Lluvia 64%), considéralo APTO PARA VOLAR y el viento es 0 (el sistema organizará el vuelo asumiendo que podría no llover). Si dice 'Ráfagas fuertes' o vientos > 40, viento es 45. Devuelve JSON con 'hourlyData' teniendo 'time' (ej. '11:00am') y 'wind' numérico." },
                                 { inline_data: { mime_type: "image/jpeg", data: base64Image } }
                             ]
                         }]
@@ -304,7 +297,7 @@
                     const parsedData = JSON.parse(aiResponseText);
                     if (parsedData && parsedData.hourlyData) {
                          generateIntelligentSchedule(parsedData.hourlyData);
-                         speak("Itinerario calculado con base en vientos detectados.");
+                         speak("Itinerario calculado para lograr objetivo de trece vuelos.");
                     } else {
                          throw new Error("La IA devolvió un formato incorrecto.");
                     }
@@ -336,11 +329,9 @@
                      });
                 }
 
-                // Guardamos en estado local temporal y en la base de datos
                 setWindDataMap(windMap);
                 window.FB_setDoc(getSharedDocRef(), { windDataMap: windMap }, { merge: true });
 
-                // LÓGICA DE ALEATORIEDAD (+- 15 MIN)
                 const applyVariance = (timeStr, isForzoso = false) => {
                     if (isForzoso) return timeStr; 
                     let parts = timeStr.split(':');
@@ -353,68 +344,33 @@
                     return `${newH}:${newM}`;
                 };
 
-                let newSchedule = [];
-
-                // LÓGICA DE SUSPENSIÓN (4 o 5 vuelos)
-                const isSuspendedAt11 = windMap[11] >= 40;
-                const isSuspendedAt12 = windMap[12] >= 40 && !isSuspendedAt11;
-                const isSuspendedAt13 = windMap[13] >= 40 && !isSuspendedAt11 && !isSuspendedAt12;
-
-                if (isSuspendedAt11) {
-                    newSchedule.push(
-                        { time: applyVariance("06:15"), type: "DINÁMICO", wind: windMap[6] || 0, hour24: 6 },
-                        { time: applyVariance("07:20", true), type: "FORZOSO", wind: windMap[7] || 0, hour24: 7 },
-                        { time: applyVariance("08:30"), type: "DINÁMICO", wind: windMap[8] || 0, hour24: 8 },
-                        { time: applyVariance("09:45"), type: "DINÁMICO", wind: windMap[9] || 0, hour24: 9 }
-                    );
-                } else if (isSuspendedAt12) {
-                    newSchedule.push(
-                        { time: applyVariance("07:20", true), type: "FORZOSO", wind: windMap[7] || 0, hour24: 7 },
-                        { time: applyVariance("08:20"), type: "DINÁMICO", wind: windMap[8] || 0, hour24: 8 },
-                        { time: applyVariance("09:20"), type: "DINÁMICO", wind: windMap[9] || 0, hour24: 9 },
-                        { time: applyVariance("10:20"), type: "DINÁMICO", wind: windMap[10] || 0, hour24: 10 },
-                        { time: applyVariance("11:20"), type: "DINÁMICO", wind: windMap[11] || 0, hour24: 11 }
-                    );
-                } else if (isSuspendedAt13) {
-                    newSchedule.push(
-                        { time: applyVariance("07:20", true), type: "FORZOSO", wind: windMap[7] || 0, hour24: 7 },
-                        { time: applyVariance("08:35"), type: "DINÁMICO", wind: windMap[8] || 0, hour24: 8 },
-                        { time: applyVariance("09:50"), type: "DINÁMICO", wind: windMap[9] || 0, hour24: 9 },
-                        { time: applyVariance("11:00"), type: "DINÁMICO", wind: windMap[11] || 0, hour24: 11 },
-                        { time: applyVariance("12:15"), type: "DINÁMICO", wind: windMap[12] || 0, hour24: 12 }
-                    );
-                } else {
-                    newSchedule.push(
-                        { time: applyVariance("07:20", true), type: "FORZOSO", wind: windMap[7] || 0, hour24: 7 },
-                        { time: applyVariance("08:40"), type: "DINÁMICO", wind: windMap[8] || 0, hour24: 8 },
-                        { time: applyVariance("10:00"), type: "DINÁMICO", wind: windMap[10] || 0, hour24: 10 },
-                        { time: applyVariance("11:30"), type: "DINÁMICO", wind: windMap[11] || 0, hour24: 11 },
-                        { time: applyVariance("12:45"), type: "DINÁMICO", wind: windMap[12] || 0, hour24: 12 }
-                    );
-                }
-
-                newSchedule.push(
-                    { time: applyVariance("14:00", true), type: "FORZOSO", wind: windMap[14] || 0, hour24: 14 },
-                    { time: applyVariance("15:30"), type: "DINÁMICO", wind: windMap[15] || 0, hour24: 15 },
-                    { time: applyVariance("17:00", true), type: "FORZOSO", wind: windMap[17] || 0, hour24: 17 },
-                    { time: applyVariance("18:30"), type: "DINÁMICO", wind: windMap[18] || 0, hour24: 18 },
-                    { time: applyVariance("20:00"), type: "DINÁMICO", wind: windMap[20] || 0, hour24: 20 },
-                    { time: applyVariance("21:30", true), type: "FORZOSO", wind: windMap[21] || 0, hour24: 21 },
-                    { time: applyVariance("22:45"), type: "DINÁMICO", wind: windMap[22] || 0, hour24: 22 }
-                );
+                // META ESTRICTA: 13 vuelos acomodados en el día.
+                let baseTimes = [
+                    "07:20", "08:35", "09:50", "11:05", "12:20", "13:35", 
+                    "14:50", "16:05", "17:20", "18:35", "19:50", "21:05", "22:20"
+                ];
                 
-                // Mapeo final para asegurar suspensiones con los datos reales del clima
-                const finalSchedule = newSchedule.map(f => ({
-                    ...f, wind: windMap[f.hour24] >= 40 ? 45 : f.wind
-                }));
+                let newSchedule = baseTimes.map((timeStr, index) => {
+                    let isForzoso = (index === 0 || index === 8 || index === 11);
+                    let finalTime = applyVariance(timeStr, isForzoso);
+                    let hour24 = parseInt(finalTime.split(':')[0]);
+                    
+                    return {
+                        time: finalTime,
+                        type: isForzoso ? "FORZOSO" : "DINÁMICO",
+                        wind: windMap[hour24] >= 40 ? 45 : (windMap[hour24] || 0),
+                        hour24: hour24
+                    };
+                });
 
                 // Enviamos a la BD compartida
-                window.FB_setDoc(getSharedDocRef(), { flights: finalSchedule }, { merge: true });
+                window.FB_setDoc(getSharedDocRef(), { flights: newSchedule }, { merge: true });
             };
 
             const toggleRainProtocol = () => {
                 const newState = !isRaining;
-                // Enviamos estado de lluvia al servidor compartido
+                
+                // Actualizamos DB primero (por el realtime listener esto actualizará UI automáticamente)
                 window.FB_setDoc(getSharedDocRef(), { isRaining: newState }, { merge: true });
 
                 if (newState) {
@@ -435,7 +391,7 @@
                     return;
                 }
 
-                const endTime = 23 * 60 + 30; 
+                const endTime = 23 * 60 + 30; // Terminan operaciones a las 23:30
                 const currentTimeInMins = currentHour * 60 + currentMinute + 15;
                 const timeWindow = endTime - currentTimeInMins;
                 
@@ -457,13 +413,12 @@
                     newSchedule.push({
                         time: timeStr,
                         type: "REPROGRAMADO",
-                        wind: windAtHour,
+                        wind: windAtHour >= 40 ? 45 : windAtHour,
                         hour24: h
                     });
                     currentSlot += interval;
                 }
                 
-                // Sincronizar en la BD compartida
                 window.FB_setDoc(getSharedDocRef(), { flights: newSchedule }, { merge: true });
             };
 
@@ -472,10 +427,8 @@
                      setModal({ isOpen: true, title: 'Bloqueo por Lluvia', message: 'No puedes registrar despegues durante el protocolo de lluvia.', type: 'error' });
                      return;
                  }
-                 if (loggedFlightsCountRef.current < totalFlightsTarget) {
-                      const newCount = loggedFlightsCountRef.current + 1;
-                      
-                      // Actualizar en el servidor para que todos lo vean
+                 if (loggedFlightsCount < totalFlightsTarget) {
+                      const newCount = loggedFlightsCount + 1;
                       window.FB_setDoc(getSharedDocRef(), { loggedFlightsCount: newCount }, { merge: true });
                       speak(`Vuelo registrado. Total del día, ${newCount} de 13.`);
                  } else {
@@ -492,7 +445,7 @@
                                 <span className="bg-indigo-600 text-white px-2 py-0.5 rounded text-xs">DP</span>
                                 DISPATCHER PRO
                             </h1>
-                            <p className="text-[10px] font-bold text-indigo-400 mt-1 tracking-widest uppercase">V42 MASTER • 🟢 NUBE CONECTADA</p>
+                            <p className="text-[10px] font-bold text-indigo-400 mt-1 tracking-widest uppercase">V42 MASTER • 🟢 NUBE V11 ACTIVA</p>
                         </div>
                         <button 
                             onClick={(e) => { e.stopPropagation(); setSettingsOpen(true); }}
@@ -566,7 +519,7 @@
 
                     <div className={`glass-card p-5 rounded-2xl mb-6 relative ${isRaining ? 'opacity-50 pointer-events-none' : ''}`}>
                         {isRaining && <div className="absolute inset-0 rain-overlay rounded-2xl z-10 flex items-center justify-center text-center p-4">
-                            <span className="text-white font-bold text-lg">Esperando que mejore el clima para calcular itinerario extendido...</span>
+                            <span className="text-white font-bold text-lg">Esperando que mejore el clima para calcular itinerario de {totalFlightsTarget - loggedFlightsCount} vuelos faltantes...</span>
                         </div>}
 
                         <p className="text-[10px] font-bold tracking-widest text-slate-400 uppercase mb-3">🗓️ Plan Restante (Calculado)</p>
@@ -645,10 +598,8 @@
             );
         }
 
-        window.renderApp = () => {
-            const root = ReactDOM.createRoot(document.getElementById('root'));
-            root.render(<App />);
-        };
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
     </script>
 </body>
 </html>
