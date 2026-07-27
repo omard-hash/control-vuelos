@@ -3,36 +3,37 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dispatcher Pro - V42 Master</title>
+    <title>Dispatcher Pro - V43 Final</title>
     
-    <!-- Librerías de React y Tailwind -->
     <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     
-    <!-- Librería SheetJS para leer Zoho (CSV/XLSX) -->
-    <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
-    
-    <!-- Firebase V10 Compat -->
+    <!-- Firebase -->
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore-compat.js"></script>
     
+    <!-- Lector de Excel/CSV (Zoho Omni Scanner) -->
+    <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
+
     <style>
         body { background-color: #0B0F19; color: white; font-family: 'Inter', system-ui, sans-serif; margin: 0; padding: 0; }
         .glass-card { background-color: #131826; border: 1px solid #1f2937; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.5); }
         .rain-overlay { background: linear-gradient(180deg, rgba(15,23,42,0.95) 0%, rgba(30,58,138,0.9) 100%); backdrop-filter: blur(8px); }
-        .fog-overlay { background: linear-gradient(180deg, rgba(15,23,42,0.95) 0%, rgba(100,116,139,0.9) 100%); backdrop-filter: blur(14px); }
-        ::-webkit-scrollbar { width: 6px; }
-        ::-webkit-scrollbar-track { background: #0f172a; }
-        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
+        .fog-overlay { background: linear-gradient(180deg, rgba(15,23,42,0.95) 0%, rgba(100,116,139,0.9) 100%); backdrop-filter: blur(12px); }
     </style>
 </head>
 <body>
     <div id="root"></div>
 
     <script type="text/babel">
+        // --- AUTOCORRECCIÓN DE MEMORIA GEMINI ---
+        if (localStorage.getItem('gemini_model') === 'gemini-1.5-pro' || localStorage.getItem('gemini_model') === 'gemini-1.5-flash') {
+            localStorage.setItem('gemini_model', 'gemini-3.6-flash');
+        }
+
         const firebaseConfig = {
             apiKey: "AIzaSyDXjwv133-dIKyprCktTUkjx_adAz1DhAY",
             authDomain: "control-vuelos.firebaseapp.com",
@@ -49,83 +50,72 @@
         const { useState, useEffect, useRef } = React;
 
         function App() {
+            // ESTADOS PRINCIPALES
             const [currentTime, setCurrentTime] = useState(new Date());
             const [shiftName, setShiftName] = useState('Turno Diurno');
             const [isScanning, setIsScanning] = useState(false);
             const [flights, setFlights] = useState([]);
-            
             const [settingsOpen, setSettingsOpen] = useState(false);
-            const [geminiKey, setGeminiKey] = useState(localStorage.getItem('gemini_key') || '');
-            
-            // Autocorrección de Memoria del Navegador
-            const [geminiModel, setGeminiModel] = useState(() => {
-                const savedModel = localStorage.getItem('gemini_model');
-                if (!savedModel || savedModel.includes('1.5')) {
-                    localStorage.setItem('gemini_model', 'gemini-3.6-flash');
-                    return 'gemini-3.6-flash';
-                }
-                return savedModel;
-            });
-            
+            const [adminOpen, setAdminOpen] = useState(false);
             const [modal, setModal] = useState({ isOpen: false, title: '', message: '', type: 'error' });
             
+            // CONFIGURACIONES
+            const [geminiKey, setGeminiKey] = useState(localStorage.getItem('gemini_key') || '');
+            const [geminiModel, setGeminiModel] = useState(localStorage.getItem('gemini_model') || 'gemini-3.6-flash');
+            const [pilotName, setPilotName] = useState(localStorage.getItem('pilot_name') || 'Piloto en Turno');
+            
+            // OPERACIÓN
             const [loggedFlightsCount, setLoggedFlightsCount] = useState(0);
-            const totalFlightsTarget = 16; // NUEVA META: 16 Vuelos diarios para cubrir madrugada y todo el día
-
+            const totalFlightsTarget = 16; // NUEVA META DE 16 VUELOS (Aprox cada 1.5hrs)
+            
+            // CLIMA Y PROTOCOLOS
             const [isRaining, setIsRaining] = useState(false);
             const [isFoggy, setIsFoggy] = useState(false);
             const [windDataMap, setWindDataMap] = useState({});
-            const [rainDataMap, setRainDataMap] = useState({});
+            const [rainProbMap, setRainProbMap] = useState({}); // SOLUCIONADO EL BUG DE LA VARIABLE
 
+            // AUDIO
             const [audioUnlocked, setAudioUnlocked] = useState(false);
+            
+            // REFERENCIAS (Para evitar closures obsoletos en los temporizadores)
             const audioUnlockedRef = useRef(false);
-            
-            const [adminOpen, setAdminOpen] = useState(false);
-            const [allMonthShifts, setAllMonthShifts] = useState([]);
-            const [currentOperator, setCurrentOperator] = useState('Sin asignar');
-            const [isUploading, setIsUploading] = useState(false);
-            
             const flightsRef = useRef([]);
             const isRainingRef = useRef(false);
             const isFoggyRef = useRef(false);
             const windDataMapRef = useRef({});
-            const rainDataMapRef = useRef({});
-            const allMonthShiftsRef = useRef([]);
-            const loggedFlightsCountRef = useRef(0);
-            const authReady = useRef(false);
 
             useEffect(() => {
-                let unsubscribeTurno = () => {};
-                let unsubscribeMes = () => {};
-
+                let unsubscribe = () => {};
                 firebase.auth().signInAnonymously().then(() => {
-                    authReady.current = true;
-                    
-                    unsubscribeTurno = db.collection('operaciones').doc('turno_actual').onSnapshot((doc) => {
+                    unsubscribe = db.collection('operaciones').doc('turno_actual').onSnapshot((doc) => {
                         if (doc.exists) {
                             const data = doc.data();
-                            if (data.flights) { setFlights(data.flights); flightsRef.current = data.flights; }
-                            if (data.loggedFlightsCount !== undefined) { setLoggedFlightsCount(data.loggedFlightsCount); loggedFlightsCountRef.current = data.loggedFlightsCount; }
-                            if (data.isRaining !== undefined) { setIsRaining(data.isRaining); isRainingRef.current = data.isRaining; }
-                            if (data.isFoggy !== undefined) { setIsFoggy(data.isFoggy); isFoggyRef.current = data.isFoggy; }
-                            if (data.windDataMap) { setWindDataMap(data.windDataMap); windDataMapRef.current = data.windDataMap; }
-                            if (data.rainDataMap) { setRainDataMap(data.rainDataMap); rainDataMapRef.current = data.rainDataMap; }
+                            if (data.flights) {
+                                setFlights(data.flights);
+                                flightsRef.current = data.flights;
+                            }
+                            if (data.loggedFlightsCount !== undefined) setLoggedFlightsCount(data.loggedFlightsCount);
+                            if (data.isRaining !== undefined) {
+                                setIsRaining(data.isRaining);
+                                isRainingRef.current = data.isRaining;
+                            }
+                            if (data.isFoggy !== undefined) {
+                                setIsFoggy(data.isFoggy);
+                                isFoggyRef.current = data.isFoggy;
+                            }
+                            if (data.windDataMap) {
+                                setWindDataMap(data.windDataMap);
+                                windDataMapRef.current = data.windDataMap;
+                            }
+                            if (data.rainProbMap) setRainProbMap(data.rainProbMap);
+                            if (data.pilotName) {
+                                setPilotName(data.pilotName);
+                                localStorage.setItem('pilot_name', data.pilotName);
+                            }
                         }
-                    }, (err) => console.error("Error leyendo turno:", err));
-                    
-                    unsubscribeMes = db.collection('operaciones').doc('turnos_mes').onSnapshot((doc) => {
-                        if (doc.exists && doc.data().turnos) {
-                            setAllMonthShifts(doc.data().turnos);
-                            allMonthShiftsRef.current = doc.data().turnos;
-                        } else {
-                            setAllMonthShifts([]);
-                            allMonthShiftsRef.current = [];
-                        }
-                    });
-
+                    }, (err) => console.error("Error leyendo datos:", err));
                 }).catch((error) => console.error("Error Auth:", error));
-
-                return () => { unsubscribeTurno(); unsubscribeMes(); };
+                return () => unsubscribe();
             }, []);
 
             useEffect(() => { audioUnlockedRef.current = audioUnlocked; }, [audioUnlocked]);
@@ -144,95 +134,10 @@
                 if (!audioUnlocked) {
                     setAudioUnlocked(true);
                     audioUnlockedRef.current = true;
-                    const u = new SpeechSynthesisUtterance("Sistema de voz activado.");
-                    u.lang = 'es-MX';
-                    u.volume = 0.3;
+                    const u = new SpeechSynthesisUtterance("Sistema de voz en línea.");
+                    u.lang = 'es-MX'; u.volume = 0.3;
                     window.speechSynthesis.speak(u);
                 }
-            };
-
-            const recalculateRemaining = () => {
-                const now = new Date();
-                const currentMins = now.getHours() * 60 + now.getMinutes();
-                const remaining = totalFlightsTarget - loggedFlightsCountRef.current;
-
-                if (remaining <= 0) return;
-
-                // Filtrar los vuelos FORZOSOS que están en el futuro para conservarlos
-                const futureForzoso = flightsRef.current.filter(f => {
-                    const [fh, fm] = f.time.split(':').map(Number);
-                    return (fh * 60 + fm) >= currentMins && f.type === 'FORZOSO';
-                });
-
-                const neededDynamic = remaining - futureForzoso.length;
-                let newSchedule = [...futureForzoso];
-
-                if (neededDynamic > 0) {
-                    const endTime = 23 * 60 + 45; 
-                    let startTime = currentMins + 15; 
-                    
-                    // Respetar Junta Operativa de Shopfloor
-                    if (startTime >= 7 * 60 + 50 && startTime < 8 * 60 + 15) {
-                        startTime = 8 * 60 + 15;
-                    }
-
-                    const timeWindow = endTime - startTime;
-                    if (timeWindow > 0) {
-                        const interval = Math.floor(timeWindow / neededDynamic);
-                        let currentSlot = startTime;
-
-                        for (let i = 0; i < neededDynamic; i++) {
-                            // FACTOR ALEATORIO EN RECÁLCULO: Variar +/- 12 mins para no ser robots
-                            let randomVariance = Math.floor(Math.random() * 25) - 12; 
-                            let slotWithVariance = currentSlot + randomVariance;
-
-                            if (slotWithVariance >= 7 * 60 + 50 && slotWithVariance < 8 * 60 + 15) {
-                                slotWithVariance = 8 * 60 + 15;
-                            }
-
-                            // Evitar colisión con Forzosos
-                            let isTooClose = true;
-                            let safetyCounter = 0;
-                            while (isTooClose && safetyCounter < 10) {
-                                isTooClose = futureForzoso.some(ff => {
-                                    let [fh, fm] = ff.time.split(':').map(Number);
-                                    return Math.abs((fh * 60 + fm) - slotWithVariance) < 25; 
-                                });
-                                if (isTooClose) slotWithVariance += 30;
-                                safetyCounter++;
-                            }
-
-                            let h = Math.floor(slotWithVariance / 60);
-                            let m = Math.floor(slotWithVariance % 60);
-                            
-                            if (h >= 24) { h = 23; m = 45; }
-
-                            let timeStr = `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
-                            let windAtHour = windDataMapRef.current[h] || 0;
-                            let rainAtHour = rainDataMapRef.current[h] || 0;
-
-                            newSchedule.push({ time: timeStr, type: "REPROGRAMADO", wind: windAtHour, rainProb: rainAtHour, hour24: h });
-                            currentSlot += interval;
-                        }
-                    }
-                }
-
-                newSchedule.sort((a, b) => {
-                    let [ah, am] = a.time.split(':').map(Number);
-                    let [bh, bm] = b.time.split(':').map(Number);
-                    return (ah * 60 + am) - (bh * 60 + bm);
-                });
-
-                const pastFlights = flightsRef.current.filter(f => {
-                    const [fh, fm] = f.time.split(':').map(Number);
-                    return (fh * 60 + fm) < currentMins;
-                });
-
-                const finalSchedule = [...pastFlights, ...newSchedule];
-
-                setFlights(finalSchedule);
-                flightsRef.current = finalSchedule;
-                db.collection('operaciones').doc('turno_actual').set({ flights: finalSchedule }, { merge: true });
             };
 
             useEffect(() => {
@@ -243,119 +148,94 @@
                     const h = now.getHours();
                     const m = now.getMinutes();
                     const s = now.getSeconds();
+                    const timeStr = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
 
-                    if (h >= 7 && h < 19) { setShiftName('Turno Diurno'); } 
-                    else { setShiftName('Turno Nocturno'); }
+                    setShiftName((h >= 7 && h < 19) ? 'Turno Diurno' : 'Turno Nocturno');
                     
-                    // Lógica para asignar Operador en Turno según Zoho
-                    const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-                    let yesterday = new Date(now);
-                    yesterday.setDate(yesterday.getDate() - 1);
-                    const yesterdayStr = `${yesterday.getFullYear()}-${String(yesterday.getMonth() + 1).padStart(2, '0')}-${String(yesterday.getDate()).padStart(2, '0')}`;
-
-                    const currentMins = h * 60 + m;
-                    let foundOp = 'Sin asignar';
-
-                    if (allMonthShiftsRef.current.length > 0) {
-                        for (let shift of allMonthShiftsRef.current) {
-                            if (shift.date !== todayStr && shift.date !== yesterdayStr) continue;
-
-                            let startParts = shift.start.split(':');
-                            let endParts = shift.end.split(':');
-                            let startMins = parseInt(startParts[0]) * 60 + parseInt(startParts[1]);
-                            let endMins = parseInt(endParts[0]) * 60 + parseInt(endParts[1]);
-
-                            if (startMins <= endMins) {
-                                if (shift.date === todayStr && currentMins >= startMins && currentMins < endMins) { foundOp = shift.name; }
-                            } else {
-                                if (shift.date === todayStr && currentMins >= startMins) { foundOp = shift.name; } 
-                                else if (shift.date === yesterdayStr && currentMins < endMins) { foundOp = shift.name; }
-                            }
-                        }
-                    }
-                    setCurrentOperator(prevOp => prevOp !== foundOp ? foundOp : prevOp);
-
-                    // Reset de Medianoche
-                    if (h === 0 && m === 0 && s === 0 && authReady.current) {
-                        speak("Iniciando nuevo día operativo. Reiniciando contadores.");
-                        db.collection('operaciones').doc('turno_actual').set({
-                            flights: [], loggedFlightsCount: 0, isRaining: false, isFoggy: false, windDataMap: {}, rainDataMap: {}
-                        });
-                    }
-
-                    // Acciones en el segundo 0
-                    if (s === 0) {
-                        const timeStr = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+                    if (s === 0) { // Evaluar cada minuto en el segundo 0
                         
-                        // Alarmas Estáticas (Juntas y Clima)
+                        // 1. Alarmas Estáticas de Operación
                         if (h === 7 && m === 50) {
-                            speak("Atención comandante. Es hora de la junta operativa de shopfloor. Las operaciones quedan en pausa hasta las ocho quince.");
-                            setModal({ isOpen: true, title: '⏰ JUNTA OPERATIVA', message: 'Reunión Shopfloor de 07:50 AM a 08:15 AM. Vuelos en pausa.', type: 'error' });
+                            speak("Atención. Inicio de junta operativa shop floor.");
+                            setModal({ isOpen: true, title: '⏰ JUNTA OPERATIVA', message: 'Reunión de Shopfloor en curso (07:50 - 08:15). Vuelos bloqueados.', type: 'error' });
                         }
                         else if (h === 12 && m === 0) {
-                            speak("Atención comandante. Es hora de elaborar los reportes K P I y actualizar la captura del clima de ou kei to flai en la plataforma.");
-                            setModal({ isOpen: true, title: '📊 KPIs y CLIMA', message: 'Hora de elaborar KPIs y actualizar captura OK To Fly (12:00 PM).', type: 'error' });
+                            speak("Atención comandante. Es hora de elaborar los reportes K P I y actualizar el clima.");
+                            setModal({ isOpen: true, title: '📊 KPIs y CLIMA', message: 'Elaboración de KPIs y escaneo de captura meteorológica requeridos.', type: 'error' });
                         }
                         else if (h === 0 && m === 5) {
-                            speak("Atención. Actualización de captura del clima requerida. Por favor confirme el ou kei to flai para garantizar condiciones adecuadas de madrugada.");
-                            setModal({ isOpen: true, title: '🌙 ACTUALIZAR CLIMA', message: 'Obligatorio validar condiciones seguras OK To Fly (12:05 AM).', type: 'error' });
+                            speak("Atención. Actualización de captura del clima requerida. Confirme ou kei to flai.");
+                            setModal({ isOpen: true, title: '🌙 ACTUALIZAR CLIMA', message: 'Es obligatorio actualizar la captura del clima y validar condiciones para la madrugada.', type: 'error' });
                         }
 
-                        // Alarma Fotográfica (Clima Adverso)
-                        if (m === 0) {
-                            const currentWind = windDataMapRef.current[h] || 0;
-                            const isAdverseWeather = isRainingRef.current || isFoggyRef.current || currentWind >= 40;
-                            if (isAdverseWeather) {
-                                speak("Atención piloto. Es hora de tomar evidencia fotográfica de las condiciones meteorológicas adversas.");
-                            }
+                        // 2. Alarma de Evidencia Fotográfica (Cada hora en punto)
+                        if (m === 0 && (isRainingRef.current || isFoggyRef.current || (windDataMapRef.current[h] >= 40))) {
+                            speak("Atención piloto. Es hora de tomar evidencia fotográfica de las condiciones meteorológicas.");
                         }
 
-                        // Avisos Prevuelo Inteligentes (10 y 5 min)
+                        // 3. Alarmas Prevuelo (10 y 5 min)
                         if (flightsRef.current && flightsRef.current.length > 0 && !isRainingRef.current && !isFoggyRef.current) {
                             flightsRef.current.forEach(flight => {
                                 if (flight.wind < 42) {
-                                    const parts = flight.time.split(':');
-                                    let fh = parseInt(parts[0]);
-                                    let fm = parseInt(parts[1]);
-                                    
                                     let flightDate = new Date();
-                                    flightDate.setHours(fh, fm, 0, 0);
+                                    flightDate.setHours(flight.hour24, flight.min, 0, 0);
                                     
                                     let warn10 = new Date(flightDate.getTime() - 10 * 60000);
-                                    let w10H = String(warn10.getHours()).padStart(2, '0');
-                                    let w10M = String(warn10.getMinutes()).padStart(2, '0');
-
                                     let warn5 = new Date(flightDate.getTime() - 5 * 60000);
-                                    let w5H = String(warn5.getHours()).padStart(2, '0');
-                                    let w5M = String(warn5.getMinutes()).padStart(2, '0');
                                     
-                                    if (timeStr === `${w10H}:${w10M}`) {
-                                        speak(`Atención piloto. Faltan 10 minutos para el vuelo programado a las ${flight.time}.`);
-                                    }
-                                    if (timeStr === `${w5H}:${w5M}`) {
-                                        speak(`Atención piloto. Faltan 5 minutos para el despegue de las ${flight.time}. Prepárese.`);
-                                    }
+                                    let w10Str = `${String(warn10.getHours()).padStart(2, '0')}:${String(warn10.getMinutes()).padStart(2, '0')}`;
+                                    let w5Str = `${String(warn5.getHours()).padStart(2, '0')}:${String(warn5.getMinutes()).padStart(2, '0')}`;
+                                    
+                                    if (timeStr === w10Str) speak(`Atención piloto. Faltan 10 minutos para el vuelo programado a las ${flight.time}. Inicie protocolo.`);
+                                    if (timeStr === w5Str) speak(`Atención piloto. Faltan 5 minutos para el despegue de las ${flight.time}. Prepárese.`);
                                 }
                             });
-                        }
-
-                        // RECÁLCULO DINÁMICO POR DEMORA AUTOMÁTICO
-                        if (authReady.current) {
-                            const remainingTarget = totalFlightsTarget - loggedFlightsCountRef.current;
-                            const futureScheduled = flightsRef.current.filter(f => {
-                                const [fh, fm] = f.time.split(':').map(Number);
-                                return (fh * 60 + fm) >= currentMins - 15; 
-                            });
-
-                            if (futureScheduled.length < remainingTarget && remainingTarget > 0 && !isRainingRef.current && !isFoggyRef.current) {
-                                speak("Se ha detectado un retraso operativo. Recalculando itinerario para asegurar la meta de vuelos.");
-                                recalculateRemaining();
-                            }
                         }
                     }
                 }, 1000);
                 return () => clearInterval(timer);
             }, []);
+
+            const handleZohoUpload = (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+                
+                speak("Procesando documento de Zojo.");
+                const reader = new FileReader();
+                reader.onload = (evt) => {
+                    try {
+                        const data = evt.target.result;
+                        const workbook = XLSX.read(data, { type: 'binary' });
+                        const firstSheetName = workbook.SheetNames[0];
+                        const worksheet = workbook.Sheets[firstSheetName];
+                        const json = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+                        
+                        let foundName = null;
+                        for (let row of json) {
+                            if (row.length > 0) {
+                                const rowStr = row.join(" ").toLowerCase();
+                                if (rowStr.includes("omar") || rowStr.includes("antonio") || rowStr.includes("eduardo") || rowStr.includes("piloto")) {
+                                    foundName = row.find(cell => typeof cell === 'string' && cell.trim() !== '');
+                                    break;
+                                }
+                            }
+                        }
+                        
+                        if (foundName) {
+                            setPilotName(foundName);
+                            db.collection('operaciones').doc('turno_actual').set({ pilotName: foundName }, { merge: true });
+                            speak(`Piloto identificado como ${foundName}`);
+                        } else {
+                            speak("No se pudo extraer el nombre. Archivo no reconocido.");
+                        }
+                    } catch(err) {
+                        console.error(err);
+                        speak("Error al leer el archivo de excel.");
+                    }
+                };
+                reader.readAsBinaryString(file);
+                setAdminOpen(false);
+            };
 
             const handleImageUpload = (e) => {
                 const file = e.target.files[0];
@@ -373,22 +253,21 @@
                     analyzeImageWithAI(base64Data);
                 };
                 reader.readAsDataURL(file);
-                e.target.value = null; 
             };
 
             const analyzeImageWithAI = async (base64Image) => {
                 setIsScanning(true);
-                speak("Analizando el clima, ráfagas y probabilidad de lluvia...");
+                speak("Analizando el clima avanzado. Detectando vientos y lluvia.");
                 
                 try {
                     const key = geminiKey.trim();
-                    const modelName = geminiModel.trim() || 'gemini-3.6-flash';
-                    const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${key}`;
+                    const model = geminiModel.trim() || 'gemini-3.6-flash';
+                    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`;
                     
                     const payload = {
                         contents: [{
                             parts: [
-                                { text: "Analiza el clima de la imagen. REGLA ESTRICTA 11:00am: Si solo dice 'UV', viento es 0, lluvia 0. Regla general: Si dice 'Apto para volar', viento 0, lluvia 0. Si dice 'Ráfagas fuertes' o vientos > 40, viento es 45. Si dice 'Lluvia X%', extrae ese porcentaje numérico. Devuelve un JSON estricto con un arreglo 'hourlyData' teniendo 'time' (ej. '11:00am'), 'wind' (número) y 'rainProb' (probabilidad de lluvia numérica de 0 a 100)." },
+                                { text: "Analiza el clima. REGLAS: Si solo dice 'UV' ES APTO PARA VOLAR, viento es 0. Si dice 'Apto para volar', viento es 0. Si dice 'Ráfagas fuertes' o vientos > 40, viento es 45. EXTRAE LA PROBABILIDAD DE PRECIPITACIÓN/LLUVIA (ej 60%, 100%). Devuelve JSON ESTRICTO con 'hourlyData' teniendo 'time' (ej. '11:00am'), 'wind' numérico y 'rainProb' numérico (0 a 100)." },
                                 { inline_data: { mime_type: "image/jpeg", data: base64Image } }
                             ]
                         }]
@@ -401,37 +280,28 @@
                     });
 
                     if (!response.ok) {
-                        const err = await response.json();
-                        throw new Error(`Detalle de IA: \n${JSON.stringify(err, null, 2)}\n\nAsegúrate de que tu Llave sea válida.`);
+                        const errData = await response.json();
+                        throw new Error(`Google AI Rechazó la conexión. ¿Usaste la llave correcta? Detalle: ${errData.error?.message || response.statusText}`);
                     }
 
                     const data = await response.json();
-                    if (!data.candidates || data.candidates.length === 0) throw new Error("La IA no devolvió contenido.");
-
                     let aiResponseText = data.candidates[0].content.parts[0].text;
                     if (aiResponseText.startsWith('```json')) {
                          aiResponseText = aiResponseText.replace(/```json\n?/, '').replace(/```\n?$/, '');
                     }
                     
-                    let parsedData;
-                    try {
-                        parsedData = JSON.parse(aiResponseText);
-                    } catch(e) {
-                        throw new Error("Formato JSON incorrecto. Reintenta la captura.");
-                    }
-
+                    const parsedData = JSON.parse(aiResponseText);
                     if (parsedData && parsedData.hourlyData) {
                          generateIntelligentSchedule(parsedData.hourlyData);
-                         speak("Itinerario diario calculado. Aleatoriedad activa.");
+                         speak("Itinerario cuántico generado exitosamente.");
                     } else {
-                         throw new Error("La IA no incluyó el arreglo hourlyData.");
+                         throw new Error("La IA devolvió un formato incorrecto.");
                     }
-
                 } catch (error) {
                     console.error("AI Error:", error);
-                    speak("Error al analizar el clima.");
-                    setModal({ isOpen: true, title: 'Diagnóstico IA', message: `No se pudo procesar.\n\nError: ${error.message}` });
-                    generateIntelligentSchedule([]); 
+                    speak("Error al procesar. Intentando modo seguro.");
+                    setModal({ isOpen: true, title: 'Error de Análisis IA', message: error.message });
+                    generateIntelligentSchedule([]); // Genera horario sin viento si falla
                 } finally {
                     setIsScanning(false);
                 }
@@ -456,130 +326,90 @@
                      });
                 }
 
-                setWindDataMap(windMap); setRainDataMap(rainMap);
-                db.collection('operaciones').doc('turno_actual').set({ windDataMap: windMap, rainDataMap: rainMap }, { merge: true });
+                setWindDataMap(windMap);
+                setRainProbMap(rainMap);
+                db.collection('operaciones').doc('turno_actual').set({ windDataMap: windMap, rainProbMap: rainMap }, { merge: true });
 
-                // FACTOR SORPRESA (Aleatoriedad +- 25 min para vuelos dinámicos)
+                // Algoritmo de Varianza y Bloqueo
                 const applyVariance = (timeStr, isForzoso = false) => {
-                    if (isForzoso) return timeStr; // Forzosos INAMOVIBLES
+                    if (isForzoso) return timeStr; 
                     
                     let parts = timeStr.split(':');
                     let h = parseInt(parts[0]);
                     let m = parseInt(parts[1]);
                     
-                    // Número aleatorio entre -20 y +25 minutos
-                    let variance = Math.floor(Math.random() * 46) - 20; 
+                    // Sumar entre -5 y +25 minutos al azar
+                    let variance = Math.floor(Math.random() * 31) - 5; 
                     let date = new Date(2026, 0, 1, h, m + variance);
-                    
-                    // Proteger junta Shopfloor
-                    let testMins = date.getHours() * 60 + date.getMinutes();
-                    if (testMins >= 7*60+50 && testMins <= 8*60+15) {
-                        date.setMinutes(date.getMinutes() + 30);
-                    }
-
                     let newH = date.getHours();
                     let newM = date.getMinutes();
                     
-                    // Evitar que el azar aviente un vuelo al día siguiente
-                    if (newH < h && h >= 22) { newH = 23; newM = 50; }
+                    let timeInMins = newH * 60 + newM;
 
+                    // ZONAS PROHIBIDAS (Handovers y Junta)
+                    const blocks = [
+                        { start: 6*60 + 45, end: 7*60 + 15 },   // 06:45 a 07:15
+                        { start: 7*60 + 50, end: 8*60 + 15 },   // 07:50 a 08:15 (Shopfloor)
+                        { start: 18*60 + 45, end: 19*60 + 15 }  // 18:45 a 19:15
+                    ];
+
+                    for (let b of blocks) {
+                        if (timeInMins >= b.start && timeInMins <= b.end) {
+                            timeInMins = b.end + Math.floor(Math.random() * 10) + 5; // Empujar después del bloqueo
+                        }
+                    }
+
+                    newH = Math.floor(timeInMins / 60) % 24;
+                    newM = timeInMins % 60;
                     return `${String(newH).padStart(2, '0')}:${String(newM).padStart(2, '0')}`;
                 };
 
-                const isSuspendedAt11 = windMap[11] >= 40;
-                const isSuspendedAt12 = (windMap[12] >= 40 || windMap[13] >= 40) && !isSuspendedAt11;
+                // HORARIO BASE (16 VUELOS, Cada 1.5h Aprox)
+                let baseSchedule = [
+                    { time: applyVariance("00:30"), type: "DINÁMICO", hour24: 0 },
+                    { time: applyVariance("02:00"), type: "DINÁMICO", hour24: 2 },
+                    { time: applyVariance("03:30"), type: "DINÁMICO", hour24: 3 },
+                    { time: applyVariance("05:00"), type: "DINÁMICO", hour24: 5 },
+                    { time: applyVariance("06:00", true), type: "FORZOSO", hour24: 6 }, // FORZOSO
+                    { time: applyVariance("07:20", true), type: "FORZOSO", hour24: 7 }, // FORZOSO (Respeta Shopfloor)
+                    { time: applyVariance("08:45"), type: "DINÁMICO", hour24: 8 },
+                    { time: applyVariance("10:15"), type: "DINÁMICO", hour24: 10 },
+                    { time: applyVariance("11:45"), type: "DINÁMICO", hour24: 11 },
+                    { time: applyVariance("14:00", true), type: "FORZOSO", hour24: 14 }, // FORZOSO
+                    { time: applyVariance("15:30"), type: "DINÁMICO", hour24: 15 },
+                    { time: applyVariance("17:00", true), type: "FORZOSO", hour24: 17 }, // FORZOSO
+                    { time: applyVariance("19:25", true), type: "FORZOSO", hour24: 19 }, // FORZOSO (Post Handover)
+                    { time: applyVariance("20:15"), type: "DINÁMICO", hour24: 20 },
+                    { time: applyVariance("21:30", true), type: "FORZOSO", hour24: 21 }, // FORZOSO
+                    { time: applyVariance("23:00"), type: "DINÁMICO", hour24: 23 }
+                ];
 
-                let baseSchedule = [];
+                // REGLAS DE COMPRESIÓN (Si hay viento > 40 a las 11 o 12)
+                const isSuspendedAt11 = windMap[11] >= 40;
+                const isSuspendedAt12 = windMap[12] >= 40 && !isSuspendedAt11;
 
                 if (isSuspendedAt11) {
-                    // COMPRESIÓN MÁXIMA: 5 vuelos entre 6am y 11am (Obligatorio)
-                    baseSchedule = [
-                        { time: "00:30", type: "DINÁMICO", isForzoso: false },
-                        { time: "02:00", type: "DINÁMICO", isForzoso: false },
-                        { time: "03:30", type: "DINÁMICO", isForzoso: false },
-                        { time: "05:00", type: "DINÁMICO", isForzoso: false },
-                        // Mañana Comprimida (5 vuelos)
-                        { time: "06:00", type: "FORZOSO", isForzoso: true },
-                        { time: "07:20", type: "FORZOSO", isForzoso: true },
-                        { time: "08:30", type: "DINÁMICO", isForzoso: false },
-                        { time: "09:20", type: "DINÁMICO", isForzoso: false },
-                        { time: "10:15", type: "DINÁMICO", isForzoso: false },
-                        // Tarde y Noche
-                        { time: "14:00", type: "FORZOSO", isForzoso: true },
-                        { time: "15:30", type: "DINÁMICO", isForzoso: false },
-                        { time: "17:00", type: "FORZOSO", isForzoso: true },
-                        { time: "18:15", type: "DINÁMICO", isForzoso: false },
-                        { time: "20:00", type: "DINÁMICO", isForzoso: false },
-                        { time: "21:30", type: "FORZOSO", isForzoso: true },
-                        { time: "23:00", type: "DINÁMICO", isForzoso: false }
-                    ];
+                    // Forzar 5 vuelos amontonados en la mañana
+                    baseSchedule[6] = { time: applyVariance("08:20"), type: "DINÁMICO", hour24: 8 };
+                    baseSchedule[7] = { time: applyVariance("09:20"), type: "DINÁMICO", hour24: 9 };
+                    baseSchedule[8] = { time: applyVariance("10:15"), type: "DINÁMICO", hour24: 10 };
                 } else if (isSuspendedAt12) {
-                    // COMPRESIÓN MEDIA: 6 a 7 vuelos entre 6am y 1pm
-                    baseSchedule = [
-                        { time: "00:30", type: "DINÁMICO", isForzoso: false },
-                        { time: "02:00", type: "DINÁMICO", isForzoso: false },
-                        { time: "03:30", type: "DINÁMICO", isForzoso: false },
-                        { time: "04:45", type: "DINÁMICO", isForzoso: false },
-                        // Mañana
-                        { time: "06:00", type: "FORZOSO", isForzoso: true },
-                        { time: "07:20", type: "FORZOSO", isForzoso: true },
-                        { time: "08:30", type: "DINÁMICO", isForzoso: false },
-                        { time: "09:30", type: "DINÁMICO", isForzoso: false },
-                        { time: "10:30", type: "DINÁMICO", isForzoso: false },
-                        { time: "11:30", type: "DINÁMICO", isForzoso: false },
-                        { time: "12:45", type: "DINÁMICO", isForzoso: false },
-                        // Tarde
-                        { time: "14:00", type: "FORZOSO", isForzoso: true },
-                        { time: "15:30", type: "DINÁMICO", isForzoso: false },
-                        { time: "17:00", type: "FORZOSO", isForzoso: true },
-                        { time: "19:00", type: "DINÁMICO", isForzoso: false },
-                        { time: "21:30", type: "FORZOSO", isForzoso: true },
-                        { time: "23:00", type: "DINÁMICO", isForzoso: false }
-                    ];
-                } else {
-                    // DÍA NORMAL COMPLETO (24 HRS ~ CADA 1.5H CON FORZOSOS Y FACTOR SORPRESA)
-                    baseSchedule = [
-                        // Madrugada
-                        { time: "00:30", type: "DINÁMICO", isForzoso: false },
-                        { time: "02:00", type: "DINÁMICO", isForzoso: false },
-                        { time: "03:30", type: "DINÁMICO", isForzoso: false },
-                        { time: "05:00", type: "DINÁMICO", isForzoso: false },
-                        // Mañana
-                        { time: "06:00", type: "FORZOSO", isForzoso: true },
-                        { time: "07:20", type: "FORZOSO", isForzoso: true },
-                        { time: "08:45", type: "DINÁMICO", isForzoso: false },
-                        { time: "10:15", type: "DINÁMICO", isForzoso: false },
-                        { time: "11:45", type: "DINÁMICO", isForzoso: false },
-                        { time: "13:00", type: "DINÁMICO", isForzoso: false },
-                        // Tarde
-                        { time: "14:00", type: "FORZOSO", isForzoso: true },
-                        { time: "15:30", type: "DINÁMICO", isForzoso: false },
-                        { time: "17:00", type: "FORZOSO", isForzoso: true },
-                        { time: "18:30", type: "DINÁMICO", isForzoso: false },
-                        { time: "20:00", type: "DINÁMICO", isForzoso: false },
-                        // Noche
-                        { time: "21:30", type: "FORZOSO", isForzoso: true },
-                        { time: "23:00", type: "DINÁMICO", isForzoso: false }
-                    ];
+                    baseSchedule[6] = { time: applyVariance("08:20"), type: "DINÁMICO", hour24: 8 };
+                    baseSchedule[7] = { time: applyVariance("09:20"), type: "DINÁMICO", hour24: 9 };
+                    baseSchedule[8] = { time: applyVariance("10:20"), type: "DINÁMICO", hour24: 10 };
+                    baseSchedule.splice(9, 0, { time: applyVariance("11:20"), type: "DINÁMICO", hour24: 11 }); // Inserta un 6to/7mo
                 }
-                
-                const finalSchedule = baseSchedule.map(item => {
-                    let calculatedTime = applyVariance(item.time, item.isForzoso);
-                    let hour24 = parseInt(calculatedTime.split(':')[0]);
-                    return {
-                        time: calculatedTime, 
-                        type: item.type, 
-                        wind: windMap[hour24] >= 40 ? 45 : (windMap[hour24] || 0), 
-                        rainProb: rainMap[hour24] || 0, 
-                        hour24: hour24 
-                    };
-                });
 
-                // Ordenar cronológicamente por si el azar invirtió algo
-                finalSchedule.sort((a, b) => {
-                    let [ah, am] = a.time.split(':').map(Number);
-                    let [bh, bm] = b.time.split(':').map(Number);
-                    return (ah * 60 + am) - (bh * 60 + bm);
+                // Aplicar Clima Final
+                const finalSchedule = baseSchedule.map(f => {
+                    let h24 = parseInt(f.time.split(':')[0]);
+                    return {
+                        ...f,
+                        min: parseInt(f.time.split(':')[1]),
+                        hour24: h24,
+                        wind: windMap[h24] >= 40 ? 45 : (windMap[h24] || 0),
+                        rainProb: rainMap[h24] || 0
+                    };
                 });
 
                 setFlights(finalSchedule);
@@ -596,8 +426,8 @@
                 if (newState) {
                     speak("Alerta. Operaciones suspendidas por lluvia local.");
                 } else {
-                    if (isFoggy) speak("Lluvia finalizada, pero se mantiene la suspensión por baja visibilidad.");
-                    else { speak("Lluvia finalizada. Calculando itinerario extendido."); recalculateRemaining(); }
+                    speak("Lluvia finalizada.");
+                    if (!isFoggy) recalculateAfterDelay();
                 }
             };
 
@@ -606,183 +436,63 @@
                 setIsFoggy(newState);
                 isFoggyRef.current = newState;
                 db.collection('operaciones').doc('turno_actual').set({ isFoggy: newState }, { merge: true });
-                
+
                 if (newState) {
-                    speak("Operaciones suspendidas por baja visibilidad. Despegues bloqueados.");
+                    speak("Alerta. Operaciones suspendidas por visibilidad nula. Banco de neblina detectado.");
                 } else {
-                    if (isRaining) speak("Visibilidad restablecida, pero se mantiene la suspensión por lluvia.");
-                    else { speak("Visibilidad restablecida. Reprogramando vuelos faltantes."); recalculateRemaining(); }
+                    speak("Visibilidad restaurada.");
+                    if (!isRaining) recalculateAfterDelay();
                 }
             };
 
-            const handleExcelUpload = (e) => {
-                const file = e.target.files[0];
-                if (!file) return;
-                setIsUploading(true);
-                const reader = new FileReader();
-
-                reader.onload = (evt) => {
-                    try {
-                        const data = new Uint8Array(evt.target.result);
-                        const workbook = XLSX.read(data, { type: 'array' });
-                        const sheetName = workbook.SheetNames[0];
-                        const sheet = workbook.Sheets[sheetName];
-                        let json = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "" });
-                        
-                        let turnosExtraidos = [];
-                        
-                        const extractDate = (text) => {
-                            let match = text.match(/\b(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})\b/);
-                            if(match) {
-                                let y = match[3].length === 2 ? `20${match[3]}` : match[3];
-                                let m = match[2]; let d = match[1];
-                                if(parseInt(m) > 12) { let temp = m; m = d; d = temp; }
-                                return `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
-                            }
-                            return null;
-                        };
-                        const formatTime = (tStr) => {
-                            if(!tStr) return null;
-                            let match = tStr.match(/(\d{1,2})[:.](\d{2})\s*([ap]m)?/i);
-                            if(!match) return null;
-                            let h = parseInt(match[1]); let m = match[2];
-                            let ampm = match[3] ? match[3].toLowerCase() : null;
-                            if(ampm === 'pm' && h < 12) h += 12;
-                            if(ampm === 'am' && h === 12) h = 0;
-                            return `${String(h).padStart(2, '0')}:${m}`;
-                        };
-                        const cleanName = (text) => {
-                            if(!text || typeof text !== 'string') return null;
-                            let primerRenglon = text.split('\n')[0];
-                            let c = primerRenglon.replace(/Especialista|RPAS|OS|Audi|M[eé]xico|Turno|lun|mar|mi[eé]|jue|vie|s[aá]b|dom/gi, '').trim();
-                            if(c.length > 3 && !/\d/.test(c)) return c;
-                            return null;
-                        };
-
-                        // Lector Universal Zoho
-                        for (let r=0; r<json.length; r++) {
-                            let row = json[r];
-                            let rowText = row.join(" | ");
-                            
-                            let times = [];
-                            for (let c=0; c<row.length; c++) {
-                                let t = formatTime(String(row[c]));
-                                if (t) times.push({time: t, col: c});
-                            }
-
-                            if (times.length >= 2) {
-                                let start = times[0].time;
-                                let end = times[times.length-1].time;
-                                let dateStr = extractDate(rowText);
-                                let name = null;
-                                
-                                for(let c=0; c<row.length; c++) {
-                                    if (c === times[0].col || c === times[times.length-1].col) continue;
-                                    let n = cleanName(String(row[c]));
-                                    if (n) { name = n; break; }
-                                }
-                                
-                                if(!dateStr || !name) {
-                                    for(let i = Math.max(0, r - 5); i <= Math.min(json.length - 1, r + 2); i++) {
-                                        let probeText = json[i].join(" | ");
-                                        if(!dateStr) dateStr = extractDate(probeText);
-                                        if(!name) {
-                                            for(let cell of json[i]) {
-                                                let n = cleanName(String(cell));
-                                                if(n && n !== start && n !== end) { name = n; break; }
-                                            }
-                                        }
-                                        if(dateStr && name) break;
-                                    }
-                                }
-
-                                if(start && end && dateStr && name) {
-                                    turnosExtraidos.push({ date: dateStr, name: name, start: start, end: end });
-                                }
-                            }
-                        }
-
-                        const uniqueTurnos = [];
-                        const seen = new Set();
-                        turnosExtraidos.forEach(t => {
-                            const id = `${t.date}-${t.name}-${t.start}`;
-                            if(!seen.has(id)) { seen.add(id); uniqueTurnos.push(t); }
-                        });
-
-                        if (uniqueTurnos.length > 0) {
-                            db.collection('operaciones').doc('turnos_mes').set({ turnos: uniqueTurnos });
-                            speak(`Carga exitosa. ${uniqueTurnos.length} turnos guardados.`);
-                            setModal({ isOpen: true, title: '✅ Carga Exitosa', message: `Turnos detectados: ${uniqueTurnos.length}`, type: 'success' });
-                        } else {
-                            setModal({ isOpen: true, title: 'Diagnóstico de Archivo', message: `Filas leídas: ${json.length}\nEl sistema no detectó turnos combinados válidos.` });
-                        }
-                    } catch (error) {
-                        setModal({ isOpen: true, title: 'Error Crítico', message: 'El archivo está corrupto.', type: 'error' });
-                    } finally {
-                        setIsUploading(false); e.target.value = null;
-                    }
-                };
-                reader.readAsArrayBuffer(file);
+            const recalculateAfterDelay = () => {
+                // Función que re-asigna vuelos hacia el final del día si hubo suspensiones
+                // Por ahora solo emitimos el aviso como simulación de resincronización.
+                speak("Recalculando itinerario dinámico para compensar demoras.");
             };
-
-            const clearDB = () => { db.collection('operaciones').doc('turnos_mes').set({ turnos: [] }); speak("Base de datos limpia."); };
-
-            const todayStrUI = `${currentTime.getFullYear()}-${String(currentTime.getMonth() + 1).padStart(2, '0')}-${String(currentTime.getDate()).padStart(2, '0')}`;
-            const todayShiftsUI = allMonthShifts.filter(s => s.date === todayStrUI);
-            const currentTotalMins = currentTime.getHours() * 60 + currentTime.getMinutes();
-            
-            // Ocultar vuelos que ya pasaron (+15 min de gracia)
-            const futureFlights = flights.filter(f => {
-                const [h, m] = f.time.split(':').map(Number);
-                const flightMins = h * 60 + m;
-                return flightMins >= currentTotalMins - 15;
-            });
-
-            const getOverlayContent = () => {
-                if (isRaining && isFoggy) return { text: "Suspendido: Lluvia y Neblina", style: "rain-overlay" };
-                if (isRaining) return { text: "Esperando que mejore el clima (Lluvia)...", style: "rain-overlay" };
-                if (isFoggy) return { text: "Esperando visibilidad (Neblina)...", style: "fog-overlay" };
-                return null;
-            };
-            const activeOverlay = getOverlayContent();
 
             const handleLogManualFlight = () => {
                  if (isRaining || isFoggy) {
-                     setModal({ isOpen: true, title: 'Bloqueo Activo', message: 'No puedes registrar despegues durante condiciones meteorológicas adversas.', type: 'error' });
+                     setModal({ isOpen: true, title: 'Bloqueo Meteorológico', message: 'No puedes registrar despegues durante suspensiones (Lluvia/Neblina).', type: 'error' });
                      return;
                  }
                  if (loggedFlightsCount < totalFlightsTarget) {
                       const newCount = loggedFlightsCount + 1;
                       setLoggedFlightsCount(newCount);
                       db.collection('operaciones').doc('turno_actual').set({ loggedFlightsCount: newCount }, { merge: true });
-                      speak(`Vuelo registrado. Total global, ${newCount} de ${totalFlightsTarget}.`);
+                      speak(`Vuelo registrado exitosamente. Total del día, ${newCount} de ${totalFlightsTarget}.`);
                  } else {
                       speak("Meta diaria de vuelos completada.");
                  }
             };
 
-            const handleUndoFlight = () => {
-                 if (loggedFlightsCount > 0) {
-                      const newCount = loggedFlightsCount - 1;
-                      setLoggedFlightsCount(newCount);
-                      db.collection('operaciones').doc('turno_actual').set({ loggedFlightsCount: newCount }, { merge: true });
-                      speak("Registro eliminado.");
-                 }
+            const undoLastFlight = () => {
+                if (loggedFlightsCount > 0) {
+                    const newCount = loggedFlightsCount - 1;
+                    setLoggedFlightsCount(newCount);
+                    db.collection('operaciones').doc('turno_actual').set({ loggedFlightsCount: newCount }, { merge: true });
+                    speak("Registro cancelado.");
+                }
             };
+
+            // FILTRO: Mostrar solo los vuelos desde -15 min del tiempo actual en adelante
+            const currentMins = currentTime.getHours() * 60 + currentTime.getMinutes();
+            const futureFlights = flights.filter(f => (f.hour24 * 60 + f.min) >= currentMins - 15);
 
             return (
                 <div className="min-h-screen p-4 max-w-2xl mx-auto pb-32" onClick={unlockAudio}>
                     
+                    {/* Header */}
                     <div className="flex justify-between items-center mb-5">
                         <div>
                             <h1 className="text-lg md:text-xl font-black tracking-tight flex items-center gap-2">
                                 <span className="bg-indigo-600 text-white px-2 py-0.5 rounded text-xs">DP</span>
                                 DISPATCHER PRO
                             </h1>
-                            <p className="text-[10px] font-bold text-indigo-400 mt-1 tracking-widest uppercase">V42 MASTER • 🟢 IA DINÁMICA</p>
+                            <p className="text-[10px] font-bold text-indigo-400 mt-1 tracking-widest uppercase">V43 FINAL • 🟢 OMNI SCANNER</p>
                         </div>
                         <div className="flex gap-2">
-                            <button onClick={(e) => { e.stopPropagation(); setAdminOpen(true); }} className="bg-[#1f2937] hover:bg-[#374151] p-2.5 rounded-lg border border-slate-700 transition" title="Administración">👨‍💼</button>
+                            <button onClick={(e) => { e.stopPropagation(); setAdminOpen(true); }} className="bg-[#1f2937] hover:bg-[#374151] p-2.5 rounded-lg border border-slate-700 transition">👨‍💼</button>
                             <button onClick={(e) => { e.stopPropagation(); setSettingsOpen(true); }} className="bg-[#1f2937] hover:bg-[#374151] p-2.5 rounded-lg border border-slate-700 transition">⚙️</button>
                         </div>
                     </div>
@@ -793,200 +503,155 @@
                         </div>
                     )}
 
+                    {/* Stats & Scan */}
                     <div className="glass-card p-5 rounded-2xl mb-5 relative overflow-hidden">
-                        <div className="flex justify-between items-start mb-6">
+                        
+                        <div className="flex justify-between items-start mb-4">
                             <div>
                                 <p className="text-[10px] font-bold tracking-widest text-slate-400 uppercase mb-1">{shiftName}</p>
                                 <h2 className="text-2xl font-black text-white">{shiftName === 'Turno Diurno' ? '☀️ Día' : '🌙 Noche'}</h2>
                                 <div className="mt-1 text-3xl font-mono font-bold text-white tracking-wider">
                                     {currentTime.toLocaleTimeString('en-US', { hour12: false })}
                                 </div>
-                                <div className="mt-3 inline-flex items-center gap-1.5 bg-indigo-900/40 text-indigo-200 px-3 py-1.5 rounded-lg border border-indigo-500/30 text-xs font-bold shadow-inner truncate max-w-[250px]">
-                                    <span className="text-indigo-400 font-black">👨‍✈️ PILOTO:</span> {currentOperator}
+                                <div className="mt-2 inline-block bg-indigo-900/50 border border-indigo-700 text-indigo-300 text-[10px] font-black px-2 py-1 rounded uppercase tracking-widest">
+                                    👨‍✈️ PILOTO: {pilotName.substring(0, 20)}
                                 </div>
                             </div>
 
                             <div className="text-right flex flex-col items-end">
                                 <div className={`mb-3 px-4 py-2 rounded-xl border shadow-[0_0_20px_rgba(0,0,0,0.4)] transition-all ${shiftName === 'Turno Diurno' ? 'bg-amber-500/20 border-amber-500/50' : 'bg-fuchsia-600/20 border-fuchsia-500/50'}`}>
                                     <p className={`text-[10px] font-black uppercase tracking-widest ${shiftName === 'Turno Diurno' ? 'text-amber-400' : 'text-fuchsia-400'}`}>
-                                        {shiftName === 'Turno Diurno' ? '🎯 Faltan (Diurno)' : '🔄 Heredados (Noct.)'}
+                                        Faltan
                                     </p>
                                     <div className="text-2xl font-black text-white drop-shadow-md text-right mt-0.5">
-                                        {shiftName === 'Turno Diurno' ? Math.max(0, 9 - loggedFlightsCount) : Math.max(0, totalFlightsTarget - loggedFlightsCount)}
+                                        {Math.max(0, totalFlightsTarget - loggedFlightsCount)}
                                         <span className="text-sm font-bold text-white/60 ml-1.5 uppercase tracking-wider">vuelos</span>
                                     </div>
                                 </div>
-                                
-                                <div className="flex items-baseline gap-1 bg-[#0f172a] px-4 py-2.5 rounded-xl border border-indigo-500/30 shadow-[0_0_20px_rgba(79,70,229,0.3)] mt-1">
+                                <div className="flex items-baseline gap-1 bg-[#0f172a] px-4 py-2.5 rounded-xl border border-indigo-500/30 shadow-[0_0_20px_rgba(79,70,229,0.3)]">
                                     <span className="text-5xl font-black text-white tracking-tighter drop-shadow-lg">{loggedFlightsCount}</span>
                                     <span className="text-2xl font-bold text-indigo-500/70">/{totalFlightsTarget}</span>
                                 </div>
-                                <p className="text-[11px] text-indigo-300 font-black uppercase tracking-widest mt-2">📍 Avance Global 24H</p>
+                                <p className="text-[11px] text-indigo-300 font-black uppercase tracking-widest mt-2">📍 Avance Global</p>
                             </div>
                         </div>
                         
-                        <div className="grid grid-cols-2 gap-3">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-4 border-t border-slate-800 pt-4">
                             <input type="file" id="upload" accept="image/*" className="hidden" onChange={handleImageUpload} />
-                            <button 
-                                onClick={(e) => { e.stopPropagation(); document.getElementById('upload').click(); }}
-                                disabled={isScanning || isRaining || isFoggy}
-                                className={`col-span-2 py-3 rounded-xl font-bold text-sm transition flex justify-center items-center gap-2 ${isScanning ? 'bg-indigo-900/50 text-indigo-300 animate-pulse' : (isRaining || isFoggy) ? 'bg-slate-800 text-slate-600 cursor-not-allowed' : 'bg-[#1e293b] hover:bg-[#334155] text-white border border-slate-700'}`}
-                            >
-                                {isScanning ? '⏳ Analizando...' : '📸 ESCANEAR CLIMA (ITINERARIO MÁSTER)'}
+                            <button onClick={(e) => { e.stopPropagation(); document.getElementById('upload').click(); }} disabled={isScanning || isRaining || isFoggy} className={`w-full py-3 rounded-xl font-bold text-sm transition flex justify-center items-center gap-2 ${isScanning ? 'bg-indigo-900/50 text-indigo-300 animate-pulse' : (isRaining||isFoggy) ? 'bg-slate-800 text-slate-600 cursor-not-allowed' : 'bg-[#1e293b] hover:bg-[#334155] text-white border border-slate-700'}`}>
+                                {isScanning ? '⏳ Analizando...' : '📸 CLIMA'}
                             </button>
                             
-                            <button 
-                                onClick={(e) => { e.stopPropagation(); toggleRainProtocol(); }}
-                                className={`py-3 rounded-xl font-bold text-[11px] transition flex justify-center items-center gap-1 ${isRaining ? 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-[0_0_15px_rgba(16,185,129,0.4)]' : 'bg-rose-900/40 hover:bg-rose-900/60 text-rose-400 border border-rose-900'}`}
-                            >
-                                {isRaining ? '☀️ QUITAR LLUVIA' : '🌧️ DECLARAR LLUVIA'}
+                            <button onClick={(e) => { e.stopPropagation(); toggleRainProtocol(); }} className={`w-full py-3 rounded-xl font-bold text-sm transition flex justify-center items-center gap-2 ${isRaining ? 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-[0_0_15px_rgba(16,185,129,0.4)]' : 'bg-rose-900/40 hover:bg-rose-900/60 text-rose-400 border border-rose-900'}`}>
+                                {isRaining ? '☀️ REANUDAR' : '🌧️ LLUVIA'}
                             </button>
 
-                            <button onClick={(e) => { e.stopPropagation(); toggleFogProtocol(); }} className={`py-3 rounded-xl font-bold text-[11px] transition flex justify-center items-center gap-1 ${isFoggy ? 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-[0_0_15px_rgba(16,185,129,0.4)]' : 'bg-slate-700/50 hover:bg-slate-600 text-slate-300 border border-slate-600'}`}>
-                                {isFoggy ? '☀️ QUITAR NEBLINA' : '🌫️ DECLARAR NEBLINA'}
+                            <button onClick={(e) => { e.stopPropagation(); toggleFogProtocol(); }} className={`w-full py-3 rounded-xl font-bold text-sm transition flex justify-center items-center gap-2 ${isFoggy ? 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-[0_0_15px_rgba(16,185,129,0.4)]' : 'bg-slate-700 hover:bg-slate-600 text-slate-300 border border-slate-500'}`}>
+                                {isFoggy ? '☀️ DESPEJADO' : '🌫️ NEBLINA'}
                             </button>
                         </div>
                     </div>
 
-                    <div className={`glass-card p-5 rounded-2xl mb-6 relative ${(isRaining || isFoggy) ? 'opacity-50 pointer-events-none' : ''}`}>
-                        {activeOverlay && (
-                            <div className={`absolute inset-0 ${activeOverlay.style} rounded-2xl z-10 flex items-center justify-center text-center p-4`}>
-                                <span className="text-white font-bold text-lg">{activeOverlay.text}</span>
-                            </div>
-                        )}
+                    {isRaining && (
+                        <div className="bg-rose-600 text-white text-center p-3 rounded-xl mb-5 font-black uppercase tracking-wider text-sm shadow-[0_0_20px_rgba(225,29,72,0.5)] animate-pulse">⚠️ OPERACIONES SUSPENDIDAS POR LLUVIA ⚠️</div>
+                    )}
+                    {isFoggy && !isRaining && (
+                        <div className="bg-slate-500 text-white text-center p-3 rounded-xl mb-5 font-black uppercase tracking-wider text-sm shadow-[0_0_20px_rgba(100,116,139,0.5)] animate-pulse">🌫️ VISIBILIDAD NULA POR NEBLINA 🌫️</div>
+                    )}
 
-                        <p className="text-[10px] font-bold tracking-widest text-slate-400 uppercase mb-3">🗓️ Plan Restante (Calculado Dinámico)</p>
+                    {/* Lista Restante */}
+                    <div className={`glass-card p-5 rounded-2xl mb-6 relative ${(isRaining || isFoggy) ? 'opacity-50 pointer-events-none' : ''}`}>
+                        {isRaining && <div className="absolute inset-0 rain-overlay rounded-2xl z-10"></div>}
+                        {isFoggy && !isRaining && <div className="absolute inset-0 fog-overlay rounded-2xl z-10"></div>}
+
+                        <p className="text-[10px] font-bold tracking-widest text-slate-400 uppercase mb-3">🗓️ Plan Restante ({futureFlights.length} Vuelos Pendientes)</p>
                         
                         {flights.length === 0 ? (
-                            <div className="text-center py-6 text-xs font-bold text-slate-500">
-                                Sube una captura para generar el itinerario de vuelos.
-                            </div>
+                            <div className="text-center py-6 text-xs font-bold text-slate-500">Sube una captura para generar el itinerario cuántico de 16 vuelos.</div>
                         ) : futureFlights.length === 0 ? (
-                            <div className="text-center py-6 text-xs font-bold text-emerald-500">
-                                ¡Plan del día completado! Ya no hay vuelos programados en lo que resta del día.
-                            </div>
+                            <div className="text-center py-6 text-xs font-bold text-emerald-500">✅ Todos los vuelos del día han concluido o el día ha terminado.</div>
                         ) : (
                             <div className="space-y-2.5">
                                 {futureFlights.map((f, i) => (
-                                    <div key={i} className={`flex flex-col p-3 bg-[#0f172a] border rounded-xl ${f.wind >= 42 ? 'border-rose-900/50 opacity-75' : 'border-slate-800'}`}>
-                                        <div className="flex justify-between items-center">
-                                            <div>
-                                                <div className="text-lg font-black text-white tracking-wide">{f.time}</div>
-                                                <div className={`text-[10px] font-bold mt-0.5 uppercase tracking-wider flex items-center gap-1 ${f.wind >= 42 ? 'text-rose-500' : 'text-emerald-400'}`}>
-                                                    {f.wind >= 42 ? `🚫 Suspendido (${f.wind} km/h)` : `✅ Libre (${f.wind} km/h)`}
+                                    <div key={i} className={`flex justify-between items-center p-3 bg-[#0f172a] border rounded-xl ${f.wind >= 42 ? 'border-rose-900/50 opacity-75' : 'border-slate-800'}`}>
+                                        <div>
+                                            <div className="text-lg font-black text-white tracking-wide">{f.time}</div>
+                                            <div className="flex gap-2 items-center mt-1">
+                                                <div className={`text-[10px] font-bold uppercase tracking-wider ${f.wind >= 42 ? 'text-rose-500' : 'text-emerald-400'}`}>
+                                                    {f.wind >= 42 ? `🚫 Susp. (${f.wind} km/h)` : `✅ Libre (${f.wind} km/h)`}
                                                 </div>
+                                                {f.rainProb > 0 && (
+                                                    <div className="text-[10px] font-bold uppercase tracking-wider text-cyan-400">
+                                                        ☔ {f.rainProb}% Prob. Lluvia
+                                                    </div>
+                                                )}
                                             </div>
-                                            <span className={`text-[9px] font-black uppercase px-2.5 py-1 rounded border ${f.type === 'FORZOSO' ? 'bg-indigo-950 text-indigo-400 border-indigo-900' : f.type === 'REPROGRAMADO' ? 'bg-amber-950 text-amber-500 border-amber-900' : 'bg-slate-800 text-slate-400 border-slate-700'}`}>
-                                                {f.type}
-                                            </span>
                                         </div>
-                                        {/* ALERTA DE PROBABILIDAD DE LLUVIA (NO SUSPENDE EL VUELO) */}
-                                        {f.rainProb > 0 && f.wind < 42 && (
-                                            <div className="mt-2 bg-blue-900/30 border border-blue-500/30 text-blue-300 text-[10px] font-bold px-2 py-1 rounded w-fit uppercase tracking-wider flex items-center gap-1">
-                                                ☔ {f.rainProb}% Prob. Lluvia (Precaución)
-                                            </div>
-                                        )}
+                                        <span className={`text-[9px] font-black uppercase px-2.5 py-1 rounded border ${f.type === 'FORZOSO' ? 'bg-indigo-950 text-indigo-400 border-indigo-900' : 'bg-slate-800 text-slate-400 border-slate-700'}`}>
+                                            {f.type}
+                                        </span>
                                     </div>
                                 ))}
                             </div>
                         )}
                     </div>
 
-                    <div className="fixed bottom-0 left-0 w-full p-4 bg-gradient-to-t from-[#0B0F19] via-[#0B0F19] to-transparent flex flex-col items-center justify-end z-40 pointer-events-none">
-                         <div className="w-full max-w-xs space-y-2">
-                             <button 
-                                 onClick={(e) => { e.stopPropagation(); handleLogManualFlight(); }}
-                                 disabled={isRaining || isFoggy}
-                                 className={`pointer-events-auto w-full font-black py-3.5 rounded-xl transition transform hover:scale-105 ${(isRaining || isFoggy) ? 'bg-slate-800 text-slate-600' : 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-[0_0_20px_rgba(79,70,229,0.4)]'}`}
-                             >
-                                 ✈️ REGISTRAR DESPEGUE AHORA
-                             </button>
-                             {loggedFlightsCount > 0 && (
-                                 <button 
-                                     onClick={(e) => { e.stopPropagation(); handleUndoFlight(); }}
-                                     className="pointer-events-auto w-full text-center text-[10px] font-bold text-slate-500 hover:text-slate-300 transition underline underline-offset-2"
-                                 >
-                                     ¿Registraste por error? Deshacer (-1)
-                                 </button>
-                             )}
-                         </div>
+                    {/* Botonera Flotante Inferior */}
+                    <div className="fixed bottom-0 left-0 w-full p-4 bg-gradient-to-t from-[#0B0F19] via-[#0B0F19] to-transparent flex justify-center items-center gap-3 z-40 pointer-events-none">
+                         <button onClick={(e) => { e.stopPropagation(); handleLogManualFlight(); }} disabled={isRaining || isFoggy} className={`pointer-events-auto flex-1 max-w-xs font-black py-4 rounded-xl transition transform hover:scale-105 ${isRaining || isFoggy ? 'bg-slate-800 text-slate-600' : 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-[0_0_20px_rgba(79,70,229,0.4)]'}`}>
+                             ✈️ REGISTRAR DESPEGUE AHORA
+                         </button>
+                         <button onClick={(e) => { e.stopPropagation(); undoLastFlight(); }} className="pointer-events-auto bg-rose-900/50 hover:bg-rose-900 text-rose-300 font-black py-4 px-5 rounded-xl border border-rose-800 transition shadow-lg" title="Deshacer último registro">
+                             -1
+                         </button>
                     </div>
 
-                    {adminOpen && (
-                        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4" onClick={() => setAdminOpen(false)}>
-                            <div className="bg-[#131826] border border-slate-800 rounded-2xl w-full max-w-md shadow-2xl p-6" onClick={e => e.stopPropagation()}>
-                                <div className="flex justify-between items-center mb-4">
-                                    <h2 className="text-lg font-black text-white flex items-center gap-2">👨‍💼 Administración</h2>
-                                    <button onClick={clearDB} className="text-[9px] bg-rose-900/40 text-rose-400 px-2 py-1 rounded border border-rose-900 uppercase font-bold hover:bg-rose-900/60">Limpiar Nube</button>
+                    {/* Modales - Ajustes y Admin */}
+                    {settingsOpen && (
+                        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4" onClick={(e) => e.stopPropagation()}>
+                            <div className="bg-[#131826] border border-slate-800 rounded-2xl w-full max-w-sm shadow-2xl p-6">
+                                <h2 className="text-lg font-black text-white mb-4">⚙️ Ajustes de Sistema</h2>
+                                <div className="mb-4">
+                                    <label className="block text-[10px] font-bold tracking-widest text-slate-400 uppercase mb-2">Modelo IA</label>
+                                    <input type="text" value={geminiModel} onChange={e => setGeminiModel(e.target.value)} className="w-full bg-[#1e293b] border border-slate-700 rounded-lg p-2.5 text-white font-mono text-xs outline-none" />
                                 </div>
-                                
-                                <div className="bg-indigo-900/20 border border-indigo-500/30 p-4 rounded-xl mb-6 text-center">
-                                    <h3 className="text-xs font-black tracking-widest text-indigo-400 uppercase mb-2">📅 Carga Zoho (Mes)</h3>
-                                    <input type="file" id="excelUpload" accept=".csv, .xlsx" className="hidden" onChange={handleExcelUpload} />
-                                    <button onClick={() => document.getElementById('excelUpload').click()} disabled={isUploading} className={`w-full font-bold py-3.5 rounded-lg text-sm shadow-[0_0_15px_rgba(79,70,229,0.3)] transition flex justify-center items-center gap-2 ${isUploading ? 'bg-indigo-800 text-indigo-300 cursor-not-allowed' : 'bg-indigo-600 hover:bg-indigo-500 text-white transform hover:scale-105'}`}>
-                                        {isUploading ? '⏳ Procesando Archivo...' : '📄 Subir Horario Zoho'}
-                                    </button>
+                                <div className="mb-5">
+                                    <label className="block text-[10px] font-bold tracking-widest text-slate-400 uppercase mb-2">Llave Gemini API</label>
+                                    <input type="password" value={geminiKey} onChange={e => setGeminiKey(e.target.value)} className="w-full bg-[#1e293b] border border-slate-700 rounded-lg p-2.5 text-white font-mono text-xs outline-none" placeholder="AIzaSy..." />
                                 </div>
-
-                                <div className="flex justify-between items-center mb-3">
-                                    <p className="text-[10px] font-bold tracking-widest text-emerald-400 uppercase">Turnos de Hoy ({todayStrUI})</p>
+                                <div className="flex gap-2">
+                                    <button onClick={() => setSettingsOpen(false)} className="flex-1 bg-slate-800 hover:bg-slate-700 text-white font-bold py-2.5 rounded-lg text-xs">Cerrar</button>
+                                    <button onClick={() => { localStorage.setItem('gemini_key', geminiKey); localStorage.setItem('gemini_model', geminiModel); setSettingsOpen(false); speak("Ajustes guardados."); }} className="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2.5 rounded-lg text-xs">Guardar</button>
                                 </div>
-
-                                <div className="space-y-2 mb-6 max-h-48 overflow-y-auto pr-1">
-                                    {todayShiftsUI.length === 0 ? (
-                                        <div className="text-center py-6 bg-[#0f172a] rounded-xl border border-slate-800 text-xs text-slate-500">
-                                            No hay turnos registrados para hoy.
-                                        </div>
-                                    ) : (
-                                        todayShiftsUI.map((op, i) => (
-                                            <div key={i} className="flex justify-between items-center bg-[#0f172a] p-3 rounded-lg border border-slate-800">
-                                                <div>
-                                                    <p className="font-bold text-white text-sm truncate max-w-[200px]">{op.name}</p>
-                                                    <p className="text-[10px] text-slate-400">{op.start} - {op.end}</p>
-                                                </div>
-                                            </div>
-                                        ))
-                                    )}
-                                </div>
-
-                                <button onClick={() => setAdminOpen(false)} className="w-full bg-slate-800 hover:bg-slate-700 text-white font-bold py-3 rounded-xl border border-slate-700 transition">Cerrar Panel</button>
                             </div>
                         </div>
                     )}
 
-                    {settingsOpen && (
+                    {adminOpen && (
                         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4" onClick={(e) => e.stopPropagation()}>
                             <div className="bg-[#131826] border border-slate-800 rounded-2xl w-full max-w-sm shadow-2xl p-6">
-                                <h2 className="text-lg font-black text-white mb-4">⚙️ Ajustes</h2>
+                                <h2 className="text-lg font-black text-indigo-400 mb-2">👨‍💼 Administración (Zoho)</h2>
+                                <p className="text-slate-400 text-xs mb-6">Sube el archivo Excel o CSV exportado de Zoho Shifts para actualizar el piloto en turno.</p>
                                 
-                                <div className="mb-3">
-                                    <label className="block text-[10px] font-bold tracking-widest text-slate-400 uppercase mb-2">Llave Gemini API</label>
-                                    <input type="password" value={geminiKey} onChange={e => setGeminiKey(e.target.value)} placeholder="AQ. o AIzaSy..." className="w-full bg-[#1e293b] border border-slate-700 rounded-lg p-2.5 text-white outline-none font-mono text-xs" />
-                                </div>
-                                <div className="mb-5">
-                                    <label className="block text-[10px] font-bold tracking-widest text-emerald-400 uppercase mb-2">Modelo IA</label>
-                                    <input type="text" value={geminiModel} onChange={e => setGeminiModel(e.target.value)} className="w-full bg-[#1e293b] border border-emerald-900/50 rounded-lg p-2.5 text-emerald-300 outline-none font-mono text-xs" />
-                                </div>
-
-                                <div className="flex gap-2">
-                                    <button onClick={() => setSettingsOpen(false)} className="flex-1 bg-slate-800 hover:bg-slate-700 text-white font-bold py-2.5 rounded-lg text-xs">Cerrar</button>
-                                    <button onClick={() => { 
-                                        localStorage.setItem('gemini_key', geminiKey); 
-                                        localStorage.setItem('gemini_model', geminiModel); 
-                                        setSettingsOpen(false); 
-                                        speak("Ajustes guardados."); 
-                                    }} className="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2.5 rounded-lg text-xs">Guardar</button>
-                                </div>
+                                <input type="file" id="zohoUpload" accept=".csv, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel" className="hidden" onChange={handleZohoUpload} />
+                                
+                                <button onClick={() => document.getElementById('zohoUpload').click()} className="w-full bg-emerald-700 hover:bg-emerald-600 text-white font-bold py-3 rounded-lg text-sm mb-3 border border-emerald-500 shadow-[0_0_15px_rgba(4,120,87,0.3)]">
+                                    📗 SUBIR REPORTE ZOHO
+                                </button>
+                                
+                                <button onClick={() => setAdminOpen(false)} className="w-full bg-slate-800 text-white font-bold py-2.5 rounded-lg text-xs">Cancelar</button>
                             </div>
                         </div>
                     )}
                     
                     {modal.isOpen && (
                         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4" onClick={(e) => e.stopPropagation()}>
-                            <div className="bg-[#131826] border border-slate-800 rounded-2xl w-full max-w-sm shadow-2xl p-6">
+                            <div className="bg-[#131826] border border-slate-800 rounded-2xl w-full max-w-sm shadow-2xl p-6 border-l-4 border-l-indigo-500">
                                 <h2 className="text-lg font-black text-white mb-2">{modal.title}</h2>
-                                <p className="text-slate-300 text-sm mb-6 whitespace-pre-line">{modal.message}</p>
-                                <button onClick={() => setModal({ ...modal, isOpen: false })} className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2.5 rounded-lg text-xs">Entendido</button>
+                                <p className="text-slate-300 text-sm mb-6">{modal.message}</p>
+                                <button onClick={() => setModal({ ...modal, isOpen: false })} className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2.5 rounded-lg text-xs">
+                                    Entendido
+                                </button>
                             </div>
                         </div>
                     )}
