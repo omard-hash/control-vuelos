@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dispatcher Pro - V42 Master</title>
     
-    <!-- Librerías de React -->
     <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -57,7 +56,7 @@
             const [settingsOpen, setSettingsOpen] = useState(false);
             const [geminiKey, setGeminiKey] = useState(localStorage.getItem('gemini_key') || '');
             
-            // Autocorrección: Si el navegador guardó el modelo 1.5 por error, lo forzamos al 3.6 automáticamente
+            // Autocorrección del modelo (borra el 1.5 si existe y fuerza el 3.6)
             const [geminiModel, setGeminiModel] = useState(() => {
                 const savedModel = localStorage.getItem('gemini_model');
                 if (!savedModel || savedModel.includes('1.5')) {
@@ -75,21 +74,21 @@
             const [isRaining, setIsRaining] = useState(false);
             const [isFoggy, setIsFoggy] = useState(false);
             const [windDataMap, setWindDataMap] = useState({});
+            const [rainDataMap, setRainDataMap] = useState({});
 
             const [audioUnlocked, setAudioUnlocked] = useState(false);
             const audioUnlockedRef = useRef(false);
             
-            // Estados para Administración de Zoho
             const [adminOpen, setAdminOpen] = useState(false);
             const [allMonthShifts, setAllMonthShifts] = useState([]);
             const [currentOperator, setCurrentOperator] = useState('Sin asignar');
             const [isUploading, setIsUploading] = useState(false);
             
-            // Referencias estables
             const flightsRef = useRef([]);
             const isRainingRef = useRef(false);
             const isFoggyRef = useRef(false);
             const windDataMapRef = useRef({});
+            const rainDataMapRef = useRef({});
             const allMonthShiftsRef = useRef([]);
             const loggedFlightsCountRef = useRef(0);
             const authReady = useRef(false);
@@ -109,6 +108,7 @@
                             if (data.isRaining !== undefined) { setIsRaining(data.isRaining); isRainingRef.current = data.isRaining; }
                             if (data.isFoggy !== undefined) { setIsFoggy(data.isFoggy); isFoggyRef.current = data.isFoggy; }
                             if (data.windDataMap) { setWindDataMap(data.windDataMap); windDataMapRef.current = data.windDataMap; }
+                            if (data.rainDataMap) { setRainDataMap(data.rainDataMap); rainDataMapRef.current = data.rainDataMap; }
                         }
                     }, (err) => console.error("Error leyendo turno:", err));
                     
@@ -192,32 +192,33 @@
                     if (h === 0 && m === 0 && s === 0 && authReady.current) {
                         speak("Iniciando nuevo día operativo. Reiniciando contadores.");
                         db.collection('operaciones').doc('turno_actual').set({
-                            flights: [], loggedFlightsCount: 0, isRaining: false, isFoggy: false, windDataMap: {}
+                            flights: [], loggedFlightsCount: 0, isRaining: false, isFoggy: false, windDataMap: {}, rainDataMap: {}
                         });
                     }
 
                     if (s === 0) {
                         const timeStr = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
                         
+                        // Alarmas Estáticas Requeridas
                         if (h === 7 && m === 50) {
-                            speak("Atención comandante. Es hora de la junta operativa de las siete cincuenta.");
-                            setModal({ isOpen: true, title: '⏰ JUNTA OPERATIVA', message: 'Reunión de las 7:50 AM.', type: 'error' });
+                            speak("Atención comandante. Es hora de la junta operativa de shopfloor. Las operaciones de vuelo quedan en pausa hasta las ocho quince.");
+                            setModal({ isOpen: true, title: '⏰ JUNTA OPERATIVA', message: 'Reunión Shopfloor de 07:50 AM a 08:15 AM. Vuelos en pausa.', type: 'error' });
                         }
                         else if (h === 12 && m === 0) {
-                            speak("Atención comandante. Es hora de elaborar los reportes K P I.");
-                            setModal({ isOpen: true, title: '📊 ELABORACIÓN DE KPIs', message: 'Hora de elaborar KPIs.', type: 'error' });
+                            speak("Atención comandante. Es hora de elaborar los reportes K P I y actualizar la captura del clima de ou kei to flai en la plataforma.");
+                            setModal({ isOpen: true, title: '📊 KPIs y CLIMA', message: 'Hora de elaborar KPIs y actualizar captura OK To Fly (12:00 PM).', type: 'error' });
                         }
-                        else if ((h === 12 && m === 5) || (h === 0 && m === 5)) {
-                            speak("Atención. Actualización de captura del clima requerida.");
-                            setModal({ isOpen: true, title: '🌤️ ACTUALIZAR CLIMA', message: 'Obligatorio validar condiciones seguras.', type: 'error' });
+                        else if (h === 0 && m === 5) {
+                            speak("Atención. Actualización de captura del clima requerida. Por favor confirme el ou kei to flai para garantizar condiciones adecuadas.");
+                            setModal({ isOpen: true, title: '🌙 ACTUALIZAR CLIMA', message: 'Obligatorio validar condiciones seguras OK To Fly (12:05 AM).', type: 'error' });
                         }
 
-                        // Alarma de Evidencia por clima
+                        // Alarma de toma de evidencia por mal clima (Cada hora exacta)
                         if (m === 0) {
                             const currentWind = windDataMapRef.current[h] || 0;
                             const isAdverseWeather = isRainingRef.current || isFoggyRef.current || currentWind >= 40;
                             if (isAdverseWeather) {
-                                speak("Atención piloto. Es hora de tomar evidencia fotográfica de las condiciones meteorológicas.");
+                                speak("Atención piloto. Es hora de tomar evidencia fotográfica de las condiciones meteorológicas adversas.");
                             }
                         }
 
@@ -274,7 +275,7 @@
 
             const analyzeImageWithAI = async (base64Image) => {
                 setIsScanning(true);
-                speak("Analizando el clima y ráfagas de viento...");
+                speak("Analizando el clima, ráfagas y probabilidad de lluvia...");
                 
                 try {
                     const key = geminiKey.trim();
@@ -284,7 +285,7 @@
                     const payload = {
                         contents: [{
                             parts: [
-                                { text: "Analiza el clima. REGLA ESTRICTA 11:00am: Si solo dice 'UV' (ej. 'UV 10', 'Extremo UV 13') ES APTO PARA VOLAR, el viento es 0. Regla general: Si dice 'Apto para volar', viento es 0. Si dice 'Ráfagas fuertes' o vientos > 40, viento es 45. Devuelve JSON con 'hourlyData' teniendo 'time' (ej. '11:00am') y 'wind' numérico." },
+                                { text: "Analiza el clima de la imagen. REGLA ESTRICTA 11:00am: Si solo dice 'UV', viento es 0, lluvia 0. Regla general: Si dice 'Apto para volar', viento 0, lluvia 0. Si dice 'Ráfagas fuertes' o vientos > 40, viento es 45. Si dice 'Lluvia X%', extrae ese porcentaje numérico. Devuelve un JSON estricto con un arreglo 'hourlyData' teniendo 'time' (ej. '11:00am'), 'wind' (número) y 'rainProb' (probabilidad de lluvia numérica de 0 a 100)." },
                                 { inline_data: { mime_type: "image/jpeg", data: base64Image } }
                             ]
                         }]
@@ -298,7 +299,7 @@
 
                     if (!response.ok) {
                         const err = await response.json();
-                        throw new Error(`Detalle de IA: \n${JSON.stringify(err, null, 2)}\n\nAsegúrate de que el "Modelo IA" en Ajustes sea válido.`);
+                        throw new Error(`Detalle de IA: \n${JSON.stringify(err, null, 2)}\n\nAsegúrate de que tu Llave sea válida.`);
                     }
 
                     const data = await response.json();
@@ -318,7 +319,7 @@
 
                     if (parsedData && parsedData.hourlyData) {
                          generateIntelligentSchedule(parsedData.hourlyData);
-                         speak("Itinerario calculado con base en vientos detectados.");
+                         speak("Itinerario calculado con base en vientos y condiciones operativas.");
                     } else {
                          throw new Error("La IA no incluyó el arreglo hourlyData.");
                     }
@@ -335,7 +336,11 @@
 
             const generateIntelligentSchedule = (hourlyWeatherData) => {
                 let windMap = {};
-                for(let i=0; i<24; i++) windMap[i] = 0;
+                let rainMap = {};
+                for(let i=0; i<24; i++) {
+                    windMap[i] = 0;
+                    rainMap[i] = 0;
+                }
 
                 if (hourlyWeatherData && hourlyWeatherData.length > 0) {
                      hourlyWeatherData.forEach(dataPoint => {
@@ -345,13 +350,15 @@
                                let ampm = hourMatch[2].toLowerCase();
                                if (ampm === 'pm' && hour < 12) hour += 12;
                                if (ampm === 'am' && hour === 12) hour = 0;
-                               windMap[hour] = dataPoint.wind;
+                               windMap[hour] = dataPoint.wind || 0;
+                               rainMap[hour] = dataPoint.rainProb || 0;
                           }
                      });
                 }
 
                 setWindDataMap(windMap);
-                db.collection('operaciones').doc('turno_actual').set({ windDataMap: windMap }, { merge: true });
+                setRainDataMap(rainMap);
+                db.collection('operaciones').doc('turno_actual').set({ windDataMap: windMap, rainDataMap: rainMap }, { merge: true });
 
                 const applyVariance = (timeStr, isForzoso = false) => {
                     if (isForzoso) return timeStr; 
@@ -365,58 +372,74 @@
                     return `${newH}:${newM}`;
                 };
 
-                let newSchedule = [];
-
                 const isSuspendedAt11 = windMap[11] >= 40;
-                const isSuspendedAt12 = windMap[12] >= 40 && !isSuspendedAt11;
-                const isSuspendedAt13 = windMap[13] >= 40 && !isSuspendedAt11 && !isSuspendedAt12;
+                const isSuspendedAt12 = (windMap[12] >= 40 || windMap[13] >= 40) && !isSuspendedAt11;
 
+                let baseSchedule = [];
+
+                // REGLAS ESTRICTAS DE COMPRESIÓN
                 if (isSuspendedAt11) {
-                    newSchedule.push(
-                        { time: applyVariance("06:15"), type: "DINÁMICO", wind: windMap[6] || 0, hour24: 6 },
-                        { time: applyVariance("07:20", true), type: "FORZOSO", wind: windMap[7] || 0, hour24: 7 },
-                        { time: applyVariance("08:30"), type: "DINÁMICO", wind: windMap[8] || 0, hour24: 8 },
-                        { time: applyVariance("09:45"), type: "DINÁMICO", wind: windMap[9] || 0, hour24: 9 }
-                    );
+                    baseSchedule = [
+                        { time: "06:00", type: "FORZOSO", isForzoso: true },
+                        { time: "07:20", type: "FORZOSO", isForzoso: true },
+                        { time: "08:30", type: "DINÁMICO", isForzoso: false },
+                        { time: "09:20", type: "DINÁMICO", isForzoso: false },
+                        { time: "10:15", type: "DINÁMICO", isForzoso: false },
+                        { time: "14:00", type: "FORZOSO", isForzoso: true },
+                        { time: "15:30", type: "DINÁMICO", isForzoso: false },
+                        { time: "17:00", type: "FORZOSO", isForzoso: true },
+                        { time: "18:15", type: "DINÁMICO", isForzoso: false },
+                        { time: "19:30", type: "DINÁMICO", isForzoso: false },
+                        { time: "20:30", type: "DINÁMICO", isForzoso: false },
+                        { time: "21:30", type: "FORZOSO", isForzoso: true },
+                        { time: "22:45", type: "DINÁMICO", isForzoso: false }
+                    ];
                 } else if (isSuspendedAt12) {
-                    newSchedule.push(
-                        { time: applyVariance("07:20", true), type: "FORZOSO", wind: windMap[7] || 0, hour24: 7 },
-                        { time: applyVariance("08:20"), type: "DINÁMICO", wind: windMap[8] || 0, hour24: 8 },
-                        { time: applyVariance("09:20"), type: "DINÁMICO", wind: windMap[9] || 0, hour24: 9 },
-                        { time: applyVariance("10:20"), type: "DINÁMICO", wind: windMap[10] || 0, hour24: 10 },
-                        { time: applyVariance("11:20"), type: "DINÁMICO", wind: windMap[11] || 0, hour24: 11 }
-                    );
-                } else if (isSuspendedAt13) {
-                    newSchedule.push(
-                        { time: applyVariance("07:20", true), type: "FORZOSO", wind: windMap[7] || 0, hour24: 7 },
-                        { time: applyVariance("08:35"), type: "DINÁMICO", wind: windMap[8] || 0, hour24: 8 },
-                        { time: applyVariance("09:50"), type: "DINÁMICO", wind: windMap[9] || 0, hour24: 9 },
-                        { time: applyVariance("11:00"), type: "DINÁMICO", wind: windMap[11] || 0, hour24: 11 },
-                        { time: applyVariance("12:15"), type: "DINÁMICO", wind: windMap[12] || 0, hour24: 12 }
-                    );
+                    baseSchedule = [
+                        { time: "06:00", type: "FORZOSO", isForzoso: true },
+                        { time: "07:20", type: "FORZOSO", isForzoso: true },
+                        { time: "08:30", type: "DINÁMICO", isForzoso: false },
+                        { time: "09:30", type: "DINÁMICO", isForzoso: false },
+                        { time: "10:30", type: "DINÁMICO", isForzoso: false },
+                        { time: "11:30", type: "DINÁMICO", isForzoso: false },
+                        { time: "12:45", type: "DINÁMICO", isForzoso: false },
+                        { time: "14:00", type: "FORZOSO", isForzoso: true },
+                        { time: "15:30", type: "DINÁMICO", isForzoso: false },
+                        { time: "17:00", type: "FORZOSO", isForzoso: true },
+                        { time: "19:00", type: "DINÁMICO", isForzoso: false },
+                        { time: "21:30", type: "FORZOSO", isForzoso: true },
+                        { time: "22:45", type: "DINÁMICO", isForzoso: false }
+                    ];
                 } else {
-                    newSchedule.push(
-                        { time: applyVariance("07:20", true), type: "FORZOSO", wind: windMap[7] || 0, hour24: 7 },
-                        { time: applyVariance("08:40"), type: "DINÁMICO", wind: windMap[8] || 0, hour24: 8 },
-                        { time: applyVariance("10:00"), type: "DINÁMICO", wind: windMap[10] || 0, hour24: 10 },
-                        { time: applyVariance("11:30"), type: "DINÁMICO", wind: windMap[11] || 0, hour24: 11 },
-                        { time: applyVariance("12:45"), type: "DINÁMICO", wind: windMap[12] || 0, hour24: 12 }
-                    );
+                    // DÍA NORMAL
+                    baseSchedule = [
+                        { time: "06:00", type: "FORZOSO", isForzoso: true },
+                        { time: "07:20", type: "FORZOSO", isForzoso: true },
+                        { time: "08:45", type: "DINÁMICO", isForzoso: false },
+                        { time: "10:15", type: "DINÁMICO", isForzoso: false },
+                        { time: "11:45", type: "DINÁMICO", isForzoso: false },
+                        { time: "13:00", type: "DINÁMICO", isForzoso: false },
+                        { time: "14:00", type: "FORZOSO", isForzoso: true },
+                        { time: "15:30", type: "DINÁMICO", isForzoso: false },
+                        { time: "17:00", type: "FORZOSO", isForzoso: true },
+                        { time: "18:30", type: "DINÁMICO", isForzoso: false },
+                        { time: "20:00", type: "DINÁMICO", isForzoso: false },
+                        { time: "21:30", type: "FORZOSO", isForzoso: true },
+                        { time: "22:45", type: "DINÁMICO", isForzoso: false }
+                    ];
                 }
-
-                newSchedule.push(
-                    { time: applyVariance("14:00", true), type: "FORZOSO", wind: windMap[14] || 0, hour24: 14 },
-                    { time: applyVariance("15:30"), type: "DINÁMICO", wind: windMap[15] || 0, hour24: 15 },
-                    { time: applyVariance("17:00", true), type: "FORZOSO", wind: windMap[17] || 0, hour24: 17 },
-                    { time: applyVariance("18:30"), type: "DINÁMICO", wind: windMap[18] || 0, hour24: 18 },
-                    { time: applyVariance("20:00"), type: "DINÁMICO", wind: windMap[20] || 0, hour24: 20 },
-                    { time: applyVariance("21:30", true), type: "FORZOSO", wind: windMap[21] || 0, hour24: 21 },
-                    { time: applyVariance("22:45"), type: "DINÁMICO", wind: windMap[22] || 0, hour24: 22 }
-                );
                 
-                const finalSchedule = newSchedule.map(f => ({
-                    ...f, wind: windMap[f.hour24] >= 40 ? 45 : f.wind
-                }));
+                const finalSchedule = baseSchedule.map(item => {
+                    let calculatedTime = applyVariance(item.time, item.isForzoso);
+                    let hour24 = parseInt(calculatedTime.split(':')[0]);
+                    return {
+                        time: calculatedTime, 
+                        type: item.type, 
+                        wind: windMap[hour24] >= 40 ? 45 : (windMap[hour24] || 0), 
+                        rainProb: rainMap[hour24] || 0, 
+                        hour24: hour24 
+                    };
+                });
 
                 setFlights(finalSchedule);
                 flightsRef.current = finalSchedule;
@@ -473,29 +496,15 @@
                     let m = Math.floor(currentSlot % 60);
                     let timeStr = `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
                     let windAtHour = windDataMap[h] || 0;
+                    let rainAtHour = rainDataMap[h] || 0;
 
-                    newSchedule.push({ time: timeStr, type: "REPROGRAMADO", wind: windAtHour, hour24: h });
+                    newSchedule.push({ time: timeStr, type: "REPROGRAMADO", wind: windAtHour, rainProb: rainAtHour, hour24: h });
                     currentSlot += interval;
                 }
                 
                 setFlights(newSchedule);
                 flightsRef.current = newSchedule;
                 db.collection('operaciones').doc('turno_actual').set({ flights: newSchedule }, { merge: true });
-            };
-
-            const handleLogManualFlight = () => {
-                 if (isRaining || isFoggy) {
-                     setModal({ isOpen: true, title: 'Bloqueo Activo', message: 'No puedes registrar despegues durante condiciones meteorológicas adversas.', type: 'error' });
-                     return;
-                 }
-                 if (loggedFlightsCount < totalFlightsTarget) {
-                      const newCount = loggedFlightsCount + 1;
-                      setLoggedFlightsCount(newCount);
-                      db.collection('operaciones').doc('turno_actual').set({ loggedFlightsCount: newCount }, { merge: true });
-                      speak(`Vuelo registrado. Total del día, ${newCount} de 13.`);
-                 } else {
-                      speak("Meta diaria de vuelos completada.");
-                 }
             };
 
             const handleExcelUpload = (e) => {
@@ -518,11 +527,9 @@
 
                         const cleanName = (text) => {
                             if(!text || typeof text !== 'string') return null;
-                            let lines = text.split('\n');
-                            for(let line of lines) {
-                                let c = line.replace(/Especialista|RPAS|OS|Audi|M[eé]xico|Turno|lun|mar|mi[eé]|jue|vie|s[aá]b|dom/gi, '').trim();
-                                if(c.length > 3 && !/\d/.test(c)) return c;
-                            }
+                            let primerRenglon = text.split('\n')[0];
+                            let c = primerRenglon.replace(/Especialista|RPAS|OS|Audi|M[eé]xico|Turno|lun|mar|mi[eé]|jue|vie|s[aá]b|dom/gi, '').trim();
+                            if(c.length > 3 && !/\d/.test(c)) return c;
                             return null;
                         };
 
@@ -549,17 +556,15 @@
                             return `${String(h).padStart(2, '0')}:${m}`;
                         };
 
+                        // 1. MODO CUADRÍCULA (PDF/Excel normal)
                         for(let r=0; r<json.length; r++) {
                             let row = json[r];
                             let combinedText = row.join(" | ");
-                            
                             let timeMatches = combinedText.match(/\b([01]?\d|2[0-3])[:.]([0-5]\d)(?:\s*[aApP][mM])?\b/g);
                             
                             if (timeMatches && timeMatches.length >= 2) {
-                                parseados++;
                                 let start = formatTime(timeMatches[0]);
                                 let end = formatTime(timeMatches[1]);
-                                
                                 let dateStr = null;
                                 let name = null;
 
@@ -577,6 +582,38 @@
 
                                 if(start && end && dateStr && name) {
                                     turnosExtraidos.push({ date: dateStr, name: name, start: start, end: end });
+                                    parseados++;
+                                }
+                            }
+                        }
+
+                        // 2. MODO LISTA (El "Falso CSV" de Zoho)
+                        if (turnosExtraidos.length === 0) {
+                            for(let r=0; r<json.length; r++) {
+                                let row = json[r];
+                                let rowText = row.join(" ");
+                                
+                                let times = [];
+                                for (let cell of row) {
+                                    let t = formatTime(String(cell));
+                                    if (t) times.push(t);
+                                }
+                                
+                                if (times.length >= 2) {
+                                    let start = times[0];
+                                    let end = times[1];
+                                    let dateStr = extractDate(rowText);
+                                    let name = null;
+                                    
+                                    for(let cell of row) {
+                                        let n = cleanName(String(cell));
+                                        if (n) { name = n; break; }
+                                    }
+                                    
+                                    if(start && end && dateStr && name) {
+                                        turnosExtraidos.push({ date: dateStr, name: name, start: start, end: end });
+                                        parseados++;
+                                    }
                                 }
                             }
                         }
@@ -593,7 +630,7 @@
                             speak(`Carga exitosa. ${uniqueTurnos.length} turnos guardados.`);
                             setModal({ isOpen: true, title: '✅ Carga Exitosa', message: `Turnos detectados: ${uniqueTurnos.length}`, type: 'success' });
                         } else {
-                            setModal({ isOpen: true, title: 'Diagnóstico de Archivo', message: `Filas analizadas: ${json.length}\nHorarios detectados: ${parseados}\nTurnos formados: ${uniqueTurnos.length}\n\nEl sistema encontró horarios, pero no pudo encontrar nombres o fechas válidas junto a ellos. Revisa que el archivo original no esté en blanco.` });
+                            setModal({ isOpen: true, title: 'Diagnóstico de Archivo', message: `Filas analizadas: ${json.length}\nHorarios detectados: ${parseados}\nTurnos formados: ${uniqueTurnos.length}\n\nEl sistema encontró 0 horarios, revisa que el archivo original no esté en blanco.` });
                         }
 
                     } catch (error) {
@@ -614,6 +651,14 @@
             const todayStrUI = `${currentTime.getFullYear()}-${String(currentTime.getMonth() + 1).padStart(2, '0')}-${String(currentTime.getDate()).padStart(2, '0')}`;
             const todayShiftsUI = allMonthShifts.filter(s => s.date === todayStrUI);
 
+            const currentTotalMins = currentTime.getHours() * 60 + currentTime.getMinutes();
+            // Filtrar vuelos para que solo muestre los futuros (con 15 min de gracia)
+            const futureFlights = flights.filter(f => {
+                const [h, m] = f.time.split(':').map(Number);
+                const flightMins = h * 60 + m;
+                return flightMins >= currentTotalMins - 15;
+            });
+
             const getOverlayContent = () => {
                 if (isRaining && isFoggy) return { text: "Suspendido: Lluvia y Neblina", style: "rain-overlay" };
                 if (isRaining) return { text: "Esperando que mejore el clima (Lluvia)...", style: "rain-overlay" };
@@ -622,8 +667,32 @@
             };
             const activeOverlay = getOverlayContent();
 
+            const handleLogManualFlight = () => {
+                 if (isRaining || isFoggy) {
+                     setModal({ isOpen: true, title: 'Bloqueo Activo', message: 'No puedes registrar despegues durante condiciones meteorológicas adversas.', type: 'error' });
+                     return;
+                 }
+                 if (loggedFlightsCount < totalFlightsTarget) {
+                      const newCount = loggedFlightsCount + 1;
+                      setLoggedFlightsCount(newCount);
+                      db.collection('operaciones').doc('turno_actual').set({ loggedFlightsCount: newCount }, { merge: true });
+                      speak(`Vuelo registrado. Total del día, ${newCount} de 13.`);
+                 } else {
+                      speak("Meta diaria de vuelos completada.");
+                 }
+            };
+
+            const handleUndoFlight = () => {
+                 if (loggedFlightsCount > 0) {
+                      const newCount = loggedFlightsCount - 1;
+                      setLoggedFlightsCount(newCount);
+                      db.collection('operaciones').doc('turno_actual').set({ loggedFlightsCount: newCount }, { merge: true });
+                      speak("Registro eliminado exitosamente.");
+                 }
+            };
+
             return (
-                <div className="min-h-screen p-4 max-w-2xl mx-auto pb-24" onClick={unlockAudio}>
+                <div className="min-h-screen p-4 max-w-2xl mx-auto pb-32" onClick={unlockAudio}>
                     
                     <div className="flex justify-between items-center mb-5">
                         <div>
@@ -646,7 +715,6 @@
                     )}
 
                     <div className="glass-card p-5 rounded-2xl mb-5 relative overflow-hidden">
-                        
                         <div className="flex justify-between items-start mb-6">
                             <div>
                                 <p className="text-[10px] font-bold tracking-widest text-slate-400 uppercase mb-1">{shiftName}</p>
@@ -708,39 +776,61 @@
                             </div>
                         )}
 
-                        <p className="text-[10px] font-bold tracking-widest text-slate-400 uppercase mb-3">🗓️ Plan Restante (Calculado)</p>
+                        <p className="text-[10px] font-bold tracking-widest text-slate-400 uppercase mb-3">🗓️ Plan Restante del Día</p>
                         
                         {flights.length === 0 ? (
                             <div className="text-center py-6 text-xs font-bold text-slate-500">
                                 Sube una captura para generar el itinerario de vuelos.
                             </div>
+                        ) : futureFlights.length === 0 ? (
+                            <div className="text-center py-6 text-xs font-bold text-emerald-500">
+                                ¡Plan del día completado! Ya no hay vuelos programados.
+                            </div>
                         ) : (
                             <div className="space-y-2.5">
-                                {flights.map((f, i) => (
-                                    <div key={i} className={`flex justify-between items-center p-3 bg-[#0f172a] border rounded-xl ${f.wind >= 42 ? 'border-rose-900/50 opacity-75' : 'border-slate-800'}`}>
-                                        <div>
-                                            <div className="text-lg font-black text-white tracking-wide">{f.time}</div>
-                                            <div className={`text-[10px] font-bold mt-0.5 uppercase tracking-wider flex items-center gap-1 ${f.wind >= 42 ? 'text-rose-500' : 'text-emerald-400'}`}>
-                                                {f.wind >= 42 ? `🚫 Suspendido (${f.wind} km/h)` : `✅ Libre (${f.wind} km/h)`}
+                                {futureFlights.map((f, i) => (
+                                    <div key={i} className={`flex flex-col p-3 bg-[#0f172a] border rounded-xl ${f.wind >= 42 ? 'border-rose-900/50 opacity-75' : 'border-slate-800'}`}>
+                                        <div className="flex justify-between items-center">
+                                            <div>
+                                                <div className="text-lg font-black text-white tracking-wide">{f.time}</div>
+                                                <div className={`text-[10px] font-bold mt-0.5 uppercase tracking-wider flex items-center gap-1 ${f.wind >= 42 ? 'text-rose-500' : 'text-emerald-400'}`}>
+                                                    {f.wind >= 42 ? `🚫 Suspendido (${f.wind} km/h)` : `✅ Libre (${f.wind} km/h)`}
+                                                </div>
                                             </div>
+                                            <span className={`text-[9px] font-black uppercase px-2.5 py-1 rounded border ${f.type === 'FORZOSO' ? 'bg-indigo-950 text-indigo-400 border-indigo-900' : f.type === 'REPROGRAMADO' ? 'bg-amber-950 text-amber-500 border-amber-900' : 'bg-slate-800 text-slate-400 border-slate-700'}`}>
+                                                {f.type}
+                                            </span>
                                         </div>
-                                        <span className={`text-[9px] font-black uppercase px-2.5 py-1 rounded border ${f.type === 'FORZOSO' ? 'bg-indigo-950 text-indigo-400 border-indigo-900' : f.type === 'REPROGRAMADO' ? 'bg-amber-950 text-amber-500 border-amber-900' : 'bg-slate-800 text-slate-400 border-slate-700'}`}>
-                                            {f.type}
-                                        </span>
+                                        {/* Advertencia visual si hay probabilidad de lluvia (No bloquea el vuelo) */}
+                                        {f.rainProb > 0 && f.wind < 42 && (
+                                            <div className="mt-2 bg-blue-900/30 border border-blue-500/30 text-blue-300 text-[10px] font-bold px-2 py-1 rounded w-fit uppercase tracking-wider flex items-center gap-1">
+                                                ☔ {f.rainProb}% Prob. Lluvia (Precaución)
+                                            </div>
+                                        )}
                                     </div>
                                 ))}
                             </div>
                         )}
                     </div>
 
-                    <div className="fixed bottom-0 left-0 w-full p-4 bg-gradient-to-t from-[#0B0F19] via-[#0B0F19] to-transparent flex justify-center z-40 pointer-events-none">
-                         <button 
-                             onClick={(e) => { e.stopPropagation(); handleLogManualFlight(); }}
-                             disabled={isRaining || isFoggy}
-                             className={`pointer-events-auto w-full max-w-xs font-black py-3.5 rounded-xl transition transform hover:scale-105 ${(isRaining || isFoggy) ? 'bg-slate-800 text-slate-600' : 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-[0_0_20px_rgba(79,70,229,0.4)]'}`}
-                         >
-                             ✈️ REGISTRAR DESPEGUE AHORA
-                         </button>
+                    <div className="fixed bottom-0 left-0 w-full p-4 bg-gradient-to-t from-[#0B0F19] via-[#0B0F19] to-transparent flex flex-col items-center justify-end z-40 pointer-events-none">
+                         <div className="w-full max-w-xs space-y-2">
+                             <button 
+                                 onClick={(e) => { e.stopPropagation(); handleLogManualFlight(); }}
+                                 disabled={isRaining || isFoggy}
+                                 className={`pointer-events-auto w-full font-black py-3.5 rounded-xl transition transform hover:scale-105 ${(isRaining || isFoggy) ? 'bg-slate-800 text-slate-600' : 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-[0_0_20px_rgba(79,70,229,0.4)]'}`}
+                             >
+                                 ✈️ REGISTRAR DESPEGUE AHORA
+                             </button>
+                             {loggedFlightsCount > 0 && (
+                                 <button 
+                                     onClick={(e) => { e.stopPropagation(); handleUndoFlight(); }}
+                                     className="pointer-events-auto w-full text-center text-[10px] font-bold text-slate-500 hover:text-slate-300 transition underline underline-offset-2"
+                                 >
+                                     ¿Registraste por error? Deshacer (-1)
+                                 </button>
+                             )}
+                         </div>
                     </div>
 
                     {adminOpen && (
