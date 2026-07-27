@@ -11,7 +11,7 @@
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     
-    <!-- Lector de Excel / CSV Robusto -->
+    <!-- Lector de Excel / CSV Robusto (SheetJS) -->
     <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
     
     <!-- FIREBASE COMPAT (Manteniendo V10 para asegurar permisos) -->
@@ -32,7 +32,6 @@
     <div id="root"></div>
 
     <script type="text/babel">
-        // CONFIGURACIÓN FIREBASE V10
         const firebaseConfig = {
             apiKey: "AIzaSyDXjwv133-dIKyprCktTUkjx_adAz1DhAY",
             authDomain: "control-vuelos.firebaseapp.com",
@@ -51,7 +50,6 @@
         const { useState, useEffect, useRef } = React;
 
         function App() {
-            // Estados Principales
             const [currentTime, setCurrentTime] = useState(new Date());
             const [shiftName, setShiftName] = useState('Turno Diurno');
             const [isScanning, setIsScanning] = useState(false);
@@ -60,23 +58,19 @@
             const [geminiKey, setGeminiKey] = useState(localStorage.getItem('gemini_key') || '');
             const [modal, setModal] = useState({ isOpen: false, title: '', message: '', type: 'error' });
             
-            // Estados Operativos
             const [loggedFlightsCount, setLoggedFlightsCount] = useState(0);
             const totalFlightsTarget = 13;
             const [isRaining, setIsRaining] = useState(false);
             const [windDataMap, setWindDataMap] = useState({});
 
-            // Audio
             const [audioUnlocked, setAudioUnlocked] = useState(false);
             const audioUnlockedRef = useRef(false);
             
-            // Estados del Mes
             const [adminOpen, setAdminOpen] = useState(false);
             const [allMonthShifts, setAllMonthShifts] = useState([]);
             const [currentOperator, setCurrentOperator] = useState('Sin asignar');
             const [isUploading, setIsUploading] = useState(false);
             
-            // Referencias
             const flightsRef = useRef([]);
             const isRainingRef = useRef(false);
             const allMonthShiftsRef = useRef([]);
@@ -90,7 +84,6 @@
                 auth.signInAnonymously().then(() => {
                     authReady.current = true;
                     
-                    // Escuchar Turno Actual
                     unsubscribeTurno = db.collection('operaciones').doc('turno_actual').onSnapshot((doc) => {
                         if (doc.exists) {
                             const data = doc.data();
@@ -101,7 +94,6 @@
                         }
                     });
 
-                    // Escuchar Todo el Mes
                     unsubscribeMes = db.collection('operaciones').doc('turnos_mes').onSnapshot((doc) => {
                         if (doc.exists && doc.data().turnos) {
                             setAllMonthShifts(doc.data().turnos);
@@ -111,7 +103,6 @@
                             allMonthShiftsRef.current = [];
                         }
                     });
-
                 });
 
                 return () => { unsubscribeTurno(); unsubscribeMes(); };
@@ -190,9 +181,6 @@
                         });
                     }
                     
-                    // ==========================================
-                    // AVISOS DE VUELO
-                    // ==========================================
                     if (s === 0) {
                         const timeStr = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
                         
@@ -223,9 +211,6 @@
                 return () => clearInterval(timer);
             }, []);
 
-            // ==========================================
-            // LECTOR DE ARCHIVOS - MOTOR "QUIRÚRGICO"
-            // ==========================================
             const handleExcelUpload = (e) => {
                 const file = e.target.files[0];
                 if (!file) return;
@@ -233,39 +218,51 @@
                 setIsUploading(true);
                 const reader = new FileReader();
 
+                // Lector de Binarios para evitar que CSV se rompa por formatos extraños de Zoho
                 reader.onload = (evt) => {
                     try {
-                        let data = evt.target.result;
-                        let json = [];
+                        const data = new Uint8Array(evt.target.result);
+                        const workbook = XLSX.read(data, { type: 'array' });
+                        const sheetName = workbook.SheetNames[0];
+                        const sheet = workbook.Sheets[sheetName];
                         
-                        // PARCHE 1: Pre-Lectura para CSV con puntos y comas (;)
-                        if (file.name.toLowerCase().endsWith('.csv')) {
-                            const rawString = evt.target.result; // El archivo como texto puro
-                            let delimiter = rawString.includes(';') ? ';' : (rawString.includes('\t') ? '\t' : ',');
-                            let rows = rawString.split(/\r?\n/);
+                        let json = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "" });
+
+                        // Respaldo de seguridad si Zoho exportó un falso CSV separado por punto y coma (;)
+                        if (json.length > 0 && json[0].length === 1 && file.name.toLowerCase().endsWith('.csv')) {
+                            const rawText = new TextDecoder("utf-8").decode(data);
+                            const delimiter = rawText.includes(';') ? ';' : ',';
+                            const rows = rawText.split(/\r?\n/);
                             json = rows.map(r => r.split(delimiter).map(cell => cell.replace(/^"|"$/g, '').trim()));
-                        } else {
-                            // Lectura normal para Excel (.xlsx)
-                            const workbook = XLSX.read(data, { type: 'binary', raw: false });
-                            const sheet = workbook.Sheets[workbook.SheetNames[0]];
-                            json = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "" });
                         }
 
                         let turnosExtraidos = [];
-                        let timesFound = 0; // Para diagnóstico
+                        let timesFound = 0; 
                         
-                        // Mes y Año por defecto
                         let defaultMonth = new Date().getMonth() + 1;
                         let defaultYear = new Date().getFullYear();
                         
+                        // Extraer mes/año global por si acado
                         const fullTextStr = json.map(row => row.join(' ')).join(' ');
-                        let globalDateMatch = fullTextStr.match(/(\d{2})[\/\-](\d{2})[\/\-](\d{4})/);
+                        let globalDateMatch = fullTextStr.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
                         if (globalDateMatch) {
                             defaultMonth = parseInt(globalDateMatch[2]);
                             defaultYear = parseInt(globalDateMatch[3]);
                         }
 
-                        // ESCANEO CELDA POR CELDA
+                        // Convertir hora tipo "06:50 PM" o "6:50" a "18:50"
+                        const parseTimeStr = (tStr) => {
+                            let match = tStr.match(/(\d{1,2})[:.](\d{2})\s*([ap]m)?/i);
+                            if(!match) return tStr;
+                            let h = parseInt(match[1]);
+                            let m = match[2];
+                            let ampm = match[3] ? match[3].toLowerCase() : null;
+                            if(ampm === 'pm' && h < 12) h += 12;
+                            if(ampm === 'am' && h === 12) h = 0;
+                            return `${String(h).padStart(2, '0')}:${m}`;
+                        };
+
+                        // ESCANEO QUIRÚRGICO CELDA POR CELDA
                         for (let r = 0; r < json.length; r++) {
                             let row = json[r];
                             if (!row) continue;
@@ -275,69 +272,75 @@
                                 if (!cellValue) continue;
                                 let cellText = String(cellValue).trim();
 
-                                // Buscar un patrón de hora estricto (ej. 06:50 - 19:00 o 06:50-19:00)
-                                let timeMatch = cellText.match(/(\d{1,2}[:.]\d{2})\s*[-aA\/_]\s*(\d{1,2}[:.]\d{2})/);
+                                // Expresión regular permisiva para horarios: 06:50-19:00 o 6:50 am - 7:00 pm
+                                let timeMatch = cellText.match(/(\d{1,2}[:.]\d{2}(?:\s*[ap]m)?)\s*[-aA\/_]\s*(\d{1,2}[:.]\d{2}(?:\s*[ap]m)?)/i);
 
                                 if (timeMatch) {
                                     timesFound++;
-                                    let start = timeMatch[1].replace('.', ':');
-                                    let end = timeMatch[2].replace('.', ':');
+                                    let start = parseTimeStr(timeMatch[1]);
+                                    let end = parseTimeStr(timeMatch[2]);
 
-                                    // PARCHE 2: Separar el nombre con "bisturí" (split('\n'))
-                                    let rawName = cellText.replace(timeMatch[0], '').trim();
+                                    let cleanName = "";
                                     
-                                    // Tomar solo la primera línea de texto sobrante (ignorar puestos que están abajo)
-                                    let cleanName = rawName.split(/\r?\n/)[0].trim();
-
-                                    // Si el nombre sigue vacío, buscar en la celda de la derecha
-                                    if (!cleanName && c + 1 < row.length) {
-                                        cleanName = String(json[r][c+1]).split(/\r?\n/)[0].trim();
-                                    }
-
-                                    // Limpieza extrema de basura
-                                    cleanName = cleanName
-                                        .replace(/Especialista.*/gi, '')
-                                        .replace(/Audi.*/gi, '')
-                                        .replace(/RPAS.*/gi, '')
-                                        .replace(/OS\b/gi, '')
-                                        .replace(/\d{1,2}:\d{2}/g, '')
-                                        .replace(/[-_]/g, ' ')
-                                        .replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑ\s]/g, '') // Solo letras
-                                        .replace(/\s+/g, ' ')
-                                        .trim();
-
-                                    // Dejar máximo Nombre y Primer Apellido
-                                    let nameParts = cleanName.split(' ').filter(p => p.length > 2);
-                                    cleanName = nameParts.slice(0, 2).join(' ') || "Operador";
-
-                                    // Buscar la FECHA mirando hacia arriba en la columna
-                                    let day = null;
+                                    // 1. Intentar sacar el nombre de la misma celda (Si Zoho lo pegó)
+                                    let textSinHora = cellText.replace(timeMatch[0], '').trim();
+                                    let lineas = textSinHora.split(/\n|<br>/i); // Separar por enter invisible
                                     
-                                    for (let lookUpRow = r - 1; lookUpRow >= 0; lookUpRow--) {
-                                        let upCell = json[lookUpRow][c];
-                                        if (!upCell) continue;
-                                        let upText = String(upCell).trim();
-                                        
-                                        // Detectar "27", "01", "15" exactos
-                                        if (/^0?([1-9]|[12]\d|3[01])$/.test(upText)) {
-                                            day = parseInt(upText);
+                                    for(let linea of lineas) {
+                                        linea = linea.trim();
+                                        // Ignorar líneas de basura
+                                        if(linea && !/Especialista|RPAS|OS|Audi|México|Turno|lun|mar|mié|jue|vie|sáb|dom|Mon|Tue|Wed|Thu|Fri|Sat|Sun/i.test(linea)) {
+                                            cleanName = linea;
                                             break;
                                         }
-                                        
-                                        // Detectar "Lun 27" o "27 Lun"
-                                        let tMatch = upText.match(/^(?:lun|mar|mi[eé]|jue|vie|s[aá]b|dom)[^\d]*([1-9]|[12]\d|3[01])$/i) || upText.match(/^([1-9]|[12]\d|3[01])[^\d]*(?:lun|mar|mi[eé]|jue|vie|s[aá]b|dom)$/i);
-                                        if (tMatch) { day = parseInt(tMatch[1]); break; }
                                     }
 
-                                    // Si no la encontró arriba, buscar en la misma fila completa (Modo Lista)
+                                    // 2. Si no hay nombre en la celda, buscar en la columna izquierda (Modo Lista/Matriz)
+                                    if (!cleanName && c > 0) {
+                                        cleanName = String(json[r][0] || '').trim();
+                                    }
+
+                                    // Limpieza de nombre final
+                                    cleanName = cleanName.replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑ\s]/g, '').trim();
+                                    let nameParts = cleanName.split(/\s+/).filter(p => p.length > 2);
+                                    cleanName = nameParts.slice(0, 2).join(' ') || "Operador";
+
+                                    // BUSCAR FECHA
+                                    let day = null, month = defaultMonth, year = defaultYear;
+                                    
+                                    // 1. Mirar HACIA ARRIBA en la misma columna
+                                    for (let lookUpRow = r - 1; lookUpRow >= 0; lookUpRow--) {
+                                        let upCell = String(json[lookUpRow][c] || '').trim();
+                                        
+                                        // Buscar formato completo (ej. 27/07/2026)
+                                        let fullDateMatch = upCell.match(/(?:^|\s)(\d{1,2})\s*[\/\-]\s*(\d{1,2})\s*[\/\-]\s*(\d{4})/);
+                                        if (fullDateMatch) {
+                                            day = parseInt(fullDateMatch[1]);
+                                            month = parseInt(fullDateMatch[2]);
+                                            year = parseInt(fullDateMatch[3]);
+                                            break;
+                                        }
+
+                                        // Buscar solo número de día (ej. "27" o "Lun 27")
+                                        let dayMatch = upCell.match(/^(?:lun|mar|mi[eé]|jue|vie|s[aá]b|dom|mon|tue|wed|thu|fri|sat|sun)[^\d]*(\d{1,2})$/i) || 
+                                                       upCell.match(/^(\d{1,2})[^\d]*(?:lun|mar|mi[eé]|jue|vie|s[aá]b|dom|mon|tue|wed|thu|fri|sat|sun)$/i) ||
+                                                       upCell.match(/^0?([1-9]|[12]\d|3[01])$/);
+                                        
+                                        if (dayMatch) { day = parseInt(dayMatch[1]); break; }
+                                    }
+
+                                    // 2. Si no encontró arriba, buscar fecha en el MISMO RENGLÓN
                                     if (!day) {
                                         let rowStr = row.join(' ');
-                                        let fDate = rowStr.match(/(?:^|\s)(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})(?:\s|$)/);
-                                        if (fDate) { day = parseInt(fDate[1]); defaultMonth = parseInt(fDate[2]); defaultYear = parseInt(fDate[3]); }
+                                        let rowDateMatch = rowStr.match(/(?:^|\s)(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})(?:\s|$)/);
+                                        if (rowDateMatch) {
+                                            day = parseInt(rowDateMatch[1]); month = parseInt(rowDateMatch[2]); year = parseInt(rowDateMatch[3]);
+                                        }
                                     }
 
-                                    if (day) {
-                                        let dateStr = `${defaultYear}-${String(defaultMonth).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                                    // GUARDAR EL TURNO
+                                    if (day && cleanName !== "Operador") {
+                                        let dateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
                                         turnosExtraidos.push({ date: dateStr, name: cleanName, start: start, end: end });
                                     }
                                 }
@@ -352,33 +355,31 @@
                             if(!seen.has(id)) { seen.add(id); uniqueTurnos.push(t); }
                         });
 
-                        // Resultado del Escaneo
+                        // Resultado
                         if (uniqueTurnos.length > 0) {
                             db.collection('operaciones').doc('turnos_mes').set({ turnos: uniqueTurnos });
                             speak(`Calendario escaneado. ${uniqueTurnos.length} turnos guardados.`);
-                            setModal({ isOpen: true, title: '✅ Carga Exitosa', message: `El motor procesó tu archivo correctamente y guardó ${uniqueTurnos.length} turnos.\n\nEl sistema cambiará al operador asignado según el reloj.`, type: 'success' });
+                            setModal({ isOpen: true, title: '✅ Carga Exitosa', message: `Se procesaron ${uniqueTurnos.length} turnos.\n\nEl sistema identificó los horarios y asignará al operador en turno automáticamente.`, type: 'success' });
                         } else {
-                            // DIAGNÓSTICO DE ERROR
                             speak("Error. No se pudo armar el calendario.");
                             setModal({ 
                                 isOpen: true, 
                                 title: 'Diagnóstico de Archivo', 
-                                message: `Filas analizadas: ${json.length}\nHorarios detectados: ${timesFound}\n\nEl sistema encontró ${timesFound} horarios, pero no pudo encontrar el NÚMERO DE DÍA (ej. 27) arriba de ellos.\nPor favor, verifica que tu archivo tenga los días en la parte superior.`, 
+                                message: `Filas analizadas: ${json.length}\nHorarios detectados: ${timesFound}\nTurnos formados: ${uniqueTurnos.length}\n\nEl sistema encontró ${timesFound} horarios, pero no pudo encontrar nombres o fechas válidas junto a ellos. Revisa que el archivo original no esté en blanco.`, 
                                 type: 'error' 
                             });
                         }
 
                     } catch (error) {
                         console.error("Error leyendo archivo:", error);
-                        setModal({ isOpen: true, title: 'Error del Lector', message: 'El archivo está corrupto o protegido.', type: 'error' });
+                        setModal({ isOpen: true, title: 'Error del Lector', message: 'El archivo está corrupto o no se pudo leer el contenido.', type: 'error' });
                     } finally {
                         setIsUploading(false);
                         e.target.value = null;
                     }
                 };
                 
-                if (file.name.toLowerCase().endsWith('.csv')) reader.readAsText(file);
-                else reader.readAsBinaryString(file);
+                reader.readAsArrayBuffer(file);
             };
 
             const clearDB = () => {
@@ -386,9 +387,6 @@
                 speak("Base de datos limpiada.");
             };
 
-            // ==========================================
-            // ESCANEO DEL CLIMA (GEMINI) Y VUELOS
-            // ==========================================
             const handleImageUpload = (e) => {
                 const file = e.target.files[0];
                 if (!file) return;
@@ -473,7 +471,6 @@
                     return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
                 };
 
-                // GENERAR EXACTAMENTE 13 VUELOS
                 let newSchedule = [];
                 const isSuspendedAt11 = windMap[11] >= 40;
                 const isSuspendedAt12 = windMap[12] >= 40 && !isSuspendedAt11;
@@ -489,7 +486,6 @@
                     newSchedule.push({ time: applyVariance("07:20", true), type: "FORZOSO", wind: windMap[7] || 0, hour24: 7 }, { time: applyVariance("08:40"), type: "DINÁMICO", wind: windMap[8] || 0, hour24: 8 }, { time: applyVariance("10:00"), type: "DINÁMICO", wind: windMap[10] || 0, hour24: 10 }, { time: applyVariance("11:30"), type: "DINÁMICO", wind: windMap[11] || 0, hour24: 11 }, { time: applyVariance("12:45"), type: "DINÁMICO", wind: windMap[12] || 0, hour24: 12 });
                 }
 
-                // Asegurar los 13 espacios (faltan 8)
                 let remainingSpaces = 13 - newSchedule.length;
                 let startPM = 14; 
                 let endPM = 22; 
@@ -543,7 +539,6 @@
                  }
             };
 
-            // UI del Admin
             const todayStrUI = `${currentTime.getFullYear()}-${String(currentTime.getMonth() + 1).padStart(2, '0')}-${String(currentTime.getDate()).padStart(2, '0')}`;
             const todayShiftsUI = allMonthShifts.filter(s => s.date === todayStrUI);
 
@@ -666,7 +661,7 @@
                                         📅 CARGA INTELIGENTE DEL MES (ZOHO)
                                     </h3>
                                     <p className="text-[10px] text-slate-400 mb-4 leading-relaxed">
-                                        Sube el archivo de Excel (.xlsx) o CSV exportado de Zoho Shifts. El sistema procesará el calendario automáticamente.
+                                        Sube el archivo CSV de Zoho Shifts original (sin modificar). El sistema extraerá los datos automáticamente.
                                     </p>
                                     <input type="file" id="excelUpload" accept=".csv, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel" className="hidden" onChange={handleExcelUpload} />
                                     <button onClick={() => document.getElementById('excelUpload').click()} disabled={isUploading} className={`w-full font-bold py-3.5 rounded-lg text-sm shadow-[0_0_15px_rgba(79,70,229,0.3)] transition flex justify-center items-center gap-2 ${isUploading ? 'bg-indigo-800 text-indigo-300 cursor-not-allowed' : 'bg-indigo-600 hover:bg-indigo-500 text-white transform hover:scale-105'}`}>
