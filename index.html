@@ -5,13 +5,16 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dispatcher Pro - V42 Master</title>
     
+    <!-- Librerías de React -->
     <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     
+    <!-- Librería SheetJS para leer Zoho (CSV/XLSX) -->
     <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
     
+    <!-- Firebase V10 Compat -->
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore-compat.js"></script>
@@ -53,7 +56,10 @@
             
             const [settingsOpen, setSettingsOpen] = useState(false);
             const [geminiKey, setGeminiKey] = useState(localStorage.getItem('gemini_key') || '');
-            const [geminiModel, setGeminiModel] = useState(localStorage.getItem('gemini_model') || 'gemini-1.5-pro');
+            
+            // ¡AQUÍ ESTÁ LA CORRECCIÓN! Por defecto usamos 3.6-flash
+            const [geminiModel, setGeminiModel] = useState(localStorage.getItem('gemini_model') || 'gemini-3.6-flash');
+            
             const [modal, setModal] = useState({ isOpen: false, title: '', message: '', type: 'error' });
             
             const [loggedFlightsCount, setLoggedFlightsCount] = useState(0);
@@ -72,7 +78,7 @@
             const [currentOperator, setCurrentOperator] = useState('Sin asignar');
             const [isUploading, setIsUploading] = useState(false);
             
-            // Referencias estables para evitar bugs en el reloj (setInterval)
+            // Referencias estables
             const flightsRef = useRef([]);
             const isRainingRef = useRef(false);
             const isFoggyRef = useRef(false);
@@ -88,7 +94,6 @@
                 firebase.auth().signInAnonymously().then(() => {
                     authReady.current = true;
                     
-                    // Escuchar Turno Actual
                     unsubscribeTurno = db.collection('operaciones').doc('turno_actual').onSnapshot((doc) => {
                         if (doc.exists) {
                             const data = doc.data();
@@ -100,7 +105,6 @@
                         }
                     }, (err) => console.error("Error leyendo turno:", err));
                     
-                    // Escuchar Base de Operadores (Mensual)
                     unsubscribeMes = db.collection('operaciones').doc('turnos_mes').onSnapshot((doc) => {
                         if (doc.exists && doc.data().turnos) {
                             setAllMonthShifts(doc.data().turnos);
@@ -132,7 +136,7 @@
                 if (!audioUnlocked) {
                     setAudioUnlocked(true);
                     audioUnlockedRef.current = true;
-                    const u = new SpeechSynthesisUtterance("Sistema de voz activado y listo para instrucciones.");
+                    const u = new SpeechSynthesisUtterance("Sistema de voz activado.");
                     u.lang = 'es-MX';
                     u.volume = 0.3;
                     window.speechSynthesis.speak(u);
@@ -148,11 +152,9 @@
                     const m = now.getMinutes();
                     const s = now.getSeconds();
 
-                    // 1. Calcular tipo de turno
                     if (h >= 7 && h < 19) { setShiftName('Turno Diurno'); } 
                     else { setShiftName('Turno Nocturno'); }
                     
-                    // 2. Asignar Operador en Turno Dinámicamente (Soporta nocturnos)
                     const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
                     let yesterday = new Date(now);
                     yesterday.setDate(yesterday.getDate() - 1);
@@ -180,19 +182,16 @@
                     }
                     setCurrentOperator(prevOp => prevOp !== foundOp ? foundOp : prevOp);
 
-                    // 3. Reseteo de Medianoche
                     if (h === 0 && m === 0 && s === 0 && authReady.current) {
-                        speak("Iniciando nuevo día operativo. Reiniciando contadores de vuelo a cero.");
+                        speak("Iniciando nuevo día operativo. Reiniciando contadores.");
                         db.collection('operaciones').doc('turno_actual').set({
                             flights: [], loggedFlightsCount: 0, isRaining: false, isFoggy: false, windDataMap: {}
                         });
                     }
 
-                    // 4. Disparar alarmas de voz a los 0 segundos
                     if (s === 0) {
                         const timeStr = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
                         
-                        // Alarmas Base
                         if (h === 7 && m === 50) {
                             speak("Atención comandante. Es hora de la junta operativa de las siete cincuenta.");
                             setModal({ isOpen: true, title: '⏰ JUNTA OPERATIVA', message: 'Reunión de las 7:50 AM.', type: 'error' });
@@ -202,11 +201,11 @@
                             setModal({ isOpen: true, title: '📊 ELABORACIÓN DE KPIs', message: 'Hora de elaborar KPIs.', type: 'error' });
                         }
                         else if ((h === 12 && m === 5) || (h === 0 && m === 5)) {
-                            speak("Atención. Actualización de captura del clima requerida. Confirme para garantizar condiciones adecuadas.");
+                            speak("Atención. Actualización de captura del clima requerida.");
                             setModal({ isOpen: true, title: '🌤️ ACTUALIZAR CLIMA', message: 'Obligatorio validar condiciones seguras.', type: 'error' });
                         }
 
-                        // Alarma de Evidencia (Cada hora en punto)
+                        // Alarma de Evidencia por clima
                         if (m === 0) {
                             const currentWind = windDataMapRef.current[h] || 0;
                             const isAdverseWeather = isRainingRef.current || isFoggyRef.current || currentWind >= 40;
@@ -215,7 +214,6 @@
                             }
                         }
 
-                        // Alarmas 10/5 minutos previas al vuelo
                         if (flightsRef.current && flightsRef.current.length > 0 && !isRainingRef.current && !isFoggyRef.current) {
                             flightsRef.current.forEach(flight => {
                                 if (flight.wind < 42) {
@@ -264,7 +262,7 @@
                     analyzeImageWithAI(base64Data);
                 };
                 reader.readAsDataURL(file);
-                e.target.value = null; // Reset input
+                e.target.value = null; 
             };
 
             const analyzeImageWithAI = async (base64Image) => {
@@ -273,7 +271,7 @@
                 
                 try {
                     const key = geminiKey.trim();
-                    const modelName = geminiModel.trim() || 'gemini-1.5-pro';
+                    const modelName = geminiModel.trim() || 'gemini-3.6-flash';
                     const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${key}`;
                     
                     const payload = {
@@ -292,8 +290,8 @@
                     });
 
                     if (!response.ok) {
-                        const err = await response.text();
-                        throw new Error(`Detalle de IA: ${err}`);
+                        const err = await response.json();
+                        throw new Error(`Detalle de IA: \n${JSON.stringify(err, null, 2)}\n\nAsegúrate de que el "Modelo IA" en Ajustes sea válido.`);
                     }
 
                     const data = await response.json();
@@ -321,11 +319,7 @@
                 } catch (error) {
                     console.error("AI Error:", error);
                     speak("Error al analizar el clima.");
-                    setModal({ 
-                        isOpen: true, 
-                        title: 'Diagnóstico IA', 
-                        message: `No se pudo procesar.\n\nError: ${error.message}\n\nAsegúrate de que el "Modelo IA" en Ajustes sea válido (ej. gemini-1.5-pro).`
-                    });
+                    setModal({ isOpen: true, title: 'Diagnóstico IA', message: `No se pudo procesar.\n\nError: ${error.message}` });
                     generateIntelligentSchedule([]); 
                 } finally {
                     setIsScanning(false);
@@ -455,19 +449,13 @@
                 const currentMinute = currentTime.getMinutes();
                 const remaining = totalFlightsTarget - loggedFlightsCount;
 
-                if (remaining <= 0) {
-                    speak("Meta alcanzada. No se requieren vuelos adicionales hoy.");
-                    return;
-                }
+                if (remaining <= 0) return;
 
                 const endTime = 23 * 60 + 30; 
                 const currentTimeInMins = currentHour * 60 + currentMinute + 15;
                 const timeWindow = endTime - currentTimeInMins;
                 
-                if (timeWindow <= 0) {
-                    speak("Fuera de horario operativo. No es posible reprogramar.");
-                    return;
-                }
+                if (timeWindow <= 0) return;
 
                 const interval = Math.floor(timeWindow / remaining);
                 let newSchedule = [];
@@ -519,8 +507,30 @@
                         
                         let json = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "" });
                         let turnosExtraidos = [];
-                        
-                        const parseTimeStr = (tStr) => {
+                        let parseados = 0;
+
+                        const cleanName = (text) => {
+                            if(!text || typeof text !== 'string') return null;
+                            let lines = text.split('\n');
+                            for(let line of lines) {
+                                let c = line.replace(/Especialista|RPAS|OS|Audi|M[eé]xico|Turno|lun|mar|mi[eé]|jue|vie|s[aá]b|dom/gi, '').trim();
+                                if(c.length > 3 && !/\d/.test(c)) return c;
+                            }
+                            return null;
+                        };
+
+                        const extractDate = (text) => {
+                            let match = text.match(/\b(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})\b/);
+                            if(match) {
+                                let y = match[3].length === 2 ? `20${match[3]}` : match[3];
+                                let m = match[2]; let d = match[1];
+                                if(parseInt(m) > 12) { let temp = m; m = d; d = temp; }
+                                return `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+                            }
+                            return null;
+                        };
+
+                        const formatTime = (tStr) => {
                             if(!tStr) return null;
                             let match = tStr.match(/(\d{1,2})[:.](\d{2})\s*([ap]m)?/i);
                             if(!match) return null;
@@ -532,68 +542,34 @@
                             return `${String(h).padStart(2, '0')}:${m}`;
                         };
 
-                        const extraerFecha = (texto, rowIdx, grid) => {
-                            let matchStr = texto.match(/\b(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})\b/);
-                            if(matchStr) {
-                                let y = matchStr[3].length === 2 ? `20${matchStr[3]}` : matchStr[3];
-                                let m = matchStr[2]; let d = matchStr[1];
-                                if(parseInt(m) > 12) { let temp = m; m = d; d = temp; }
-                                return `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
-                            }
-
-                            for(let c = 0; c < grid[rowIdx].length; c++) {
-                                let cellText = String(grid[rowIdx][c]).trim();
-                                let match = cellText.match(/\b(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})\b/);
-                                if(match) {
-                                    let y = match[3].length === 2 ? `20${match[3]}` : match[3];
-                                    let m = match[2]; let d = match[1];
-                                    if(parseInt(m) > 12) { let temp = m; m = d; d = temp; }
-                                    return `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
-                                }
-                            }
-                            return null;
-                        };
-
-                        const limpiarNombreCompleto = (textoBruto) => {
-                            let lineas = textoBruto.split('\n');
-                            for(let linea of lineas) {
-                                if(/[a-zA-Z]{3,}/.test(linea) && !/\d/.test(linea)) {
-                                    let limpio = linea.replace(/Especialista|RPAS|OS|Audi|M[eé]xico|Turno|lun|mar|mi[eé]|jue|vie|s[aá]b|dom/gi, '').trim();
-                                    if(limpio.length > 3) return limpio; 
-                                }
-                            }
-                            return null;
-                        };
-
-                        for (let r = 0; r < json.length; r++) {
+                        for(let r=0; r<json.length; r++) {
                             let row = json[r];
-                            let rowText = row.join(" | ");
+                            let combinedText = row.join(" | ");
                             
-                            let timeRegex = /\b([01]?\d|2[0-3])[:.]([0-5]\d)(?:\s*[aApP][mM])?\b/g;
-                            let times = rowText.match(timeRegex);
+                            let timeMatches = combinedText.match(/\b([01]?\d|2[0-3])[:.]([0-5]\d)(?:\s*[aApP][mM])?\b/g);
                             
-                            if (times && times.length >= 2) {
-                                let start = parseTimeStr(times[0]);
-                                let end = parseTimeStr(times[1]);
-                                let dateStr = extraerFecha(rowText, r, json);
-                                let cleanName = null;
-
-                                for (let c = 0; c < row.length; c++) {
-                                    let cellText = String(row[c]).trim();
-                                    let tryName = limpiarNombreCompleto(cellText);
-                                    if(tryName) { cleanName = tryName; break; }
-                                }
+                            if (timeMatches && timeMatches.length >= 2) {
+                                parseados++;
+                                let start = formatTime(timeMatches[0]);
+                                let end = formatTime(timeMatches[1]);
                                 
-                                if(!cleanName) {
-                                    let possibleNames = row.filter(cell => {
-                                        let t = String(cell).trim();
-                                        return t.length > 5 && !/\d/.test(t) && !t.toLowerCase().includes('especialista');
-                                    });
-                                    if(possibleNames.length > 0) cleanName = possibleNames[0].trim();
+                                let dateStr = null;
+                                let name = null;
+
+                                for(let i = Math.max(0, r - 5); i <= Math.min(json.length - 1, r + 2); i++) {
+                                    let probeText = json[i].join(" | ");
+                                    if(!dateStr) dateStr = extractDate(probeText);
+                                    if(!name) {
+                                        for(let cell of json[i]) {
+                                            let n = cleanName(String(cell));
+                                            if(n) { name = n; break; }
+                                        }
+                                    }
+                                    if(dateStr && name) break;
                                 }
 
-                                if (dateStr && cleanName && start && end) {
-                                    turnosExtraidos.push({ date: dateStr, name: cleanName, start: start, end: end });
+                                if(start && end && dateStr && name) {
+                                    turnosExtraidos.push({ date: dateStr, name: name, start: start, end: end });
                                 }
                             }
                         }
@@ -610,8 +586,7 @@
                             speak(`Carga exitosa. ${uniqueTurnos.length} turnos guardados.`);
                             setModal({ isOpen: true, title: '✅ Carga Exitosa', message: `Turnos detectados: ${uniqueTurnos.length}`, type: 'success' });
                         } else {
-                            speak("Error. No se detectaron turnos válidos.");
-                            setModal({ isOpen: true, title: 'Archivo Irreconocible', message: 'No se encontraron patrones de hora o fechas correctos.', type: 'error' });
+                            setModal({ isOpen: true, title: 'Diagnóstico de Archivo', message: `Filas analizadas: ${json.length}\nHorarios detectados: ${parseados}\nTurnos formados: ${uniqueTurnos.length}\n\nEl sistema encontró horarios, pero no pudo encontrar nombres o fechas válidas junto a ellos. Revisa que el archivo original no esté en blanco.` });
                         }
 
                     } catch (error) {
@@ -629,7 +604,6 @@
                 speak("Base de datos de operadores limpiada.");
             };
 
-            // Helpers de renderizado
             const todayStrUI = `${currentTime.getFullYear()}-${String(currentTime.getMonth() + 1).padStart(2, '0')}-${String(currentTime.getDate()).padStart(2, '0')}`;
             const todayShiftsUI = allMonthShifts.filter(s => s.date === todayStrUI);
 
@@ -762,7 +736,6 @@
                          </button>
                     </div>
 
-                    {}
                     {adminOpen && (
                         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4" onClick={() => setAdminOpen(false)}>
                             <div className="bg-[#131826] border border-slate-800 rounded-2xl w-full max-w-md shadow-2xl p-6" onClick={e => e.stopPropagation()}>
