@@ -75,7 +75,7 @@
             const [currentOperator, setCurrentOperator] = useState('Sin asignar');
             const [isUploading, setIsUploading] = useState(false);
             
-            // Referencias para usarlas en intervalos sin problemas de renderizado
+            // Referencias
             const flightsRef = useRef([]);
             const isRainingRef = useRef(false);
             const allMonthShiftsRef = useRef([]);
@@ -89,7 +89,7 @@
                 auth.signInAnonymously().then(() => {
                     authReady.current = true;
                     
-                    // 1. Escuchar los datos del turno actual (Vuelos, clima) en tiempo real
+                    // 1. Escuchar turno actual
                     unsubscribeTurno = db.collection('operaciones').doc('turno_actual').onSnapshot((doc) => {
                         if (doc.exists) {
                             const data = doc.data();
@@ -109,7 +109,7 @@
                         }
                     }, (err) => console.error("Error leyendo turno:", err));
 
-                    // 2. Escuchar TODOS los turnos del mes subidos desde CSV/XLSX
+                    // 2. Escuchar TODO el mes de la nube
                     unsubscribeMes = db.collection('operaciones').doc('turnos_mes').onSnapshot((doc) => {
                         if (doc.exists && doc.data().turnos) {
                             setAllMonthShifts(doc.data().turnos);
@@ -141,9 +141,9 @@
                 if (!audioUnlocked) {
                     setAudioUnlocked(true);
                     audioUnlockedRef.current = true;
-                    const u = new SpeechSynthesisUtterance("Sistema de voz activado.");
+                    const u = new SpeechSynthesisUtterance("Sistema activado.");
                     u.lang = 'es-MX';
-                    u.volume = 0.3;
+                    u.volume = 0.1;
                     window.speechSynthesis.speak(u);
                 }
             };
@@ -177,23 +177,22 @@
                             let endMins = parseInt(endParts[0]) * 60 + parseInt(endParts[1]);
 
                             if (startMins <= endMins) {
-                                // Turno normal (ej. 07:00 a 19:00)
+                                // Turno normal de día
                                 if (currentMins >= startMins && currentMins < endMins) foundOp = shift.name;
                             } else {
-                                // Turno nocturno (ej. 18:50 a 07:00 del día siguiente)
+                                // Turno cruzado (ej. 18:50 a 07:00 del día siguiente)
                                 if (currentMins >= startMins || currentMins < endMins) foundOp = shift.name;
                             }
                         }
                     }
                     
-                    // Actualizar el estado si cambió el operador (para no renderizar de más)
                     setCurrentOperator(prevOp => prevOp !== foundOp ? foundOp : prevOp);
 
                     // ==========================================
-                    // CORTE DE CAJA A LAS 12:00 AM EXACTAS
+                    // CORTE DE CAJA (12:00 AM)
                     // ==========================================
                     if (h === 0 && m === 0 && s === 0 && authReady.current) {
-                        speak("Iniciando nuevo día de operaciones. Reiniciando base de datos a cero.");
+                        speak("Iniciando nuevo día de operaciones. Reiniciando contadores.");
                         db.collection('operaciones').doc('turno_actual').set({
                             flights: [],
                             loggedFlightsCount: 0,
@@ -208,8 +207,8 @@
                     if (s === 0) {
                         const timeStr = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
                         
-                        if (h === 7 && m === 50) speak("Atención comandante. Junta operativa en diez minutos.");
-                        else if (h === 12 && m === 0) speak("Atención. Hora de elaborar los reportes K P I.");
+                        if (h === 7 && m === 50) speak("Junta operativa en diez minutos.");
+                        else if (h === 12 && m === 0) speak("Hora de elaborar los reportes K P I.");
                         else if ((h === 12 && m === 5) || (h === 0 && m === 5)) speak("Actualización de captura del clima requerida.");
 
                         if (flightsRef.current && flightsRef.current.length > 0 && !isRainingRef.current) {
@@ -225,8 +224,8 @@
                                     let w10Str = `${String(warn10.getHours()).padStart(2, '0')}:${String(warn10.getMinutes()).padStart(2, '0')}`;
                                     let w5Str = `${String(warn5.getHours()).padStart(2, '0')}:${String(warn5.getMinutes()).padStart(2, '0')}`;
                                     
-                                    if (timeStr === w10Str) speak(`Faltan 10 minutos para el vuelo de las ${flight.time}.`);
-                                    if (timeStr === w5Str) speak(`Faltan 5 minutos para el despegue de las ${flight.time}. Salga a plataforma.`);
+                                    if (timeStr === w10Str) speak(`10 minutos para el vuelo de las ${flight.time}.`);
+                                    if (timeStr === w5Str) speak(`5 minutos para despegue. Salga a plataforma.`);
                                 }
                             });
                         }
@@ -253,16 +252,16 @@
                         let defaultMonth = new Date().getMonth() + 1;
                         let defaultYear = new Date().getFullYear();
 
-                        // 1. Extraer Mes y Año general del documento completo
+                        // 1. Extraer Mes y Año globales del documento por si las dudas
                         const fullText = json.map(row => row.join(' ')).join(' ');
-                        const dateRangeMatch = fullText.match(/(\d{2})[\/\-](\d{2})[\/\-](\d{4})/);
-                        if (dateRangeMatch) {
-                            // Asumimos formato DD/MM/YYYY o similar (Zoho exporta con el mes y año en las cabeceras)
-                            defaultMonth = parseInt(dateRangeMatch[2]);
-                            defaultYear = parseInt(dateRangeMatch[3]);
+                        const dateRegex = /(?:(\d{2})[\/\-])?(\d{2})[\/\-](\d{4})/;
+                        const dateMatch = fullText.match(dateRegex);
+                        if (dateMatch) {
+                            defaultMonth = parseInt(dateMatch[2]);
+                            defaultYear = parseInt(dateMatch[3]);
                         }
 
-                        // 2. MODO 1: ESCÁNER PROFUNDO DE CUADRÍCULA (Modo Calendario)
+                        // 2. MODO TERMINATOR: Analizar cada celda del archivo buscando horarios
                         for (let r = 0; r < json.length; r++) {
                             let row = json[r];
                             if (!row) continue;
@@ -270,122 +269,135 @@
                             for (let c = 0; c < row.length; c++) {
                                 let cellValue = row[c];
                                 if (!cellValue) continue;
-                                let cellText = String(cellValue);
-                                
-                                let lines = cellText.split('\n');
-                                
-                                for (let i = 0; i < lines.length; i++) {
-                                    let line = lines[i].trim();
-                                    // Buscar hora (ej. 06:50 - 19:00 o 18:50 - 07:00)
-                                    let timeMatch = line.match(/(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})/);
-                                    
-                                    if (timeMatch) {
-                                        let start = timeMatch[1];
-                                        let end = timeMatch[2];
-                                        
-                                        // Buscar nombre en la misma celda (o en la siguiente si la celda solo tiene horas)
-                                        let rawName = line.replace(timeMatch[0], '').trim();
-                                        if (!rawName && i + 1 < lines.length) rawName = lines[i+1].trim();
-                                        if (!rawName && r + 1 < json.length && json[r+1][c]) {
-                                            rawName = String(json[r+1][c]).split('\n')[0].trim();
-                                        }
-                                        
-                                        // Filtro Estricto: Limpiar puestos y títulos basura
-                                        rawName = rawName.replace(/Especialista.*/gi, '').replace(/Audi.*/gi, '').replace(/RPAS.*/gi, '').replace(/OS/gi, '').replace(/[-]/g, '').trim();
-                                        let cleanName = rawName.split(/\s+/).slice(0, 2).join(' '); // Tomar máximo 2 palabras (Nombre y Apellido)
-                                        if (!cleanName || cleanName.length < 2) cleanName = "Operador";
+                                let cellText = String(cellValue).trim();
 
-                                        // Buscar el Día en celdas superiores de la misma columna
-                                        let day = null;
-                                        for (let lookUpRow = r - 1; lookUpRow >= 0; lookUpRow--) {
-                                            let upCell = json[lookUpRow][c];
-                                            if (upCell) {
-                                                let upText = String(upCell).trim();
-                                                if (!upText.match(/\d{1,2}:\d{2}/) && !upText.match(/Especialista/i)) {
-                                                    // Detecta "27", "05", etc. solos en la celda superior
-                                                    let numMatch = upText.match(/^0?([1-9]|[12]\d|3[01])$/);
-                                                    if (numMatch) {
-                                                        day = parseInt(numMatch[1]);
-                                                        break;
-                                                    }
-                                                    // Detecta "Mon 27", "27 Lun", "01/07", etc.
-                                                    let textMatch = upText.match(/(?:lun|mar|mié|jue|vie|sáb|dom|mon|tue|wed|thu|fri|sat|sun)[^\d]*([1-9]|[12]\d|3[01])/i);
-                                                    if (!textMatch) textMatch = upText.match(/([1-9]|[12]\d|3[01])[^\d]*(?:lun|mar|mié|jue|vie|sáb|dom|mon|tue|wed|thu|fri|sat|sun)/i);
-                                                    if (textMatch) {
-                                                        day = parseInt(textMatch[1]);
-                                                        break;
-                                                    }
+                                // Expresión regular Súper Amplia: Encuentra "06:50 - 19:00" o "6:50 a 19:00"
+                                let timeMatch = cellText.match(/(\d{1,2}:\d{2})\s*[-aA]\s*(\d{1,2}:\d{2})/);
+
+                                if (timeMatch) {
+                                    let start = timeMatch[1];
+                                    let end = timeMatch[2];
+
+                                    // ===== EXTRAER EL NOMBRE =====
+                                    // Limpiar la hora de la celda para ver qué queda
+                                    let rawName = cellText.replace(timeMatch[0], '').trim();
+                                    
+                                    // Si todo estaba pegado en la misma celda con saltos de línea (típico CSV de Zoho)
+                                    let lines = rawName.split(/\r?\n/);
+                                    rawName = lines[0].trim(); // Tomar primera linea restante
+
+                                    // Si no hay nombre útil, buscar en las celdas de abajo o de la izquierda
+                                    if (!rawName || rawName.match(/Especialista|Audi|OS/i) || rawName.length < 3) {
+                                        let foundName = "";
+                                        // Buscar abajo hasta 2 filas
+                                        for(let i=1; i<=2; i++) {
+                                            if (json[r+i] && json[r+i][c]) {
+                                                let downText = String(json[r+i][c]).trim();
+                                                // Que sea largo, no sea una hora, no sea "Especialista"
+                                                if (downText.length > 2 && !downText.match(/\d{2}:\d{2}/) && !downText.match(/Especialista|Audi|OS/i)) {
+                                                    foundName = downText; 
+                                                    break;
                                                 }
                                             }
                                         }
-                                        
-                                        if (day) {
-                                            // Formatear la fecha al estándar ISO YYYY-MM-DD
-                                            let dateStr = `${defaultYear}-${String(defaultMonth).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-                                            turnosExtraidos.push({ date: dateStr, name: cleanName, start: start, end: end });
+                                        // Si no, buscar izquierda
+                                        if(!foundName && c > 0 && json[r][c-1]) {
+                                             let leftText = String(json[r][c-1]).trim();
+                                             if (leftText.length > 2 && !leftText.match(/\d{2}:\d{2}/) && !leftText.match(/Especialista|Audi|OS/i)) {
+                                                 foundName = leftText;
+                                             }
                                         }
+                                        rawName = foundName;
+                                    }
+
+                                    // Super Filtro de Limpieza
+                                    let cleanName = rawName
+                                        .replace(/Especialista.*/gi, '')
+                                        .replace(/Audi.*/gi, '')
+                                        .replace(/RPAS.*/gi, '')
+                                        .replace(/OS/gi, '')
+                                        .replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑ\s]/g, '') // Quitar números y basuritas
+                                        .trim();
+
+                                    // Dejar máximo Nombre y Primer Apellido
+                                    let nameParts = cleanName.split(/\s+/).filter(p => p.length > 2);
+                                    cleanName = nameParts.slice(0, 2).join(' ') || "Operador";
+
+                                    // ===== EXTRAER LA FECHA =====
+                                    let day = null;
+                                    
+                                    // 1. Mirar hacia ARRIBA en la columna (Modo Calendario)
+                                    for (let lookUpRow = r - 1; lookUpRow >= 0; lookUpRow--) {
+                                        let upCell = json[lookUpRow] ? json[lookUpRow][c] : null;
+                                        if (upCell) {
+                                            let upText = String(upCell).trim();
+                                            // Match exacto "27"
+                                            if (/^\s*0?[1-9]|[12]\d|3[01]\s*$/.test(upText)) { 
+                                                day = parseInt(upText); break; 
+                                            }
+                                            // Match corto "Mon 27" o "27 Lun"
+                                            let textMatch = upText.match(/[^\d]*([1-9]|[12]\d|3[01])\b/);
+                                            if (textMatch && upText.length < 15) { 
+                                                day = parseInt(textMatch[1]); break; 
+                                            }
+                                            // Match Completo "27/07/2026"
+                                            let fullDateMatch = upText.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
+                                            if (fullDateMatch) { 
+                                                day = parseInt(fullDateMatch[1]); 
+                                                defaultMonth = parseInt(fullDateMatch[2]); 
+                                                defaultYear = parseInt(fullDateMatch[3]); 
+                                                break; 
+                                            }
+                                        }
+                                    }
+
+                                    // 2. Si falló arriba, buscar en la MISMA fila (Modo Lista CSV)
+                                    if (!day) {
+                                        let rowStr = row.join(' '); // Unir toda la fila en texto
+                                        let fullDateMatch = rowStr.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
+                                        if (fullDateMatch) {
+                                            day = parseInt(fullDateMatch[1]);
+                                            defaultMonth = parseInt(fullDateMatch[2]);
+                                            defaultYear = parseInt(fullDateMatch[3]);
+                                        }
+                                    }
+
+                                    // 3. Guardar el turno si encontramos una fecha (día)
+                                    if (day) {
+                                        let dateStr = `${defaultYear}-${String(defaultMonth).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                                        turnosExtraidos.push({ date: dateStr, name: cleanName, start: start, end: end });
                                     }
                                 }
                             }
                         }
 
-                        // 3. MODO 2: ESCÁNER DE LISTA (Respaldo si el Modo Calendario falla por formato CSV plano)
-                        if (turnosExtraidos.length === 0) {
-                            for (let r = 0; r < json.length; r++) {
-                                let row = json[r];
-                                let rowStr = row.join(' ');
-                                
-                                let timeMatch = rowStr.match(/(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})/);
-                                let dateMatch = rowStr.match(/(\d{2})[\/\-](\d{2})[\/\-](\d{4})/);
-                                
-                                if (timeMatch && dateMatch) {
-                                    let possibleNames = row.filter(cell => {
-                                        let s = String(cell);
-                                        return !s.match(/(\d{2})[\/\-](\d{2})[\/\-](\d{4})/) &&
-                                               !s.match(/(\d{1,2}:\d{2})/) &&
-                                               !s.match(/Especialista/i) &&
-                                               !s.match(/RPAS/i) &&
-                                               !s.match(/Audi/i) &&
-                                               s.trim().length > 2;
-                                    });
-                                    
-                                    let rawName = possibleNames.length > 0 ? possibleNames[0].trim() : "Operador";
-                                    let cleanName = rawName.split(/\s+/).slice(0, 2).join(' ');
-                                    
-                                    let p1 = parseInt(dateMatch[1]);
-                                    let p2 = parseInt(dateMatch[2]);
-                                    let y = dateMatch[3];
-                                    let m = p2;
-                                    let d = p1;
-                                    // Adivinar si es MM/DD o DD/MM
-                                    if (p1 <= 12 && p2 > 12) { m = p1; d = p2; }
-                                    
-                                    turnosExtraidos.push({
-                                        date: `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`,
-                                        name: cleanName,
-                                        start: timeMatch[1],
-                                        end: timeMatch[2]
-                                    });
-                                }
+                        // Filtrar duplicados (Si Zoho fusionó celdas, a veces un turno se lee 2 veces)
+                        const uniqueTurnos = [];
+                        const seen = new Set();
+                        turnosExtraidos.forEach(t => {
+                            const id = `${t.date}-${t.name}-${t.start}`;
+                            if(!seen.has(id)) {
+                                seen.add(id);
+                                uniqueTurnos.push(t);
                             }
-                        }
+                        });
 
-                        if (turnosExtraidos.length > 0) {
-                            db.collection('operaciones').doc('turnos_mes').set({ turnos: turnosExtraidos });
-                            speak(`Documento analizado. Se cargaron ${turnosExtraidos.length} turnos exitosamente.`);
-                            setModal({ isOpen: true, title: '✅ Carga Exitosa', message: `Se extrajeron ${turnosExtraidos.length} turnos de la cuadrícula.\nYa puedes cerrar este panel.`, type: 'success' });
+                        // Resultado Final
+                        if (uniqueTurnos.length > 0) {
+                            db.collection('operaciones').doc('turnos_mes').set({ turnos: uniqueTurnos });
+                            speak(`Carga de ${uniqueTurnos.length} turnos exitosa.`);
+                            setModal({ isOpen: true, title: '✅ Carga Exitosa', message: `El escáner profundo encontró ${uniqueTurnos.length} turnos para este mes.\n\nEl sistema cambiará al operador correspondiente automáticamente.`, type: 'success' });
                         } else {
-                            speak("El sistema no logró encontrar turnos válidos.");
-                            setModal({ isOpen: true, title: 'Formato Irreconocible', message: 'No se encontraron horarios válidos (ej. 07:00 - 15:00) ni fechas en columnas.', type: 'error' });
+                            speak("El sistema no logró encontrar turnos.");
+                            setModal({ isOpen: true, title: 'Archivo Vacío', message: 'El escáner leyó el archivo pero no pudo encontrar patrones de Hora (ej. 07:00 - 15:00) y Fechas juntos. Revisa tu exportación.', type: 'error' });
                         }
 
                     } catch (error) {
                         console.error("Error parseando Excel/CSV:", error);
-                        setModal({ isOpen: true, title: 'Error de Archivo', message: 'No se pudo leer el archivo. Intenta exportarlo nuevamente.', type: 'error' });
+                        setModal({ isOpen: true, title: 'Error Crítico', message: 'El archivo está corrupto o protegido.', type: 'error' });
                     } finally {
                         setIsUploading(false);
-                        // Resetear el input file para poder subir el mismo archivo de nuevo si se desea
-                        e.target.value = null;
+                        e.target.value = null; // Reset input
                     }
                 };
                 
@@ -417,7 +429,7 @@
 
             const analyzeImageWithAI = async (base64Image) => {
                 setIsScanning(true);
-                speak("Analizando el clima y ráfagas de viento...");
+                speak("Analizando clima...");
                 
                 try {
                     const key = geminiKey.trim();
@@ -426,7 +438,7 @@
                     const payload = {
                         contents: [{
                             parts: [
-                                { text: "Analiza el clima. Si dice 'Lluvia 64%' o similar, tómalo como APTO y viento 0. Si dice 'Apto para volar', viento es 0. Si dice 'Ráfagas fuertes' o vientos > 40, viento es 45. Devuelve JSON con 'hourlyData' teniendo 'time' y 'wind' numérico." },
+                                { text: "Analiza el clima. REGLA ESTRICTA 11:00am: Si solo dice 'UV' (ej. 'UV 10', 'Extremo UV 13') ES APTO PARA VOLAR, viento 0. Regla general: Si dice 'Apto para volar', viento 0. Si dice 'Ráfagas fuertes' o vientos > 40, viento 45. Si dice 'Lluvia 64%' o similar, trátalo como viento 0. Devuelve JSON con 'hourlyData' teniendo 'time' (ej. '11:00am') y 'wind' numérico." },
                                 { inline_data: { mime_type: "image/jpeg", data: base64Image } }
                             ]
                         }]
@@ -442,7 +454,7 @@
                     const parsedData = JSON.parse(aiResponseText);
                     if (parsedData && parsedData.hourlyData) {
                          generateIntelligentSchedule(parsedData.hourlyData);
-                         speak("Itinerario de trece vuelos generado correctamente.");
+                         speak("Itinerario de trece vuelos generado.");
                     } else throw new Error("Formato incorrecto devuelto por IA.");
 
                 } catch (error) {
@@ -458,52 +470,63 @@
                 let windMap = {};
                 for(let i=0; i<24; i++) windMap[i] = 0;
 
-                if (hourlyWeatherData) {
-                     hourlyWeatherData.forEach(dp => {
-                          let m = dp.time.match(/(\d+):00([ap]m)/i);
-                          if (m) {
-                               let hour = parseInt(m[1]);
-                               if (m[2].toLowerCase() === 'pm' && hour < 12) hour += 12;
-                               if (m[2].toLowerCase() === 'am' && hour === 12) hour = 0;
-                               windMap[hour] = dp.wind;
+                if (hourlyWeatherData && hourlyWeatherData.length > 0) {
+                     hourlyWeatherData.forEach(dataPoint => {
+                          let hourMatch = dataPoint.time.match(/(\d+):00([ap]m)/i);
+                          if (hourMatch) {
+                               let hour = parseInt(hourMatch[1]);
+                               let ampm = hourMatch[2].toLowerCase();
+                               if (ampm === 'pm' && hour < 12) hour += 12;
+                               if (ampm === 'am' && hour === 12) hour = 0;
+                               windMap[hour] = dataPoint.wind;
                           }
                      });
                 }
+                
                 db.collection('operaciones').doc('turno_actual').set({ windDataMap: windMap }, { merge: true });
 
                 const applyVariance = (timeStr, isForzoso = false) => {
                     if (isForzoso) return timeStr; 
-                    let p = timeStr.split(':');
-                    let d = new Date(2026, 0, 1, parseInt(p[0]), parseInt(p[1]) + (Math.floor(Math.random() * 31) - 15));
-                    return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+                    let parts = timeStr.split(':');
+                    let variance = Math.floor(Math.random() * 31) - 15; 
+                    let date = new Date(2026, 0, 1, parseInt(parts[0]), parseInt(parts[1]) + variance);
+                    return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
                 };
 
-                // Base para asegurar exactamente 13 vuelos en el día
-                let baseTimes = ["07:20", "08:35", "09:50", "11:05", "12:20", "13:35", "14:50", "16:05", "17:20", "18:35", "19:50", "21:05", "22:20"];
-                
-                let newSchedule = baseTimes.map((timeStr, index) => {
-                    let isForzoso = (index === 0 || index === 8 || index === 11);
-                    let finalTime = applyVariance(timeStr, isForzoso);
-                    let h24 = parseInt(finalTime.split(':')[0]);
-                    return { time: finalTime, type: isForzoso ? "FORZOSO" : "DINÁMICO", wind: windMap[h24] >= 40 ? 45 : (windMap[h24] || 0), hour24: h24 };
-                });
+                let newSchedule = [];
+                const isSuspendedAt11 = windMap[11] >= 40;
+                const isSuspendedAt12 = windMap[12] >= 40 && !isSuspendedAt11;
+                const isSuspendedAt13 = windMap[13] >= 40 && !isSuspendedAt11 && !isSuspendedAt12;
 
-                db.collection('operaciones').doc('turno_actual').set({ flights: newSchedule }, { merge: true });
+                if (isSuspendedAt11) {
+                    newSchedule.push({ time: applyVariance("06:15"), type: "DINÁMICO", wind: windMap[6] || 0, hour24: 6 }, { time: applyVariance("07:20", true), type: "FORZOSO", wind: windMap[7] || 0, hour24: 7 }, { time: applyVariance("08:30"), type: "DINÁMICO", wind: windMap[8] || 0, hour24: 8 }, { time: applyVariance("09:45"), type: "DINÁMICO", wind: windMap[9] || 0, hour24: 9 });
+                } else if (isSuspendedAt12) {
+                    newSchedule.push({ time: applyVariance("07:20", true), type: "FORZOSO", wind: windMap[7] || 0, hour24: 7 }, { time: applyVariance("08:20"), type: "DINÁMICO", wind: windMap[8] || 0, hour24: 8 }, { time: applyVariance("09:20"), type: "DINÁMICO", wind: windMap[9] || 0, hour24: 9 }, { time: applyVariance("10:20"), type: "DINÁMICO", wind: windMap[10] || 0, hour24: 10 }, { time: applyVariance("11:20"), type: "DINÁMICO", wind: windMap[11] || 0, hour24: 11 });
+                } else if (isSuspendedAt13) {
+                    newSchedule.push({ time: applyVariance("07:20", true), type: "FORZOSO", wind: windMap[7] || 0, hour24: 7 }, { time: applyVariance("08:35"), type: "DINÁMICO", wind: windMap[8] || 0, hour24: 8 }, { time: applyVariance("09:50"), type: "DINÁMICO", wind: windMap[9] || 0, hour24: 9 }, { time: applyVariance("11:00"), type: "DINÁMICO", wind: windMap[11] || 0, hour24: 11 }, { time: applyVariance("12:15"), type: "DINÁMICO", wind: windMap[12] || 0, hour24: 12 });
+                } else {
+                    newSchedule.push({ time: applyVariance("07:20", true), type: "FORZOSO", wind: windMap[7] || 0, hour24: 7 }, { time: applyVariance("08:40"), type: "DINÁMICO", wind: windMap[8] || 0, hour24: 8 }, { time: applyVariance("10:00"), type: "DINÁMICO", wind: windMap[10] || 0, hour24: 10 }, { time: applyVariance("11:30"), type: "DINÁMICO", wind: windMap[11] || 0, hour24: 11 }, { time: applyVariance("12:45"), type: "DINÁMICO", wind: windMap[12] || 0, hour24: 12 });
+                }
+
+                newSchedule.push({ time: applyVariance("14:00", true), type: "FORZOSO", wind: windMap[14] || 0, hour24: 14 }, { time: applyVariance("15:30"), type: "DINÁMICO", wind: windMap[15] || 0, hour24: 15 }, { time: applyVariance("17:00", true), type: "FORZOSO", wind: windMap[17] || 0, hour24: 17 }, { time: applyVariance("18:30"), type: "DINÁMICO", wind: windMap[18] || 0, hour24: 18 }, { time: applyVariance("20:00"), type: "DINÁMICO", wind: windMap[20] || 0, hour24: 20 }, { time: applyVariance("21:30", true), type: "FORZOSO", wind: windMap[21] || 0, hour24: 21 }, { time: applyVariance("22:45"), type: "DINÁMICO", wind: windMap[22] || 0, hour24: 22 });
+                
+                const finalSchedule = newSchedule.map(f => ({ ...f, wind: windMap[f.hour24] >= 40 ? 45 : f.wind }));
+                db.collection('operaciones').doc('turno_actual').set({ flights: finalSchedule }, { merge: true });
             };
 
             const toggleRainProtocol = () => {
                 const newState = !isRaining;
                 db.collection('operaciones').doc('turno_actual').set({ isRaining: newState }, { merge: true });
                 if (newState) speak("Operaciones suspendidas por lluvia local."); 
-                else { speak("Lluvia finalizada. Reprogramando vuelos faltantes."); recalculateAfterRain(); }
+                else { speak("Lluvia finalizada. Reprogramando vuelos."); recalculateAfterRain(); }
             };
 
             const recalculateAfterRain = () => {
                 const remaining = totalFlightsTarget - loggedFlightsCountRef.current;
                 if (remaining <= 0) return;
                 
-                const currentSlot = currentTime.getHours() * 60 + currentTime.getMinutes() + 15; // Dar 15 min de margen
-                const timeWindow = (23 * 60 + 30) - currentSlot; // Límite hasta las 23:30
+                const currentSlot = currentTime.getHours() * 60 + currentTime.getMinutes() + 15; 
+                const timeWindow = (23 * 60 + 30) - currentSlot; 
                 if (timeWindow <= 0) return;
 
                 const interval = Math.floor(timeWindow / remaining);
@@ -526,7 +549,7 @@
                  }
             };
 
-            // Filtrar los turnos correspondientes al día actual para mostrarlos en el modal de admin
+            // Filtrado de visualización en panel admin
             const todayStrUI = `${currentTime.getFullYear()}-${String(currentTime.getMonth() + 1).padStart(2, '0')}-${String(currentTime.getDate()).padStart(2, '0')}`;
             const todayShiftsUI = allMonthShifts.filter(s => s.date === todayStrUI);
 
@@ -642,14 +665,14 @@
                                 
                                 <div className="bg-indigo-900/20 border border-indigo-500/30 p-4 rounded-xl mb-6 text-center">
                                     <h3 className="text-xs font-black tracking-widest text-indigo-400 uppercase mb-2">
-                                        📅 CARGA INTELIGENTE DEL MES (ZOHO)
+                                        📅 CARGA INTELIGENTE (ZOHO CSV/XLSX)
                                     </h3>
                                     <p className="text-[10px] text-slate-400 mb-4 leading-relaxed">
-                                        Sube el archivo de Excel (.xlsx) o CSV original de Zoho Shifts. El sistema procesará toda la cuadrícula y asignará operadores automáticamente cada día.
+                                        Sube tu archivo (incluso si se ve desordenado). El Escáner Profundo encontrará fechas, horas y limpiará los nombres automáticamente.
                                     </p>
                                     <input type="file" id="excelUpload" accept=".csv, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel" className="hidden" onChange={handleExcelUpload} />
                                     <button onClick={() => document.getElementById('excelUpload').click()} disabled={isUploading} className={`w-full font-bold py-3.5 rounded-lg text-sm shadow-[0_0_15px_rgba(79,70,229,0.3)] transition flex justify-center items-center gap-2 ${isUploading ? 'bg-indigo-800 text-indigo-300 cursor-not-allowed' : 'bg-indigo-600 hover:bg-indigo-500 text-white transform hover:scale-105'}`}>
-                                        {isUploading ? '⏳ Analizando cuadrícula...' : '📄 Subir Horario Mensual (.CSV o .XLSX)'}
+                                        {isUploading ? '⏳ Escaneando archivo...' : '📄 Subir Horario Mensual'}
                                     </button>
                                 </div>
 
@@ -661,7 +684,7 @@
                                 <div className="space-y-2 mb-6 max-h-48 overflow-y-auto pr-1">
                                     {todayShiftsUI.length === 0 ? (
                                         <div className="text-center py-6 bg-[#0f172a] rounded-xl border border-slate-800 text-xs text-slate-500">
-                                            No hay turnos registrados para hoy. Revisa haber subido el mes correcto.
+                                            No hay turnos para la fecha actual.
                                         </div>
                                     ) : (
                                         todayShiftsUI.map((op, i) => (
@@ -682,7 +705,6 @@
                         </div>
                     )}
 
-                    {}
                     {settingsOpen && (
                         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4" onClick={(e) => e.stopPropagation()}>
                             <div className="bg-[#131826] border border-slate-800 rounded-2xl w-full max-w-sm shadow-2xl p-6">
