@@ -10,6 +10,11 @@
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     
+    <!-- RESTAURADO A TU VERSIÓN ORIGINAL DE FIREBASE QUE SÍ TIENE PERMISOS -->
+    <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore-compat.js"></script>
+    
     <style>
         body { background-color: #0B0F19; color: white; font-family: 'Inter', system-ui, sans-serif; margin: 0; padding: 0; }
         .glass-card { background-color: #131826; border: 1px solid #1f2937; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.5); }
@@ -19,13 +24,8 @@
 <body>
     <div id="root"></div>
 
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-
-        // Configuración Firebase
-        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {
+    <script type="text/babel">
+        const firebaseConfig = {
             apiKey: "AIzaSyDXjwv133-dIKyprCktTUkjx_adAz1DhAY",
             authDomain: "control-vuelos.firebaseapp.com",
             projectId: "control-vuelos",
@@ -34,32 +34,37 @@
             appId: "1:756032981781:web:451641e72abe3692c0771c"
         };
         
-        const app = initializeApp(firebaseConfig);
-        const db = getFirestore(app);
-        const auth = getAuth(app);
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-dispatcher';
+        if (!firebase.apps.length) {
+            firebase.initializeApp(firebaseConfig);
+        }
+        const db = firebase.firestore();
+        const auth = firebase.auth();
 
-        // Exponemos funciones para React
-        window.FB_Db = db;
-        window.FB_Auth = auth;
-        window.FB_AppId = appId;
-        window.FB_doc = doc;
-        window.FB_setDoc = setDoc;
-        window.FB_onSnapshot = onSnapshot;
-        window.FB_signInAnonymously = signInAnonymously;
-        window.FB_signInWithCustomToken = signInWithCustomToken;
-        window.FB_initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
-    </script>
-
-    <script type="text/babel">
         const { useState, useEffect, useRef } = React;
 
-        const getSharedDocRef = () => {
-            if (typeof __app_id !== 'undefined') {
-                return window.FB_doc(window.FB_Db, 'artifacts', window.FB_AppId, 'public', 'data', 'operaciones', 'turno_actual');
-            } else {
-                return window.FB_doc(window.FB_Db, 'operaciones', 'turno_actual');
-            }
+        // Función global para obtener múltiples formatos de fecha de hoy (usado para buscar coincidencias en el CSV)
+        const getTodayStrings = () => {
+            const today = new Date();
+            const d = String(today.getDate()).padStart(2, '0');
+            const d_noPad = String(today.getDate());
+            const m = String(today.getMonth() + 1).padStart(2, '0');
+            const m_noPad = String(today.getMonth() + 1);
+            const yyyy = today.getFullYear();
+            const yy = String(yyyy).slice(2);
+            
+            const meses = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+            const months = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
+            const mesTxt = meses[today.getMonth()];
+            const monthTxt = months[today.getMonth()];
+
+            return [
+                `${d}/${m}/${yyyy}`, `${d}-${m}-${yyyy}`, `${yyyy}-${m}-${d}`, `${yyyy}/${m}/${d}`,
+                `${d}/${m}/${yy}`, `${d}-${m}-${yy}`, `${m}/${d}/${yyyy}`, `${m}-${d}-${yyyy}`,
+                `${d_noPad}/${m_noPad}/${yyyy}`, `${m_noPad}/${d_noPad}/${yyyy}`,
+                `${d_noPad}/${m_noPad}/${yy}`, `${m_noPad}/${d_noPad}/${yy}`,
+                `${d_noPad}-${mesTxt}-${yyyy}`, `${d_noPad}-${monthTxt}-${yyyy}`,
+                `${d_noPad} ${mesTxt} ${yyyy}`, `${d_noPad} ${monthTxt} ${yyyy}`
+            ].map(s => s.toLowerCase());
         };
 
         function App() {
@@ -88,7 +93,6 @@
             const [audioUnlocked, setAudioUnlocked] = useState(false);
             const audioUnlockedRef = useRef(false);
             
-            // Referencias
             const flightsRef = useRef([]);
             const isRainingRef = useRef(false);
             const loggedFlightsCountRef = useRef(0);
@@ -97,58 +101,52 @@
             useEffect(() => {
                 let unsubscribe = () => {};
 
-                const initFirebase = async () => {
-                    try {
-                        if (window.FB_initialAuthToken) {
-                            await window.FB_signInWithCustomToken(window.FB_Auth, window.FB_initialAuthToken);
-                        } else {
-                            await window.FB_signInAnonymously(window.FB_Auth);
-                        }
-                        
-                        authReady.current = true;
-                        
-                        unsubscribe = window.FB_onSnapshot(getSharedDocRef(), (docSnap) => {
-                            if (docSnap.exists()) {
-                                const data = docSnap.data();
-                                
-                                if (data.flights) {
-                                    setFlights(data.flights);
-                                    flightsRef.current = data.flights;
-                                } else {
-                                    setFlights([]);
-                                    flightsRef.current = [];
-                                }
-                                
-                                if (data.loggedFlightsCount !== undefined) {
-                                    setLoggedFlightsCount(data.loggedFlightsCount);
-                                    loggedFlightsCountRef.current = data.loggedFlightsCount;
-                                }
-                                
-                                if (data.isRaining !== undefined) {
-                                    setIsRaining(data.isRaining);
-                                    isRainingRef.current = data.isRaining;
-                                }
-                                
-                                if (data.windDataMap) setWindDataMap(data.windDataMap);
-                                
-                                if (data.operators) {
-                                    setOperators(data.operators);
-                                    operatorsRef.current = data.operators;
-                                } else {
-                                    setOperators([]);
-                                    operatorsRef.current = [];
-                                }
+                auth.signInAnonymously().then(() => {
+                    authReady.current = true;
+                    
+                    unsubscribe = db.collection('operaciones').doc('turno_actual').onSnapshot((doc) => {
+                        if (doc.exists) {
+                            const data = doc.data();
+                            
+                            if (data.flights) {
+                                setFlights(data.flights);
+                                flightsRef.current = data.flights;
+                            } else {
+                                setFlights([]);
+                                flightsRef.current = [];
                             }
-                        }, (err) => {
-                            console.error("Error sincronizando datos:", err);
-                        });
-                        
-                    } catch (error) {
-                        console.error("Error Auth Firebase:", error);
-                    }
-                };
+                            
+                            if (data.loggedFlightsCount !== undefined) {
+                                setLoggedFlightsCount(data.loggedFlightsCount);
+                                loggedFlightsCountRef.current = data.loggedFlightsCount;
+                            } else {
+                                setLoggedFlightsCount(0);
+                                loggedFlightsCountRef.current = 0;
+                            }
+                            
+                            if (data.isRaining !== undefined) {
+                                setIsRaining(data.isRaining);
+                                isRainingRef.current = data.isRaining;
+                            }
+                            
+                            if (data.windDataMap) setWindDataMap(data.windDataMap);
+                            
+                            if (data.operators) {
+                                setOperators(data.operators);
+                                operatorsRef.current = data.operators;
+                            } else {
+                                setOperators([]);
+                                operatorsRef.current = [];
+                            }
+                        }
+                    }, (err) => {
+                        console.error("Error sincronizando datos:", err);
+                        setModal({ isOpen: true, title: 'Error de Conexión', message: 'No se pudo sincronizar con la base de datos.', type: 'error' });
+                    });
+                }).catch((error) => {
+                    console.error("Error Auth Firebase:", error);
+                });
 
-                setTimeout(initFirebase, 500);
                 return () => unsubscribe();
             }, []);
 
@@ -170,7 +168,7 @@
                 if (!audioUnlocked) {
                     setAudioUnlocked(true);
                     audioUnlockedRef.current = true;
-                    const u = new SpeechSynthesisUtterance("Sistema de voz activado y listo para instrucciones.");
+                    const u = new SpeechSynthesisUtterance("Sistema activado.");
                     u.lang = 'es-MX';
                     u.volume = 0.3;
                     window.speechSynthesis.speak(u);
@@ -189,38 +187,52 @@
                     if (h >= 7 && h < 19) setShiftName('Turno Diurno');
                     else setShiftName('Turno Nocturno');
                     
+                    // FILTRO DE OPERADORES
+                    const todayStrings = getTodayStrings();
                     let foundOperator = 'Sin asignar';
                     const currentTotalMins = h * 60 + m;
+
                     if (operatorsRef.current && operatorsRef.current.length > 0) {
                         for (let op of operatorsRef.current) {
-                            let startParts = op.start.split(':');
-                            let endParts = op.end.split(':');
-                            let startTotal = parseInt(startParts[0]) * 60 + parseInt(startParts[1]);
-                            let endTotal = parseInt(endParts[0]) * 60 + parseInt(endParts[1]);
-                            
-                            if (startTotal <= endTotal) {
-                                if (currentTotalMins >= startTotal && currentTotalMins < endTotal) foundOperator = op.name;
+                            let isTodayShift = false;
+                            if (op.dateStr) {
+                                isTodayShift = todayStrings.some(ts => op.dateStr.includes(ts));
                             } else {
-                                if (currentTotalMins >= startTotal || currentTotalMins < endTotal) foundOperator = op.name;
+                                isTodayShift = true; 
+                            }
+
+                            if (isTodayShift) {
+                                let startParts = op.start.split(':');
+                                let endParts = op.end.split(':');
+                                let startTotal = parseInt(startParts[0]) * 60 + parseInt(startParts[1]);
+                                let endTotal = parseInt(endParts[0]) * 60 + parseInt(endParts[1]);
+                                
+                                if (startTotal <= endTotal) {
+                                    if (currentTotalMins >= startTotal && currentTotalMins < endTotal) foundOperator = op.name;
+                                } else {
+                                    if (currentTotalMins >= startTotal || currentTotalMins < endTotal) foundOperator = op.name;
+                                }
                             }
                         }
                     }
+
                     if (currentOperatorRef.current !== foundOperator) {
                         setCurrentOperator(foundOperator);
                         currentOperatorRef.current = foundOperator;
                     }
 
-                    // CORTE NOCTURNO (12:00 AM)
+                    // CORTE NOCTURNO ESTRICTO (12:00 AM)
                     if (h === 0 && m === 0 && s === 0 && authReady.current) {
                         speak("Iniciando nuevo día de operaciones. Borrando bitácora de vuelos e inicializando contadores a cero.");
-                        window.FB_setDoc(getSharedDocRef(), {
+                        db.collection('operaciones').doc('turno_actual').set({
                             flights: [],
                             loggedFlightsCount: 0,
                             isRaining: false,
                             windDataMap: {}
-                        }, { merge: false });
+                        }, { merge: true });
                     }
 
+                    // ALERTAS DE VOZ (Juntas, Clima, Vuelos)
                     if (s === 0) {
                         const timeStr = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
                         
@@ -229,10 +241,10 @@
                             setModal({ isOpen: true, title: '⏰ JUNTA OPERATIVA', message: 'Reunión de las 7:50 AM.', type: 'error' });
                         } else if (h === 12 && m === 0) {
                             speak("Atención comandante. Es hora de elaborar los reportes K P I.");
-                            setModal({ isOpen: true, title: '📊 ELABORACIÓN DE KPIs', message: 'Es la hora designada para la elaboración de los KPIs operativos.', type: 'error' });
+                            setModal({ isOpen: true, title: '📊 ELABORACIÓN DE KPIs', message: 'Hora de reportes.', type: 'error' });
                         } else if ((h === 12 && m === 5) || (h === 0 && m === 5)) {
-                            speak("Atención. Actualización de captura del clima requerida. Por favor confirme el ou kei to flai.");
-                            setModal({ isOpen: true, title: '🌤️ ACTUALIZAR CLIMA', message: 'Es obligatorio actualizar la captura del clima y validar condiciones seguras para volar.', type: 'error' });
+                            speak("Atención. Actualización de captura del clima requerida.");
+                            setModal({ isOpen: true, title: '🌤️ ACTUALIZAR CLIMA', message: 'Obligatorio actualizar clima.', type: 'error' });
                         }
 
                         if (flightsRef.current && flightsRef.current.length > 0 && !isRainingRef.current) {
@@ -248,7 +260,7 @@
                                     let warn5 = new Date(flightDate.getTime() - 5 * 60000);
                                     
                                     if (timeStr === `${String(warn10.getHours()).padStart(2, '0')}:${String(warn10.getMinutes()).padStart(2, '0')}`) {
-                                        speak(`Atención piloto. Faltan 10 minutos para el vuelo de las ${flight.time}. Inicie protocolo.`);
+                                        speak(`Atención piloto. Faltan 10 minutos para el vuelo de las ${flight.time}.`);
                                     }
                                     if (timeStr === `${String(warn5.getHours()).padStart(2, '0')}:${String(warn5.getMinutes()).padStart(2, '0')}`) {
                                         speak(`Faltan 5 minutos para el despegue de las ${flight.time}. Salga a plataforma.`);
@@ -345,7 +357,7 @@
                      });
                 }
 
-                window.FB_setDoc(getSharedDocRef(), { windDataMap: windMap }, { merge: true });
+                db.collection('operaciones').doc('turno_actual').set({ windDataMap: windMap }, { merge: true });
 
                 const applyVariance = (timeStr, isForzoso = false) => {
                     if (isForzoso) return timeStr; 
@@ -359,6 +371,7 @@
                     return `${newH}:${newM}`;
                 };
 
+                // META ESTRICTA 13 VUELOS DIARIOS
                 let baseTimes = [
                     "07:20", "08:35", "09:50", "11:05", "12:20", "13:35", 
                     "14:50", "16:05", "17:20", "18:35", "19:50", "21:05", "22:20"
@@ -377,17 +390,17 @@
                     };
                 });
 
-                window.FB_setDoc(getSharedDocRef(), { flights: newSchedule }, { merge: true });
+                db.collection('operaciones').doc('turno_actual').set({ flights: newSchedule }, { merge: true });
             };
 
             const toggleRainProtocol = () => {
                 const newState = !isRaining;
-                window.FB_setDoc(getSharedDocRef(), { isRaining: newState }, { merge: true });
+                db.collection('operaciones').doc('turno_actual').set({ isRaining: newState }, { merge: true });
 
                 if (newState) {
                     speak("Alerta. Operaciones suspendidas por lluvia local.");
                 } else {
-                    speak("Lluvia finalizada. Calculando itinerario extendido.");
+                    speak("Lluvia finalizada. Calculando itinerario para recuperar vuelos perdidos.");
                     recalculateAfterRain();
                 }
             };
@@ -402,8 +415,8 @@
                     return;
                 }
 
-                const endTime = 23 * 60 + 30; 
-                const currentTimeInMins = currentHour * 60 + currentMinute + 15;
+                const endTime = 23 * 60 + 30; // 23:30 límite
+                const currentTimeInMins = currentHour * 60 + currentMinute + 15; // 15 mins margen
                 const timeWindow = endTime - currentTimeInMins;
                 
                 if (timeWindow <= 0) {
@@ -430,17 +443,17 @@
                     currentSlot += interval;
                 }
                 
-                window.FB_setDoc(getSharedDocRef(), { flights: newSchedule }, { merge: true });
+                db.collection('operaciones').doc('turno_actual').set({ flights: newSchedule }, { merge: true });
             };
 
             const handleLogManualFlight = () => {
                  if (isRaining) {
-                     setModal({ isOpen: true, title: 'Bloqueo por Lluvia', message: 'No puedes registrar despegues durante el protocolo de lluvia.', type: 'error' });
+                     setModal({ isOpen: true, title: 'Bloqueo por Lluvia', message: 'No puedes registrar despegues durante lluvia.', type: 'error' });
                      return;
                  }
                  if (loggedFlightsCount < totalFlightsTarget) {
                       const newCount = loggedFlightsCount + 1;
-                      window.FB_setDoc(getSharedDocRef(), { loggedFlightsCount: newCount }, { merge: true });
+                      db.collection('operaciones').doc('turno_actual').set({ loggedFlightsCount: newCount }, { merge: true });
                       speak(`Vuelo registrado. Total del día, ${newCount} de 13.`);
                  } else {
                       speak("Meta diaria de vuelos completada.");
@@ -463,12 +476,23 @@
                         const firstLine = lines[0] || '';
                         const delimiter = firstLine.includes(';') ? ';' : (firstLine.includes('\t') ? '\t' : ',');
                         
+                        const anyDateRegex = /\b\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}\b|\b\d{1,2}[\s\-](ene|feb|mar|abr|may|jun|jul|ago|sep|oct|nov|dic|jan|apr|aug|dec)[\s\-]\d{2,4}\b/i;
+
                         for (let i = 0; i < lines.length; i++) {
                             let line = lines[i].trim();
                             if (!line) continue;
                             
-                            line = line.replace(/['"]/g, '');
-                            const parts = line.split(delimiter).map(p => p.trim());
+                            const parts = line.split(delimiter).map(p => p.replace(/['"]/g, '').trim());
+                            let rowDateStr = '';
+
+                            parts.forEach(part => {
+                                const lowerPart = part.toLowerCase();
+                                if (anyDateRegex.test(lowerPart)) {
+                                    rowDateStr = lowerPart;
+                                }
+                            });
+
+                            if (!rowDateStr) continue; 
                             
                             const timeRegex = /([01]?[0-9]|2[0-3]):([0-5][0-9])/;
                             let times = [];
@@ -478,11 +502,11 @@
                                 const match = part.match(timeRegex);
                                 if (match) {
                                     times.push(match[0]);
-                                } else if (isNaN(part) && part.length > 3) {
+                                } else if (isNaN(part) && part.length > 2) {
                                     const lower = part.toLowerCase();
-                                    const isRoleOrHeader = ['nombre', 'hora', 'fecha', 'especialista', 'rpas', 'os', 'puesto', 'cargo', 'rol', 'turno', 'supervisor'].some(word => lower.includes(word));
+                                    const isRoleOrHeader = ['especialista', 'rpas', 'os', 'nombre', 'hora', 'fecha', 'puesto', 'cargo', 'rol', 'turno', 'supervisor'].some(word => lower.includes(word));
                                     
-                                    if (!isRoleOrHeader) {
+                                    if (!isRoleOrHeader && !anyDateRegex.test(lower)) {
                                         possibleNames.push(part);
                                     }
                                 }
@@ -491,20 +515,25 @@
                             let potentialName = possibleNames.length > 0 ? possibleNames[0] : '';
 
                             if (times.length >= 2 && potentialName) {
-                                newOperators.push({ name: potentialName, start: times[0], end: times[1] });
+                                newOperators.push({ 
+                                    name: potentialName, 
+                                    start: times[0], 
+                                    end: times[1],
+                                    dateStr: rowDateStr 
+                                });
                             }
                         }
                         
                         if (newOperators.length > 0) {
-                            window.FB_setDoc(getSharedDocRef(), { operators: newOperators }, { merge: true });
-                            speak("Horarios actualizados exitosamente en la base de datos.");
-                            setModal({ isOpen: true, title: 'Carga Exitosa', message: `Se detectaron e importaron ${newOperators.length} turnos desde tu archivo CSV.`, type: 'success' });
+                            db.collection('operaciones').doc('turno_actual').set({ operators: newOperators }, { merge: true });
+                            speak("Horarios del mes actualizados exitosamente en la base de datos.");
+                            setModal({ isOpen: true, title: 'Carga Mensual Exitosa', message: `Se importaron ${newOperators.length} turnos en total. El sistema mostrará cada día solo a los que correspondan.`, type: 'success' });
                         } else {
-                            throw new Error("No pude detectar nombres y horarios (HH:MM). Abre tu archivo y verifica que tenga nombres reales y horas legibles.");
+                            throw new Error("No pude detectar fechas y horarios útiles. Revisa el archivo.");
                         }
                     } catch (error) {
                         speak("Error al procesar el archivo CSV.");
-                        setModal({ isOpen: true, title: 'Error de Lectura CSV', message: error.message, type: 'error' });
+                        setModal({ isOpen: true, title: 'Error de Lectura', message: error.message, type: 'error' });
                     } finally {
                         setIsScanningCSV(false);
                         document.getElementById('csv-upload').value = '';
@@ -514,10 +543,28 @@
                 reader.readAsText(file);
             };
 
-            const handleRemoveOperator = (index) => {
-                const updatedOps = operators.filter((_, i) => i !== index);
-                window.FB_setDoc(getSharedDocRef(), { operators: updatedOps }, { merge: true });
+            const handleRemoveOperator = (index, isTodayList = false) => {
+                let originalIndex = index;
+                
+                if (isTodayList) {
+                    const todayStrings = getTodayStrings();
+                    const todaysOps = operators.filter(op => !op.dateStr || todayStrings.some(ts => op.dateStr.includes(ts)));
+                    const opToDelete = todaysOps[index];
+                    originalIndex = operators.findIndex(op => op === opToDelete);
+                }
+
+                if (originalIndex >= 0) {
+                    const updatedOps = operators.filter((_, i) => i !== originalIndex);
+                    db.collection('operaciones').doc('turno_actual').set({ operators: updatedOps }, { merge: true });
+                }
             };
+
+            // Filtrar operadores del panel para mostrar SOLO LOS DE HOY
+            const todayStringsUI = getTodayStrings();
+            const todaysOperators = operators.filter(op => {
+                if(!op.dateStr) return true;
+                return todayStringsUI.some(ts => op.dateStr.includes(ts));
+            });
 
             return (
                 <div className="min-h-screen p-4 max-w-2xl mx-auto pb-24" onClick={unlockAudio}>
@@ -528,7 +575,7 @@
                                 <span className="bg-indigo-600 text-white px-2 py-0.5 rounded text-xs">DP</span>
                                 DISPATCHER PRO
                             </h1>
-                            <p className="text-[10px] font-bold text-indigo-400 mt-1 tracking-widest uppercase">V42 MASTER • 🟢 NUBE V11 ACTIVA</p>
+                            <p className="text-[10px] font-bold text-indigo-400 mt-1 tracking-widest uppercase">V42 MASTER • 🟢 NUBE COMPAT</p>
                         </div>
                         <div className="flex gap-2">
                             <button 
@@ -650,7 +697,6 @@
                          </button>
                     </div>
 
-                    {}
                     {settingsOpen && (
                         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4" onClick={(e) => e.stopPropagation()}>
                             <div className="bg-[#131826] border border-slate-800 rounded-2xl w-full max-w-sm shadow-2xl p-6">
@@ -677,41 +723,46 @@
                         </div>
                     )}
                     
-                    {}
                     {adminOpen && (
                         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4" onClick={(e) => e.stopPropagation()}>
-                            <div className="bg-[#131826] border border-slate-800 rounded-2xl w-full max-w-md shadow-2xl p-6 max-h-[90vh] overflow-y-auto">
-                                <h2 className="text-lg font-black text-white mb-1 flex items-center gap-2">👨‍💼 Administración</h2>
-                                <p className="text-xs text-slate-400 mb-5">Gestión de Horarios de Operadores</p>
-                                
-                                <div className="bg-[#0f172a] p-4 rounded-xl border border-indigo-500/40 mb-4 shadow-[0_0_15px_rgba(79,70,229,0.1)]">
-                                    <h3 className="text-xs font-bold text-indigo-300 uppercase tracking-widest mb-3 flex items-center gap-2">
-                                        📊 Carga Rápida (CSV)
-                                    </h3>
-                                    <input type="file" id="csv-upload" accept=".csv" className="hidden" onChange={handleCSVUpload} />
-                                    <button 
-                                        onClick={() => document.getElementById('csv-upload').click()}
-                                        disabled={isScanningCSV}
-                                        className={`w-full py-2.5 rounded-lg text-sm font-bold transition flex justify-center items-center gap-2 ${isScanningCSV ? 'bg-indigo-900/50 text-indigo-300 animate-pulse' : 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-md'}`}
-                                    >
-                                        {isScanningCSV ? '⏳ Procesando...' : '📄 Subir Horario (.CSV)'}
-                                    </button>
-                                    <p className="text-[9px] text-slate-400 mt-2 text-center">El archivo debe tener 3 columnas:<br/><b>Nombre, Entrada (HH:MM), Salida (HH:MM)</b></p>
+                            <div className="bg-[#131826] border border-slate-800 rounded-2xl w-full max-w-md shadow-2xl p-6 max-h-[90vh] flex flex-col">
+                                <div>
+                                    <h2 className="text-lg font-black text-white mb-1 flex items-center gap-2">👨‍💼 Administración</h2>
+                                    <p className="text-xs text-slate-400 mb-5">Gestión de Horarios de Operadores</p>
+                                    
+                                    <div className="bg-[#0f172a] p-4 rounded-xl border border-indigo-500/40 mb-4 shadow-[0_0_15px_rgba(79,70,229,0.1)]">
+                                        <h3 className="text-xs font-bold text-indigo-300 uppercase tracking-widest mb-3 flex items-center gap-2">
+                                            📊 Carga del Mes Completo (CSV)
+                                        </h3>
+                                        <input type="file" id="csv-upload" accept=".csv" className="hidden" onChange={handleCSVUpload} />
+                                        <button 
+                                            onClick={() => document.getElementById('csv-upload').click()}
+                                            disabled={isScanningCSV}
+                                            className={`w-full py-2.5 rounded-lg text-sm font-bold transition flex justify-center items-center gap-2 ${isScanningCSV ? 'bg-indigo-900/50 text-indigo-300 animate-pulse' : 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-md'}`}
+                                        >
+                                            {isScanningCSV ? '⏳ Procesando...' : '📄 Subir Horario (.CSV)'}
+                                        </button>
+                                        <p className="text-[9px] text-slate-400 mt-2 text-center">Sube el mes entero. El sistema guardará todo<br/>pero solo mostrará los turnos del día actual.</p>
+                                    </div>
+
+                                    <div className="flex justify-between items-center mb-3">
+                                        <h3 className="text-xs font-bold text-slate-300 uppercase tracking-widest">Turnos filtrados (Solo de hoy)</h3>
+                                        <span className="text-[9px] bg-slate-800 text-slate-400 px-2 py-0.5 rounded-full">Total en BD: {operators.length}</span>
+                                    </div>
                                 </div>
 
-                                <div className="mb-6 bg-[#0f172a] p-4 rounded-xl border border-slate-800">
-                                    <h3 className="text-xs font-bold text-slate-300 uppercase tracking-widest mb-3">Operadores Registrados</h3>
-                                    {operators.length === 0 ? (
-                                        <p className="text-xs text-slate-500 text-center py-2">No hay operadores registrados</p>
+                                <div className="overflow-y-auto flex-1 mb-4 bg-[#0f172a] p-3 rounded-xl border border-slate-800 min-h-[150px]">
+                                    {todaysOperators.length === 0 ? (
+                                        <p className="text-xs text-slate-500 text-center py-6">No hay turnos programados para el día de hoy.</p>
                                     ) : (
                                         <div className="space-y-2">
-                                            {operators.map((op, idx) => (
+                                            {todaysOperators.map((op, idx) => (
                                                 <div key={idx} className="flex justify-between items-center bg-[#1e293b] p-3 rounded-lg border border-slate-700">
                                                     <div>
                                                         <p className="font-bold text-sm text-white">{op.name}</p>
                                                         <p className="text-[10px] text-slate-400">{op.start} hrs - {op.end} hrs</p>
                                                     </div>
-                                                    <button onClick={() => handleRemoveOperator(idx)} className="bg-rose-900/50 hover:bg-rose-900 text-rose-400 px-3 py-1.5 rounded-lg transition text-xs font-bold">
+                                                    <button onClick={() => handleRemoveOperator(idx, true)} className="bg-rose-900/50 hover:bg-rose-900 text-rose-400 px-3 py-1.5 rounded-lg transition text-xs font-bold">
                                                         Eliminar
                                                     </button>
                                                 </div>
@@ -720,14 +771,13 @@
                                     )}
                                 </div>
 
-                                <button onClick={() => setAdminOpen(false)} className="w-full bg-slate-700 hover:bg-slate-600 text-white font-bold py-3 rounded-lg text-sm transition">
+                                <button onClick={() => setAdminOpen(false)} className="w-full bg-slate-700 hover:bg-slate-600 text-white font-bold py-3 rounded-lg text-sm transition mt-auto">
                                     Cerrar Panel
                                 </button>
                             </div>
                         </div>
                     )}
                     
-                    {}
                     {modal.isOpen && (
                         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4" onClick={(e) => e.stopPropagation()}>
                             <div className="bg-[#131826] border border-slate-800 rounded-2xl w-full max-w-sm shadow-2xl p-6">
