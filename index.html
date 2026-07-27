@@ -42,29 +42,37 @@
 
         const { useState, useEffect, useRef } = React;
 
-        // Función global para obtener múltiples formatos de fecha de hoy (usado para buscar coincidencias en el CSV)
-        const getTodayStrings = () => {
-            const today = new Date();
-            const d = String(today.getDate()).padStart(2, '0');
-            const d_noPad = String(today.getDate());
-            const m = String(today.getMonth() + 1).padStart(2, '0');
-            const m_noPad = String(today.getMonth() + 1);
-            const yyyy = today.getFullYear();
-            const yy = String(yyyy).slice(2);
+        // Filtro Súper Inteligente de Fechas: Analiza el texto para encontrar el día y mes
+        const isStringToday = (dateStr) => {
+            if (!dateStr) return false;
             
+            const today = new Date();
+            const d = today.getDate(); // ej: 27
+            const m = today.getMonth() + 1; // ej: 7
+            
+            const dPad = String(d).padStart(2, '0');
+            const mPad = String(m).padStart(2, '0');
+            const s = dateStr.toLowerCase();
+
+            // 1. Busca formatos numéricos comunes (ej. 27/07, 27-07, 07/27)
+            if (s.includes(`${dPad}/${mPad}`) || s.includes(`${dPad}-${mPad}`) || 
+                s.includes(`${mPad}/${dPad}`) || s.includes(`${mPad}-${dPad}`) ||
+                s.includes(`${d}/${m}/`) || s.includes(`${d}-${m}-`)) {
+                return true;
+            }
+
+            // 2. Busca formatos de texto (ej. 27 jul, 27 de julio)
             const meses = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
             const months = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
-            const mesTxt = meses[today.getMonth()];
-            const monthTxt = months[today.getMonth()];
+            
+            const mes = meses[today.getMonth()];
+            const month = months[today.getMonth()];
 
-            return [
-                `${d}/${m}/${yyyy}`, `${d}-${m}-${yyyy}`, `${yyyy}-${m}-${d}`, `${yyyy}/${m}/${d}`,
-                `${d}/${m}/${yy}`, `${d}-${m}-${yy}`, `${m}/${d}/${yyyy}`, `${m}-${d}-${yyyy}`,
-                `${d_noPad}/${m_noPad}/${yyyy}`, `${m_noPad}/${d_noPad}/${yyyy}`,
-                `${d_noPad}/${m_noPad}/${yy}`, `${m_noPad}/${d_noPad}/${yy}`,
-                `${d_noPad}-${mesTxt}-${yyyy}`, `${d_noPad}-${monthTxt}-${yyyy}`,
-                `${d_noPad} ${mesTxt} ${yyyy}`, `${d_noPad} ${monthTxt} ${yyyy}`
-            ].map(s => s.toLowerCase());
+            // Verifica que el número del día exista solo, y que tenga el mes
+            const hasDay = new RegExp(`\\b0?${d}\\b`).test(s);
+            const hasMonth = s.includes(mes) || s.includes(month);
+
+            return (hasDay && hasMonth);
         };
 
         function App() {
@@ -188,18 +196,12 @@
                     else setShiftName('Turno Nocturno');
                     
                     // FILTRO DE OPERADORES
-                    const todayStrings = getTodayStrings();
                     let foundOperator = 'Sin asignar';
                     const currentTotalMins = h * 60 + m;
 
                     if (operatorsRef.current && operatorsRef.current.length > 0) {
                         for (let op of operatorsRef.current) {
-                            let isTodayShift = false;
-                            if (op.dateStr) {
-                                isTodayShift = todayStrings.some(ts => op.dateStr.includes(ts));
-                            } else {
-                                isTodayShift = true; 
-                            }
+                            let isTodayShift = op.dateStr ? isStringToday(op.dateStr) : true;
 
                             if (isTodayShift) {
                                 let startParts = op.start.split(':');
@@ -476,7 +478,8 @@
                         const firstLine = lines[0] || '';
                         const delimiter = firstLine.includes(';') ? ';' : (firstLine.includes('\t') ? '\t' : ',');
                         
-                        const anyDateRegex = /\b\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}\b|\b\d{1,2}[\s\-](ene|feb|mar|abr|may|jun|jul|ago|sep|oct|nov|dic|jan|apr|aug|dec)[\s\-]\d{2,4}\b/i;
+                        // Expresión regular ultra flexible para atrapar CUALQUIER formato de fecha de Excel/Zoho
+                        const anyDateRegex = /\b\d{1,2}[\/\-]\d{1,2}(?:[\/\-]\d{2,4})?\b|\b\d{1,2}[\s\-\/]*(?:de\s*)?(?:ene|feb|mar|abr|may|jun|jul|ago|sep|oct|nov|dic|jan|apr|aug|dec)[a-z]*[\.\s\-\/]*(?:\d{2,4})?\b/i;
 
                         for (let i = 0; i < lines.length; i++) {
                             let line = lines[i].trim();
@@ -547,8 +550,7 @@
                 let originalIndex = index;
                 
                 if (isTodayList) {
-                    const todayStrings = getTodayStrings();
-                    const todaysOps = operators.filter(op => !op.dateStr || todayStrings.some(ts => op.dateStr.includes(ts)));
+                    const todaysOps = operators.filter(op => !op.dateStr || isStringToday(op.dateStr));
                     const opToDelete = todaysOps[index];
                     originalIndex = operators.findIndex(op => op === opToDelete);
                 }
@@ -560,10 +562,9 @@
             };
 
             // Filtrar operadores del panel para mostrar SOLO LOS DE HOY
-            const todayStringsUI = getTodayStrings();
             const todaysOperators = operators.filter(op => {
                 if(!op.dateStr) return true;
-                return todayStringsUI.some(ts => op.dateStr.includes(ts));
+                return isStringToday(op.dateStr);
             });
 
             return (
@@ -657,6 +658,7 @@
                         </div>
                     )}
 
+                    {}
                     <div className={`glass-card p-5 rounded-2xl mb-6 relative ${isRaining ? 'opacity-50 pointer-events-none' : ''}`}>
                         {isRaining && <div className="absolute inset-0 rain-overlay rounded-2xl z-10 flex items-center justify-center text-center p-4">
                             <span className="text-white font-bold text-lg">Esperando que mejore el clima para calcular itinerario de {totalFlightsTarget - loggedFlightsCount} vuelos faltantes...</span>
@@ -697,6 +699,7 @@
                          </button>
                     </div>
 
+                    {}
                     {settingsOpen && (
                         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4" onClick={(e) => e.stopPropagation()}>
                             <div className="bg-[#131826] border border-slate-800 rounded-2xl w-full max-w-sm shadow-2xl p-6">
