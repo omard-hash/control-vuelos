@@ -10,12 +10,10 @@
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     
-    <!-- Firebase -->
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore-compat.js"></script>
     
-    <!-- Lector de Excel/CSV (Zoho Omni Scanner) -->
     <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
 
     <style>
@@ -66,18 +64,18 @@
             
             // OPERACIÓN
             const [loggedFlightsCount, setLoggedFlightsCount] = useState(0);
-            const totalFlightsTarget = 16; // NUEVA META DE 16 VUELOS (Aprox cada 1.5hrs)
+            const totalFlightsTarget = 16; 
             
             // CLIMA Y PROTOCOLOS
             const [isRaining, setIsRaining] = useState(false);
             const [isFoggy, setIsFoggy] = useState(false);
             const [windDataMap, setWindDataMap] = useState({});
-            const [rainProbMap, setRainProbMap] = useState({}); // SOLUCIONADO EL BUG DE LA VARIABLE
+            const [rainProbMap, setRainProbMap] = useState({});
 
             // AUDIO
             const [audioUnlocked, setAudioUnlocked] = useState(false);
             
-            // REFERENCIAS (Para evitar closures obsoletos en los temporizadores)
+            // REFERENCIAS
             const audioUnlockedRef = useRef(false);
             const flightsRef = useRef([]);
             const isRainingRef = useRef(false);
@@ -152,8 +150,7 @@
 
                     setShiftName((h >= 7 && h < 19) ? 'Turno Diurno' : 'Turno Nocturno');
                     
-                    if (s === 0) { // Evaluar cada minuto en el segundo 0
-                        
+                    if (s === 0) { 
                         // 1. Alarmas Estáticas de Operación
                         if (h === 7 && m === 50) {
                             speak("Atención. Inicio de junta operativa shop floor.");
@@ -173,7 +170,7 @@
                             speak("Atención piloto. Es hora de tomar evidencia fotográfica de las condiciones meteorológicas.");
                         }
 
-                        // 3. Alarmas Prevuelo (10 y 5 min)
+                        // 3. Alarmas Prevuelo (10 y 5 min) y Recálculo por Retraso
                         if (flightsRef.current && flightsRef.current.length > 0 && !isRainingRef.current && !isFoggyRef.current) {
                             flightsRef.current.forEach(flight => {
                                 if (flight.wind < 42) {
@@ -281,7 +278,7 @@
 
                     if (!response.ok) {
                         const errData = await response.json();
-                        throw new Error(`Google AI Rechazó la conexión. ¿Usaste la llave correcta? Detalle: ${errData.error?.message || response.statusText}`);
+                        throw new Error(`Error de IA. Detalle: ${errData.error?.message || response.statusText}`);
                     }
 
                     const data = await response.json();
@@ -301,7 +298,7 @@
                     console.error("AI Error:", error);
                     speak("Error al procesar. Intentando modo seguro.");
                     setModal({ isOpen: true, title: 'Error de Análisis IA', message: error.message });
-                    generateIntelligentSchedule([]); // Genera horario sin viento si falla
+                    generateIntelligentSchedule([]); 
                 } finally {
                     setIsScanning(false);
                 }
@@ -330,7 +327,6 @@
                 setRainProbMap(rainMap);
                 db.collection('operaciones').doc('turno_actual').set({ windDataMap: windMap, rainProbMap: rainMap }, { merge: true });
 
-                // Algoritmo de Varianza y Bloqueo
                 const applyVariance = (timeStr, isForzoso = false) => {
                     if (isForzoso) return timeStr; 
                     
@@ -338,8 +334,8 @@
                     let h = parseInt(parts[0]);
                     let m = parseInt(parts[1]);
                     
-                    // Sumar entre -5 y +25 minutos al azar
-                    let variance = Math.floor(Math.random() * 31) - 5; 
+                    // Sumar entre 10 y 25 minutos al azar (Factor Sorpresa)
+                    let variance = Math.floor(Math.random() * 16) + 10; 
                     let date = new Date(2026, 0, 1, h, m + variance);
                     let newH = date.getHours();
                     let newM = date.getMinutes();
@@ -349,13 +345,13 @@
                     // ZONAS PROHIBIDAS (Handovers y Junta)
                     const blocks = [
                         { start: 6*60 + 45, end: 7*60 + 15 },   // 06:45 a 07:15
-                        { start: 7*60 + 50, end: 8*60 + 15 },   // 07:50 a 08:15 (Shopfloor)
+                        { start: 7*60 + 50, end: 8*60 + 15 },   // 07:50 a 08:15
                         { start: 18*60 + 45, end: 19*60 + 15 }  // 18:45 a 19:15
                     ];
 
                     for (let b of blocks) {
                         if (timeInMins >= b.start && timeInMins <= b.end) {
-                            timeInMins = b.end + Math.floor(Math.random() * 10) + 5; // Empujar después del bloqueo
+                            timeInMins = b.end + 15; // Empujar fuera del bloqueo
                         }
                     }
 
@@ -370,17 +366,17 @@
                     { time: applyVariance("02:00"), type: "DINÁMICO", hour24: 2 },
                     { time: applyVariance("03:30"), type: "DINÁMICO", hour24: 3 },
                     { time: applyVariance("05:00"), type: "DINÁMICO", hour24: 5 },
-                    { time: applyVariance("06:00", true), type: "FORZOSO", hour24: 6 }, // FORZOSO
-                    { time: applyVariance("07:20", true), type: "FORZOSO", hour24: 7 }, // FORZOSO (Respeta Shopfloor)
+                    { time: applyVariance("06:00", true), type: "FORZOSO", hour24: 6 },
+                    { time: applyVariance("07:20", true), type: "FORZOSO", hour24: 7 }, 
                     { time: applyVariance("08:45"), type: "DINÁMICO", hour24: 8 },
                     { time: applyVariance("10:15"), type: "DINÁMICO", hour24: 10 },
                     { time: applyVariance("11:45"), type: "DINÁMICO", hour24: 11 },
-                    { time: applyVariance("14:00", true), type: "FORZOSO", hour24: 14 }, // FORZOSO
+                    { time: applyVariance("14:00", true), type: "FORZOSO", hour24: 14 }, 
                     { time: applyVariance("15:30"), type: "DINÁMICO", hour24: 15 },
-                    { time: applyVariance("17:00", true), type: "FORZOSO", hour24: 17 }, // FORZOSO
-                    { time: applyVariance("19:25", true), type: "FORZOSO", hour24: 19 }, // FORZOSO (Post Handover)
+                    { time: applyVariance("17:00", true), type: "FORZOSO", hour24: 17 }, 
+                    { time: applyVariance("19:25", true), type: "FORZOSO", hour24: 19 },
                     { time: applyVariance("20:15"), type: "DINÁMICO", hour24: 20 },
-                    { time: applyVariance("21:30", true), type: "FORZOSO", hour24: 21 }, // FORZOSO
+                    { time: applyVariance("21:30", true), type: "FORZOSO", hour24: 21 }, 
                     { time: applyVariance("23:00"), type: "DINÁMICO", hour24: 23 }
                 ];
 
@@ -389,7 +385,6 @@
                 const isSuspendedAt12 = windMap[12] >= 40 && !isSuspendedAt11;
 
                 if (isSuspendedAt11) {
-                    // Forzar 5 vuelos amontonados en la mañana
                     baseSchedule[6] = { time: applyVariance("08:20"), type: "DINÁMICO", hour24: 8 };
                     baseSchedule[7] = { time: applyVariance("09:20"), type: "DINÁMICO", hour24: 9 };
                     baseSchedule[8] = { time: applyVariance("10:15"), type: "DINÁMICO", hour24: 10 };
@@ -397,7 +392,7 @@
                     baseSchedule[6] = { time: applyVariance("08:20"), type: "DINÁMICO", hour24: 8 };
                     baseSchedule[7] = { time: applyVariance("09:20"), type: "DINÁMICO", hour24: 9 };
                     baseSchedule[8] = { time: applyVariance("10:20"), type: "DINÁMICO", hour24: 10 };
-                    baseSchedule.splice(9, 0, { time: applyVariance("11:20"), type: "DINÁMICO", hour24: 11 }); // Inserta un 6to/7mo
+                    baseSchedule.splice(9, 0, { time: applyVariance("11:20"), type: "DINÁMICO", hour24: 11 });
                 }
 
                 // Aplicar Clima Final
@@ -427,7 +422,6 @@
                     speak("Alerta. Operaciones suspendidas por lluvia local.");
                 } else {
                     speak("Lluvia finalizada.");
-                    if (!isFoggy) recalculateAfterDelay();
                 }
             };
 
@@ -441,14 +435,7 @@
                     speak("Alerta. Operaciones suspendidas por visibilidad nula. Banco de neblina detectado.");
                 } else {
                     speak("Visibilidad restaurada.");
-                    if (!isRaining) recalculateAfterDelay();
                 }
-            };
-
-            const recalculateAfterDelay = () => {
-                // Función que re-asigna vuelos hacia el final del día si hubo suspensiones
-                // Por ahora solo emitimos el aviso como simulación de resincronización.
-                speak("Recalculando itinerario dinámico para compensar demoras.");
             };
 
             const handleLogManualFlight = () => {
@@ -480,114 +467,114 @@
             const futureFlights = flights.filter(f => (f.hour24 * 60 + f.min) >= currentMins - 15);
 
             return (
-                <div className="min-h-screen p-4 max-w-2xl mx-auto pb-32" onClick={unlockAudio}>
+                <div className="min-h-screen p-4 w-full max-w-[400px] mx-auto pb-32" onClick={unlockAudio}>
                     
                     {/* Header */}
                     <div className="flex justify-between items-center mb-5">
                         <div>
-                            <h1 className="text-lg md:text-xl font-black tracking-tight flex items-center gap-2">
+                            <h1 className="text-lg font-black tracking-tight flex items-center gap-2">
                                 <span className="bg-indigo-600 text-white px-2 py-0.5 rounded text-xs">DP</span>
                                 DISPATCHER PRO
                             </h1>
-                            <p className="text-[10px] font-bold text-indigo-400 mt-1 tracking-widest uppercase">V43 FINAL • 🟢 OMNI SCANNER</p>
+                            <p className="text-[10px] font-bold text-indigo-400 mt-1 tracking-widest uppercase">V43 FINAL • COMPACTO</p>
                         </div>
                         <div className="flex gap-2">
-                            <button onClick={(e) => { e.stopPropagation(); setAdminOpen(true); }} className="bg-[#1f2937] hover:bg-[#374151] p-2.5 rounded-lg border border-slate-700 transition">👨‍💼</button>
-                            <button onClick={(e) => { e.stopPropagation(); setSettingsOpen(true); }} className="bg-[#1f2937] hover:bg-[#374151] p-2.5 rounded-lg border border-slate-700 transition">⚙️</button>
+                            <button onClick={(e) => { e.stopPropagation(); setAdminOpen(true); }} className="bg-[#1f2937] hover:bg-[#374151] p-2 rounded-lg border border-slate-700 transition">👨‍💼</button>
+                            <button onClick={(e) => { e.stopPropagation(); setSettingsOpen(true); }} className="bg-[#1f2937] hover:bg-[#374151] p-2 rounded-lg border border-slate-700 transition">⚙️</button>
                         </div>
                     </div>
 
                     {!audioUnlocked && (
                         <div className="bg-amber-500/20 border border-amber-500/50 text-amber-400 text-xs font-bold text-center p-2 rounded-lg mb-4 animate-pulse shadow-md">
-                            🔇 Toca la pantalla para activar el Asistente de Voz y Alertas
+                            🔇 Toca la pantalla para activar Voz
                         </div>
                     )}
 
                     {/* Stats & Scan */}
-                    <div className="glass-card p-5 rounded-2xl mb-5 relative overflow-hidden">
+                    <div className="glass-card p-4 rounded-2xl mb-4 relative overflow-hidden">
                         
                         <div className="flex justify-between items-start mb-4">
                             <div>
                                 <p className="text-[10px] font-bold tracking-widest text-slate-400 uppercase mb-1">{shiftName}</p>
-                                <h2 className="text-2xl font-black text-white">{shiftName === 'Turno Diurno' ? '☀️ Día' : '🌙 Noche'}</h2>
-                                <div className="mt-1 text-3xl font-mono font-bold text-white tracking-wider">
+                                <h2 className="text-xl font-black text-white">{shiftName === 'Turno Diurno' ? '☀️ Día' : '🌙 Noche'}</h2>
+                                <div className="mt-1 text-2xl font-mono font-bold text-white tracking-wider">
                                     {currentTime.toLocaleTimeString('en-US', { hour12: false })}
                                 </div>
-                                <div className="mt-2 inline-block bg-indigo-900/50 border border-indigo-700 text-indigo-300 text-[10px] font-black px-2 py-1 rounded uppercase tracking-widest">
-                                    👨‍✈️ PILOTO: {pilotName.substring(0, 20)}
+                                <div className="mt-2 inline-block bg-indigo-900/50 border border-indigo-700 text-indigo-300 text-[9px] font-black px-2 py-1 rounded uppercase tracking-widest max-w-[150px] truncate">
+                                    👨‍✈️ {pilotName}
                                 </div>
                             </div>
 
                             <div className="text-right flex flex-col items-end">
-                                <div className={`mb-3 px-4 py-2 rounded-xl border shadow-[0_0_20px_rgba(0,0,0,0.4)] transition-all ${shiftName === 'Turno Diurno' ? 'bg-amber-500/20 border-amber-500/50' : 'bg-fuchsia-600/20 border-fuchsia-500/50'}`}>
-                                    <p className={`text-[10px] font-black uppercase tracking-widest ${shiftName === 'Turno Diurno' ? 'text-amber-400' : 'text-fuchsia-400'}`}>
-                                        Faltan
-                                    </p>
-                                    <div className="text-2xl font-black text-white drop-shadow-md text-right mt-0.5">
+                                <div className={`mb-2 px-3 py-1.5 rounded-xl border shadow-lg ${shiftName === 'Turno Diurno' ? 'bg-amber-500/20 border-amber-500/50' : 'bg-fuchsia-600/20 border-fuchsia-500/50'}`}>
+                                    <p className={`text-[9px] font-black uppercase tracking-widest ${shiftName === 'Turno Diurno' ? 'text-amber-400' : 'text-fuchsia-400'}`}>Faltan</p>
+                                    <div className="text-xl font-black text-white drop-shadow-md text-right">
                                         {Math.max(0, totalFlightsTarget - loggedFlightsCount)}
-                                        <span className="text-sm font-bold text-white/60 ml-1.5 uppercase tracking-wider">vuelos</span>
                                     </div>
                                 </div>
-                                <div className="flex items-baseline gap-1 bg-[#0f172a] px-4 py-2.5 rounded-xl border border-indigo-500/30 shadow-[0_0_20px_rgba(79,70,229,0.3)]">
-                                    <span className="text-5xl font-black text-white tracking-tighter drop-shadow-lg">{loggedFlightsCount}</span>
-                                    <span className="text-2xl font-bold text-indigo-500/70">/{totalFlightsTarget}</span>
+                                <div className="flex items-baseline gap-1 bg-[#0f172a] px-3 py-2 rounded-xl border border-indigo-500/30 shadow-[0_0_15px_rgba(79,70,229,0.3)]">
+                                    <span className="text-4xl font-black text-white tracking-tighter drop-shadow-lg">{loggedFlightsCount}</span>
+                                    <span className="text-lg font-bold text-indigo-500/70">/{totalFlightsTarget}</span>
                                 </div>
-                                <p className="text-[11px] text-indigo-300 font-black uppercase tracking-widest mt-2">📍 Avance Global</p>
                             </div>
                         </div>
                         
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-4 border-t border-slate-800 pt-4">
+                        {/* Botones de Operación (Compactos) */}
+                        <div className="flex flex-col gap-2 mt-4 border-t border-slate-800 pt-4">
                             <input type="file" id="upload" accept="image/*" className="hidden" onChange={handleImageUpload} />
-                            <button onClick={(e) => { e.stopPropagation(); document.getElementById('upload').click(); }} disabled={isScanning || isRaining || isFoggy} className={`w-full py-3 rounded-xl font-bold text-sm transition flex justify-center items-center gap-2 ${isScanning ? 'bg-indigo-900/50 text-indigo-300 animate-pulse' : (isRaining||isFoggy) ? 'bg-slate-800 text-slate-600 cursor-not-allowed' : 'bg-[#1e293b] hover:bg-[#334155] text-white border border-slate-700'}`}>
+                            
+                            <button onClick={(e) => { e.stopPropagation(); document.getElementById('upload').click(); }} disabled={isScanning || isRaining || isFoggy} className={`w-full py-3 rounded-xl font-bold text-xs transition flex justify-center items-center gap-2 ${isScanning ? 'bg-indigo-900/50 text-indigo-300 animate-pulse' : (isRaining||isFoggy) ? 'bg-slate-800 text-slate-600 cursor-not-allowed' : 'bg-[#1e293b] hover:bg-[#334155] text-white border border-slate-700'}`}>
                                 {isScanning ? '⏳ Analizando...' : '📸 CLIMA'}
                             </button>
                             
-                            <button onClick={(e) => { e.stopPropagation(); toggleRainProtocol(); }} className={`w-full py-3 rounded-xl font-bold text-sm transition flex justify-center items-center gap-2 ${isRaining ? 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-[0_0_15px_rgba(16,185,129,0.4)]' : 'bg-rose-900/40 hover:bg-rose-900/60 text-rose-400 border border-rose-900'}`}>
-                                {isRaining ? '☀️ REANUDAR' : '🌧️ LLUVIA'}
-                            </button>
+                            <div className="grid grid-cols-2 gap-2">
+                                <button onClick={(e) => { e.stopPropagation(); toggleRainProtocol(); }} className={`w-full py-3 rounded-xl font-bold text-xs transition flex justify-center items-center gap-1 ${isRaining ? 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-[0_0_15px_rgba(16,185,129,0.4)]' : 'bg-rose-900/40 hover:bg-rose-900/60 text-rose-400 border border-rose-900'}`}>
+                                    {isRaining ? '☀️ REANUDAR' : '🌧️ LLUVIA'}
+                                </button>
 
-                            <button onClick={(e) => { e.stopPropagation(); toggleFogProtocol(); }} className={`w-full py-3 rounded-xl font-bold text-sm transition flex justify-center items-center gap-2 ${isFoggy ? 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-[0_0_15px_rgba(16,185,129,0.4)]' : 'bg-slate-700 hover:bg-slate-600 text-slate-300 border border-slate-500'}`}>
-                                {isFoggy ? '☀️ DESPEJADO' : '🌫️ NEBLINA'}
-                            </button>
+                                <button onClick={(e) => { e.stopPropagation(); toggleFogProtocol(); }} className={`w-full py-3 rounded-xl font-bold text-xs transition flex justify-center items-center gap-1 ${isFoggy ? 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-[0_0_15px_rgba(16,185,129,0.4)]' : 'bg-slate-700 hover:bg-slate-600 text-slate-300 border border-slate-500'}`}>
+                                    {isFoggy ? '☀️ DESPEJADO' : '🌫️ NEBLINA'}
+                                </button>
+                            </div>
                         </div>
                     </div>
 
                     {isRaining && (
-                        <div className="bg-rose-600 text-white text-center p-3 rounded-xl mb-5 font-black uppercase tracking-wider text-sm shadow-[0_0_20px_rgba(225,29,72,0.5)] animate-pulse">⚠️ OPERACIONES SUSPENDIDAS POR LLUVIA ⚠️</div>
+                        <div className="bg-rose-600 text-white text-center p-2.5 rounded-xl mb-4 font-black uppercase tracking-wider text-xs shadow-[0_0_20px_rgba(225,29,72,0.5)] animate-pulse">⚠️ SUSPENDIDO POR LLUVIA</div>
                     )}
                     {isFoggy && !isRaining && (
-                        <div className="bg-slate-500 text-white text-center p-3 rounded-xl mb-5 font-black uppercase tracking-wider text-sm shadow-[0_0_20px_rgba(100,116,139,0.5)] animate-pulse">🌫️ VISIBILIDAD NULA POR NEBLINA 🌫️</div>
+                        <div className="bg-slate-500 text-white text-center p-2.5 rounded-xl mb-4 font-black uppercase tracking-wider text-xs shadow-[0_0_20px_rgba(100,116,139,0.5)] animate-pulse">🌫️ VISIBILIDAD NULA</div>
                     )}
 
                     {/* Lista Restante */}
-                    <div className={`glass-card p-5 rounded-2xl mb-6 relative ${(isRaining || isFoggy) ? 'opacity-50 pointer-events-none' : ''}`}>
+                    <div className={`glass-card p-4 rounded-2xl mb-6 relative ${(isRaining || isFoggy) ? 'opacity-50 pointer-events-none' : ''}`}>
                         {isRaining && <div className="absolute inset-0 rain-overlay rounded-2xl z-10"></div>}
                         {isFoggy && !isRaining && <div className="absolute inset-0 fog-overlay rounded-2xl z-10"></div>}
 
-                        <p className="text-[10px] font-bold tracking-widest text-slate-400 uppercase mb-3">🗓️ Plan Restante ({futureFlights.length} Vuelos Pendientes)</p>
+                        <p className="text-[10px] font-bold tracking-widest text-slate-400 uppercase mb-3">🗓️ Plan Restante ({futureFlights.length} Vuelos)</p>
                         
                         {flights.length === 0 ? (
-                            <div className="text-center py-6 text-xs font-bold text-slate-500">Sube una captura para generar el itinerario cuántico de 16 vuelos.</div>
+                            <div className="text-center py-6 text-xs font-bold text-slate-500">Sube captura para generar.</div>
                         ) : futureFlights.length === 0 ? (
-                            <div className="text-center py-6 text-xs font-bold text-emerald-500">✅ Todos los vuelos del día han concluido o el día ha terminado.</div>
+                            <div className="text-center py-6 text-xs font-bold text-emerald-500">✅ Vuelos concluidos.</div>
                         ) : (
-                            <div className="space-y-2.5">
+                            <div className="space-y-2">
                                 {futureFlights.map((f, i) => (
-                                    <div key={i} className={`flex justify-between items-center p-3 bg-[#0f172a] border rounded-xl ${f.wind >= 42 ? 'border-rose-900/50 opacity-75' : 'border-slate-800'}`}>
+                                    <div key={i} className={`flex justify-between items-center p-2.5 bg-[#0f172a] border rounded-xl ${f.wind >= 42 ? 'border-rose-900/50 opacity-75' : 'border-slate-800'}`}>
                                         <div>
-                                            <div className="text-lg font-black text-white tracking-wide">{f.time}</div>
-                                            <div className="flex gap-2 items-center mt-1">
-                                                <div className={`text-[10px] font-bold uppercase tracking-wider ${f.wind >= 42 ? 'text-rose-500' : 'text-emerald-400'}`}>
-                                                    {f.wind >= 42 ? `🚫 Susp. (${f.wind} km/h)` : `✅ Libre (${f.wind} km/h)`}
+                                            <div className="text-base font-black text-white tracking-wide">{f.time}</div>
+                                            <div className="flex gap-2 items-center mt-0.5">
+                                                <div className={`text-[9px] font-bold uppercase tracking-wider ${f.wind >= 42 ? 'text-rose-500' : 'text-emerald-400'}`}>
+                                                    {f.wind >= 42 ? `🚫 Susp. (${f.wind}k)` : `✅ Libre (${f.wind}k)`}
                                                 </div>
                                                 {f.rainProb > 0 && (
-                                                    <div className="text-[10px] font-bold uppercase tracking-wider text-cyan-400">
-                                                        ☔ {f.rainProb}% Prob. Lluvia
+                                                    <div className="text-[9px] font-bold uppercase tracking-wider text-cyan-400">
+                                                        ☔ {f.rainProb}% Lluvia
                                                     </div>
                                                 )}
                                             </div>
                                         </div>
-                                        <span className={`text-[9px] font-black uppercase px-2.5 py-1 rounded border ${f.type === 'FORZOSO' ? 'bg-indigo-950 text-indigo-400 border-indigo-900' : 'bg-slate-800 text-slate-400 border-slate-700'}`}>
+                                        <span className={`text-[8px] font-black uppercase px-2 py-1 rounded border ${f.type === 'FORZOSO' ? 'bg-indigo-950 text-indigo-400 border-indigo-900' : 'bg-slate-800 text-slate-400 border-slate-700'}`}>
                                             {f.type}
                                         </span>
                                     </div>
@@ -597,31 +584,33 @@
                     </div>
 
                     {/* Botonera Flotante Inferior */}
-                    <div className="fixed bottom-0 left-0 w-full p-4 bg-gradient-to-t from-[#0B0F19] via-[#0B0F19] to-transparent flex justify-center items-center gap-3 z-40 pointer-events-none">
-                         <button onClick={(e) => { e.stopPropagation(); handleLogManualFlight(); }} disabled={isRaining || isFoggy} className={`pointer-events-auto flex-1 max-w-xs font-black py-4 rounded-xl transition transform hover:scale-105 ${isRaining || isFoggy ? 'bg-slate-800 text-slate-600' : 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-[0_0_20px_rgba(79,70,229,0.4)]'}`}>
-                             ✈️ REGISTRAR DESPEGUE AHORA
-                         </button>
-                         <button onClick={(e) => { e.stopPropagation(); undoLastFlight(); }} className="pointer-events-auto bg-rose-900/50 hover:bg-rose-900 text-rose-300 font-black py-4 px-5 rounded-xl border border-rose-800 transition shadow-lg" title="Deshacer último registro">
-                             -1
-                         </button>
+                    <div className="fixed bottom-0 left-0 w-full p-4 bg-gradient-to-t from-[#0B0F19] via-[#0B0F19] to-transparent flex justify-center items-center gap-2 z-40 pointer-events-none">
+                        <div className="w-full max-w-[400px] mx-auto flex gap-2">
+                             <button onClick={(e) => { e.stopPropagation(); handleLogManualFlight(); }} disabled={isRaining || isFoggy} className={`pointer-events-auto flex-1 font-black py-4 rounded-xl text-sm transition transform hover:scale-105 ${isRaining || isFoggy ? 'bg-slate-800 text-slate-600' : 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-[0_0_20px_rgba(79,70,229,0.4)]'}`}>
+                                 ✈️ REGISTRAR
+                             </button>
+                             <button onClick={(e) => { e.stopPropagation(); undoLastFlight(); }} className="pointer-events-auto bg-rose-900/50 hover:bg-rose-900 text-rose-300 font-black py-4 px-4 rounded-xl border border-rose-800 transition shadow-lg text-sm" title="Deshacer">
+                                 -1
+                             </button>
+                        </div>
                     </div>
 
-                    {/* Modales - Ajustes y Admin */}
+                    {/* Modales */}
                     {settingsOpen && (
                         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4" onClick={(e) => e.stopPropagation()}>
-                            <div className="bg-[#131826] border border-slate-800 rounded-2xl w-full max-w-sm shadow-2xl p-6">
-                                <h2 className="text-lg font-black text-white mb-4">⚙️ Ajustes de Sistema</h2>
+                            <div className="bg-[#131826] border border-slate-800 rounded-2xl w-full max-w-[320px] shadow-2xl p-5">
+                                <h2 className="text-base font-black text-white mb-4">⚙️ Ajustes</h2>
                                 <div className="mb-4">
-                                    <label className="block text-[10px] font-bold tracking-widest text-slate-400 uppercase mb-2">Modelo IA</label>
-                                    <input type="text" value={geminiModel} onChange={e => setGeminiModel(e.target.value)} className="w-full bg-[#1e293b] border border-slate-700 rounded-lg p-2.5 text-white font-mono text-xs outline-none" />
+                                    <label className="block text-[10px] font-bold tracking-widest text-slate-400 uppercase mb-1">Modelo IA</label>
+                                    <input type="text" value={geminiModel} onChange={e => setGeminiModel(e.target.value)} className="w-full bg-[#1e293b] border border-slate-700 rounded-lg p-2 text-white font-mono text-xs outline-none" />
                                 </div>
                                 <div className="mb-5">
-                                    <label className="block text-[10px] font-bold tracking-widest text-slate-400 uppercase mb-2">Llave Gemini API</label>
-                                    <input type="password" value={geminiKey} onChange={e => setGeminiKey(e.target.value)} className="w-full bg-[#1e293b] border border-slate-700 rounded-lg p-2.5 text-white font-mono text-xs outline-none" placeholder="AIzaSy..." />
+                                    <label className="block text-[10px] font-bold tracking-widest text-slate-400 uppercase mb-1">Llave API</label>
+                                    <input type="password" value={geminiKey} onChange={e => setGeminiKey(e.target.value)} className="w-full bg-[#1e293b] border border-slate-700 rounded-lg p-2 text-white font-mono text-xs outline-none" />
                                 </div>
                                 <div className="flex gap-2">
-                                    <button onClick={() => setSettingsOpen(false)} className="flex-1 bg-slate-800 hover:bg-slate-700 text-white font-bold py-2.5 rounded-lg text-xs">Cerrar</button>
-                                    <button onClick={() => { localStorage.setItem('gemini_key', geminiKey); localStorage.setItem('gemini_model', geminiModel); setSettingsOpen(false); speak("Ajustes guardados."); }} className="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2.5 rounded-lg text-xs">Guardar</button>
+                                    <button onClick={() => setSettingsOpen(false)} className="flex-1 bg-slate-800 hover:bg-slate-700 text-white font-bold py-2 rounded-lg text-xs">Cerrar</button>
+                                    <button onClick={() => { localStorage.setItem('gemini_key', geminiKey); localStorage.setItem('gemini_model', geminiModel); setSettingsOpen(false); speak("Ajustes guardados."); }} className="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2 rounded-lg text-xs">Guardar</button>
                                 </div>
                             </div>
                         </div>
@@ -629,16 +618,11 @@
 
                     {adminOpen && (
                         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4" onClick={(e) => e.stopPropagation()}>
-                            <div className="bg-[#131826] border border-slate-800 rounded-2xl w-full max-w-sm shadow-2xl p-6">
-                                <h2 className="text-lg font-black text-indigo-400 mb-2">👨‍💼 Administración (Zoho)</h2>
-                                <p className="text-slate-400 text-xs mb-6">Sube el archivo Excel o CSV exportado de Zoho Shifts para actualizar el piloto en turno.</p>
-                                
-                                <input type="file" id="zohoUpload" accept=".csv, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel" className="hidden" onChange={handleZohoUpload} />
-                                
-                                <button onClick={() => document.getElementById('zohoUpload').click()} className="w-full bg-emerald-700 hover:bg-emerald-600 text-white font-bold py-3 rounded-lg text-sm mb-3 border border-emerald-500 shadow-[0_0_15px_rgba(4,120,87,0.3)]">
-                                    📗 SUBIR REPORTE ZOHO
-                                </button>
-                                
+                            <div className="bg-[#131826] border border-slate-800 rounded-2xl w-full max-w-[320px] shadow-2xl p-5">
+                                <h2 className="text-base font-black text-indigo-400 mb-2">👨‍💼 Admin</h2>
+                                <p className="text-slate-400 text-[10px] mb-5">Sube el archivo Excel Zoho para actualizar piloto.</p>
+                                <input type="file" id="zohoUpload" accept=".csv, .xlsx" className="hidden" onChange={handleZohoUpload} />
+                                <button onClick={() => document.getElementById('zohoUpload').click()} className="w-full bg-emerald-700 hover:bg-emerald-600 text-white font-bold py-2.5 rounded-lg text-xs mb-2 border border-emerald-500 shadow-[0_0_15px_rgba(4,120,87,0.3)]">📗 SUBIR ZOHO</button>
                                 <button onClick={() => setAdminOpen(false)} className="w-full bg-slate-800 text-white font-bold py-2.5 rounded-lg text-xs">Cancelar</button>
                             </div>
                         </div>
@@ -646,12 +630,10 @@
                     
                     {modal.isOpen && (
                         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4" onClick={(e) => e.stopPropagation()}>
-                            <div className="bg-[#131826] border border-slate-800 rounded-2xl w-full max-w-sm shadow-2xl p-6 border-l-4 border-l-indigo-500">
-                                <h2 className="text-lg font-black text-white mb-2">{modal.title}</h2>
-                                <p className="text-slate-300 text-sm mb-6">{modal.message}</p>
-                                <button onClick={() => setModal({ ...modal, isOpen: false })} className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2.5 rounded-lg text-xs">
-                                    Entendido
-                                </button>
+                            <div className="bg-[#131826] border border-slate-800 rounded-2xl w-full max-w-[320px] shadow-2xl p-5 border-l-4 border-l-indigo-500">
+                                <h2 className="text-base font-black text-white mb-2">{modal.title}</h2>
+                                <p className="text-slate-300 text-xs mb-5">{modal.message}</p>
+                                <button onClick={() => setModal({ ...modal, isOpen: false })} className="w-full bg-indigo-600 text-white font-bold py-2.5 rounded-lg text-xs">Entendido</button>
                             </div>
                         </div>
                     )}
