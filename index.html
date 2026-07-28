@@ -124,6 +124,7 @@
                     const utterance = new SpeechSynthesisUtterance(text);
                     utterance.lang = 'es-MX';
                     utterance.rate = 1.0;
+                    utterance.volume = 1.0; // <-- Volumen forzado al 100%
                     window.speechSynthesis.speak(utterance);
                 }
             };
@@ -133,7 +134,8 @@
                     setAudioUnlocked(true);
                     audioUnlockedRef.current = true;
                     const u = new SpeechSynthesisUtterance("Sistema de voz en línea.");
-                    u.lang = 'es-MX'; u.volume = 0.3;
+                    u.lang = 'es-MX'; 
+                    u.volume = 1.0; // <-- Volumen forzado al 100%
                     window.speechSynthesis.speak(u);
                 }
             };
@@ -170,7 +172,7 @@
                             speak("Atención piloto. Es hora de tomar evidencia fotográfica de las condiciones meteorológicas.");
                         }
 
-                        // 3. Alarmas Prevuelo (10 y 5 min) y Recálculo por Retraso
+                        // 3. Alarmas Prevuelo (10 y 5 min)
                         if (flightsRef.current && flightsRef.current.length > 0 && !isRainingRef.current && !isFoggyRef.current) {
                             flightsRef.current.forEach(flight => {
                                 if (flight.wind < 42) {
@@ -380,7 +382,6 @@
                     { time: applyVariance("23:00"), type: "DINÁMICO", hour24: 23 }
                 ];
 
-                // REGLAS DE COMPRESIÓN (Si hay viento > 40 a las 11 o 12)
                 const isSuspendedAt11 = windMap[11] >= 40;
                 const isSuspendedAt12 = windMap[12] >= 40 && !isSuspendedAt11;
 
@@ -395,7 +396,6 @@
                     baseSchedule.splice(9, 0, { time: applyVariance("11:20"), type: "DINÁMICO", hour24: 11 });
                 }
 
-                // Aplicar Clima Final
                 const finalSchedule = baseSchedule.map(f => {
                     let h24 = parseInt(f.time.split(':')[0]);
                     return {
