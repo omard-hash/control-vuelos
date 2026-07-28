@@ -24,6 +24,7 @@
     <div id="root"></div>
 
     <script type="text/babel">
+        // AUTOCORRECCIÓN GEMINI: Forzamos el uso del modelo Flash (Más rápido y preciso)
         if (localStorage.getItem('gemini_model') === 'gemini-1.5-pro' || localStorage.getItem('gemini_model') === 'gemini-1.5-flash') {
             localStorage.setItem('gemini_model', 'gemini-3.6-flash');
         }
@@ -54,7 +55,7 @@
             const [geminiModel, setGeminiModel] = useState(localStorage.getItem('gemini_model') || 'gemini-3.6-flash');
             const [pilotName, setPilotName] = useState(localStorage.getItem('pilot_name') || 'Piloto en Turno');
             
-            // Meta de 8 vuelos por turno y rastreador de período (7 AM / 7 PM)
+            // Meta de 8 vuelos por turno
             const [loggedFlightsCount, setLoggedFlightsCount] = useState(0);
             const [shiftPeriod, setShiftPeriod] = useState('');
             const totalFlightsTarget = 8; 
@@ -73,6 +74,7 @@
             const windDataMapRef = useRef({});
             const shiftPeriodRef = useRef('');
 
+            // SINCRONIZACIÓN FIREBASE
             useEffect(() => {
                 let unsubscribe = () => {};
                 firebase.auth().signInAnonymously().then(() => {
@@ -113,13 +115,14 @@
 
             useEffect(() => { audioUnlockedRef.current = audioUnlocked; }, [audioUnlocked]);
 
+            // MOTOR DE VOZ (VOLUMEN AL 100%)
             const speak = (text) => {
                 if (audioUnlockedRef.current && 'speechSynthesis' in window) {
                     window.speechSynthesis.cancel(); 
                     const utterance = new SpeechSynthesisUtterance(text);
                     utterance.lang = 'es-MX';
                     utterance.rate = 1.0;
-                    utterance.volume = 1.0; // 100% VOLUMEN
+                    utterance.volume = 1.0; // VOLUMEN AL 100% FORZADO
                     window.speechSynthesis.speak(utterance);
                 }
             };
@@ -135,6 +138,7 @@
                 }
             };
 
+            // RELOJ CENTRAL Y CONTROL DE TURNOS
             useEffect(() => {
                 const timer = setInterval(() => {
                     const now = new Date();
@@ -145,7 +149,7 @@
                     const s = now.getSeconds();
                     const timeStr = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
 
-                    // REINICIO DE TURNO ESTRICTO A LAS 7 AM y 7 PM
+                    // CÁLCULO ESTRICTO DEL TURNO ACTUAL
                     let shiftDate = new Date(now);
                     if (h < 7) { shiftDate.setDate(shiftDate.getDate() - 1); } // Madrugada pertenece al día anterior
                     
@@ -153,31 +157,30 @@
                     const shiftType = isDayShift ? 'DIA' : 'NOCHE';
                     const currentShiftPeriod = `${shiftDate.getFullYear()}-${shiftDate.getMonth()}-${shiftDate.getDate()}-${shiftType}`;
 
-                    // Reinicio de contador a 0 al iniciar un nuevo turno (7 AM o 7 PM)
+                    // REINICIO DE CONTADOR (0/8) A LAS 7 AM Y 7 PM
                     if (shiftPeriodRef.current && shiftPeriodRef.current !== currentShiftPeriod) {
                         shiftPeriodRef.current = currentShiftPeriod;
                         db.collection('operaciones').doc('turno_actual').set({ 
                             loggedFlightsCount: 0,
                             shiftPeriod: currentShiftPeriod
                         }, { merge: true });
-                        speak(`Atención. Inicio de nuevo turno. Contador reiniciado a cero para la meta de 8 vuelos.`);
+                        speak(`Atención. Cambio de turno detectado. Contador de vuelos reiniciado a cero.`);
                     } else if (!shiftPeriodRef.current) {
-                         // Inicialización en primera carga
                          shiftPeriodRef.current = currentShiftPeriod;
                     }
 
                     setShiftName(isDayShift ? 'Turno Diurno' : 'Turno Nocturno');
                     
                     if (s === 0) { 
-                        // Autocambio de piloto Zoho Scanner (7 AM y 7 PM en punto)
+                        // ZOHO SCANNER AUTOMÁTICO (7 AM y 7 PM)
                         if ((h === 7 && m === 0) || (h === 19 && m === 0)) {
                             autoAssignPilot();
-                            speak("Cambio de turno en progreso. Asignando nuevo piloto automáticamente.");
+                            speak("Iniciando escaneo de plantilla de personal. Asignando nuevo piloto en turno.");
                         }
 
-                        // Alarmas Estáticas Administrativas
+                        // JUNTAS Y ALERTAS ADMINISTRATIVAS
                         if (h === 7 && m === 50) {
-                            speak("Atención. Inicio de junta operativa shop floor. Ventana de vuelo bloqueada.");
+                            speak("Atención. Inicio de junta operativa shop floor. Ventana de vuelo bloqueada hasta las 8 15.");
                             setModal({ isOpen: true, title: '⏰ JUNTA OPERATIVA', message: 'Reunión de Shopfloor en curso (07:50 - 08:15). Vuelos bloqueados.', type: 'error' });
                         }
                         else if (h === 12 && m === 0) {
@@ -187,15 +190,17 @@
                             speak("Atención. Actualización de captura del clima requerida. Valide condiciones para la madrugada.");
                         }
 
-                        // Evidencias (Vientos o lluvia)
+                        // EVIDENCIAS (VIENTOS O LLUVIA)
                         if (m === 0 && (isRainingRef.current || isFoggyRef.current || (windDataMapRef.current[h] >= 40))) {
-                            speak("Atención piloto. Es hora de tomar evidencia fotográfica de las condiciones meteorológicas.");
+                            speak("Atención piloto. Es hora de tomar evidencia fotográfica de las condiciones meteorológicas adversas.");
                         }
 
-                        // Prevuelos
+                        // ALARMAS DE DESPEGUE (PREVUELOS 10 y 5 MIN)
                         if (flightsRef.current && flightsRef.current.length > 0 && !isRainingRef.current && !isFoggyRef.current) {
                             flightsRef.current.forEach(flight => {
-                                if (flight.wind < 42) {
+                                // Solo avisar si el vuelo es de este turno y no hay suspensión por viento
+                                const isFlightDay = flight.hour24 >= 7 && flight.hour24 < 19;
+                                if (isDayShift === isFlightDay && flight.wind < 42) {
                                     let flightDate = new Date();
                                     flightDate.setHours(flight.hour24, flight.min, 0, 0);
                                     
@@ -215,6 +220,7 @@
                 return () => clearInterval(timer);
             }, []);
 
+            // NUEVO ESCÁNER ZOHO 3D AVANZADO (Lector Inverso)
             const autoAssignPilot = (jsonData = null) => {
                 try {
                     const rawData = jsonData || localStorage.getItem('zoho_schedule');
@@ -224,26 +230,25 @@
                     const now = new Date();
                     const h = now.getHours();
                     
-                    // Máquina del tiempo: si es madrugada, buscamos el rol del día anterior
-                    let targetDate = new Date();
+                    // Máquina del tiempo
+                    let targetDate = new Date(now);
                     if (h < 7) { targetDate.setDate(targetDate.getDate() - 1); }
 
                     const isDayShift = h >= 7 && h < 19;
                     const shiftCodeToFind = isDayShift ? "d" : "n"; 
-                    
-                    const d = String(targetDate.getDate()); // Ej. "28"
+                    const d = String(targetDate.getDate()); 
                     
                     let foundName = null;
                     let dateColumnIndex = -1;
                     
                     // 1. ESCÁNER HORIZONTAL (Buscar la columna del día)
-                    for (let r = 0; r < Math.min(json.length, 15); r++) {
+                    for (let r = 0; r < Math.min(json.length, 10); r++) {
                         if (!json[r]) continue;
                         for (let c = 0; c < json[r].length; c++) {
                             if (json[r][c] == null) continue;
                             const cell = String(json[r][c]).toLowerCase().trim();
                             
-                            // Regex súper agresivo: Busca el día aislado (28, 28/07, 28-jul)
+                            // Busca "28", "28-jul", "28/07", etc.
                             const regex = new RegExp(`^0?${d}(\\b|\\D|$)`);
                             if (regex.test(cell) || cell === d || cell === `0${d}`) {
                                 dateColumnIndex = c;
@@ -253,45 +258,57 @@
                         if (dateColumnIndex !== -1) break;
                     }
 
-                    // 2. ESCÁNER VERTICAL (Buscar el turno específico de Zoho)
+                    // 2. ESCÁNER VERTICAL Y LECTURA INVERSA
                     if (dateColumnIndex !== -1) {
                         for (let r = 0; r < json.length; r++) {
                             if (!json[r] || json[r][dateColumnIndex] == null) continue;
                             const shiftValue = String(json[r][dateColumnIndex]).toLowerCase().trim();
                             
-                            // Coincidencias específicas para los horarios extraños del cliente
-                            const isMatchDay = shiftValue === "d" || shiftValue.includes("dia") || shiftValue.includes("6:50") || shiftValue.includes("7:00");
+                            // Buscamos coincidencia exacta con formatos raros como "6:50", "18:50", "D", "N"
+                            const isMatchDay = shiftValue === "d" || shiftValue.includes("dia") || shiftValue.includes("6:50") || shiftValue.includes("06:50") || shiftValue.includes("7:00");
                             const isMatchNight = shiftValue === "n" || shiftValue.includes("noche") || shiftValue.includes("18:50") || shiftValue.includes("19:00");
 
                             const isMatch = (shiftCodeToFind === "d" && isMatchDay) || (shiftCodeToFind === "n" && isMatchNight);
 
                             if (isMatch) {
-                                // 3. ESCÁNER A LA IZQUIERDA (Caminar hacia atrás buscando un nombre)
-                                for (let colNames = 0; colNames < dateColumnIndex; colNames++) {
+                                // 3. LECTURA INVERSA: Leemos de la columna de la fecha hacia la izquierda (así evitamos atrapar columnas fantasma)
+                                for (let colNames = dateColumnIndex - 1; colNames >= 0; colNames--) {
                                     const potentialName = String(json[r][colNames] || '').trim();
                                     
-                                    // Filtro Anti-ID's: Ignorar números de empleado y encabezados
+                                    // Validamos que tenga letras y sea mayor a 3 caracteres (ignora IDs de empleado)
                                     if (potentialName.length > 3 && 
                                         /[a-zA-ZáéíóúÁÉÍÓÚñÑ]/.test(potentialName) && 
-                                        !/^\d+$/.test(potentialName) && 
-                                        !potentialName.toLowerCase().includes("turno") &&
-                                        !potentialName.toLowerCase().includes("empleado") &&
-                                        !potentialName.toLowerCase().includes("id")) {
+                                        !/^\d+$/.test(potentialName)) {
                                         
-                                        foundName = potentialName;
-                                        break;
+                                        const lowerName = potentialName.toLowerCase();
+                                        // Filtro anti-fantasmas: Ignoramos celdas que sean encabezados o departamentos
+                                        const invalidWords = ["turno", "empleado", "id", "departamento", "puesto", "area", "área", "operador", "piloto", "nombre", "descanso", "ausente"];
+                                        const hasInvalidWord = invalidWords.some(w => lowerName.includes(w));
+                                        
+                                        if (!hasInvalidWord) {
+                                            foundName = potentialName;
+                                            break; // Encontramos el nombre real, detenemos el escáner horizontal
+                                        }
                                     }
                                 }
-                                if (foundName) break;
+                                if (foundName) break; // Detenemos el escáner vertical si ya hallamos al piloto
                             }
                         }
                     }
 
+                    // 4. APLICACIÓN DE RESULTADOS
                     if (foundName) {
+                        // Limpiamos el nombre (Ej. "miguel angel" -> "Miguel Angel")
                         foundName = foundName.replace(/\b\w/g, l => l.toUpperCase()).trim();
                         setPilotName(foundName);
                         db.collection('operaciones').doc('turno_actual').set({ pilotName: foundName }, { merge: true });
                         localStorage.setItem('pilot_name', foundName);
+                    } else {
+                        // Si no lo encuentra por formato raro, en vez de dejar el de ayer (Omar), avisa que hay un error.
+                        const fallbackName = isDayShift ? "Piloto AM (Falla en Zoho)" : "Piloto PM (Falla en Zoho)";
+                        setPilotName(fallbackName);
+                        db.collection('operaciones').doc('turno_actual').set({ pilotName: fallbackName }, { merge: true });
+                        localStorage.setItem('pilot_name', fallbackName);
                     }
                 } catch (err) {
                     console.error("Error en Zoho 3D Scanner:", err);
@@ -343,7 +360,7 @@
 
             const analyzeImageWithAI = async (base64Image) => {
                 setIsScanning(true);
-                speak("Analizando el clima avanzado. Detectando vientos y precipitación.");
+                speak("Analizando el clima avanzado. Detectando vientos y probabilidad de lluvia.");
                 
                 try {
                     const key = geminiKey.trim();
@@ -382,7 +399,7 @@
                     }
                 } catch (error) {
                     console.error("AI Error:", error);
-                    speak("Error al procesar. Intentando modo seguro.");
+                    speak("Error al procesar. Intentando modo seguro de vuelos.");
                     generateIntelligentSchedule([]); 
                 } finally {
                     setIsScanning(false);
@@ -426,11 +443,11 @@
                     
                     let timeInMins = newH * 60 + newM;
 
-                    // ZONAS PROHIBIDAS (Handovers y Junta)
+                    // ZONAS PROHIBIDAS
                     const blocks = [
-                        { start: 6*60 + 45, end: 7*60 + 15 },   // Cambio AM (06:45 - 07:15)
-                        { start: 7*60 + 50, end: 8*60 + 15 },   // Shopfloor (07:50 - 08:15)
-                        { start: 18*60 + 45, end: 19*60 + 15 }  // Cambio PM (18:45 - 19:15)
+                        { start: 6*60 + 45, end: 7*60 + 15 },   // Cambio AM
+                        { start: 7*60 + 50, end: 8*60 + 15 },   // Shopfloor
+                        { start: 18*60 + 45, end: 19*60 + 15 }  // Cambio PM
                     ];
 
                     for (let b of blocks) {
@@ -454,12 +471,10 @@
                     { time: applyVariance("16:15"), type: "DINÁMICO", hour24: 16 },
                     { time: applyVariance("17:45", true), type: "FORZOSO", hour24: 17 },
 
-                    // TURNO NOCTURNO: Bloque 1 (19:00 a 23:30 - 3 Vuelos)
+                    // TURNO NOCTURNO (8 Vuelos en Total)
                     { time: applyVariance("19:25", true), type: "FORZOSO", hour24: 19 }, 
                     { time: applyVariance("21:00"), type: "DINÁMICO", hour24: 21 },
                     { time: applyVariance("22:50", true), type: "FORZOSO", hour24: 22 },
-
-                    // TURNO NOCTURNO: Bloque 2 (00:00 a 06:00 - 5 Vuelos)
                     { time: applyVariance("00:15"), type: "DINÁMICO", hour24: 0 },
                     { time: applyVariance("01:30"), type: "DINÁMICO", hour24: 1 },
                     { time: applyVariance("03:00"), type: "DINÁMICO", hour24: 3 },
@@ -519,20 +534,19 @@
                     const newCount = loggedFlightsCount - 1;
                     setLoggedFlightsCount(newCount);
                     db.collection('operaciones').doc('turno_actual').set({ loggedFlightsCount: newCount }, { merge: true });
-                    speak("Registro deshecho.");
+                    speak("Registro de vuelo eliminado.");
                 }
             };
 
+            // FILTRO DE PANTALLA INTELIGENTE (Muestra solo vuelos de TU turno)
             const currentMins = currentTime.getHours() * 60 + currentTime.getMinutes();
             const currentH = currentTime.getHours();
             const isCurrentlyDayShift = currentH >= 7 && currentH < 19;
 
             const futureFlights = flights.filter(f => {
-                // Filtrar para mostrar SOLO los vuelos del turno actual
                 const isFlightDay = f.hour24 >= 7 && f.hour24 < 19;
-                if (isCurrentlyDayShift !== isFlightDay) return false;
+                if (isCurrentlyDayShift !== isFlightDay) return false; // Solo muestra vuelos del turno actual
 
-                // Lógica de expiración (borrarlos 15 min después)
                 let flightMins = f.hour24 * 60 + f.min;
                 let nowMins = currentMins;
                 
@@ -547,7 +561,7 @@
             return (
                 <div className="min-h-screen p-4 w-full max-w-[400px] mx-auto pb-32" onClick={unlockAudio}>
                     
-                    {/* Header */}
+                    {/* Header Compacto */}
                     <div className="flex justify-between items-center mb-5">
                         <div>
                             <h1 className="text-lg font-black tracking-tight flex items-center gap-2">
@@ -564,11 +578,11 @@
 
                     {!audioUnlocked && (
                         <div className="bg-amber-500/20 border border-amber-500/50 text-amber-400 text-xs font-bold text-center p-2 rounded-lg mb-4 animate-pulse">
-                            🔇 Toca para activar Voz
+                            🔇 Toca cualquier parte para activar Voz
                         </div>
                     )}
 
-                    {/* Stats & Scan */}
+                    {/* Stats & Scan (Widget View) */}
                     <div className="glass-card p-4 rounded-2xl mb-4 relative overflow-hidden">
                         <div className="flex justify-between items-start mb-4">
                             <div>
@@ -589,8 +603,8 @@
                                     </div>
                                 </div>
                                 <div className="flex items-baseline gap-1 bg-indigo-900/30 px-3 py-2 rounded-xl border border-indigo-500/30">
-                                    <span className="text-4xl font-black text-white">{loggedFlightsCount}</span>
-                                    <span className="text-lg font-bold text-indigo-500/70">/{totalFlightsTarget}</span>
+                                    <span className="text-3xl font-black text-white">{loggedFlightsCount}</span>
+                                    <span className="text-sm font-bold text-indigo-500/70">/{totalFlightsTarget}</span>
                                 </div>
                             </div>
                         </div>
@@ -614,13 +628,13 @@
                     {isRaining && <div className="bg-rose-600 text-white text-center p-2.5 rounded-xl mb-4 font-black uppercase text-xs animate-pulse">⚠️ SUSPENDIDO POR LLUVIA</div>}
                     {isFoggy && !isRaining && <div className="bg-slate-500 text-white text-center p-2.5 rounded-xl mb-4 font-black uppercase text-xs animate-pulse">🌫️ VISIBILIDAD NULA</div>}
 
-                    {/* Vuelos Restantes */}
+                    {/* Vuelos Restantes (Filtro por turno aplicado) */}
                     <div className={`glass-card p-4 rounded-2xl mb-6 relative ${(isRaining || isFoggy) ? 'opacity-50 pointer-events-none' : ''}`}>
-                        <p className="text-[10px] font-bold text-slate-400 uppercase mb-3">🗓️ Plan Restante ({futureFlights.length} Vuelos)</p>
+                        <p className="text-[10px] font-bold text-slate-400 uppercase mb-3">🗓️ PLAN RESTANTE ({futureFlights.length} VUELOS)</p>
                         {flights.length === 0 ? (
                             <div className="text-center py-6 text-xs font-bold text-slate-500">Sube captura para generar.</div>
                         ) : futureFlights.length === 0 ? (
-                            <div className="text-center py-6 text-xs font-bold text-emerald-500">✅ Vuelos de este turno concluidos.</div>
+                            <div className="text-center py-6 text-xs font-bold text-emerald-500">✅ Vuelos de tu turno concluidos.</div>
                         ) : (
                             <div className="space-y-2">
                                 {futureFlights.map((f, i) => (
@@ -673,7 +687,7 @@
                         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4" onClick={(e) => e.stopPropagation()}>
                             <div className="bg-[#131826] border border-slate-800 rounded-2xl w-full max-w-[320px] p-5">
                                 <h2 className="text-base font-black text-indigo-400 mb-2">👨‍💼 Admin (Pilotos)</h2>
-                                <p className="text-[10px] text-slate-400 mb-4">Escáner de Matriz 3D (Anti-Errores) Activo.</p>
+                                <p className="text-[10px] text-slate-400 mb-4">Escáner de Matriz 3D Avanzado Activo.</p>
                                 <input type="file" id="zohoUpload" accept=".csv, .xlsx" className="hidden" onChange={handleZohoUpload} />
                                 <button onClick={() => document.getElementById('zohoUpload').click()} className="w-full bg-emerald-700 hover:bg-emerald-600 text-white font-bold py-3 rounded-lg text-xs mb-4">📗 SUBIR NUEVO ZOHO (CSV)</button>
                                 
