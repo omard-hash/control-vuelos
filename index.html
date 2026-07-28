@@ -60,6 +60,7 @@
             const [pilotName, setPilotName] = useState(localStorage.getItem('pilot_name') || 'Piloto en Turno');
             
             const [loggedFlightsCount, setLoggedFlightsCount] = useState(0);
+            const [lastResetDate, setLastResetDate] = useState('');
             const totalFlightsTarget = 16; 
             
             const [isRaining, setIsRaining] = useState(false);
@@ -74,6 +75,7 @@
             const isRainingRef = useRef(false);
             const isFoggyRef = useRef(false);
             const windDataMapRef = useRef({});
+            const lastResetDateRef = useRef('');
 
             useEffect(() => {
                 let unsubscribe = () => {};
@@ -103,6 +105,15 @@
                                 setPilotName(data.pilotName);
                                 localStorage.setItem('pilot_name', data.pilotName);
                             }
+                            // Lógica de memoria para el cambio de día
+                            if (data.lastResetDate) {
+                                setLastResetDate(data.lastResetDate);
+                                lastResetDateRef.current = data.lastResetDate;
+                            } else {
+                                const today = new Date().toDateString();
+                                db.collection('operaciones').doc('turno_actual').set({ lastResetDate: today }, { merge: true });
+                                lastResetDateRef.current = today;
+                            }
                         }
                     }, (err) => console.error("Error leyendo datos:", err));
                 }).catch((error) => console.error("Error Auth:", error));
@@ -117,7 +128,7 @@
                     const utterance = new SpeechSynthesisUtterance(text);
                     utterance.lang = 'es-MX';
                     utterance.rate = 1.0;
-                    utterance.volume = 1.0; // VOLUMEN MÁXIMO FORZADO 100%
+                    utterance.volume = 1.0; // VOLUMEN AL 100%
                     window.speechSynthesis.speak(utterance);
                 }
             };
@@ -128,7 +139,7 @@
                     audioUnlockedRef.current = true;
                     const u = new SpeechSynthesisUtterance("Sistema de voz en línea y calibrado.");
                     u.lang = 'es-MX'; 
-                    u.volume = 1.0; // VOLUMEN MÁXIMO FORZADO 100%
+                    u.volume = 1.0; // VOLUMEN AL 100%
                     window.speechSynthesis.speak(u);
                 }
             };
@@ -143,16 +154,27 @@
                     const s = now.getSeconds();
                     const timeStr = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
 
+                    // REINICIO DE CONTADOR (Corte de media noche)
+                    const todayStr = now.toDateString();
+                    if (lastResetDateRef.current && lastResetDateRef.current !== todayStr) {
+                        lastResetDateRef.current = todayStr; // Actualiza ref
+                        db.collection('operaciones').doc('turno_actual').set({ 
+                            loggedFlightsCount: 0,
+                            lastResetDate: todayStr
+                        }, { merge: true });
+                        speak("Corte de media noche. El contador de vuelos ha sido reiniciado a cero para el nuevo día.");
+                    }
+
                     setShiftName((h >= 7 && h < 19) ? 'Turno Diurno' : 'Turno Nocturno');
                     
                     if (s === 0) { 
-                        // Autocambio de piloto con el archivo Zoho (A las 7:00 AM y 7:00 PM exactas)
+                        // Autocambio de piloto con Zoho Scanner a las 7 AM y 7 PM
                         if ((h === 7 && m === 0) || (h === 19 && m === 0)) {
                             autoAssignPilot();
-                            speak("Cambio de turno. Buscando operador asignado para esta jornada.");
+                            speak("Cambio de turno. Asignando nuevo piloto automáticamente de la matriz.");
                         }
 
-                        // Alarmas Estáticas
+                        // Alarmas Estáticas Administrativas
                         if (h === 7 && m === 50) {
                             speak("Atención. Inicio de junta operativa shop floor. Ventana de vuelo bloqueada.");
                             setModal({ isOpen: true, title: '⏰ JUNTA OPERATIVA', message: 'Reunión de Shopfloor en curso (07:50 - 08:15). Vuelos bloqueados.', type: 'error' });
@@ -208,27 +230,26 @@
                     const now = new Date();
                     const h = now.getHours();
                     
-                    // Ajuste de "Madrugada": Si son menos de las 7am, buscar el turno de AYER
+                    // LÓGICA DE MADRUGADA: Si son menos de las 7am (Ej. 2 AM), estamos operando el turno que empezó AYER.
                     let targetDate = new Date();
                     if (h < 7) {
                         targetDate.setDate(targetDate.getDate() - 1);
                     }
 
+                    // Determinar qué letra buscar en base al horario
                     const isDayShift = h >= 7 && h < 19;
-                    const d = String(targetDate.getDate()); // Día del mes en texto (ej. "27")
-                    
-                    const dayCodes = ["d", "día", "dia", "diurno", "1", "m", "mañana"];
-                    const nightCodes = ["n", "noche", "nocturno", "2"];
-                    const validNames = ["omar", "antonio", "eduardo", "piloto", "juan", "carlos", "oscar"];
+                    const shiftCodeToFind = isDayShift ? "d" : "n"; // Buscamos "D" o "N"
+                    const d = String(targetDate.getDate()); // Día numérico del mes en texto (ej. "27")
                     
                     let foundName = null;
                     let dateColumnIndex = -1;
                     
-                    // 1. ESCÁNER HORIZONTAL: Busca el día de hoy en la cabecera (primeras 5 filas)
+                    // PASO 1: ESCANER HORIZONTAL (Buscar la columna con el día de hoy)
                     for (let r = 0; r < Math.min(json.length, 5); r++) {
                         if (!json[r]) continue;
                         for (let c = 0; c < json[r].length; c++) {
                             const cell = String(json[r][c]).toLowerCase().trim();
+                            // Buscar el número "27" suelto o "27/07" o "27-jul"
                             if (cell === d || cell === `0${d}` || cell.startsWith(`${d}/`) || cell.startsWith(`${d}-`)) {
                                 dateColumnIndex = c;
                                 break;
@@ -237,41 +258,37 @@
                         if (dateColumnIndex !== -1) break;
                     }
 
-                    // 2. ESCÁNER VERTICAL: Baja por la columna de hoy buscando "D" o "N"
+                    // PASO 2: ESCANER VERTICAL (Bajar por la columna de hoy buscando "D" o "N")
                     if (dateColumnIndex !== -1) {
                         for (let r = 0; r < json.length; r++) {
                             if (!json[r] || !json[r][dateColumnIndex]) continue;
                             const shiftValue = String(json[r][dateColumnIndex]).toLowerCase().trim();
                             
-                            const matchDay = isDayShift && dayCodes.includes(shiftValue);
-                            const matchNight = !isDayShift && nightCodes.includes(shiftValue);
-
-                            if (matchDay || matchNight) {
-                                // 3. EXTRACCIÓN: Encontramos la fila correcta. Buscamos el nombre.
-                                let rowName = json[r].find(cell => typeof cell === 'string' && validNames.some(n => cell.toLowerCase().includes(n)));
+                            // ¿Es el turno que buscamos? (Día o Noche)
+                            if (shiftValue === shiftCodeToFind || shiftValue === shiftCodeToFind.toUpperCase() || shiftValue.includes(shiftCodeToFind === "d" ? "dia" : "noche")) {
                                 
-                                // Fallback: Si no está en validNames, tomamos la columna 0 o 1 (usualmente donde están los nombres)
-                                if (rowName) {
-                                    foundName = rowName;
-                                } else if (typeof json[r][0] === 'string' && json[r][0].length > 3) {
-                                    foundName = json[r][0];
-                                } else if (typeof json[r][1] === 'string' && json[r][1].length > 3) {
-                                    foundName = json[r][1];
+                                // PASO 3: EXTRACCIÓN (Mirar a la izquierda, a la columna de Nombres)
+                                // Generalmente los nombres están en la columna 0, 1 o 2.
+                                for (let colNames = 0; colNames < 3; colNames++) {
+                                    if (typeof json[r][colNames] === 'string' && json[r][colNames].length > 3) {
+                                        foundName = json[r][colNames];
+                                        break;
+                                    }
                                 }
-                                break; // Detiene la búsqueda
+                                break; // Detiene la búsqueda vertical porque ya lo encontramos
                             }
                         }
                     }
 
                     if (foundName) {
-                        // Formatear Nombre (Mayúsculas)
+                        // Formatear Nombre (Primera letra Mayúscula)
                         foundName = foundName.replace(/\b\w/g, l => l.toUpperCase()).trim();
                         setPilotName(foundName);
                         db.collection('operaciones').doc('turno_actual').set({ pilotName: foundName }, { merge: true });
                         localStorage.setItem('pilot_name', foundName);
                     }
                 } catch (err) {
-                    console.error("Error asignando piloto:", err);
+                    console.error("Error en Zoho 3D Scanner:", err);
                 }
             };
 
@@ -575,7 +592,7 @@
                     {isRaining && <div className="bg-rose-600 text-white text-center p-2.5 rounded-xl mb-4 font-black uppercase text-xs animate-pulse">⚠️ SUSPENDIDO POR LLUVIA</div>}
                     {isFoggy && !isRaining && <div className="bg-slate-500 text-white text-center p-2.5 rounded-xl mb-4 font-black uppercase text-xs animate-pulse">🌫️ VISIBILIDAD NULA</div>}
 
-                    {}
+                    {/* Vuelos Restantes */}
                     <div className={`glass-card p-4 rounded-2xl mb-6 relative ${(isRaining || isFoggy) ? 'opacity-50 pointer-events-none' : ''}`}>
                         <p className="text-[10px] font-bold text-slate-400 uppercase mb-3">🗓️ Plan Restante ({futureFlights.length} Vuelos)</p>
                         {flights.length === 0 ? (
@@ -615,7 +632,7 @@
                         </div>
                     </div>
 
-                    {}
+                    {/* Modales */}
                     {settingsOpen && (
                         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4" onClick={(e) => e.stopPropagation()}>
                             <div className="bg-[#131826] border border-slate-800 rounded-2xl w-full max-w-[320px] p-5">
@@ -633,7 +650,7 @@
                         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4" onClick={(e) => e.stopPropagation()}>
                             <div className="bg-[#131826] border border-slate-800 rounded-2xl w-full max-w-[320px] p-5">
                                 <h2 className="text-base font-black text-indigo-400 mb-2">👨‍💼 Admin (Pilotos)</h2>
-                                <p className="text-[10px] text-slate-400 mb-4">La asignación ahora escanea el día y turno ("D" o "N") de tu matriz.</p>
+                                <p className="text-[10px] text-slate-400 mb-4">Escaneo de Matriz 3D activo.</p>
                                 <input type="file" id="zohoUpload" accept=".csv, .xlsx" className="hidden" onChange={handleZohoUpload} />
                                 <button onClick={() => document.getElementById('zohoUpload').click()} className="w-full bg-emerald-700 hover:bg-emerald-600 text-white font-bold py-3 rounded-lg text-xs mb-4">📗 SUBIR ZOHO (MATRIZ)</button>
                                 
