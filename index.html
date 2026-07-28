@@ -24,7 +24,6 @@
     <div id="root"></div>
 
     <script type="text/babel">
-        // Forzamos el uso del modelo Flash (Más rápido y preciso)
         if (localStorage.getItem('gemini_model') === 'gemini-1.5-pro' || localStorage.getItem('gemini_model') === 'gemini-1.5-flash') {
             localStorage.setItem('gemini_model', 'gemini-3.6-flash');
         }
@@ -55,10 +54,9 @@
             const [geminiModel, setGeminiModel] = useState(localStorage.getItem('gemini_model') || 'gemini-3.6-flash');
             const [pilotName, setPilotName] = useState(localStorage.getItem('pilot_name') || 'Piloto en Turno');
             
-            // Meta de 8 vuelos por turno
             const [loggedFlightsCount, setLoggedFlightsCount] = useState(0);
             const [shiftPeriod, setShiftPeriod] = useState('');
-            const totalFlightsTarget = 8; 
+            const totalFlightsTarget = 8; // META ESTRICTA: 8 Vuelos por turno
             
             const [isRaining, setIsRaining] = useState(false);
             const [isFoggy, setIsFoggy] = useState(false);
@@ -120,7 +118,7 @@
                     const utterance = new SpeechSynthesisUtterance(text);
                     utterance.lang = 'es-MX';
                     utterance.rate = 1.0;
-                    utterance.volume = 1.0; // VOLUMEN AL 100% GARANTIZADO
+                    utterance.volume = 1.0; // 100% Volumen Fijo
                     window.speechSynthesis.speak(utterance);
                 }
             };
@@ -146,15 +144,15 @@
                     const s = now.getSeconds();
                     const timeStr = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
 
-                    // CÁLCULO ESTRICTO DEL TURNO ACTUAL
+                    // Máquina del tiempo: Madrugada pertenece al día anterior
                     let shiftDate = new Date(now);
-                    if (h < 7) { shiftDate.setDate(shiftDate.getDate() - 1); } // Madrugada pertenece al día anterior
+                    if (h < 7) { shiftDate.setDate(shiftDate.getDate() - 1); } 
                     
                     const isDayShift = (h >= 7 && h < 19);
                     const shiftType = isDayShift ? 'DIA' : 'NOCHE';
                     const currentShiftPeriod = `${shiftDate.getFullYear()}-${shiftDate.getMonth()}-${shiftDate.getDate()}-${shiftType}`;
 
-                    // REINICIO DE CONTADOR (0/8) A LAS 7 AM Y 7 PM
+                    // REINICIO AUTOMÁTICO A LAS 7 AM Y 7 PM
                     if (shiftPeriodRef.current && shiftPeriodRef.current !== currentShiftPeriod) {
                         shiftPeriodRef.current = currentShiftPeriod;
                         db.collection('operaciones').doc('turno_actual').set({ 
@@ -175,35 +173,28 @@
                             speak("Iniciando escaneo de plantilla de personal. Asignando nuevo piloto en turno.");
                         }
 
-                        // JUNTAS Y ALERTAS ADMINISTRATIVAS
+                        // JUNTAS Y ALERTAS
                         if (h === 7 && m === 50) {
                             speak("Atención. Inicio de junta operativa shop floor. Ventana de vuelo bloqueada hasta las 8 15.");
-                            setModal({ isOpen: true, title: '⏰ JUNTA OPERATIVA', message: 'Reunión de Shopfloor en curso (07:50 - 08:15). Vuelos bloqueados.', type: 'error' });
                         }
                         else if (h === 12 && m === 0) {
                             speak("Atención comandante. Es hora de elaborar los reportes de capé i y actualizar el clima.");
                         }
-                        else if (h === 0 && m === 5) {
-                            speak("Atención. Actualización de captura del clima requerida. Valide condiciones para la madrugada.");
-                        }
 
-                        // EVIDENCIAS (VIENTOS O LLUVIA)
+                        // EVIDENCIAS
                         if (m === 0 && (isRainingRef.current || isFoggyRef.current || (windDataMapRef.current[h] >= 40))) {
                             speak("Atención piloto. Es hora de tomar evidencia fotográfica de las condiciones meteorológicas adversas.");
                         }
 
-                        // ALARMAS DE DESPEGUE (PREVUELOS 10 y 5 MIN)
+                        // ALARMAS DE VUELO
                         if (flightsRef.current && flightsRef.current.length > 0 && !isRainingRef.current && !isFoggyRef.current) {
                             flightsRef.current.forEach(flight => {
-                                // Solo avisar si el vuelo es de este turno y no hay suspensión por viento
                                 const isFlightDay = flight.hour24 >= 7 && flight.hour24 < 19;
                                 if (isDayShift === isFlightDay && flight.wind < 42) {
                                     let flightDate = new Date();
                                     flightDate.setHours(flight.hour24, flight.min, 0, 0);
-                                    
                                     let warn10 = new Date(flightDate.getTime() - 10 * 60000);
                                     let warn5 = new Date(flightDate.getTime() - 5 * 60000);
-                                    
                                     let w10Str = `${String(warn10.getHours()).padStart(2, '0')}:${String(warn10.getMinutes()).padStart(2, '0')}`;
                                     let w5Str = `${String(warn5.getHours()).padStart(2, '0')}:${String(warn5.getMinutes()).padStart(2, '0')}`;
                                     
@@ -223,83 +214,117 @@
                     if (!rawData) return;
                     
                     const json = typeof rawData === 'string' ? JSON.parse(rawData) : rawData;
+                    if (!json || json.length === 0) return;
+
                     const now = new Date();
                     const h = now.getHours();
                     
-                    // Máquina del tiempo (Madrugada pertenece al día anterior)
                     let targetDate = new Date(now);
                     if (h < 7) { targetDate.setDate(targetDate.getDate() - 1); }
 
                     const isDayShift = h >= 7 && h < 19;
-                    const d = String(targetDate.getDate()); 
+                    const targetDay = String(targetDate.getDate()); 
                     
                     let foundName = null;
-                    let dateColumnIndex = -1;
                     
-                    // 1. ESCÁNER DE FECHA A PRUEBA DE FORMATOS "7/28/2026" o "28-jul"
-                    // Busca el número aislado (con o sin cero a la izquierda)
-                    const dateRegex = new RegExp(`\\b0?${d}\\b`);
+                    // Lector Anti-Gringo para Fecha (Encuentra el '28' sin importar si dice 28-Jul o 7/28)
+                    const dateRegex = new RegExp(`(^|\\D)0?${targetDay}(\\D|$)`, 'i');
+
+                    // ==========================================
+                    // ESTRATEGIA 1: Lector de Matriz (Columnas y Filas)
+                    // ==========================================
+                    let dateColIdx = -1;
                     
-                    for (let r = 0; r < Math.min(json.length, 10); r++) {
-                        if (!json[r]) continue;
-                        for (let c = 0; c < json[r].length; c++) {
-                            if (json[r][c] == null) continue;
-                            const cell = String(json[r][c]).toLowerCase().trim();
-                            
-                            // Si detecta el día en la celda (max 15 caracteres para no agarrar textos largos)
-                            if (dateRegex.test(cell) && cell.length <= 15) {
-                                dateColumnIndex = c;
+                    // Buscar columna de fecha
+                    for(let r=0; r < Math.min(json.length, 30); r++) {
+                        if(!json[r]) continue;
+                        for(let c=0; c < json[r].length; c++) {
+                            const cellVal = String(json[r][c] || '').trim();
+                            if(dateRegex.test(cellVal) && cellVal.length <= 15) {
+                                dateColIdx = c;
                                 break;
                             }
                         }
-                        if (dateColumnIndex !== -1) break;
+                        if(dateColIdx !== -1) break;
                     }
 
-                    // 2. ESCÁNER VERTICAL Y LECTURA EN REVERSA
-                    if (dateColumnIndex !== -1) {
-                        for (let r = 0; r < json.length; r++) {
-                            if (!json[r] || json[r][dateColumnIndex] == null) continue;
-                            const shiftValue = String(json[r][dateColumnIndex]).toLowerCase().trim();
+                    if(dateColIdx !== -1) {
+                        for(let r=0; r < json.length; r++) {
+                            const cellVal = String(json[r][dateColIdx] || '').toLowerCase().trim();
                             
-                            // Reconoce específicamente los horarios de tu Zoho (6:50 y 18:50)
-                            const isMatchDay = shiftValue.includes("6:50") || shiftValue.includes("06:50") || shiftValue.includes("7:") || shiftValue === "d" || shiftValue.includes("dia");
-                            const isMatchNight = shiftValue.includes("18:50") || shiftValue.includes("19:") || shiftValue === "n" || shiftValue.includes("noche");
-
-                            const isMatch = (isDayShift && isMatchDay) || (!isDayShift && isMatchNight);
-
-                            if (isMatch) {
-                                // 3. LECTURA INVERSA: Lee de derecha a izquierda desde la columna de la fecha
-                                // Esto ignora columnas vacías o números hasta chocar con el Nombre.
-                                for (let col = dateColumnIndex - 1; col >= 0; col--) {
-                                    const potentialName = String(json[r][col] || '').trim();
+                            const isDay = cellVal.includes("6:50") || cellVal.includes("06:50") || cellVal.includes("7:00") || cellVal === "d";
+                            const isNight = cellVal.includes("18:50") || cellVal.includes("19:00") || cellVal === "n" || cellVal.includes("a 7");
+                            
+                            if((isDayShift && isDay) || (!isDayShift && isNight)) {
+                                // Encontró la fila del turno correcto. Ahora escanear TODA la fila buscando el nombre.
+                                for(let c=0; c < json[r].length; c++) {
+                                    if(c === dateColIdx) continue; // Saltar la celda del turno
                                     
-                                    // Filtro Anti-ID Numéricos (Debe tener letras, longitud > 3, y no ser puros números)
-                                    if (potentialName.length > 3 && /[a-zA-ZáéíóúÁÉÍÓÚñÑ]/.test(potentialName) && !/^\d+$/.test(potentialName)) {
-                                        const lowerName = potentialName.toLowerCase();
-                                        // Filtro de palabras prohibidas de RRHH
-                                        const invalidWords = ["turno", "empleado", "id", "departamento", "puesto", "area", "área", "operador", "piloto", "nombre", "descanso", "ausente", "fecha", "hora", "emp"];
-                                        const hasInvalidWord = invalidWords.some(w => lowerName.includes(w));
+                                    let cellStr = String(json[r][c] || '').trim();
+                                    cellStr = cellStr.replace(/^[0-9\s-]+/, ''); // Quitar IDs numéricos del inicio
+                                    
+                                    if(cellStr.length >= 3 && /[a-zA-Z]{3,}/.test(cellStr)) {
+                                        const lower = cellStr.toLowerCase();
+                                        const blacklist = ["turno", "empleado", "departamento", "puesto", "operador", "piloto", "nombre", "descanso", "ausente", "fecha", "6:50", "18:50", "19:00", "7:00", "a 7", "am", "pm"];
                                         
-                                        // Si pasa todos los filtros, es el nombre del piloto
-                                        if (!hasInvalidWord && potentialName.split(' ').length <= 4) {
-                                            foundName = potentialName;
-                                            break; 
+                                        if(!blacklist.some(b => lower.includes(b))) {
+                                            foundName = cellStr;
+                                            break;
                                         }
                                     }
                                 }
-                                if (foundName) break;
                             }
+                            if(foundName) break;
+                        }
+                    }
+
+                    // ==========================================
+                    // ESTRATEGIA 2: Lector de Lista (Base de Datos)
+                    // ==========================================
+                    if (!foundName) {
+                        for (let r = 0; r < json.length; r++) {
+                            if (!json[r]) continue;
+                            
+                            let hasDate = false;
+                            let hasShift = false;
+                            
+                            // Revisar si esta fila pertenece al día y turno actuales
+                            for (let c = 0; c < json[r].length; c++) {
+                                const cellStr = String(json[r][c] || '').toLowerCase().trim();
+                                if (dateRegex.test(cellStr)) hasDate = true;
+                                if (isDayShift && (cellStr.includes("6:50") || cellStr.includes("7:00"))) hasShift = true;
+                                if (!isDayShift && (cellStr.includes("18:50") || cellStr.includes("19:00") || cellStr.includes("a 7"))) hasShift = true;
+                            }
+                            
+                            if (hasDate && hasShift) {
+                                // Extraer el nombre de esta misma fila
+                                for (let c = 0; c < json[r].length; c++) {
+                                    let nameCandidate = String(json[r][c] || '').trim();
+                                    nameCandidate = nameCandidate.replace(/^[0-9\s-]+/, ''); 
+                                    
+                                    if (nameCandidate.length >= 3 && /[a-zA-Z]{3,}/.test(nameCandidate)) {
+                                        const lower = nameCandidate.toLowerCase();
+                                        const blacklist = ["turno", "empleado", "departamento", "puesto", "operador", "piloto", "nombre", "descanso", "ausente", "fecha", "6:50", "18:50", "19:00", "7:00", "a 7"];
+                                        
+                                        // Evitar atrapar la celda de la fecha por error (ej. "28-Jul")
+                                        if (!blacklist.some(b => lower.includes(b)) && !dateRegex.test(lower)) {
+                                            foundName = nameCandidate;
+                                            break;
+                                        }
+                                    }
+                                }
+                            }
+                            if (foundName) break;
                         }
                     }
 
                     // 4. APLICACIÓN DE RESULTADOS
                     if (foundName) {
-                        foundName = foundName.replace(/\b\w/g, l => l.toUpperCase()).trim();
+                        foundName = foundName.toLowerCase().replace(/\b\w/g, l => l.toUpperCase()).trim();
                         setPilotName(foundName);
                         db.collection('operaciones').doc('turno_actual').set({ pilotName: foundName }, { merge: true });
                         localStorage.setItem('pilot_name', foundName);
                     } else {
-                        // Mensaje de Fallo mejorado para saber si no encontró fecha
                         const fallbackName = isDayShift ? "Piloto AM (Falla en Zoho)" : "Piloto PM (Falla en Zoho)";
                         setPilotName(fallbackName);
                         db.collection('operaciones').doc('turno_actual').set({ pilotName: fallbackName }, { merge: true });
@@ -314,7 +339,7 @@
                 const file = e.target.files[0];
                 if (!file) return;
                 
-                speak("Procesando archivo CSV. Sincronizando personal operativo.");
+                speak("Procesando archivo CSV con motor doble núcleo.");
                 const reader = new FileReader();
                 reader.onload = (evt) => {
                     try {
@@ -325,7 +350,7 @@
                         const json = XLSX.utils.sheet_to_json(worksheet, { header: 1, raw: false });
                         
                         localStorage.setItem('zoho_schedule', JSON.stringify(json));
-                        autoAssignPilot(json); // Ejecutar de inmediato
+                        autoAssignPilot(json);
                         
                     } catch(err) {
                         speak("Error al leer el archivo de excel.");
@@ -341,7 +366,6 @@
 
                 if (!geminiKey || geminiKey.trim() === '') {
                     speak("Falta la llave de la inteligencia artificial.");
-                    setModal({ isOpen: true, title: 'Falta la Llave', message: 'Abre los ajustes (⚙️) y pega tu llave API.' });
                     return;
                 }
                 
@@ -365,33 +389,24 @@
                     const payload = {
                         contents: [{
                             parts: [
-                                { text: "Analiza el clima. REGLAS: Si solo dice 'UV' ES APTO PARA VOLAR, viento es 0. Si dice 'Apto para volar', viento es 0. Si dice 'Ráfagas fuertes' o vientos > 40, viento es 45. EXTRAE LA PROBABILIDAD DE PRECIPITACIÓN/LLUVIA (ej 60%, 100%). Devuelve JSON ESTRICTO con 'hourlyData' teniendo 'time' (ej. '11:00am'), 'wind' numérico y 'rainProb' numérico (0 a 100)." },
+                                { text: "Analiza el clima. REGLAS: Si solo dice 'UV' ES APTO PARA VOLAR, viento es 0. Si dice 'Apto para volar', viento es 0. Si dice 'Ráfagas fuertes' o vientos > 40, viento es 45. EXTRAE LA PROBABILIDAD DE PRECIPITACIÓN/LLUVIA. Devuelve JSON ESTRICTO con 'hourlyData' teniendo 'time' (ej. '11:00am'), 'wind' numérico y 'rainProb' numérico (0 a 100)." },
                                 { inline_data: { mime_type: "image/jpeg", data: base64Image } }
                             ]
                         }]
                     };
 
-                    const response = await fetch(url, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(payload)
-                    });
-
-                    if (!response.ok) throw new Error(`Error de IA. Detalle: ${response.statusText}`);
+                    const response = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+                    if (!response.ok) throw new Error("Error de API");
 
                     const data = await response.json();
                     let aiResponseText = data.candidates[0].content.parts[0].text;
-                    if (aiResponseText.startsWith('```json')) {
-                         aiResponseText = aiResponseText.replace(/```json\n?/, '').replace(/```\n?$/, '');
-                    }
+                    if (aiResponseText.startsWith('```json')) aiResponseText = aiResponseText.replace(/```json\n?/, '').replace(/```\n?$/, '');
                     
                     const parsedData = JSON.parse(aiResponseText);
                     if (parsedData && parsedData.hourlyData) {
                          generateIntelligentSchedule(parsedData.hourlyData);
                          speak("Itinerario generado exitosamente. 8 vuelos programados para su turno.");
-                    } else {
-                         throw new Error("Formato incorrecto.");
-                    }
+                    } else throw new Error("Formato incorrecto.");
                 } catch (error) {
                     console.error("AI Error:", error);
                     speak("Error al procesar. Intentando modo seguro de vuelos.");
@@ -402,43 +417,35 @@
             };
 
             const generateIntelligentSchedule = (hourlyWeatherData) => {
-                let windMap = {};
-                let rainMap = {};
+                let windMap = {}; let rainMap = {};
                 for(let i=0; i<24; i++) { windMap[i] = 0; rainMap[i] = 0; }
 
                 if (hourlyWeatherData && hourlyWeatherData.length > 0) {
-                     hourlyWeatherData.forEach(dataPoint => {
-                          let hourMatch = dataPoint.time.match(/(\d+):00([ap]m)/i);
-                          if (hourMatch) {
-                               let hour = parseInt(hourMatch[1]);
-                               let ampm = hourMatch[2].toLowerCase();
-                               if (ampm === 'pm' && hour < 12) hour += 12;
-                               if (ampm === 'am' && hour === 12) hour = 0;
-                               windMap[hour] = dataPoint.wind || 0;
-                               rainMap[hour] = dataPoint.rainProb || 0;
+                     hourlyWeatherData.forEach(dp => {
+                          let match = dp.time.match(/(\d+):00([ap]m)/i);
+                          if (match) {
+                               let h = parseInt(match[1]);
+                               let ampm = match[2].toLowerCase();
+                               if (ampm === 'pm' && h < 12) h += 12;
+                               if (ampm === 'am' && h === 12) h = 0;
+                               windMap[h] = dp.wind || 0;
+                               rainMap[h] = dp.rainProb || 0;
                           }
                      });
                 }
 
-                setWindDataMap(windMap);
-                setRainProbMap(rainMap);
+                setWindDataMap(windMap); setRainProbMap(rainMap);
                 db.collection('operaciones').doc('turno_actual').set({ windDataMap: windMap, rainProbMap: rainMap }, { merge: true });
 
                 const applyVariance = (timeStr, isForzoso = false) => {
                     if (isForzoso) return timeStr; 
-                    
                     let parts = timeStr.split(':');
                     let h = parseInt(parts[0]);
                     let m = parseInt(parts[1]);
                     
-                    let variance = Math.floor(Math.random() * 16) + 10; // 10 a 25 mins
-                    let date = new Date(2026, 0, 1, h, m + variance);
-                    let newH = date.getHours();
-                    let newM = date.getMinutes();
-                    
-                    let timeInMins = newH * 60 + newM;
+                    let variance = Math.floor(Math.random() * 16) + 10; 
+                    let timeInMins = h * 60 + m + variance;
 
-                    // ZONAS PROHIBIDAS (Handovers y Shopfloor)
                     const blocks = [
                         { start: 6*60 + 45, end: 7*60 + 15 },   
                         { start: 7*60 + 50, end: 8*60 + 15 },   
@@ -449,14 +456,11 @@
                         if (timeInMins >= b.start && timeInMins <= b.end) timeInMins = b.end + 15;
                     }
 
-                    newH = Math.floor(timeInMins / 60) % 24;
-                    newM = timeInMins % 60;
-                    return `${String(newH).padStart(2, '0')}:${String(newM).padStart(2, '0')}`;
+                    return `${String(Math.floor(timeInMins / 60) % 24).padStart(2, '0')}:${String(timeInMins % 60).padStart(2, '0')}`;
                 };
 
                 // HORARIOS DEFINITIVOS (8 Día, 8 Noche)
                 let baseSchedule = [
-                    // TURNO DIURNO (8 Vuelos)
                     { time: applyVariance("07:20", true), type: "FORZOSO", hour24: 7 }, 
                     { time: applyVariance("08:45"), type: "DINÁMICO", hour24: 8 },
                     { time: applyVariance("10:15"), type: "DINÁMICO", hour24: 10 },
@@ -466,7 +470,6 @@
                     { time: applyVariance("16:15"), type: "DINÁMICO", hour24: 16 },
                     { time: applyVariance("17:45", true), type: "FORZOSO", hour24: 17 },
 
-                    // TURNO NOCTURNO (8 Vuelos)
                     { time: applyVariance("19:25", true), type: "FORZOSO", hour24: 19 }, 
                     { time: applyVariance("21:00"), type: "DINÁMICO", hour24: 21 },
                     { time: applyVariance("22:50", true), type: "FORZOSO", hour24: 22 },
@@ -479,48 +482,20 @@
 
                 const finalSchedule = baseSchedule.map(f => {
                     let h24 = parseInt(f.time.split(':')[0]);
-                    return {
-                        ...f,
-                        min: parseInt(f.time.split(':')[1]),
-                        hour24: h24,
-                        wind: windMap[h24] >= 40 ? 45 : (windMap[h24] || 0),
-                        rainProb: rainMap[h24] || 0
-                    };
+                    return { ...f, min: parseInt(f.time.split(':')[1]), hour24: h24, wind: windMap[h24] >= 40 ? 45 : (windMap[h24] || 0), rainProb: rainMap[h24] || 0 };
                 });
 
-                setFlights(finalSchedule);
-                flightsRef.current = finalSchedule;
+                setFlights(finalSchedule); flightsRef.current = finalSchedule;
                 db.collection('operaciones').doc('turno_actual').set({ flights: finalSchedule }, { merge: true });
             };
 
-            const toggleRainProtocol = () => {
-                const newState = !isRaining;
-                setIsRaining(newState);
-                isRainingRef.current = newState;
-                db.collection('operaciones').doc('turno_actual').set({ isRaining: newState }, { merge: true });
-                if (newState) speak("Alerta. Operaciones suspendidas por lluvia local.");
-                else speak("Lluvia finalizada.");
-            };
-
-            const toggleFogProtocol = () => {
-                const newState = !isFoggy;
-                setIsFoggy(newState);
-                isFoggyRef.current = newState;
-                db.collection('operaciones').doc('turno_actual').set({ isFoggy: newState }, { merge: true });
-                if (newState) speak("Alerta. Operaciones suspendidas por neblina.");
-                else speak("Visibilidad restaurada.");
-            };
-
             const handleLogManualFlight = () => {
-                 if (isRaining || isFoggy) {
-                     setModal({ isOpen: true, title: 'Bloqueo', message: 'No puedes registrar despegues durante suspensiones.', type: 'error' });
-                     return;
-                 }
+                 if (isRaining || isFoggy) return;
                  if (loggedFlightsCount < totalFlightsTarget) {
                       const newCount = loggedFlightsCount + 1;
                       setLoggedFlightsCount(newCount);
                       db.collection('operaciones').doc('turno_actual').set({ loggedFlightsCount: newCount }, { merge: true });
-                      speak(`Vuelo registrado. Total del turno, ${newCount} de ${totalFlightsTarget}.`);
+                      speak(`Vuelo registrado. ${newCount} de ${totalFlightsTarget}.`);
                  }
             };
 
@@ -529,7 +504,6 @@
                     const newCount = loggedFlightsCount - 1;
                     setLoggedFlightsCount(newCount);
                     db.collection('operaciones').doc('turno_actual').set({ loggedFlightsCount: newCount }, { merge: true });
-                    speak("Registro de vuelo eliminado.");
                 }
             };
 
@@ -539,7 +513,7 @@
 
             const futureFlights = flights.filter(f => {
                 const isFlightDay = f.hour24 >= 7 && f.hour24 < 19;
-                if (isCurrentlyDayShift !== isFlightDay) return false; // Filtra solo vuelos de tu turno
+                if (isCurrentlyDayShift !== isFlightDay) return false; 
 
                 let flightMins = f.hour24 * 60 + f.min;
                 let nowMins = currentMins;
@@ -548,14 +522,12 @@
                     if (f.hour24 < 7) flightMins += (24 * 60);
                     if (currentH < 7) nowMins += (24 * 60);
                 }
-
-                return flightMins >= (nowMins - 15); // Desaparecen 15 mins después de su hora
+                return flightMins >= (nowMins - 15);
             });
 
             return (
                 <div className="min-h-screen p-4 w-full max-w-[400px] mx-auto pb-32" onClick={unlockAudio}>
                     
-                    {/* Header Compacto */}
                     <div className="flex justify-between items-center mb-5">
                         <div>
                             <h1 className="text-lg font-black tracking-tight flex items-center gap-2">
@@ -576,7 +548,6 @@
                         </div>
                     )}
 
-                    {/* Stats & Scan (Widget View) */}
                     <div className="glass-card p-4 rounded-2xl mb-4 relative overflow-hidden">
                         <div className="flex justify-between items-start mb-4">
                             <div>
@@ -609,10 +580,10 @@
                                 {isScanning ? '⏳ Analizando...' : '📸 CLIMA'}
                             </button>
                             <div className="grid grid-cols-2 gap-2">
-                                <button onClick={(e) => { e.stopPropagation(); toggleRainProtocol(); }} className={`w-full py-3 rounded-xl font-bold text-xs flex justify-center items-center gap-1 ${isRaining ? 'bg-emerald-600 text-white' : 'bg-rose-900/40 text-rose-400 border border-rose-900'}`}>
+                                <button onClick={(e) => { e.stopPropagation(); setIsRaining(!isRaining); }} className={`w-full py-3 rounded-xl font-bold text-xs flex justify-center items-center gap-1 ${isRaining ? 'bg-emerald-600 text-white' : 'bg-rose-900/40 text-rose-400 border border-rose-900'}`}>
                                     {isRaining ? '☀️ REANUDAR' : '🌧️ LLUVIA'}
                                 </button>
-                                <button onClick={(e) => { e.stopPropagation(); toggleFogProtocol(); }} className={`w-full py-3 rounded-xl font-bold text-xs flex justify-center items-center gap-1 ${isFoggy ? 'bg-emerald-600 text-white' : 'bg-slate-700 text-slate-300 border border-slate-500'}`}>
+                                <button onClick={(e) => { e.stopPropagation(); setIsFoggy(!isFoggy); }} className={`w-full py-3 rounded-xl font-bold text-xs flex justify-center items-center gap-1 ${isFoggy ? 'bg-emerald-600 text-white' : 'bg-slate-700 text-slate-300 border border-slate-500'}`}>
                                     {isFoggy ? '☀️ DESPEJADO' : '🌫️ NEBLINA'}
                                 </button>
                             </div>
@@ -622,7 +593,6 @@
                     {isRaining && <div className="bg-rose-600 text-white text-center p-2.5 rounded-xl mb-4 font-black uppercase text-xs animate-pulse">⚠️ SUSPENDIDO POR LLUVIA</div>}
                     {isFoggy && !isRaining && <div className="bg-slate-500 text-white text-center p-2.5 rounded-xl mb-4 font-black uppercase text-xs animate-pulse">🌫️ VISIBILIDAD NULA</div>}
 
-                    {/* Vuelos Restantes (Filtro por turno aplicado) */}
                     <div className={`glass-card p-4 rounded-2xl mb-6 relative ${(isRaining || isFoggy) ? 'opacity-50 pointer-events-none' : ''}`}>
                         <p className="text-[10px] font-bold text-slate-400 uppercase mb-3">🗓️ PLAN RESTANTE ({futureFlights.length} VUELOS)</p>
                         {flights.length === 0 ? (
@@ -651,7 +621,6 @@
                         )}
                     </div>
 
-                    {/* Controles Flotantes Inferiores */}
                     <div className="fixed bottom-0 left-0 w-full p-4 bg-[#0B0F19] flex justify-center items-center gap-2 z-40 border-t border-slate-800">
                         <div className="w-full max-w-[400px] mx-auto flex gap-2">
                              <button onClick={(e) => { e.stopPropagation(); handleLogManualFlight(); }} disabled={isRaining || isFoggy} className={`flex-1 font-black py-4 rounded-xl text-sm ${isRaining || isFoggy ? 'bg-slate-800 text-slate-600' : 'bg-indigo-600 hover:bg-indigo-500 text-white'}`}>
@@ -663,7 +632,6 @@
                         </div>
                     </div>
 
-                    {/* Modales de Interfaz */}
                     {settingsOpen && (
                         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4" onClick={(e) => e.stopPropagation()}>
                             <div className="bg-[#131826] border border-slate-800 rounded-2xl w-full max-w-[320px] p-5">
@@ -681,7 +649,7 @@
                         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4" onClick={(e) => e.stopPropagation()}>
                             <div className="bg-[#131826] border border-slate-800 rounded-2xl w-full max-w-[320px] p-5">
                                 <h2 className="text-base font-black text-indigo-400 mb-2">👨‍💼 Admin (Pilotos)</h2>
-                                <p className="text-[10px] text-slate-400 mb-4">Escáner de Matriz 3D Avanzado Activo.</p>
+                                <p className="text-[10px] text-slate-400 mb-4">Motor "Doble Núcleo" (Matriz/Lista) Activo.</p>
                                 <input type="file" id="zohoUpload" accept=".csv, .xlsx" className="hidden" onChange={handleZohoUpload} />
                                 <button onClick={() => document.getElementById('zohoUpload').click()} className="w-full bg-emerald-700 hover:bg-emerald-600 text-white font-bold py-3 rounded-lg text-xs mb-4">📗 SUBIR NUEVO ZOHO (CSV)</button>
                                 
