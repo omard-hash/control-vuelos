@@ -51,7 +51,7 @@
             
             const [geminiKey, setGeminiKey] = useState(localStorage.getItem('gemini_key') || '');
             const [geminiModel, setGeminiModel] = useState(localStorage.getItem('gemini_model') || 'gemini-3.6-flash');
-            const [pilotName, setPilotName] = useState(localStorage.getItem('pilot_name') || 'Piloto en Turno');
+            const [pilotName, setPilotName] = useState(localStorage.getItem('pilot_name') || 'No Asignado');
             
             const [loggedFlightsCount, setLoggedFlightsCount] = useState(0);
             const [dailyLoggedFlightsCount, setDailyLoggedFlightsCount] = useState(0);
@@ -85,7 +85,7 @@
                             }
                             if (data.loggedFlightsCount !== undefined) setLoggedFlightsCount(data.loggedFlightsCount);
                             
-                            // Parche de compatibilidad por si es la primera vez que se carga el daily count
+                            // Parche de compatibilidad dual
                             if (data.dailyLoggedFlightsCount !== undefined) {
                                 setDailyLoggedFlightsCount(data.dailyLoggedFlightsCount);
                             } else if (data.loggedFlightsCount !== undefined) {
@@ -156,7 +156,7 @@
                     const s = now.getSeconds();
                     const timeStr = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
 
-                    // Máquina del tiempo de turnos: Madrugada pertenece al turno de la noche
+                    // Máquina del tiempo
                     let shiftDate = new Date(now);
                     if (h < 7) { shiftDate.setDate(shiftDate.getDate() - 1); } 
                     
@@ -164,29 +164,31 @@
                     const shiftType = isDayShift ? 'DIA' : 'NOCHE';
                     
                     const currentShiftPeriod = `${shiftDate.getFullYear()}-${shiftDate.getMonth()}-${shiftDate.getDate()}-${shiftType}`;
-                    // Periodo global de día natural (corta a media noche)
                     const strictCalendarDayPeriod = `${now.getFullYear()}-${now.getMonth()}-${now.getDate()}`;
 
                     let updates = {};
                     let needsUpdate = false;
 
-                    // Reinicio de TURNO (A las 7 AM y 7 PM)
+                    // Reinicio de TURNO (7 AM y 7 PM)
                     if (shiftPeriodRef.current && shiftPeriodRef.current !== currentShiftPeriod) {
                         shiftPeriodRef.current = currentShiftPeriod;
                         updates.loggedFlightsCount = 0;
                         updates.shiftPeriod = currentShiftPeriod;
                         needsUpdate = true;
-                        speak(`Atención. Cambio de turno detectado. Contador de vuelos reiniciado a cero.`);
+                        speak(`Atención. Cambio de turno detectado. Contador de turno reiniciado a cero.`);
                     } else if (!shiftPeriodRef.current) {
                          shiftPeriodRef.current = currentShiftPeriod;
                     }
 
-                    // Reinicio GLOBAL de DÍA (A las 12:00 AM / Medianoche)
+                    // Reinicio GLOBAL (12:00 AM Medianoche estricta)
                     if (dailyPeriodRef.current && dailyPeriodRef.current !== strictCalendarDayPeriod) {
                         dailyPeriodRef.current = strictCalendarDayPeriod;
                         updates.dailyLoggedFlightsCount = 0;
                         updates.dailyPeriod = strictCalendarDayPeriod;
                         needsUpdate = true;
+                        if (h === 0 && m === 0) {
+                            speak(`Atención. Inicio de nuevo día operativo. Contador global reiniciado a cero.`);
+                        }
                     } else if (!dailyPeriodRef.current) {
                          dailyPeriodRef.current = strictCalendarDayPeriod;
                     }
@@ -197,8 +199,8 @@
 
                     setShiftName(isDayShift ? 'Turno Diurno' : 'Turno Nocturno');
                     
+                    // Alertas habladas
                     if (s === 0) { 
-                        // ZOHO SCANNER AUTOMÁTICO (7 AM y 7 PM)
                         if ((h === 7 && m === 0) || (h === 19 && m === 0)) {
                             autoAssignPilot();
                             speak("Iniciando escaneo de plantilla de personal. Asignando nuevo piloto en turno.");
@@ -286,8 +288,8 @@
                                     
                                     if(cellStr.length >= 3 && /[a-zA-Z]{3,}/.test(cellStr)) {
                                         const lower = cellStr.toLowerCase();
-                                        // AÑADIDAS PALABRAS A IGNORAR: published, draft, scheduled, approved
-                                        const blacklist = ["turno", "empleado", "departamento", "puesto", "operador", "piloto", "nombre", "descanso", "ausente", "fecha", "6:50", "18:50", "19:00", "7:00", "a 7", "am", "pm", "published", "draft", "scheduled", "approved"];
+                                        // LISTA NEGRA ACTUALIZADA
+                                        const blacklist = ["turno", "empleado", "departamento", "puesto", "operador", "nombre", "descanso", "ausente", "fecha", "6:50", "18:50", "19:00", "7:00", "a 7", "am", "pm", "published", "draft", "scheduled", "approved"];
                                         
                                         if(!blacklist.some(b => lower.includes(b))) {
                                             foundName = cellStr;
@@ -321,8 +323,8 @@
                                     
                                     if (nameCandidate.length >= 3 && /[a-zA-Z]{3,}/.test(nameCandidate)) {
                                         const lower = nameCandidate.toLowerCase();
-                                        // AÑADIDAS PALABRAS A IGNORAR: published, draft, scheduled, approved
-                                        const blacklist = ["turno", "empleado", "departamento", "puesto", "operador", "piloto", "nombre", "descanso", "ausente", "fecha", "6:50", "18:50", "19:00", "7:00", "a 7", "published", "draft", "scheduled", "approved"];
+                                        // LISTA NEGRA ACTUALIZADA
+                                        const blacklist = ["turno", "empleado", "departamento", "puesto", "operador", "nombre", "descanso", "ausente", "fecha", "6:50", "18:50", "19:00", "7:00", "a 7", "published", "draft", "scheduled", "approved"];
                                         
                                         if (!blacklist.some(b => lower.includes(b)) && !dateRegex.test(lower)) {
                                             foundName = nameCandidate;
@@ -341,7 +343,7 @@
                         db.collection('operaciones').doc('turno_actual').set({ pilotName: foundName }, { merge: true });
                         localStorage.setItem('pilot_name', foundName);
                     } else {
-                        const fallbackName = isDayShift ? "Piloto AM (Falla en Zoho)" : "Piloto PM (Falla en Zoho)";
+                        const fallbackName = isDayShift ? "No Asignado" : "No Asignado";
                         setPilotName(fallbackName);
                         db.collection('operaciones').doc('turno_actual').set({ pilotName: fallbackName }, { merge: true });
                         localStorage.setItem('pilot_name', fallbackName);
@@ -476,7 +478,7 @@
                 };
 
                 let baseSchedule = [
-                    // TURNO DIURNO (7:00 am - 7:00 pm) - Corregidos forzosos
+                    // TURNO DIURNO (7:00 am - 7:00 pm) 
                     { time: applyVariance("07:20", true), type: "FORZOSO", hour24: 7 }, 
                     { time: applyVariance("08:45"), type: "DINÁMICO", hour24: 8 },
                     { time: applyVariance("10:15"), type: "DINÁMICO", hour24: 10 },
@@ -486,7 +488,7 @@
                     { time: applyVariance("15:30"), type: "DINÁMICO", hour24: 15 },
                     { time: applyVariance("17:00", true), type: "FORZOSO", hour24: 17 },
 
-                    // TURNO NOCTURNO (7:00 pm - 7:00 am) - Corregidos forzosos
+                    // TURNO NOCTURNO (7:00 pm - 7:00 am) 
                     { time: applyVariance("19:25", true), type: "FORZOSO", hour24: 19 }, 
                     { time: applyVariance("21:30", true), type: "FORZOSO", hour24: 21 },
                     { time: applyVariance("23:15"), type: "DINÁMICO", hour24: 23 },
@@ -508,22 +510,26 @@
 
             const handleLogManualFlight = () => {
                  if (isRaining || isFoggy) return;
-                 if (loggedFlightsCount < totalFlightsTarget) {
-                      const newCount = loggedFlightsCount + 1;
-                      const newDailyCount = dailyLoggedFlightsCount + 1;
-                      setLoggedFlightsCount(newCount);
-                      setDailyLoggedFlightsCount(newDailyCount);
-                      db.collection('operaciones').doc('turno_actual').set({ 
-                          loggedFlightsCount: newCount,
-                          dailyLoggedFlightsCount: newDailyCount
-                      }, { merge: true });
-                      speak(`Vuelo registrado. ${newCount} de ${totalFlightsTarget}.`);
+                 // Permite que siga subiendo el global aunque el turno llegue a 8
+                 const newCount = Math.min(loggedFlightsCount + 1, 8);
+                 const newDailyCount = dailyLoggedFlightsCount + 1;
+                 
+                 setLoggedFlightsCount(newCount);
+                 setDailyLoggedFlightsCount(newDailyCount);
+                 
+                 db.collection('operaciones').doc('turno_actual').set({ 
+                     loggedFlightsCount: newCount,
+                     dailyLoggedFlightsCount: newDailyCount
+                 }, { merge: true });
+                 
+                 if(newCount <= totalFlightsTarget) {
+                    speak(`Vuelo registrado. ${newCount} de ${totalFlightsTarget}.`);
                  }
             };
 
             const undoLastFlight = () => {
-                if (loggedFlightsCount > 0) {
-                    const newCount = loggedFlightsCount - 1;
+                if (dailyLoggedFlightsCount > 0) {
+                    const newCount = Math.max(0, loggedFlightsCount - 1);
                     const newDailyCount = Math.max(0, dailyLoggedFlightsCount - 1);
                     setLoggedFlightsCount(newCount);
                     setDailyLoggedFlightsCount(newDailyCount);
@@ -534,22 +540,19 @@
                 }
             };
 
-            const currentMins = currentTime.getHours() * 60 + currentTime.getMinutes();
             const currentH = currentTime.getHours();
-            const isCurrentlyDayShift = currentH >= 7 && currentH < 19;
+            const currentM = currentTime.getMinutes();
 
+            // Convierte la hora actual a "minutos transcurridos" desde las 7:00 AM (Inicio del día operativo)
+            let elapsedNowMins = (currentH >= 7 ? (currentH - 7) : (currentH + 17)) * 60 + currentM;
+
+            // Filtro maestro: Muestra TODOS los vuelos futuros en el bloque operativo actual de 24h
             const futureFlights = flights.filter(f => {
-                const isFlightDay = f.hour24 >= 7 && f.hour24 < 19;
-                if (isCurrentlyDayShift !== isFlightDay) return false; 
-
-                let flightMins = f.hour24 * 60 + f.min;
-                let nowMins = currentMins;
+                // Calcula en qué minuto del día operativo ocurre el vuelo
+                let flightElapsedMins = (f.hour24 >= 7 ? (f.hour24 - 7) : (f.hour24 + 17)) * 60 + f.min;
                 
-                if (!isCurrentlyDayShift) {
-                    if (f.hour24 < 7) flightMins += (24 * 60);
-                    if (currentH < 7) nowMins += (24 * 60);
-                }
-                return flightMins >= (nowMins - 15);
+                // Retorna todos los vuelos que sean en el futuro, o que pasaron hace menos de 15 minutos
+                return flightElapsedMins >= (elapsedNowMins - 15);
             });
 
             return (
@@ -583,39 +586,39 @@
                                 <div className="mt-1 text-2xl font-mono font-bold text-white tracking-wider">
                                     {currentTime.toLocaleTimeString('en-US', { hour12: false })}
                                 </div>
-                                <div className="mt-2 inline-flex items-center bg-indigo-900/50 border border-indigo-700 text-indigo-300 text-[9px] font-black px-2 py-1 rounded uppercase tracking-widest max-w-[200px] truncate">
+                                <div className="mt-2 inline-flex items-center bg-[#1e1b4b] border border-indigo-500/50 text-indigo-300 text-[10px] font-black px-3 py-1.5 rounded-lg uppercase tracking-widest truncate max-w-[200px]">
                                     👨‍✈️ PILOTO: {pilotName}
                                 </div>
                             </div>
                             
-                            <div className="text-right flex flex-col items-end gap-2">
-                                {/* Contador del Turno */}
-                                <div className="flex items-stretch bg-[#0f172a] border border-indigo-900/50 rounded-xl overflow-hidden shadow-lg">
-                                    <div className="px-2 py-1 bg-indigo-900/20 flex flex-col items-center justify-center border-r border-indigo-900/50">
-                                        <span className="text-[8px] font-black text-indigo-400 uppercase">Turno</span>
+                            <div className="flex flex-col gap-1.5 items-end">
+                                {/* Medidor TURNO */}
+                                <div className="flex items-center bg-[#0f172a] border border-indigo-900/50 rounded-lg overflow-hidden shadow-lg w-[110px]">
+                                    <div className="px-2 py-1.5 bg-indigo-900/20 flex items-center justify-center border-r border-indigo-900/50 w-12">
+                                        <span className="text-[7px] font-black text-indigo-400 uppercase">Turno</span>
                                     </div>
-                                    <div className="px-2 py-1 flex flex-col justify-center text-center">
-                                        <p className="text-[7px] font-black uppercase text-slate-500">Faltan</p>
-                                        <div className="text-sm font-black text-white leading-none">{Math.max(0, totalFlightsTarget - loggedFlightsCount)}</div>
+                                    <div className="flex-1 flex flex-col justify-center text-center py-1">
+                                        <p className="text-[6px] font-black uppercase text-slate-500 leading-none mb-0.5">Faltan</p>
+                                        <div className="text-xs font-black text-white leading-none">{Math.max(0, 8 - loggedFlightsCount)}</div>
                                     </div>
-                                    <div className="flex items-baseline gap-0.5 bg-indigo-900/40 px-2 py-1.5 border-l border-indigo-900/50">
-                                        <span className="text-lg font-black text-white leading-none">{loggedFlightsCount}</span>
-                                        <span className="text-[9px] font-bold text-indigo-400">/8</span>
+                                    <div className="flex items-baseline justify-center gap-0.5 bg-indigo-900/40 px-2 py-1.5 border-l border-indigo-900/50 w-12">
+                                        <span className="text-sm font-black text-white leading-none">{loggedFlightsCount}</span>
+                                        <span className="text-[8px] font-bold text-indigo-400">/8</span>
                                     </div>
                                 </div>
 
-                                {/* Contador Global del Día */}
-                                <div className="flex items-stretch bg-[#0f172a] border border-emerald-900/30 rounded-xl overflow-hidden shadow-lg opacity-90">
-                                    <div className="px-2 py-1 bg-emerald-900/10 flex flex-col items-center justify-center border-r border-emerald-900/30">
-                                        <span className="text-[8px] font-black text-emerald-500 uppercase">Día</span>
+                                {/* Medidor DÍA GLOBAL */}
+                                <div className="flex items-center bg-[#0f172a] border border-emerald-900/40 rounded-lg overflow-hidden shadow-lg w-[110px]">
+                                    <div className="px-2 py-1.5 bg-emerald-900/10 flex items-center justify-center border-r border-emerald-900/40 w-12">
+                                        <span className="text-[7px] font-black text-emerald-500 uppercase">Día</span>
                                     </div>
-                                    <div className="px-2 py-1 flex flex-col justify-center text-center">
-                                        <p className="text-[7px] font-black uppercase text-slate-500">Faltan</p>
-                                        <div className="text-sm font-black text-white leading-none">{Math.max(0, 16 - dailyLoggedFlightsCount)}</div>
+                                    <div className="flex-1 flex flex-col justify-center text-center py-1">
+                                        <p className="text-[6px] font-black uppercase text-slate-500 leading-none mb-0.5">Faltan</p>
+                                        <div className="text-xs font-black text-white leading-none">{Math.max(0, 16 - dailyLoggedFlightsCount)}</div>
                                     </div>
-                                    <div className="flex items-baseline gap-0.5 bg-emerald-900/20 px-2 py-1.5 border-l border-emerald-900/30">
-                                        <span className="text-lg font-black text-emerald-400 leading-none">{dailyLoggedFlightsCount}</span>
-                                        <span className="text-[9px] font-bold text-emerald-600">/16</span>
+                                    <div className="flex items-baseline justify-center gap-0.5 bg-emerald-900/20 px-2 py-1.5 border-l border-emerald-900/40 w-12">
+                                        <span className="text-sm font-black text-emerald-400 leading-none">{dailyLoggedFlightsCount}</span>
+                                        <span className="text-[8px] font-bold text-emerald-600">/16</span>
                                     </div>
                                 </div>
                             </div>
@@ -641,17 +644,25 @@
                     {isFoggy && !isRaining && <div className="bg-slate-500 text-white text-center p-2.5 rounded-xl mb-4 font-black uppercase text-xs animate-pulse">🌫️ VISIBILIDAD NULA</div>}
 
                     <div className={`glass-card p-4 rounded-2xl mb-6 relative ${(isRaining || isFoggy) ? 'opacity-50 pointer-events-none' : ''}`}>
-                        <p className="text-[10px] font-bold text-slate-400 uppercase mb-3">🗓️ PLAN RESTANTE ({futureFlights.length} VUELOS)</p>
+                        <p className="text-[10px] font-bold text-slate-400 uppercase mb-3 flex justify-between">
+                            <span>🗓️ PLAN RESTANTE DEL DÍA</span>
+                            <span className="text-indigo-400">({futureFlights.length} VUELOS)</span>
+                        </p>
                         {flights.length === 0 ? (
                             <div className="text-center py-6 text-xs font-bold text-slate-500">Sube captura para generar.</div>
                         ) : futureFlights.length === 0 ? (
-                            <div className="text-center py-6 text-xs font-bold text-emerald-500">✅ Vuelos de tu turno concluidos.</div>
+                            <div className="text-center py-6 text-xs font-bold text-emerald-500">✅ Todos los vuelos del día completados.</div>
                         ) : (
                             <div className="space-y-2">
                                 {futureFlights.map((f, i) => (
                                     <div key={i} className={`flex justify-between items-center p-2.5 bg-[#0f172a] border rounded-xl ${f.wind >= 42 ? 'border-rose-900/50' : 'border-slate-800'}`}>
                                         <div>
-                                            <div className="text-base font-black text-white">{f.time}</div>
+                                            <div className="text-base font-black text-white flex items-center gap-2">
+                                                {f.time}
+                                                <span className="text-[9px] font-normal text-slate-500">
+                                                    {f.hour24 >= 7 && f.hour24 < 19 ? '(Día)' : '(Noche)'}
+                                                </span>
+                                            </div>
                                             <div className="flex gap-2 items-center mt-0.5">
                                                 <div className={`text-[9px] font-bold uppercase ${f.wind >= 42 ? 'text-rose-500' : 'text-emerald-400'}`}>
                                                     {f.wind >= 42 ? `🚫 Susp. (${f.wind}k)` : `✅ Libre (${f.wind}k)`}
@@ -670,10 +681,10 @@
 
                     <div className="fixed bottom-0 left-0 w-full p-4 bg-[#0B0F19] flex justify-center items-center gap-2 z-40 border-t border-slate-800">
                         <div className="w-full max-w-[400px] mx-auto flex gap-2">
-                             <button onClick={(e) => { e.stopPropagation(); handleLogManualFlight(); }} disabled={isRaining || isFoggy} className={`flex-1 font-black py-4 rounded-xl text-sm ${isRaining || isFoggy ? 'bg-slate-800 text-slate-600' : 'bg-indigo-600 hover:bg-indigo-500 text-white'}`}>
-                                 ✈️ REGISTRAR
+                             <button onClick={(e) => { e.stopPropagation(); handleLogManualFlight(); }} disabled={isRaining || isFoggy} className={`flex-1 font-black py-4 rounded-xl text-sm ${isRaining || isFoggy ? 'bg-slate-800 text-slate-600' : 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-[0_0_15px_rgba(79,70,229,0.3)]'}`}>
+                                 🚀 REGISTRAR VUELO
                              </button>
-                             <button onClick={(e) => { e.stopPropagation(); undoLastFlight(); }} className="bg-rose-900/50 hover:bg-rose-900 text-rose-300 font-black py-4 px-5 rounded-xl border border-rose-800 text-sm">
+                             <button onClick={(e) => { e.stopPropagation(); undoLastFlight(); }} className="bg-rose-950 hover:bg-rose-900 text-rose-400 font-black py-4 px-5 rounded-xl border border-rose-900 text-sm">
                                  -1
                              </button>
                         </div>
@@ -681,12 +692,12 @@
 
                     {settingsOpen && (
                         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4" onClick={(e) => e.stopPropagation()}>
-                            <div className="bg-[#131826] border border-slate-800 rounded-2xl w-full max-w-[320px] p-5">
-                                <h2 className="text-base font-black text-white mb-4">⚙️ Ajustes</h2>
-                                <input type="password" value={geminiKey} onChange={e => setGeminiKey(e.target.value)} placeholder="API Key" className="w-full bg-[#1e293b] border border-slate-700 rounded-lg p-2 text-white mb-4 text-xs" />
+                            <div className="bg-[#131826] border border-slate-800 rounded-2xl w-full max-w-[320px] p-5 shadow-2xl">
+                                <h2 className="text-base font-black text-white mb-4">⚙️ Ajustes de IA</h2>
+                                <input type="password" value={geminiKey} onChange={e => setGeminiKey(e.target.value)} placeholder="Llave Secreta API" className="w-full bg-[#1e293b] border border-slate-700 rounded-lg p-3 text-white mb-4 text-sm" />
                                 <div className="flex gap-2">
-                                    <button onClick={() => setSettingsOpen(false)} className="flex-1 bg-slate-800 text-white font-bold py-2 rounded-lg text-xs">Cerrar</button>
-                                    <button onClick={() => { localStorage.setItem('gemini_key', geminiKey); setSettingsOpen(false); }} className="flex-1 bg-indigo-600 text-white font-bold py-2 rounded-lg text-xs">Guardar</button>
+                                    <button onClick={() => setSettingsOpen(false)} className="flex-1 bg-slate-800 text-white font-bold py-3 rounded-lg text-xs">Cancelar</button>
+                                    <button onClick={() => { localStorage.setItem('gemini_key', geminiKey); setSettingsOpen(false); }} className="flex-1 bg-indigo-600 text-white font-bold py-3 rounded-lg text-xs">Guardar Llave</button>
                                 </div>
                             </div>
                         </div>
@@ -694,17 +705,19 @@
 
                     {adminOpen && (
                         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4" onClick={(e) => e.stopPropagation()}>
-                            <div className="bg-[#131826] border border-slate-800 rounded-2xl w-full max-w-[320px] p-5">
-                                <h2 className="text-base font-black text-indigo-400 mb-2">👨‍💼 Admin (Pilotos)</h2>
-                                <p className="text-[10px] text-slate-400 mb-4">Motor "Doble Núcleo" (Matriz/Lista) Activo.</p>
+                            <div className="bg-[#131826] border border-slate-800 rounded-2xl w-full max-w-[320px] p-5 shadow-2xl">
+                                <h2 className="text-base font-black text-indigo-400 mb-2 flex items-center gap-2">👨‍💼 Administrador</h2>
+                                <p className="text-[10px] text-slate-400 mb-5 leading-relaxed">Sube el reporte semanal de Zoho Shifts. El sistema auto-asignará al piloto correcto cada turno (Ignorando status como published/draft).</p>
                                 <input type="file" id="zohoUpload" accept=".csv, .xlsx" className="hidden" onChange={handleZohoUpload} />
-                                <button onClick={() => document.getElementById('zohoUpload').click()} className="w-full bg-emerald-700 hover:bg-emerald-600 text-white font-bold py-3 rounded-lg text-xs mb-4">📗 SUBIR NUEVO ZOHO (CSV)</button>
+                                <button onClick={() => document.getElementById('zohoUpload').click()} className="w-full bg-emerald-700 hover:bg-emerald-600 text-white font-bold py-3.5 rounded-lg text-xs mb-5 shadow-[0_0_10px_rgba(4,120,87,0.3)]">
+                                    📗 SUBIR REPORTE ZOHO
+                                </button>
                                 
-                                <div className="mb-4 pt-4 border-t border-slate-800">
-                                    <label className="block text-[10px] text-slate-400 uppercase mb-1">Corrección Manual (Opcional)</label>
-                                    <input type="text" value={pilotName} onChange={(e) => { setPilotName(e.target.value); db.collection('operaciones').doc('turno_actual').set({ pilotName: e.target.value }, { merge: true }); localStorage.setItem('pilot_name', e.target.value); }} className="w-full bg-[#1e293b] border border-slate-700 rounded-lg p-2 text-white text-sm" />
+                                <div className="mb-5 pt-5 border-t border-slate-800">
+                                    <label className="block text-[10px] font-bold text-slate-400 uppercase mb-2">Corrección Manual de Piloto</label>
+                                    <input type="text" value={pilotName} onChange={(e) => { setPilotName(e.target.value); db.collection('operaciones').doc('turno_actual').set({ pilotName: e.target.value }, { merge: true }); localStorage.setItem('pilot_name', e.target.value); }} placeholder="Ej. Miguel, Ricardo..." className="w-full bg-[#1e293b] border border-slate-700 rounded-lg p-3 text-white text-sm" />
                                 </div>
-                                <button onClick={() => setAdminOpen(false)} className="w-full bg-slate-700 text-white font-bold py-2.5 rounded-lg text-xs">Cerrar</button>
+                                <button onClick={() => setAdminOpen(false)} className="w-full bg-slate-700 hover:bg-slate-600 text-white font-bold py-3 rounded-lg text-xs">Cerrar Panel</button>
                             </div>
                         </div>
                     )}
