@@ -72,15 +72,6 @@
             const windDataMapRef = useRef({});
             const shiftPeriodRef = useRef('');
 
-            const applyAntiCollision = (timeMins) => {
-                let time = timeMins % 1440; 
-                let offset = Math.floor(timeMins / 1440) * 1440; 
-                if (time >= 405 && time <= 435) time = 440; // Junta Cambio AM (06:45 - 07:15) -> 07:20
-                else if (time >= 470 && time <= 495) time = 500; // Junta Shopfloor (07:50 - 08:15) -> 08:20
-                else if (time >= 1125 && time <= 1155) time = 1165; // Junta Cambio PM (18:45 - 19:15) -> 19:25
-                return offset + time;
-            };
-
             useEffect(() => {
                 let unsubscribe = () => {};
                 firebase.auth().signInAnonymously().then(() => {
@@ -127,7 +118,7 @@
                     const utterance = new SpeechSynthesisUtterance(text);
                     utterance.lang = 'es-MX';
                     utterance.rate = 1.0;
-                    utterance.volume = 1.0;
+                    utterance.volume = 1.0; // 100% Volumen Fijo
                     window.speechSynthesis.speak(utterance);
                 }
             };
@@ -153,6 +144,7 @@
                     const s = now.getSeconds();
                     const timeStr = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
 
+                    // Máquina del tiempo: Madrugada pertenece al día anterior
                     let shiftDate = new Date(now);
                     if (h < 7) { shiftDate.setDate(shiftDate.getDate() - 1); } 
                     
@@ -160,6 +152,7 @@
                     const shiftType = isDayShift ? 'DIA' : 'NOCHE';
                     const currentShiftPeriod = `${shiftDate.getFullYear()}-${shiftDate.getMonth()}-${shiftDate.getDate()}-${shiftType}`;
 
+                    // REINICIO AUTOMÁTICO A LAS 7 AM Y 7 PM
                     if (shiftPeriodRef.current && shiftPeriodRef.current !== currentShiftPeriod) {
                         shiftPeriodRef.current = currentShiftPeriod;
                         db.collection('operaciones').doc('turno_actual').set({ 
@@ -174,66 +167,41 @@
                     setShiftName(isDayShift ? 'Turno Diurno' : 'Turno Nocturno');
                     
                     if (s === 0) { 
+                        // ZOHO SCANNER AUTOMÁTICO (7 AM y 7 PM)
                         if ((h === 7 && m === 0) || (h === 19 && m === 0)) {
                             autoAssignPilot();
                             speak("Iniciando escaneo de plantilla de personal. Asignando nuevo piloto en turno.");
                         }
 
-                        if (h === 7 && m === 50) speak("Atención. Inicio de junta operativa shop floor. Ventana de vuelo bloqueada hasta las 8 15.");
-                        else if (h === 12 && m === 0) speak("Atención comandante. Es hora de elaborar los reportes de capé i y actualizar el clima del radar.");
-                        else if (h === 0 && m === 5) speak("Alerta de protocolo. Son las 12 con 5 de la madrugada. Es obligatorio actualizar la captura de OK To Fly del radar.");
+                        // JUNTAS Y ALERTAS
+                        if (h === 7 && m === 50) {
+                            speak("Atención. Inicio de junta operativa shop floor. Ventana de vuelo bloqueada hasta las 8 15.");
+                        }
+                        else if (h === 12 && m === 0) {
+                            speak("Atención comandante. Es hora de elaborar los reportes de capé i y actualizar el clima.");
+                        }
 
+                        // EVIDENCIAS
                         if (m === 0 && (isRainingRef.current || isFoggyRef.current || (windDataMapRef.current[h] >= 40))) {
                             speak("Atención piloto. Es hora de tomar evidencia fotográfica de las condiciones meteorológicas adversas.");
                         }
 
+                        // ALARMAS DE VUELO
                         if (flightsRef.current && flightsRef.current.length > 0 && !isRainingRef.current && !isFoggyRef.current) {
-                            let shouldRecalculate = false;
-                            let recalcFlights = [...flightsRef.current];
-                            let currentMins = h * 60 + m;
-                            let adjustedCurrentMins = currentMins;
-                            if (h < 7) adjustedCurrentMins += 1440;
-
-                            recalcFlights.forEach((flight, idx) => {
+                            flightsRef.current.forEach(flight => {
                                 const isFlightDay = flight.hour24 >= 7 && flight.hour24 < 19;
-                                let fMins = flight.hour24 * 60 + flight.min;
-                                if (flight.hour24 < 7) fMins += 1440;
-
-                                // Alertas 10 y 5 min
                                 if (isDayShift === isFlightDay && flight.wind < 42) {
-                                    if (fMins - adjustedCurrentMins === 10) speak(`Atención piloto. Faltan 10 minutos para el vuelo programado a las ${flight.time}.`);
-                                    if (fMins - adjustedCurrentMins === 5) speak(`Faltan 5 minutos para el despegue de las ${flight.time}. Prepárese.`);
-                                }
-
-                                // Si el vuelo se pasó por 5 minutos, activar recálculo anti-colisión
-                                if (adjustedCurrentMins - fMins === 5 && flight.wind < 42) {
-                                    shouldRecalculate = true;
+                                    let flightDate = new Date();
+                                    flightDate.setHours(flight.hour24, flight.min, 0, 0);
+                                    let warn10 = new Date(flightDate.getTime() - 10 * 60000);
+                                    let warn5 = new Date(flightDate.getTime() - 5 * 60000);
+                                    let w10Str = `${String(warn10.getHours()).padStart(2, '0')}:${String(warn10.getMinutes()).padStart(2, '0')}`;
+                                    let w5Str = `${String(warn5.getHours()).padStart(2, '0')}:${String(warn5.getMinutes()).padStart(2, '0')}`;
+                                    
+                                    if (timeStr === w10Str) speak(`Atención piloto. Faltan 10 minutos para el vuelo programado a las ${flight.time}.`);
+                                    if (timeStr === w5Str) speak(`Faltan 5 minutos para el despegue de las ${flight.time}. Prepárese.`);
                                 }
                             });
-
-                            if (shouldRecalculate) {
-                                let nextStart = adjustedCurrentMins + 10;
-                                for (let i = 0; i < recalcFlights.length; i++) {
-                                    let fMins = recalcFlights[i].hour24 * 60 + recalcFlights[i].min;
-                                    if (recalcFlights[i].hour24 < 7) fMins += 1440;
-
-                                    if (fMins < adjustedCurrentMins) continue; // Ya pasaron
-
-                                    if (recalcFlights[i].type !== 'FORZOSO') {
-                                        let safeMins = applyAntiCollision(nextStart);
-                                        let newH = Math.floor((safeMins % 1440) / 60);
-                                        let newM = (safeMins % 1440) % 60;
-                                        recalcFlights[i] = { ...recalcFlights[i], time: `${String(newH).padStart(2, '0')}:${String(newM).padStart(2, '0')}`, hour24: newH, min: newM, type: 'RECALCULADO' };
-                                        nextStart = safeMins + 90;
-                                    } else {
-                                        nextStart = fMins + 90;
-                                    }
-                                }
-                                setFlights(recalcFlights);
-                                flightsRef.current = recalcFlights;
-                                db.collection('operaciones').doc('turno_actual').set({ flights: recalcFlights }, { merge: true });
-                                speak("Alerta. Vuelo retrasado. El sistema anti colisión ha intervenido y recalculado el itinerario.");
-                            }
                         }
                     }
                 }, 1000);
@@ -250,73 +218,109 @@
 
                     const now = new Date();
                     const h = now.getHours();
+                    
                     let targetDate = new Date(now);
                     if (h < 7) { targetDate.setDate(targetDate.getDate() - 1); }
 
                     const isDayShift = h >= 7 && h < 19;
                     const targetDay = String(targetDate.getDate()); 
-                    const dateRegex = new RegExp(`(^|\\D)0?${targetDay}(\\D|$)`, 'i');
                     
-                    const shiftKeyword = isDayShift ? "6:50" : "18:50";
-                    const shiftLetter = isDayShift ? "d" : "n";
-                    const blacklist = ["empleado", "operador", "turno", "descanso", "área", "departamento", "true", "false", "si", "no", "am", "pm", "nombre", "fecha", "piloto", "d", "n", "6:50", "18:50", "7:00", "19:00", "a 7"];
-                    
-                    const isRealName = (text) => {
-                        if (!text || text.length < 3) return false;
-                        if (/\d/.test(text)) return false; 
-                        if (text.includes(":") || text.includes("/") || text.includes("-")) return false;
-                        if (blacklist.some(bad => text.toLowerCase() === bad)) return false;
-                        return true;
-                    };
-
                     let foundName = null;
-                    let success = false;
+                    
+                    // Lector Anti-Gringo para Fecha (Encuentra el '28' sin importar si dice 28-Jul o 7/28)
+                    const dateRegex = new RegExp(`(^|\\D)0?${targetDay}(\\D|$)`, 'i');
 
-                    // ESTRATEGIA 1: Lector de Matriz Clásica
-                    let colIndex = -1;
-                    for(let r = 0; r < 5 && r < json.length; r++){
+                    // ==========================================
+                    // ESTRATEGIA 1: Lector de Matriz (Columnas y Filas)
+                    // ==========================================
+                    let dateColIdx = -1;
+                    
+                    // Buscar columna de fecha
+                    for(let r=0; r < Math.min(json.length, 30); r++) {
                         if(!json[r]) continue;
-                        for (let c = 0; c < json[r].length; c++) {
-                            if (dateRegex.test(String(json[r][c]))) { colIndex = c; break; }
-                        }
-                        if(colIndex !== -1) break;
-                    }
-
-                    if (colIndex !== -1) {
-                        for (let r = 1; r < json.length; r++) {
-                            if(!json[r]) continue;
-                            const rowStr = json[r].join(" ").toLowerCase();
-                            if (rowStr.includes(shiftKeyword) || rowStr.includes(shiftLetter)) {
-                                let cell = String(json[r][colIndex] || '').trim();
-                                if (isRealName(cell)) {
-                                    foundName = cell;
-                                    success = true;
-                                    break;
-                                }
+                        for(let c=0; c < json[r].length; c++) {
+                            const cellVal = String(json[r][c] || '').trim();
+                            if(dateRegex.test(cellVal) && cellVal.length <= 15) {
+                                dateColIdx = c;
+                                break;
                             }
                         }
+                        if(dateColIdx !== -1) break;
                     }
 
-                    // ESTRATEGIA 2: Lector en Reversa (Anti-fantasmas)
-                    if (!success) {
-                        for (let r = 0; r < json.length; r++) {
-                            if (!json[r]) continue;
-                            const rowText = json[r].join(" ").toLowerCase();
+                    if(dateColIdx !== -1) {
+                        for(let r=0; r < json.length; r++) {
+                            const cellVal = String(json[r][dateColIdx] || '').toLowerCase().trim();
                             
-                            if (dateRegex.test(rowText) && (rowText.includes(shiftKeyword) || rowText.includes(shiftLetter))) {
-                                for (let c = json[r].length - 1; c >= 0; c--) {
-                                    let cell = String(json[r][c] || '').trim();
-                                    if (isRealName(cell)) {
-                                        foundName = cell;
-                                        success = true;
-                                        break;
+                            const isDay = cellVal.includes("6:50") || cellVal.includes("06:50") || cellVal.includes("7:00") || cellVal === "d";
+                            const isNight = cellVal.includes("18:50") || cellVal.includes("19:00") || cellVal === "n" || cellVal.includes("a 7");
+                            
+                            if((isDayShift && isDay) || (!isDayShift && isNight)) {
+                                // Encontró la fila del turno correcto. Ahora escanear TODA la fila buscando el nombre.
+                                for(let c=0; c < json[r].length; c++) {
+                                    if(c === dateColIdx) continue; // Saltar la celda del turno
+                                    
+                                    let cellStr = String(json[r][c] || '').trim();
+                                    cellStr = cellStr.replace(/^[0-9\s-]+/, ''); // Quitar IDs numéricos del inicio
+                                    
+                                    if(cellStr.length >= 3 && /[a-zA-Z]{3,}/.test(cellStr)) {
+                                        const lower = cellStr.toLowerCase();
+                                        // LISTA NEGRA ACTUALIZADA: Ignora "published", "draft", "scheduled"
+                                        const blacklist = ["turno", "empleado", "departamento", "puesto", "operador", "piloto", "nombre", "descanso", "ausente", "fecha", "6:50", "18:50", "19:00", "7:00", "a 7", "am", "pm", "published", "draft", "scheduled", "approved"];
+                                        
+                                        if(!blacklist.some(b => lower.includes(b))) {
+                                            foundName = cellStr;
+                                            break;
+                                        }
                                     }
                                 }
                             }
-                            if (success) break;
+                            if(foundName) break;
                         }
                     }
 
+                    // ==========================================
+                    // ESTRATEGIA 2: Lector de Lista (Base de Datos)
+                    // ==========================================
+                    if (!foundName) {
+                        for (let r = 0; r < json.length; r++) {
+                            if (!json[r]) continue;
+                            
+                            let hasDate = false;
+                            let hasShift = false;
+                            
+                            // Revisar si esta fila pertenece al día y turno actuales
+                            for (let c = 0; c < json[r].length; c++) {
+                                const cellStr = String(json[r][c] || '').toLowerCase().trim();
+                                if (dateRegex.test(cellStr)) hasDate = true;
+                                if (isDayShift && (cellStr.includes("6:50") || cellStr.includes("7:00"))) hasShift = true;
+                                if (!isDayShift && (cellStr.includes("18:50") || cellStr.includes("19:00") || cellStr.includes("a 7"))) hasShift = true;
+                            }
+                            
+                            if (hasDate && hasShift) {
+                                // Extraer el nombre de esta misma fila
+                                for (let c = 0; c < json[r].length; c++) {
+                                    let nameCandidate = String(json[r][c] || '').trim();
+                                    nameCandidate = nameCandidate.replace(/^[0-9\s-]+/, ''); 
+                                    
+                                    if (nameCandidate.length >= 3 && /[a-zA-Z]{3,}/.test(nameCandidate)) {
+                                        const lower = nameCandidate.toLowerCase();
+                                        // LISTA NEGRA ACTUALIZADA
+                                        const blacklist = ["turno", "empleado", "departamento", "puesto", "operador", "piloto", "nombre", "descanso", "ausente", "fecha", "6:50", "18:50", "19:00", "7:00", "a 7", "published", "draft", "scheduled", "approved"];
+                                        
+                                        // Evitar atrapar la celda de la fecha por error (ej. "28-Jul")
+                                        if (!blacklist.some(b => lower.includes(b)) && !dateRegex.test(lower)) {
+                                            foundName = nameCandidate;
+                                            break;
+                                        }
+                                    }
+                                }
+                            }
+                            if (foundName) break;
+                        }
+                    }
+
+                    // 4. APLICACIÓN DE RESULTADOS
                     if (foundName) {
                         foundName = foundName.toLowerCase().replace(/\b\w/g, l => l.toUpperCase()).trim();
                         setPilotName(foundName);
@@ -436,41 +440,45 @@
                 db.collection('operaciones').doc('turno_actual').set({ windDataMap: windMap, rainProbMap: rainMap }, { merge: true });
 
                 const applyVariance = (timeStr, isForzoso = false) => {
+                    if (isForzoso) return timeStr; 
                     let parts = timeStr.split(':');
                     let h = parseInt(parts[0]);
                     let m = parseInt(parts[1]);
-                    let timeInMins = h * 60 + m;
+                    
+                    let variance = Math.floor(Math.random() * 16) + 10; 
+                    let timeInMins = h * 60 + m + variance;
 
-                    if (!isForzoso) {
-                        let variance = Math.floor(Math.random() * 16) + 10; 
-                        let sign = Math.random() > 0.5 ? 1 : -1;
-                        timeInMins += (variance * sign);
+                    const blocks = [
+                        { start: 6*60 + 45, end: 7*60 + 15 },   
+                        { start: 7*60 + 50, end: 8*60 + 15 },   
+                        { start: 18*60 + 45, end: 19*60 + 15 }  
+                    ];
+
+                    for (let b of blocks) {
+                        if (timeInMins >= b.start && timeInMins <= b.end) timeInMins = b.end + 15;
                     }
 
-                    // Pasa por el sistema anti-colisión
-                    timeInMins = applyAntiCollision(timeInMins);
-
-                    return `${String(Math.floor((timeInMins % 1440) / 60)).padStart(2, '0')}:${String((timeInMins % 1440) % 60).padStart(2, '0')}`;
+                    return `${String(Math.floor(timeInMins / 60) % 24).padStart(2, '0')}:${String(timeInMins % 60).padStart(2, '0')}`;
                 };
 
-                // HORARIOS DEFINITIVOS (8 Día, 8 Noche con Forzosos en Piedra)
+                // HORARIOS DEFINITIVOS (8 Día, 8 Noche)
                 let baseSchedule = [
                     { time: applyVariance("07:20", true), type: "FORZOSO", hour24: 7 }, 
-                    { time: applyVariance("08:50"), type: "DINÁMICO", hour24: 8 },
-                    { time: applyVariance("10:20"), type: "DINÁMICO", hour24: 10 },
-                    { time: applyVariance("11:50"), type: "DINÁMICO", hour24: 11 },
-                    { time: applyVariance("14:00", true), type: "FORZOSO", hour24: 14 },
-                    { time: applyVariance("15:30"), type: "DINÁMICO", hour24: 15 },
-                    { time: applyVariance("17:00", true), type: "FORZOSO", hour24: 17 },
-                    { time: applyVariance("17:45"), type: "DINÁMICO", hour24: 17 },
+                    { time: applyVariance("08:45"), type: "DINÁMICO", hour24: 8 },
+                    { time: applyVariance("10:15"), type: "DINÁMICO", hour24: 10 },
+                    { time: applyVariance("11:45"), type: "DINÁMICO", hour24: 11 },
+                    { time: applyVariance("13:15"), type: "DINÁMICO", hour24: 13 },
+                    { time: applyVariance("14:45", true), type: "FORZOSO", hour24: 14 },
+                    { time: applyVariance("16:15"), type: "DINÁMICO", hour24: 16 },
+                    { time: applyVariance("17:45", true), type: "FORZOSO", hour24: 17 },
 
                     { time: applyVariance("19:25", true), type: "FORZOSO", hour24: 19 }, 
                     { time: applyVariance("21:00"), type: "DINÁMICO", hour24: 21 },
-                    { time: applyVariance("21:30", true), type: "FORZOSO", hour24: 21 },
-                    { time: applyVariance("23:00"), type: "DINÁMICO", hour24: 23 },
-                    { time: applyVariance("00:30"), type: "DINÁMICO", hour24: 0 },
-                    { time: applyVariance("02:00"), type: "DINÁMICO", hour24: 2 },
-                    { time: applyVariance("03:30"), type: "DINÁMICO", hour24: 3 },
+                    { time: applyVariance("22:50", true), type: "FORZOSO", hour24: 22 },
+                    { time: applyVariance("00:15"), type: "DINÁMICO", hour24: 0 },
+                    { time: applyVariance("01:30"), type: "DINÁMICO", hour24: 1 },
+                    { time: applyVariance("03:00"), type: "DINÁMICO", hour24: 3 },
+                    { time: applyVariance("04:30"), type: "DINÁMICO", hour24: 4 },
                     { time: applyVariance("06:00", true), type: "FORZOSO", hour24: 6 }
                 ];
 
@@ -478,9 +486,6 @@
                     let h24 = parseInt(f.time.split(':')[0]);
                     return { ...f, min: parseInt(f.time.split(':')[1]), hour24: h24, wind: windMap[h24] >= 40 ? 45 : (windMap[h24] || 0), rainProb: rainMap[h24] || 0 };
                 });
-
-                // Ordenar cronológicamente
-                finalSchedule.sort((a,b) => (a.hour24*60+a.min) - (b.hour24*60+b.min));
 
                 setFlights(finalSchedule); flightsRef.current = finalSchedule;
                 db.collection('operaciones').doc('turno_actual').set({ flights: finalSchedule }, { merge: true });
@@ -490,48 +495,9 @@
                  if (isRaining || isFoggy) return;
                  if (loggedFlightsCount < totalFlightsTarget) {
                       const newCount = loggedFlightsCount + 1;
-                      
-                      // SISTEMA DE ARRASTRE (Rolling Deadline)
-                      const now = new Date();
-                      let currentMins = now.getHours() * 60 + now.getMinutes();
-                      let updatedFlights = [...flights];
-                      
-                      let nextFlightIdx = updatedFlights.findIndex(f => {
-                          let fm = f.hour24 * 60 + f.min;
-                          if (now.getHours() >= 19 && f.hour24 < 7) fm += 1440;
-                          let cm = currentMins;
-                          if (now.getHours() >= 19 && now.getHours() < 7) cm += 1440; 
-                          return fm > cm;
-                      });
-
-                      if (nextFlightIdx !== -1) {
-                          let nextStartMins = now.getHours() * 60 + now.getMinutes() + 90; // Exigir max 90 mins
-                          
-                          for (let i = nextFlightIdx; i < updatedFlights.length; i++) {
-                              if (updatedFlights[i].type === 'FORZOSO') {
-                                  let fm = updatedFlights[i].hour24 * 60 + updatedFlights[i].min;
-                                  if (updatedFlights[i].hour24 < 7) fm += 1440;
-                                  nextStartMins = fm + 90; // Resetear contador desde el forzoso
-                                  continue; 
-                              }
-                              let safeMins = applyAntiCollision(nextStartMins);
-                              let h = Math.floor((safeMins % 1440) / 60);
-                              let m = (safeMins % 1440) % 60;
-                              updatedFlights[i] = { ...updatedFlights[i], time: `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`, hour24: h, min: m, type: 'DINÁMICO' };
-                              nextStartMins = safeMins + 90;
-                          }
-                      }
-
                       setLoggedFlightsCount(newCount);
-                      setFlights(updatedFlights);
-                      flightsRef.current = updatedFlights;
-
-                      db.collection('operaciones').doc('turno_actual').set({ 
-                          loggedFlightsCount: newCount,
-                          flights: updatedFlights 
-                      }, { merge: true });
-                      
-                      speak(`Vuelo registrado. ${newCount} de ${totalFlightsTarget}. Itinerario ajustado.`);
+                      db.collection('operaciones').doc('turno_actual').set({ loggedFlightsCount: newCount }, { merge: true });
+                      speak(`Vuelo registrado. ${newCount} de ${totalFlightsTarget}.`);
                  }
             };
 
@@ -648,7 +614,7 @@
                                                 {f.rainProb > 0 && <div className="text-[9px] font-bold uppercase text-cyan-400">☔ {f.rainProb}% Lluvia</div>}
                                             </div>
                                         </div>
-                                        <span className={`text-[8px] font-black uppercase px-2 py-1 rounded border ${f.type === 'FORZOSO' ? 'bg-indigo-950 text-indigo-400 border-indigo-900' : f.type === 'RECALCULADO' ? 'bg-amber-900 text-amber-400 border-amber-700' : 'bg-slate-800 text-slate-400 border-slate-700'}`}>
+                                        <span className={`text-[8px] font-black uppercase px-2 py-1 rounded border ${f.type === 'FORZOSO' ? 'bg-indigo-950 text-indigo-400 border-indigo-900' : 'bg-slate-800 text-slate-400 border-slate-700'}`}>
                                             {f.type}
                                         </span>
                                     </div>
