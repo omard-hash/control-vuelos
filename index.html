@@ -54,7 +54,7 @@
             const [geminiModel, setGeminiModel] = useState(localStorage.getItem('gemini_model') || 'gemini-3.6-flash');
             const [pilotName, setPilotName] = useState(localStorage.getItem('pilot_name') || 'Piloto en Turno');
             
-            // Meta de 8 vuelos por turno
+            // Meta de 8 vuelos por turno y rastreador de período (7 AM / 7 PM)
             const [loggedFlightsCount, setLoggedFlightsCount] = useState(0);
             const [shiftPeriod, setShiftPeriod] = useState('');
             const totalFlightsTarget = 8; 
@@ -145,15 +145,15 @@
                     const s = now.getSeconds();
                     const timeStr = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
 
-                    // REINICIO DE TURNO (7 AM y 7 PM)
+                    // REINICIO DE TURNO ESTRICTO A LAS 7 AM y 7 PM
                     let shiftDate = new Date(now);
-                    if (h < 7) { shiftDate.setDate(shiftDate.getDate() - 1); } // Antes de las 7am, sigue siendo la noche anterior
+                    if (h < 7) { shiftDate.setDate(shiftDate.getDate() - 1); } // Madrugada pertenece al día anterior
                     
                     const isDayShift = (h >= 7 && h < 19);
                     const shiftType = isDayShift ? 'DIA' : 'NOCHE';
                     const currentShiftPeriod = `${shiftDate.getFullYear()}-${shiftDate.getMonth()}-${shiftDate.getDate()}-${shiftType}`;
 
-                    // Si entramos a un nuevo turno (ej. dan las 7:00 AM o 7:00 PM), reiniciar a 0
+                    // Reinicio de contador a 0 al iniciar un nuevo turno (7 AM o 7 PM)
                     if (shiftPeriodRef.current && shiftPeriodRef.current !== currentShiftPeriod) {
                         shiftPeriodRef.current = currentShiftPeriod;
                         db.collection('operaciones').doc('turno_actual').set({ 
@@ -161,12 +161,15 @@
                             shiftPeriod: currentShiftPeriod
                         }, { merge: true });
                         speak(`Atención. Inicio de nuevo turno. Contador reiniciado a cero para la meta de 8 vuelos.`);
+                    } else if (!shiftPeriodRef.current) {
+                         // Inicialización en primera carga
+                         shiftPeriodRef.current = currentShiftPeriod;
                     }
 
                     setShiftName(isDayShift ? 'Turno Diurno' : 'Turno Nocturno');
                     
                     if (s === 0) { 
-                        // Autocambio de piloto con Zoho Scanner a las 7 AM y 7 PM en punto
+                        // Autocambio de piloto Zoho Scanner (7 AM y 7 PM en punto)
                         if ((h === 7 && m === 0) || (h === 19 && m === 0)) {
                             autoAssignPilot();
                             speak("Cambio de turno en progreso. Asignando nuevo piloto automáticamente.");
@@ -228,22 +231,21 @@
                     const isDayShift = h >= 7 && h < 19;
                     const shiftCodeToFind = isDayShift ? "d" : "n"; 
                     
-                    // Obtenemos el número del día (ej. "28")
-                    const d = String(targetDate.getDate()); 
+                    const d = String(targetDate.getDate()); // Ej. "28"
                     
                     let foundName = null;
                     let dateColumnIndex = -1;
                     
                     // 1. ESCÁNER HORIZONTAL (Buscar la columna del día)
-                    for (let r = 0; r < Math.min(json.length, 10); r++) {
+                    for (let r = 0; r < Math.min(json.length, 15); r++) {
                         if (!json[r]) continue;
                         for (let c = 0; c < json[r].length; c++) {
                             if (json[r][c] == null) continue;
                             const cell = String(json[r][c]).toLowerCase().trim();
                             
-                            // Regex que busca "28", "028", "28/07", "28-jul" sin confundirse con "280"
+                            // Regex súper agresivo: Busca el día aislado (28, 28/07, 28-jul)
                             const regex = new RegExp(`^0?${d}(\\b|\\D|$)`);
-                            if (regex.test(cell)) {
+                            if (regex.test(cell) || cell === d || cell === `0${d}`) {
                                 dateColumnIndex = c;
                                 break;
                             }
@@ -251,33 +253,41 @@
                         if (dateColumnIndex !== -1) break;
                     }
 
-                    // 2. ESCÁNER VERTICAL (Buscar el turno y luego el nombre a la izquierda)
+                    // 2. ESCÁNER VERTICAL (Buscar el turno específico de Zoho)
                     if (dateColumnIndex !== -1) {
                         for (let r = 0; r < json.length; r++) {
                             if (!json[r] || json[r][dateColumnIndex] == null) continue;
                             const shiftValue = String(json[r][dateColumnIndex]).toLowerCase().trim();
                             
-                            const isMatch = (shiftCodeToFind === "d" && (shiftValue === "d" || shiftValue === "dia" || shiftValue.includes("diurno") || shiftValue === "07:00 a 19:00")) ||
-                                          (shiftCodeToFind === "n" && (shiftValue === "n" || shiftValue === "noche" || shiftValue.includes("nocturno") || shiftValue === "19:00 a 07:00"));
+                            // Coincidencias específicas para los horarios extraños del cliente
+                            const isMatchDay = shiftValue === "d" || shiftValue.includes("dia") || shiftValue.includes("6:50") || shiftValue.includes("7:00");
+                            const isMatchNight = shiftValue === "n" || shiftValue.includes("noche") || shiftValue.includes("18:50") || shiftValue.includes("19:00");
+
+                            const isMatch = (shiftCodeToFind === "d" && isMatchDay) || (shiftCodeToFind === "n" && isMatchNight);
 
                             if (isMatch) {
-                                // Girar a la izquierda (Columnas 0 al 4) para encontrar un nombre real
-                                for (let colNames = 0; colNames <= 4; colNames++) {
+                                // 3. ESCÁNER A LA IZQUIERDA (Caminar hacia atrás buscando un nombre)
+                                for (let colNames = 0; colNames < dateColumnIndex; colNames++) {
                                     const potentialName = String(json[r][colNames] || '').trim();
                                     
-                                    // FILTRO ANTI-NÚMEROS: Debe tener al menos 4 letras y NO ser puramente números (ej. ID 12345)
-                                    if (potentialName.length > 3 && /[a-zA-ZáéíóúÁÉÍÓÚñÑ]/.test(potentialName) && !/^\d+$/.test(potentialName)) {
+                                    // Filtro Anti-ID's: Ignorar números de empleado y encabezados
+                                    if (potentialName.length > 3 && 
+                                        /[a-zA-ZáéíóúÁÉÍÓÚñÑ]/.test(potentialName) && 
+                                        !/^\d+$/.test(potentialName) && 
+                                        !potentialName.toLowerCase().includes("turno") &&
+                                        !potentialName.toLowerCase().includes("empleado") &&
+                                        !potentialName.toLowerCase().includes("id")) {
+                                        
                                         foundName = potentialName;
                                         break;
                                     }
                                 }
-                                break;
+                                if (foundName) break;
                             }
                         }
                     }
 
                     if (foundName) {
-                        // Capitalizar el nombre bonito
                         foundName = foundName.replace(/\b\w/g, l => l.toUpperCase()).trim();
                         setPilotName(foundName);
                         db.collection('operaciones').doc('turno_actual').set({ pilotName: foundName }, { merge: true });
@@ -303,7 +313,7 @@
                         const json = XLSX.utils.sheet_to_json(worksheet, { header: 1, raw: false });
                         
                         localStorage.setItem('zoho_schedule', JSON.stringify(json));
-                        autoAssignPilot(json); // Ejecutar la asignación de inmediato
+                        autoAssignPilot(json); // Ejecutar de inmediato
                         
                     } catch(err) {
                         speak("Error al leer el archivo de excel.");
@@ -416,11 +426,11 @@
                     
                     let timeInMins = newH * 60 + newM;
 
-                    // ZONAS PROHIBIDAS
+                    // ZONAS PROHIBIDAS (Handovers y Junta)
                     const blocks = [
-                        { start: 6*60 + 45, end: 7*60 + 15 },   // Cambio AM
-                        { start: 7*60 + 50, end: 8*60 + 15 },   // Shopfloor
-                        { start: 18*60 + 45, end: 19*60 + 15 }  // Cambio PM
+                        { start: 6*60 + 45, end: 7*60 + 15 },   // Cambio AM (06:45 - 07:15)
+                        { start: 7*60 + 50, end: 8*60 + 15 },   // Shopfloor (07:50 - 08:15)
+                        { start: 18*60 + 45, end: 19*60 + 15 }  // Cambio PM (18:45 - 19:15)
                     ];
 
                     for (let b of blocks) {
@@ -432,7 +442,7 @@
                     return `${String(newH).padStart(2, '0')}:${String(newM).padStart(2, '0')}`;
                 };
 
-                // HORARIOS DEFINITIVOS: 8 por Día, 8 por Noche (16 Total)
+                // HORARIOS DEFINITIVOS (8 Día, 8 Noche)
                 let baseSchedule = [
                     // TURNO DIURNO (8 Vuelos: Max 18:00)
                     { time: applyVariance("07:20", true), type: "FORZOSO", hour24: 7 }, 
@@ -526,7 +536,6 @@
                 let flightMins = f.hour24 * 60 + f.min;
                 let nowMins = currentMins;
                 
-                // Alineación para la madrugada
                 if (!isCurrentlyDayShift) {
                     if (f.hour24 < 7) flightMins += (24 * 60);
                     if (currentH < 7) nowMins += (24 * 60);
