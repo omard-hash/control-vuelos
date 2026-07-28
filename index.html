@@ -235,8 +235,9 @@
                 }
                 let dayStr = targetDate.getDate().toString();
                 
+                // NUEVO ESCÁNER ZOHO MATRIZ/LISTA 3D
                 const shiftKeyword = isNight ? "18:50" : "6:50"; 
-                const blacklist = ["empleado", "operador", "turno", "descanso", "área", "departamento", "true", "false", "si", "no", "am", "pm", "nombre", "fecha"];
+                const blacklist = ["empleado", "operador", "turno", "descanso", "área", "departamento", "true", "false", "si", "no", "am", "pm", "nombre", "fecha", "piloto", "d", "n"];
 
                 const isRealName = (text) => {
                     if (!text || text.length < 3) return false;
@@ -246,48 +247,57 @@
                     return true;
                 };
 
-                // RegEx Inteligente: Busca el día "28" no importa si es "7/28/2026", "28-Jul", o "028"
+                // RegEx Inteligente "Anti-Gringo" (Encuentra 28-Jul, 7/28, etc)
                 const dateRegex = new RegExp(`\\b0?${dayStr}\\b`);
                 let foundName = "Piloto (Falla en Zoho)";
                 let success = false;
 
-                // ESTRATEGIA 1: Lectura de Lista (Filas completas)
-                for (let r = 0; r < rows.length; r++) {
-                    const rowText = rows[r].join(" ").toLowerCase();
-                    if (dateRegex.test(rowText) && rowText.includes(shiftKeyword)) {
-                        // Encontró la fila del turno de hoy. Leer de derecha a izquierda.
-                        for (let c = rows[r].length - 1; c >= 0; c--) {
-                            let cell = rows[r][c];
-                            if (isRealName(cell)) {
-                                foundName = cell.toUpperCase();
-                                success = true;
-                                break;
-                            }
-                        }
-                    }
-                    if (success) break;
-                }
-
-                // ESTRATEGIA 2: Si falló, intentar cruce de Matriz Clásica
-                if (!success && rows.length > 0) {
+                // ESTRATEGIA 1: LECTURA DE MATRIZ CLÁSICA (Fechas arriba, cruce hacia abajo)
+                if (rows.length > 0) {
                     let colIndex = -1;
-                    // Buscar columna de la fecha
-                    for (let c = 0; c < rows[0].length; c++) {
-                        if (dateRegex.test(rows[0][c])) { colIndex = c; break; }
+                    // Buscar la columna de hoy en las primeras dos filas
+                    for(let r = 0; r < 2 && r < rows.length; r++){
+                        for (let c = 0; c < rows[r].length; c++) {
+                            if (dateRegex.test(rows[r][c])) { colIndex = c; break; }
+                        }
+                        if(colIndex !== -1) break;
                     }
+
                     if (colIndex !== -1) {
                         for (let r = 1; r < rows.length; r++) {
                             const rowStr = rows[r].join(" ").toLowerCase();
+                            // Si en la fila cruzada encuentro el turno (6:50 o 18:50) o la D/N de respaldo
                             if (rowStr.includes(shiftKeyword) || (isNight ? rowStr.includes("n") : rowStr.includes("d"))) {
                                 let cell = rows[r][colIndex];
                                 if (isRealName(cell)) {
                                     foundName = cell.toUpperCase();
+                                    success = true;
                                     break;
                                 }
                             }
                         }
                     }
                 }
+
+                // ESTRATEGIA 2: LECTURA DE LISTA (Doble Check si la matriz falla)
+                if (!success) {
+                    for (let r = 0; r < rows.length; r++) {
+                        const rowText = rows[r].join(" ").toLowerCase();
+                        if (dateRegex.test(rowText) && rowText.includes(shiftKeyword)) {
+                            // Leer en reversa ignorando basura
+                            for (let c = rows[r].length - 1; c >= 0; c--) {
+                                let cell = rows[r][c];
+                                if (isRealName(cell)) {
+                                    foundName = cell.toUpperCase();
+                                    success = true;
+                                    break;
+                                }
+                            }
+                        }
+                        if (success) break;
+                    }
+                }
+
                 setPilotName(foundName);
             };
 
