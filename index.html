@@ -48,7 +48,6 @@
         const { useState, useEffect, useRef } = React;
 
         function App() {
-            // ESTADOS PRINCIPALES
             const [currentTime, setCurrentTime] = useState(new Date());
             const [shiftName, setShiftName] = useState('Turno Diurno');
             const [isScanning, setIsScanning] = useState(false);
@@ -124,7 +123,7 @@
                     const utterance = new SpeechSynthesisUtterance(text);
                     utterance.lang = 'es-MX';
                     utterance.rate = 1.0;
-                    utterance.volume = 1.0; // <-- Volumen forzado al 100%
+                    utterance.volume = 1.0; 
                     window.speechSynthesis.speak(utterance);
                 }
             };
@@ -135,7 +134,7 @@
                     audioUnlockedRef.current = true;
                     const u = new SpeechSynthesisUtterance("Sistema de voz en línea.");
                     u.lang = 'es-MX'; 
-                    u.volume = 1.0; // <-- Volumen forzado al 100%
+                    u.volume = 1.0; 
                     window.speechSynthesis.speak(u);
                 }
             };
@@ -153,6 +152,12 @@
                     setShiftName((h >= 7 && h < 19) ? 'Turno Diurno' : 'Turno Nocturno');
                     
                     if (s === 0) { 
+                        // Autocambio de piloto con el archivo Zoho (A las 7:00 AM y 7:00 PM exactas)
+                        if ((h === 7 && m === 0) || (h === 19 && m === 0)) {
+                            autoAssignPilot();
+                            speak("Cambio de turno. Asignando nuevo piloto automáticamente.");
+                        }
+
                         // 1. Alarmas Estáticas de Operación
                         if (h === 7 && m === 50) {
                             speak("Atención. Inicio de junta operativa shop floor.");
@@ -163,7 +168,7 @@
                             setModal({ isOpen: true, title: '📊 KPIs y CLIMA', message: 'Elaboración de KPIs y escaneo de captura meteorológica requeridos.', type: 'error' });
                         }
                         else if (h === 0 && m === 5) {
-                            speak("Atención. Actualización de captura del clima requerida. Confirme ou kei to flai.");
+                            speak("Atención. Actualización de captura del clima requerida. Confirme ou kei to flai para la madrugada.");
                             setModal({ isOpen: true, title: '🌙 ACTUALIZAR CLIMA', message: 'Es obligatorio actualizar la captura del clima y validar condiciones para la madrugada.', type: 'error' });
                         }
 
@@ -172,7 +177,7 @@
                             speak("Atención piloto. Es hora de tomar evidencia fotográfica de las condiciones meteorológicas.");
                         }
 
-                        // 3. Alarmas Prevuelo (10 y 5 min)
+                        // 3. Alarmas Prevuelo (10 y 5 min) y Demoras
                         if (flightsRef.current && flightsRef.current.length > 0 && !isRainingRef.current && !isFoggyRef.current) {
                             flightsRef.current.forEach(flight => {
                                 if (flight.wind < 42) {
@@ -181,12 +186,17 @@
                                     
                                     let warn10 = new Date(flightDate.getTime() - 10 * 60000);
                                     let warn5 = new Date(flightDate.getTime() - 5 * 60000);
+                                    let overdue = new Date(flightDate.getTime() + 16 * 60000); // 16 min después
                                     
                                     let w10Str = `${String(warn10.getHours()).padStart(2, '0')}:${String(warn10.getMinutes()).padStart(2, '0')}`;
                                     let w5Str = `${String(warn5.getHours()).padStart(2, '0')}:${String(warn5.getMinutes()).padStart(2, '0')}`;
+                                    let overdueStr = `${String(overdue.getHours()).padStart(2, '0')}:${String(overdue.getMinutes()).padStart(2, '0')}`;
                                     
                                     if (timeStr === w10Str) speak(`Atención piloto. Faltan 10 minutos para el vuelo programado a las ${flight.time}. Inicie protocolo.`);
                                     if (timeStr === w5Str) speak(`Atención piloto. Faltan 5 minutos para el despegue de las ${flight.time}. Prepárese.`);
+                                    if (timeStr === overdueStr && flight.type !== 'FORZOSO') {
+                                        speak(`Se ha detectado un retraso operativo del vuelo de las ${flight.time}. Organice sus tiempos para cumplir la meta.`);
+                                    }
                                 }
                             });
                         }
@@ -195,11 +205,82 @@
                 return () => clearInterval(timer);
             }, []);
 
+            const autoAssignPilot = (jsonData = null) => {
+                try {
+                    const rawData = jsonData || localStorage.getItem('zoho_schedule');
+                    if (!rawData) return;
+                    
+                    const json = typeof rawData === 'string' ? JSON.parse(rawData) : rawData;
+                    const now = new Date();
+                    const h = now.getHours();
+                    
+                    const isDayShift = h >= 7 && h < 19;
+                    const dayKeywords = ["07:00", "7:00", "7am", "7 am", "07:00 am", "diurno", "mañana", "07:00 - 19:00", "7:00-19:00", "día", "dia"];
+                    const nightKeywords = ["19:00", "7:00 pm", "7pm", "7 pm", "19:00 hrs", "nocturno", "noche", "19:00 - 07:00", "19:00-07:00"];
+                    const shiftKeywords = isDayShift ? dayKeywords : nightKeywords;
+
+                    const d = now.getDate();
+                    const m = now.getMonth() + 1;
+                    const y = now.getFullYear();
+                    const monthNames = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
+                    const monthShort = monthNames[now.getMonth()];
+                    
+                    const todayKeywords = [
+                        `${String(d).padStart(2,'0')}/${String(m).padStart(2,'0')}`,
+                        `${d}/${m}/${y}`,
+                        `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`,
+                        `${String(d).padStart(2,'0')}-${monthShort}`,
+                        `${d}-${monthShort}`
+                    ];
+
+                    const validNames = ["omar", "antonio", "eduardo", "piloto"];
+                    let foundName = null;
+
+                    for (let row of json) {
+                        if (row.length > 0) {
+                            const rowStr = row.join(" ").toLowerCase();
+                            const hasName = validNames.some(name => rowStr.includes(name));
+                            if (!hasName) continue;
+
+                            const isToday = todayKeywords.some(kw => rowStr.includes(kw.toLowerCase()));
+                            const isCurrentShift = shiftKeywords.some(kw => rowStr.includes(kw.toLowerCase()));
+
+                            if (isToday && isCurrentShift) {
+                                foundName = row.find(cell => typeof cell === 'string' && cell.trim() !== '' && validNames.some(n => cell.toLowerCase().includes(n)));
+                                break;
+                            }
+                        }
+                    }
+
+                    if (!foundName) {
+                        for (let row of json) {
+                            if (row.length > 0) {
+                                const rowStr = row.join(" ").toLowerCase();
+                                const hasName = validNames.some(name => rowStr.includes(name));
+                                const isCurrentShift = shiftKeywords.some(kw => rowStr.includes(kw.toLowerCase()));
+                                if (hasName && isCurrentShift) {
+                                    foundName = row.find(cell => typeof cell === 'string' && cell.trim() !== '' && validNames.some(n => cell.toLowerCase().includes(n)));
+                                    break;
+                                }
+                            }
+                        }
+                    }
+
+                    if (foundName) {
+                        setPilotName(foundName);
+                        db.collection('operaciones').doc('turno_actual').set({ pilotName: foundName }, { merge: true });
+                        localStorage.setItem('pilot_name', foundName);
+                    }
+                } catch (err) {
+                    console.error("Error asignando piloto:", err);
+                }
+            };
+
             const handleZohoUpload = (e) => {
                 const file = e.target.files[0];
                 if (!file) return;
                 
-                speak("Procesando documento de Zojo.");
+                speak("Procesando documento de Zojo. Analizando fechas y turnos.");
                 const reader = new FileReader();
                 reader.onload = (evt) => {
                     try {
@@ -207,26 +288,11 @@
                         const workbook = XLSX.read(data, { type: 'binary' });
                         const firstSheetName = workbook.SheetNames[0];
                         const worksheet = workbook.Sheets[firstSheetName];
-                        const json = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+                        const json = XLSX.utils.sheet_to_json(worksheet, { header: 1, raw: false });
                         
-                        let foundName = null;
-                        for (let row of json) {
-                            if (row.length > 0) {
-                                const rowStr = row.join(" ").toLowerCase();
-                                if (rowStr.includes("omar") || rowStr.includes("antonio") || rowStr.includes("eduardo") || rowStr.includes("piloto")) {
-                                    foundName = row.find(cell => typeof cell === 'string' && cell.trim() !== '');
-                                    break;
-                                }
-                            }
-                        }
+                        localStorage.setItem('zoho_schedule', JSON.stringify(json));
+                        autoAssignPilot(json);
                         
-                        if (foundName) {
-                            setPilotName(foundName);
-                            db.collection('operaciones').doc('turno_actual').set({ pilotName: foundName }, { merge: true });
-                            speak(`Piloto identificado como ${foundName}`);
-                        } else {
-                            speak("No se pudo extraer el nombre. Archivo no reconocido.");
-                        }
                     } catch(err) {
                         console.error(err);
                         speak("Error al leer el archivo de excel.");
@@ -344,7 +410,7 @@
                     
                     let timeInMins = newH * 60 + newM;
 
-                    // ZONAS PROHIBIDAS (Handovers y Junta)
+                    // ZONAS PROHIBIDAS BLINDADAS (Handovers y Junta)
                     const blocks = [
                         { start: 6*60 + 45, end: 7*60 + 15 },   // 06:45 a 07:15
                         { start: 7*60 + 50, end: 8*60 + 15 },   // 07:50 a 08:15
@@ -519,7 +585,7 @@
                             </div>
                         </div>
                         
-                        {/* Botones de Operación (Compactos) */}
+                        {/* Botones de Operación */}
                         <div className="flex flex-col gap-2 mt-4 border-t border-slate-800 pt-4">
                             <input type="file" id="upload" accept="image/*" className="hidden" onChange={handleImageUpload} />
                             
@@ -619,11 +685,29 @@
                     {adminOpen && (
                         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4" onClick={(e) => e.stopPropagation()}>
                             <div className="bg-[#131826] border border-slate-800 rounded-2xl w-full max-w-[320px] shadow-2xl p-5">
-                                <h2 className="text-base font-black text-indigo-400 mb-2">👨‍💼 Admin</h2>
-                                <p className="text-slate-400 text-[10px] mb-5">Sube el archivo Excel Zoho para actualizar piloto.</p>
+                                <h2 className="text-base font-black text-indigo-400 mb-2">👨‍💼 Administración</h2>
+                                <p className="text-slate-400 text-xs mb-4">El sistema asigna pilotos automáticamente cruzando la fecha y hora de tu archivo Excel. Sube tu horario semanal aquí.</p>
+                                
                                 <input type="file" id="zohoUpload" accept=".csv, .xlsx" className="hidden" onChange={handleZohoUpload} />
-                                <button onClick={() => document.getElementById('zohoUpload').click()} className="w-full bg-emerald-700 hover:bg-emerald-600 text-white font-bold py-2.5 rounded-lg text-xs mb-2 border border-emerald-500 shadow-[0_0_15px_rgba(4,120,87,0.3)]">📗 SUBIR ZOHO</button>
-                                <button onClick={() => setAdminOpen(false)} className="w-full bg-slate-800 text-white font-bold py-2.5 rounded-lg text-xs">Cancelar</button>
+                                <button onClick={() => document.getElementById('zohoUpload').click()} className="w-full bg-emerald-700 hover:bg-emerald-600 text-white font-bold py-3 rounded-lg text-xs mb-4 border border-emerald-500 shadow-[0_0_15px_rgba(4,120,87,0.3)]">
+                                    📗 SUBIR EXCEL ZOHO
+                                </button>
+                                
+                                <div className="mb-4 pt-4 border-t border-slate-800">
+                                    <label className="block text-[10px] font-bold tracking-widest text-slate-400 uppercase mb-1">Nombre Manual (Emergencia)</label>
+                                    <input 
+                                        type="text" 
+                                        value={pilotName} 
+                                        onChange={(e) => {
+                                            setPilotName(e.target.value);
+                                            db.collection('operaciones').doc('turno_actual').set({ pilotName: e.target.value }, { merge: true });
+                                            localStorage.setItem('pilot_name', e.target.value);
+                                        }} 
+                                        className="w-full bg-[#1e293b] border border-slate-700 rounded-lg p-2.5 text-white font-bold text-sm outline-none" 
+                                    />
+                                </div>
+                                
+                                <button onClick={() => setAdminOpen(false)} className="w-full bg-slate-700 hover:bg-slate-600 text-white font-bold py-2.5 rounded-lg text-xs">Cerrar</button>
                             </div>
                         </div>
                     )}
