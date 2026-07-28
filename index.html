@@ -54,7 +54,7 @@
             const [geminiModel, setGeminiModel] = useState(localStorage.getItem('gemini_model') || 'gemini-3.6-flash');
             const [pilotName, setPilotName] = useState(localStorage.getItem('pilot_name') || 'Piloto en Turno');
             
-            // Meta por turno
+            // Meta de 8 vuelos por turno
             const [loggedFlightsCount, setLoggedFlightsCount] = useState(0);
             const [shiftPeriod, setShiftPeriod] = useState('');
             const totalFlightsTarget = 8; 
@@ -101,8 +101,6 @@
                                 setPilotName(data.pilotName);
                                 localStorage.setItem('pilot_name', data.pilotName);
                             }
-                            
-                            // Lectura del Periodo de Turno
                             if (data.shiftPeriod) {
                                 setShiftPeriod(data.shiftPeriod);
                                 shiftPeriodRef.current = data.shiftPeriod;
@@ -121,7 +119,7 @@
                     const utterance = new SpeechSynthesisUtterance(text);
                     utterance.lang = 'es-MX';
                     utterance.rate = 1.0;
-                    utterance.volume = 1.0; // 100% de volumen garantizado
+                    utterance.volume = 1.0; // 100% VOLUMEN
                     window.speechSynthesis.speak(utterance);
                 }
             };
@@ -130,7 +128,7 @@
                 if (!audioUnlocked) {
                     setAudioUnlocked(true);
                     audioUnlockedRef.current = true;
-                    const u = new SpeechSynthesisUtterance("Sistema de voz en línea y calibrado.");
+                    const u = new SpeechSynthesisUtterance("Sistema de voz en línea al máximo volumen.");
                     u.lang = 'es-MX'; 
                     u.volume = 1.0;
                     window.speechSynthesis.speak(u);
@@ -147,29 +145,31 @@
                     const s = now.getSeconds();
                     const timeStr = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
 
-                    // CÁLCULO DE PERIODO DE TURNO (Reinicia a las 7AM y 7PM)
+                    // REINICIO DE TURNO (7 AM y 7 PM)
                     let shiftDate = new Date(now);
-                    if (h < 7) { shiftDate.setDate(shiftDate.getDate() - 1); } // Antes de las 7am, sigue siendo turno nocturno de ayer
+                    if (h < 7) { shiftDate.setDate(shiftDate.getDate() - 1); } // Antes de las 7am, sigue siendo la noche anterior
+                    
                     const isDayShift = (h >= 7 && h < 19);
                     const shiftType = isDayShift ? 'DIA' : 'NOCHE';
                     const currentShiftPeriod = `${shiftDate.getFullYear()}-${shiftDate.getMonth()}-${shiftDate.getDate()}-${shiftType}`;
 
+                    // Si entramos a un nuevo turno (ej. dan las 7:00 AM o 7:00 PM), reiniciar a 0
                     if (shiftPeriodRef.current && shiftPeriodRef.current !== currentShiftPeriod) {
                         shiftPeriodRef.current = currentShiftPeriod;
                         db.collection('operaciones').doc('turno_actual').set({ 
                             loggedFlightsCount: 0,
                             shiftPeriod: currentShiftPeriod
                         }, { merge: true });
-                        speak(`Inicio de turno. Contador reiniciado a cero para la meta de 8 vuelos.`);
+                        speak(`Atención. Inicio de nuevo turno. Contador reiniciado a cero para la meta de 8 vuelos.`);
                     }
 
                     setShiftName(isDayShift ? 'Turno Diurno' : 'Turno Nocturno');
                     
                     if (s === 0) { 
-                        // Autocambio de piloto con Zoho Scanner a las 7 AM y 7 PM
+                        // Autocambio de piloto con Zoho Scanner a las 7 AM y 7 PM en punto
                         if ((h === 7 && m === 0) || (h === 19 && m === 0)) {
                             autoAssignPilot();
-                            speak("Cambio de turno en progreso. Asignando nuevo piloto de la matriz operativa.");
+                            speak("Cambio de turno en progreso. Asignando nuevo piloto automáticamente.");
                         }
 
                         // Alarmas Estáticas Administrativas
@@ -179,11 +179,9 @@
                         }
                         else if (h === 12 && m === 0) {
                             speak("Atención comandante. Es hora de elaborar los reportes de capé i y actualizar el clima.");
-                            setModal({ isOpen: true, title: '📊 KPIs y CLIMA', message: 'Elaboración de KPIs y escaneo de captura meteorológica requeridos.', type: 'error' });
                         }
                         else if (h === 0 && m === 5) {
                             speak("Atención. Actualización de captura del clima requerida. Valide condiciones para la madrugada.");
-                            setModal({ isOpen: true, title: '🌙 ACTUALIZAR CLIMA', message: 'Es obligatorio actualizar la captura del clima y validar condiciones para la madrugada.', type: 'error' });
                         }
 
                         // Evidencias (Vientos o lluvia)
@@ -191,7 +189,7 @@
                             speak("Atención piloto. Es hora de tomar evidencia fotográfica de las condiciones meteorológicas.");
                         }
 
-                        // Prevuelos y Demoras
+                        // Prevuelos
                         if (flightsRef.current && flightsRef.current.length > 0 && !isRainingRef.current && !isFoggyRef.current) {
                             flightsRef.current.forEach(flight => {
                                 if (flight.wind < 42) {
@@ -200,17 +198,12 @@
                                     
                                     let warn10 = new Date(flightDate.getTime() - 10 * 60000);
                                     let warn5 = new Date(flightDate.getTime() - 5 * 60000);
-                                    let overdue = new Date(flightDate.getTime() + 16 * 60000); 
                                     
                                     let w10Str = `${String(warn10.getHours()).padStart(2, '0')}:${String(warn10.getMinutes()).padStart(2, '0')}`;
                                     let w5Str = `${String(warn5.getHours()).padStart(2, '0')}:${String(warn5.getMinutes()).padStart(2, '0')}`;
-                                    let overdueStr = `${String(overdue.getHours()).padStart(2, '0')}:${String(overdue.getMinutes()).padStart(2, '0')}`;
                                     
                                     if (timeStr === w10Str) speak(`Atención piloto. Faltan 10 minutos para el vuelo programado a las ${flight.time}.`);
                                     if (timeStr === w5Str) speak(`Faltan 5 minutos para el despegue de las ${flight.time}. Prepárese.`);
-                                    if (timeStr === overdueStr && flight.type !== 'FORZOSO') {
-                                        speak(`Se ha detectado un retraso operativo en el vuelo de las ${flight.time}.`);
-                                    }
                                 }
                             });
                         }
@@ -228,22 +221,29 @@
                     const now = new Date();
                     const h = now.getHours();
                     
+                    // Máquina del tiempo: si es madrugada, buscamos el rol del día anterior
                     let targetDate = new Date();
                     if (h < 7) { targetDate.setDate(targetDate.getDate() - 1); }
 
                     const isDayShift = h >= 7 && h < 19;
                     const shiftCodeToFind = isDayShift ? "d" : "n"; 
+                    
+                    // Obtenemos el número del día (ej. "28")
                     const d = String(targetDate.getDate()); 
                     
                     let foundName = null;
                     let dateColumnIndex = -1;
                     
-                    // ESCANER HORIZONTAL: Buscamos el número del día en la cabecera (1 a 31)
-                    for (let r = 0; r < Math.min(json.length, 5); r++) {
+                    // 1. ESCÁNER HORIZONTAL (Buscar la columna del día)
+                    for (let r = 0; r < Math.min(json.length, 10); r++) {
                         if (!json[r]) continue;
                         for (let c = 0; c < json[r].length; c++) {
+                            if (json[r][c] == null) continue;
                             const cell = String(json[r][c]).toLowerCase().trim();
-                            if (cell === d || cell === `0${d}` || cell.startsWith(`${d}/`) || cell.startsWith(`${d}-`)) {
+                            
+                            // Regex que busca "28", "028", "28/07", "28-jul" sin confundirse con "280"
+                            const regex = new RegExp(`^0?${d}(\\b|\\D|$)`);
+                            if (regex.test(cell)) {
                                 dateColumnIndex = c;
                                 break;
                             }
@@ -251,21 +251,23 @@
                         if (dateColumnIndex !== -1) break;
                     }
 
-                    // ESCANER VERTICAL: Bajamos por la columna del día buscando la letra del turno
+                    // 2. ESCÁNER VERTICAL (Buscar el turno y luego el nombre a la izquierda)
                     if (dateColumnIndex !== -1) {
                         for (let r = 0; r < json.length; r++) {
-                            if (!json[r] || !json[r][dateColumnIndex]) continue;
+                            if (!json[r] || json[r][dateColumnIndex] == null) continue;
                             const shiftValue = String(json[r][dateColumnIndex]).toLowerCase().trim();
                             
-                            // Validación estricta para evitar confusión de palabras cruzadas
                             const isMatch = (shiftCodeToFind === "d" && (shiftValue === "d" || shiftValue === "dia" || shiftValue.includes("diurno") || shiftValue === "07:00 a 19:00")) ||
                                           (shiftCodeToFind === "n" && (shiftValue === "n" || shiftValue === "noche" || shiftValue.includes("nocturno") || shiftValue === "19:00 a 07:00"));
 
                             if (isMatch) {
-                                // Gira a la izquierda para extraer el nombre
-                                for (let colNames = 0; colNames < 3; colNames++) {
-                                    if (typeof json[r][colNames] === 'string' && json[r][colNames].length > 3) {
-                                        foundName = json[r][colNames];
+                                // Girar a la izquierda (Columnas 0 al 4) para encontrar un nombre real
+                                for (let colNames = 0; colNames <= 4; colNames++) {
+                                    const potentialName = String(json[r][colNames] || '').trim();
+                                    
+                                    // FILTRO ANTI-NÚMEROS: Debe tener al menos 4 letras y NO ser puramente números (ej. ID 12345)
+                                    if (potentialName.length > 3 && /[a-zA-ZáéíóúÁÉÍÓÚñÑ]/.test(potentialName) && !/^\d+$/.test(potentialName)) {
+                                        foundName = potentialName;
                                         break;
                                     }
                                 }
@@ -275,6 +277,7 @@
                     }
 
                     if (foundName) {
+                        // Capitalizar el nombre bonito
                         foundName = foundName.replace(/\b\w/g, l => l.toUpperCase()).trim();
                         setPilotName(foundName);
                         db.collection('operaciones').doc('turno_actual').set({ pilotName: foundName }, { merge: true });
@@ -289,7 +292,7 @@
                 const file = e.target.files[0];
                 if (!file) return;
                 
-                speak("Procesando matriz de turnos. Sincronizando personal operativo.");
+                speak("Procesando archivo CSV. Sincronizando personal operativo.");
                 const reader = new FileReader();
                 reader.onload = (evt) => {
                     try {
@@ -300,7 +303,7 @@
                         const json = XLSX.utils.sheet_to_json(worksheet, { header: 1, raw: false });
                         
                         localStorage.setItem('zoho_schedule', JSON.stringify(json));
-                        autoAssignPilot(json);
+                        autoAssignPilot(json); // Ejecutar la asignación de inmediato
                         
                     } catch(err) {
                         speak("Error al leer el archivo de excel.");
@@ -363,7 +366,7 @@
                     const parsedData = JSON.parse(aiResponseText);
                     if (parsedData && parsedData.hourlyData) {
                          generateIntelligentSchedule(parsedData.hourlyData);
-                         speak("Itinerario cuántico generado exitosamente con objetivo de 8 vuelos por turno.");
+                         speak("Itinerario generado exitosamente. 8 vuelos programados para su turno.");
                     } else {
                          throw new Error("Formato incorrecto.");
                     }
@@ -515,7 +518,7 @@
             const isCurrentlyDayShift = currentH >= 7 && currentH < 19;
 
             const futureFlights = flights.filter(f => {
-                // Filtramos primero para mostrar solo los vuelos que le pertenecen a este turno
+                // Filtrar para mostrar SOLO los vuelos del turno actual
                 const isFlightDay = f.hour24 >= 7 && f.hour24 < 19;
                 if (isCurrentlyDayShift !== isFlightDay) return false;
 
@@ -523,7 +526,7 @@
                 let flightMins = f.hour24 * 60 + f.min;
                 let nowMins = currentMins;
                 
-                // Si es el turno nocturno, alineamos la madrugada sumándole 24 horas para comparar bien los minutos
+                // Alineación para la madrugada
                 if (!isCurrentlyDayShift) {
                     if (f.hour24 < 7) flightMins += (24 * 60);
                     if (currentH < 7) nowMins += (24 * 60);
@@ -565,7 +568,7 @@
                                 <div className="mt-1 text-2xl font-mono font-bold text-white tracking-wider">
                                     {currentTime.toLocaleTimeString('en-US', { hour12: false })}
                                 </div>
-                                <div className="mt-2 inline-block bg-indigo-900/50 border border-indigo-700 text-indigo-300 text-[9px] font-black px-2 py-1 rounded uppercase tracking-widest max-w-[150px] truncate">
+                                <div className="mt-2 inline-flex items-center bg-indigo-900/50 border border-indigo-700 text-indigo-300 text-[9px] font-black px-2 py-1 rounded uppercase tracking-widest max-w-[150px] truncate">
                                     👨‍✈️ {pilotName}
                                 </div>
                             </div>
@@ -661,12 +664,12 @@
                         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4" onClick={(e) => e.stopPropagation()}>
                             <div className="bg-[#131826] border border-slate-800 rounded-2xl w-full max-w-[320px] p-5">
                                 <h2 className="text-base font-black text-indigo-400 mb-2">👨‍💼 Admin (Pilotos)</h2>
-                                <p className="text-[10px] text-slate-400 mb-4">Escaneo de Matriz 3D activo.</p>
+                                <p className="text-[10px] text-slate-400 mb-4">Escáner de Matriz 3D (Anti-Errores) Activo.</p>
                                 <input type="file" id="zohoUpload" accept=".csv, .xlsx" className="hidden" onChange={handleZohoUpload} />
-                                <button onClick={() => document.getElementById('zohoUpload').click()} className="w-full bg-emerald-700 hover:bg-emerald-600 text-white font-bold py-3 rounded-lg text-xs mb-4">📗 SUBIR ZOHO (MATRIZ)</button>
+                                <button onClick={() => document.getElementById('zohoUpload').click()} className="w-full bg-emerald-700 hover:bg-emerald-600 text-white font-bold py-3 rounded-lg text-xs mb-4">📗 SUBIR NUEVO ZOHO (CSV)</button>
                                 
                                 <div className="mb-4 pt-4 border-t border-slate-800">
-                                    <label className="block text-[10px] text-slate-400 uppercase mb-1">Corrección Manual</label>
+                                    <label className="block text-[10px] text-slate-400 uppercase mb-1">Corrección Manual (Opcional)</label>
                                     <input type="text" value={pilotName} onChange={(e) => { setPilotName(e.target.value); db.collection('operaciones').doc('turno_actual').set({ pilotName: e.target.value }, { merge: true }); localStorage.setItem('pilot_name', e.target.value); }} className="w-full bg-[#1e293b] border border-slate-700 rounded-lg p-2 text-white text-sm" />
                                 </div>
                                 <button onClick={() => setAdminOpen(false)} className="w-full bg-slate-700 text-white font-bold py-2.5 rounded-lg text-xs">Cerrar</button>
