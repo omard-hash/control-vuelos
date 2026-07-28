@@ -85,7 +85,14 @@
                                 flightsRef.current = data.flights;
                             }
                             if (data.loggedFlightsCount !== undefined) setLoggedFlightsCount(data.loggedFlightsCount);
-                            if (data.dailyLoggedFlightsCount !== undefined) setDailyLoggedFlightsCount(data.dailyLoggedFlightsCount);
+                            
+                            // Parche de sincronización automática BD
+                            if (data.dailyLoggedFlightsCount !== undefined) {
+                                setDailyLoggedFlightsCount(data.dailyLoggedFlightsCount);
+                            } else if (data.loggedFlightsCount !== undefined) {
+                                setDailyLoggedFlightsCount(data.loggedFlightsCount);
+                            }
+
                             if (data.isRaining !== undefined) {
                                 setIsRaining(data.isRaining);
                                 isRainingRef.current = data.isRaining;
@@ -150,19 +157,22 @@
                     const s = now.getSeconds();
                     const timeStr = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
 
-                    // Máquina del tiempo: Madrugada pertenece al día anterior
+                    // Máquina del tiempo para el TURNO (Madrugada pertenece al turno de la noche anterior)
                     let shiftDate = new Date(now);
                     if (h < 7) { shiftDate.setDate(shiftDate.getDate() - 1); } 
                     
                     const isDayShift = (h >= 7 && h < 19);
                     const shiftType = isDayShift ? 'DIA' : 'NOCHE';
+                    
+                    // Periodo de Turno (Corta a las 7am / 7pm)
                     const currentShiftPeriod = `${shiftDate.getFullYear()}-${shiftDate.getMonth()}-${shiftDate.getDate()}-${shiftType}`;
-                    const currentDayPeriod = `${shiftDate.getFullYear()}-${shiftDate.getMonth()}-${shiftDate.getDate()}`;
+                    // Periodo Global de Calendario (Corta a las 12:00 am exactas)
+                    const strictCalendarDayPeriod = `${now.getFullYear()}-${now.getMonth()}-${now.getDate()}`;
 
-                    // REINICIO AUTOMÁTICO A LAS 7 AM Y 7 PM
                     let updates = {};
                     let needsUpdate = false;
 
+                    // REINICIO AUTOMÁTICO DE TURNO (7 AM y 7 PM)
                     if (shiftPeriodRef.current && shiftPeriodRef.current !== currentShiftPeriod) {
                         shiftPeriodRef.current = currentShiftPeriod;
                         updates.loggedFlightsCount = 0;
@@ -173,14 +183,14 @@
                          shiftPeriodRef.current = currentShiftPeriod;
                     }
 
-                    // REINICIO AUTOMÁTICO DEL DÍA (Solo a las 7 AM)
-                    if (dailyPeriodRef.current && dailyPeriodRef.current !== currentDayPeriod) {
-                        dailyPeriodRef.current = currentDayPeriod;
+                    // REINICIO AUTOMÁTICO GLOBAL (12:00 AM Medianoche)
+                    if (dailyPeriodRef.current && dailyPeriodRef.current !== strictCalendarDayPeriod) {
+                        dailyPeriodRef.current = strictCalendarDayPeriod;
                         updates.dailyLoggedFlightsCount = 0;
-                        updates.dailyPeriod = currentDayPeriod;
+                        updates.dailyPeriod = strictCalendarDayPeriod;
                         needsUpdate = true;
                     } else if (!dailyPeriodRef.current) {
-                         dailyPeriodRef.current = currentDayPeriod;
+                         dailyPeriodRef.current = strictCalendarDayPeriod;
                     }
 
                     if (needsUpdate) {
