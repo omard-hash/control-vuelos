@@ -55,6 +55,7 @@
             const [pilotName, setPilotName] = useState(localStorage.getItem('pilot_name') || 'Piloto en Turno');
             
             const [loggedFlightsCount, setLoggedFlightsCount] = useState(0);
+            const [dailyLoggedFlightsCount, setDailyLoggedFlightsCount] = useState(0);
             const [shiftPeriod, setShiftPeriod] = useState('');
             const totalFlightsTarget = 8; // META ESTRICTA: 8 Vuelos por turno
             
@@ -71,6 +72,7 @@
             const isFoggyRef = useRef(false);
             const windDataMapRef = useRef({});
             const shiftPeriodRef = useRef('');
+            const dailyPeriodRef = useRef('');
 
             useEffect(() => {
                 let unsubscribe = () => {};
@@ -83,6 +85,7 @@
                                 flightsRef.current = data.flights;
                             }
                             if (data.loggedFlightsCount !== undefined) setLoggedFlightsCount(data.loggedFlightsCount);
+                            if (data.dailyLoggedFlightsCount !== undefined) setDailyLoggedFlightsCount(data.dailyLoggedFlightsCount);
                             if (data.isRaining !== undefined) {
                                 setIsRaining(data.isRaining);
                                 isRainingRef.current = data.isRaining;
@@ -103,6 +106,9 @@
                             if (data.shiftPeriod) {
                                 setShiftPeriod(data.shiftPeriod);
                                 shiftPeriodRef.current = data.shiftPeriod;
+                            }
+                            if (data.dailyPeriod) {
+                                dailyPeriodRef.current = data.dailyPeriod;
                             }
                         }
                     }, (err) => console.error("Error leyendo datos:", err));
@@ -151,17 +157,34 @@
                     const isDayShift = (h >= 7 && h < 19);
                     const shiftType = isDayShift ? 'DIA' : 'NOCHE';
                     const currentShiftPeriod = `${shiftDate.getFullYear()}-${shiftDate.getMonth()}-${shiftDate.getDate()}-${shiftType}`;
+                    const currentDayPeriod = `${shiftDate.getFullYear()}-${shiftDate.getMonth()}-${shiftDate.getDate()}`;
 
                     // REINICIO AUTOMÁTICO A LAS 7 AM Y 7 PM
+                    let updates = {};
+                    let needsUpdate = false;
+
                     if (shiftPeriodRef.current && shiftPeriodRef.current !== currentShiftPeriod) {
                         shiftPeriodRef.current = currentShiftPeriod;
-                        db.collection('operaciones').doc('turno_actual').set({ 
-                            loggedFlightsCount: 0,
-                            shiftPeriod: currentShiftPeriod
-                        }, { merge: true });
+                        updates.loggedFlightsCount = 0;
+                        updates.shiftPeriod = currentShiftPeriod;
+                        needsUpdate = true;
                         speak(`Atención. Cambio de turno detectado. Contador de vuelos reiniciado a cero.`);
                     } else if (!shiftPeriodRef.current) {
                          shiftPeriodRef.current = currentShiftPeriod;
+                    }
+
+                    // REINICIO AUTOMÁTICO DEL DÍA (Solo a las 7 AM)
+                    if (dailyPeriodRef.current && dailyPeriodRef.current !== currentDayPeriod) {
+                        dailyPeriodRef.current = currentDayPeriod;
+                        updates.dailyLoggedFlightsCount = 0;
+                        updates.dailyPeriod = currentDayPeriod;
+                        needsUpdate = true;
+                    } else if (!dailyPeriodRef.current) {
+                         dailyPeriodRef.current = currentDayPeriod;
+                    }
+
+                    if (needsUpdate) {
+                        db.collection('operaciones').doc('turno_actual').set(updates, { merge: true });
                     }
 
                     setShiftName(isDayShift ? 'Turno Diurno' : 'Turno Nocturno');
@@ -495,8 +518,13 @@
                  if (isRaining || isFoggy) return;
                  if (loggedFlightsCount < totalFlightsTarget) {
                       const newCount = loggedFlightsCount + 1;
+                      const newDailyCount = dailyLoggedFlightsCount + 1;
                       setLoggedFlightsCount(newCount);
-                      db.collection('operaciones').doc('turno_actual').set({ loggedFlightsCount: newCount }, { merge: true });
+                      setDailyLoggedFlightsCount(newDailyCount);
+                      db.collection('operaciones').doc('turno_actual').set({ 
+                          loggedFlightsCount: newCount,
+                          dailyLoggedFlightsCount: newDailyCount
+                      }, { merge: true });
                       speak(`Vuelo registrado. ${newCount} de ${totalFlightsTarget}.`);
                  }
             };
@@ -504,8 +532,13 @@
             const undoLastFlight = () => {
                 if (loggedFlightsCount > 0) {
                     const newCount = loggedFlightsCount - 1;
+                    const newDailyCount = Math.max(0, dailyLoggedFlightsCount - 1);
                     setLoggedFlightsCount(newCount);
-                    db.collection('operaciones').doc('turno_actual').set({ loggedFlightsCount: newCount }, { merge: true });
+                    setDailyLoggedFlightsCount(newDailyCount);
+                    db.collection('operaciones').doc('turno_actual').set({ 
+                        loggedFlightsCount: newCount,
+                        dailyLoggedFlightsCount: newDailyCount
+                    }, { merge: true });
                 }
             };
 
@@ -562,16 +595,36 @@
                                     👨‍✈️ {pilotName}
                                 </div>
                             </div>
-                            <div className="text-right flex flex-col items-end">
-                                <div className="mb-2 px-3 py-1.5 rounded-xl border bg-[#0f172a] shadow-lg">
-                                    <p className="text-[9px] font-black uppercase text-slate-400">Faltan</p>
-                                    <div className="text-xl font-black text-white text-right">
-                                        {Math.max(0, totalFlightsTarget - loggedFlightsCount)}
+                            
+                            <div className="text-right flex flex-col items-end gap-2">
+                                {/* INDICADOR DEL TURNO */}
+                                <div className="flex items-stretch bg-[#0f172a] border border-indigo-900/50 rounded-xl overflow-hidden shadow-lg">
+                                    <div className="px-2 py-1 bg-indigo-900/20 flex flex-col items-center justify-center border-r border-indigo-900/50">
+                                        <span className="text-[8px] font-black text-indigo-400 uppercase">Turno</span>
+                                    </div>
+                                    <div className="px-2 py-1 flex flex-col justify-center text-center">
+                                        <p className="text-[7px] font-black uppercase text-slate-500">Faltan</p>
+                                        <div className="text-sm font-black text-white leading-none">{Math.max(0, totalFlightsTarget - loggedFlightsCount)}</div>
+                                    </div>
+                                    <div className="flex items-baseline gap-0.5 bg-indigo-900/40 px-2 py-1.5 border-l border-indigo-900/50">
+                                        <span className="text-lg font-black text-white leading-none">{loggedFlightsCount}</span>
+                                        <span className="text-[9px] font-bold text-indigo-400">/8</span>
                                     </div>
                                 </div>
-                                <div className="flex items-baseline gap-1 bg-indigo-900/30 px-3 py-2 rounded-xl border border-indigo-500/30">
-                                    <span className="text-3xl font-black text-white">{loggedFlightsCount}</span>
-                                    <span className="text-sm font-bold text-indigo-500/70">/{totalFlightsTarget}</span>
+
+                                {/* INDICADOR DEL DÍA */}
+                                <div className="flex items-stretch bg-[#0f172a] border border-emerald-900/30 rounded-xl overflow-hidden shadow-lg opacity-90">
+                                    <div className="px-2 py-1 bg-emerald-900/10 flex flex-col items-center justify-center border-r border-emerald-900/30">
+                                        <span className="text-[8px] font-black text-emerald-500 uppercase">Día</span>
+                                    </div>
+                                    <div className="px-2 py-1 flex flex-col justify-center text-center">
+                                        <p className="text-[7px] font-black uppercase text-slate-500">Faltan</p>
+                                        <div className="text-sm font-black text-white leading-none">{Math.max(0, 16 - dailyLoggedFlightsCount)}</div>
+                                    </div>
+                                    <div className="flex items-baseline gap-0.5 bg-emerald-900/20 px-2 py-1.5 border-l border-emerald-900/30">
+                                        <span className="text-lg font-black text-emerald-400 leading-none">{dailyLoggedFlightsCount}</span>
+                                        <span className="text-[9px] font-bold text-emerald-600">/16</span>
+                                    </div>
                                 </div>
                             </div>
                         </div>
