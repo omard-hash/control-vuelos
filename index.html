@@ -117,7 +117,7 @@
                     const utterance = new SpeechSynthesisUtterance(text);
                     utterance.lang = 'es-MX';
                     utterance.rate = 1.0;
-                    utterance.volume = 1.0; // FUERZA EL VOLUMEN AL 100%
+                    utterance.volume = 1.0; // VOLUMEN MÁXIMO FORZADO 100%
                     window.speechSynthesis.speak(utterance);
                 }
             };
@@ -128,7 +128,7 @@
                     audioUnlockedRef.current = true;
                     const u = new SpeechSynthesisUtterance("Sistema de voz en línea y calibrado.");
                     u.lang = 'es-MX'; 
-                    u.volume = 1.0; // VOLUMEN AL MÁXIMO
+                    u.volume = 1.0; // VOLUMEN MÁXIMO FORZADO 100%
                     window.speechSynthesis.speak(u);
                 }
             };
@@ -186,11 +186,10 @@
                                     let w5Str = `${String(warn5.getHours()).padStart(2, '0')}:${String(warn5.getMinutes()).padStart(2, '0')}`;
                                     let overdueStr = `${String(overdue.getHours()).padStart(2, '0')}:${String(overdue.getMinutes()).padStart(2, '0')}`;
                                     
-                                    if (timeStr === w10Str) speak(`Atención piloto. Faltan 10 minutos para el vuelo de las ${flight.time}.`);
+                                    if (timeStr === w10Str) speak(`Atención piloto. Faltan 10 minutos para el vuelo programado a las ${flight.time}.`);
                                     if (timeStr === w5Str) speak(`Faltan 5 minutos para el despegue de las ${flight.time}. Prepárese.`);
                                     if (timeStr === overdueStr && flight.type !== 'FORZOSO') {
-                                        speak(`Retraso operativo detectado en el vuelo de las ${flight.time}. Re-calculando itinerario restante...`);
-                                        // Aquí activaremos el recálculo dinámico en el futuro.
+                                        speak(`Se ha detectado un retraso operativo en el vuelo de las ${flight.time}. Re-calculando itinerario restante...`);
                                     }
                                 }
                             });
@@ -200,7 +199,6 @@
                 return () => clearInterval(timer);
             }, []);
 
-            // NUEVA LÓGICA ULTRA-ESTRICTA DE EXCEL
             const autoAssignPilot = (jsonData = null) => {
                 try {
                     const rawData = jsonData || localStorage.getItem('zoho_schedule');
@@ -217,68 +215,57 @@
                     }
 
                     const isDayShift = h >= 7 && h < 19;
+                    const d = String(targetDate.getDate()); // Día del mes en texto (ej. "27")
                     
-                    // Palabras clave blindadas (No pueden cruzarse)
-                    const dayKeywords = ["diurno", "mañana", "7:00 am", "07:00 am", "7am"];
-                    const nightKeywords = ["nocturno", "noche", "19:00", "19 hrs", "7:00 pm", "7pm"];
-
-                    const d = targetDate.getDate();
-                    const m = targetDate.getMonth() + 1;
-                    const y = targetDate.getFullYear();
-                    const monthNames = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
-                    const monthShort = monthNames[targetDate.getMonth()];
+                    const dayCodes = ["d", "día", "dia", "diurno", "1", "m", "mañana"];
+                    const nightCodes = ["n", "noche", "nocturno", "2"];
+                    const validNames = ["omar", "antonio", "eduardo", "piloto", "juan", "carlos", "oscar"];
                     
-                    const padD = String(d).padStart(2,'0');
-                    const padM = String(m).padStart(2,'0');
-
-                    const todayKeywords = [
-                        `${padD}/${padM}`, `${d}/${m}`, `${padD}/${padM}/${y}`,
-                        `${y}-${padM}-${padD}`, `${padD}-${monthShort}`, `${d}-${monthShort}`,
-                        `${padD} ${monthShort}`
-                    ];
-
-                    const validNames = ["omar", "antonio", "eduardo", "piloto"];
                     let foundName = null;
-
-                    // Filtrar filas que solo tengan nombres validos
-                    const rowsWithNames = json.filter(row => {
-                        const rowStr = row.map(cell => String(cell).toLowerCase().trim()).join(" ");
-                        return validNames.some(name => rowStr.includes(name));
-                    });
-
-                    // Estrategia 1: Busca Fecha Exacta + Turno
-                    for (let row of rowsWithNames) {
-                        const rowStr = row.map(cell => String(cell).toLowerCase().trim()).join(" ");
-                        const isToday = todayKeywords.some(kw => rowStr.includes(kw));
-                        
-                        let shiftMatch = false;
-                        if (isDayShift) {
-                             shiftMatch = dayKeywords.some(kw => rowStr.includes(kw)) || (rowStr.includes("7:00") && !rowStr.includes("19:00 - 07:00"));
-                        } else {
-                             shiftMatch = nightKeywords.some(kw => rowStr.includes(kw)) || rowStr.includes("19:00");
+                    let dateColumnIndex = -1;
+                    
+                    // 1. ESCÁNER HORIZONTAL: Busca el día de hoy en la cabecera (primeras 5 filas)
+                    for (let r = 0; r < Math.min(json.length, 5); r++) {
+                        if (!json[r]) continue;
+                        for (let c = 0; c < json[r].length; c++) {
+                            const cell = String(json[r][c]).toLowerCase().trim();
+                            if (cell === d || cell === `0${d}` || cell.startsWith(`${d}/`) || cell.startsWith(`${d}-`)) {
+                                dateColumnIndex = c;
+                                break;
+                            }
                         }
-
-                        if (isToday && shiftMatch) {
-                            foundName = row.find(cell => typeof cell === 'string' && cell.trim() !== '' && validNames.some(n => cell.toLowerCase().includes(n)));
-                            break;
-                        }
+                        if (dateColumnIndex !== -1) break;
                     }
 
-                    // Estrategia 2: Si no trae fechas, buscar solo por turno
-                    if (!foundName) {
-                        for (let row of rowsWithNames) {
-                            const rowStr = row.map(cell => String(cell).toLowerCase().trim()).join(" ");
-                            if (isDayShift && dayKeywords.some(kw => rowStr.includes(kw))) {
-                                foundName = row.find(cell => typeof cell === 'string' && validNames.some(n => cell.toLowerCase().includes(n)));
-                                break;
-                            } else if (!isDayShift && nightKeywords.some(kw => rowStr.includes(kw))) {
-                                foundName = row.find(cell => typeof cell === 'string' && validNames.some(n => cell.toLowerCase().includes(n)));
-                                break;
+                    // 2. ESCÁNER VERTICAL: Baja por la columna de hoy buscando "D" o "N"
+                    if (dateColumnIndex !== -1) {
+                        for (let r = 0; r < json.length; r++) {
+                            if (!json[r] || !json[r][dateColumnIndex]) continue;
+                            const shiftValue = String(json[r][dateColumnIndex]).toLowerCase().trim();
+                            
+                            const matchDay = isDayShift && dayCodes.includes(shiftValue);
+                            const matchNight = !isDayShift && nightCodes.includes(shiftValue);
+
+                            if (matchDay || matchNight) {
+                                // 3. EXTRACCIÓN: Encontramos la fila correcta. Buscamos el nombre.
+                                let rowName = json[r].find(cell => typeof cell === 'string' && validNames.some(n => cell.toLowerCase().includes(n)));
+                                
+                                // Fallback: Si no está en validNames, tomamos la columna 0 o 1 (usualmente donde están los nombres)
+                                if (rowName) {
+                                    foundName = rowName;
+                                } else if (typeof json[r][0] === 'string' && json[r][0].length > 3) {
+                                    foundName = json[r][0];
+                                } else if (typeof json[r][1] === 'string' && json[r][1].length > 3) {
+                                    foundName = json[r][1];
+                                }
+                                break; // Detiene la búsqueda
                             }
                         }
                     }
 
                     if (foundName) {
+                        // Formatear Nombre (Mayúsculas)
+                        foundName = foundName.replace(/\b\w/g, l => l.toUpperCase()).trim();
                         setPilotName(foundName);
                         db.collection('operaciones').doc('turno_actual').set({ pilotName: foundName }, { merge: true });
                         localStorage.setItem('pilot_name', foundName);
@@ -292,7 +279,7 @@
                 const file = e.target.files[0];
                 if (!file) return;
                 
-                speak("Procesando documento. Analizando fechas y turnos.");
+                speak("Procesando matriz de turnos. Sincronizando personal operativo.");
                 const reader = new FileReader();
                 reader.onload = (evt) => {
                     try {
@@ -421,7 +408,7 @@
                     
                     let timeInMins = newH * 60 + newM;
 
-                    // ZONAS PROHIBIDAS (Handovers y Junta)
+                    // ZONAS PROHIBIDAS (Handovers y Junta Shopfloor)
                     const blocks = [
                         { start: 6*60 + 45, end: 7*60 + 15 },   // 06:45 a 07:15 (Cambio Turno AM)
                         { start: 7*60 + 50, end: 8*60 + 15 },   // 07:50 a 08:15 (Shopfloor)
@@ -430,7 +417,7 @@
 
                     for (let b of blocks) {
                         if (timeInMins >= b.start && timeInMins <= b.end) {
-                            timeInMins = b.end + 15; // Lo rebota para que aterrice después del bloqueo
+                            timeInMins = b.end + 15; // Rebota el vuelo
                         }
                     }
 
@@ -439,23 +426,23 @@
                     return `${String(newH).padStart(2, '0')}:${String(newM).padStart(2, '0')}`;
                 };
 
-                // HORARIO DIARIO: 16 VUELOS, FORZOSOS BLINDADOS
+                // HORARIO DIARIO: 16 VUELOS (Forzosos Blindados)
                 let baseSchedule = [
                     { time: applyVariance("00:30"), type: "DINÁMICO", hour24: 0 },
                     { time: applyVariance("02:00"), type: "DINÁMICO", hour24: 2 },
                     { time: applyVariance("03:30"), type: "DINÁMICO", hour24: 3 },
                     { time: applyVariance("05:00"), type: "DINÁMICO", hour24: 5 },
-                    { time: applyVariance("06:00", true), type: "FORZOSO", hour24: 6 }, // Fijo
-                    { time: applyVariance("07:20", true), type: "FORZOSO", hour24: 7 }, // Fijo
+                    { time: applyVariance("06:00", true), type: "FORZOSO", hour24: 6 }, 
+                    { time: applyVariance("07:20", true), type: "FORZOSO", hour24: 7 }, 
                     { time: applyVariance("08:45"), type: "DINÁMICO", hour24: 8 },
                     { time: applyVariance("10:15"), type: "DINÁMICO", hour24: 10 },
                     { time: applyVariance("11:45"), type: "DINÁMICO", hour24: 11 },
-                    { time: applyVariance("14:00", true), type: "FORZOSO", hour24: 14 }, // Fijo
+                    { time: applyVariance("14:00", true), type: "FORZOSO", hour24: 14 },
                     { time: applyVariance("15:30"), type: "DINÁMICO", hour24: 15 },
-                    { time: applyVariance("17:00", true), type: "FORZOSO", hour24: 17 }, // Fijo
-                    { time: applyVariance("19:25", true), type: "FORZOSO", hour24: 19 }, // Fijo (Después del Handover PM)
+                    { time: applyVariance("17:00", true), type: "FORZOSO", hour24: 17 }, 
+                    { time: applyVariance("19:25", true), type: "FORZOSO", hour24: 19 }, 
                     { time: applyVariance("20:15"), type: "DINÁMICO", hour24: 20 },
-                    { time: applyVariance("21:30", true), type: "FORZOSO", hour24: 21 }, // Fijo
+                    { time: applyVariance("21:30", true), type: "FORZOSO", hour24: 21 },
                     { time: applyVariance("23:00"), type: "DINÁMICO", hour24: 23 }
                 ];
 
@@ -588,7 +575,7 @@
                     {isRaining && <div className="bg-rose-600 text-white text-center p-2.5 rounded-xl mb-4 font-black uppercase text-xs animate-pulse">⚠️ SUSPENDIDO POR LLUVIA</div>}
                     {isFoggy && !isRaining && <div className="bg-slate-500 text-white text-center p-2.5 rounded-xl mb-4 font-black uppercase text-xs animate-pulse">🌫️ VISIBILIDAD NULA</div>}
 
-                    {/* Lista Restante */}
+                    {}
                     <div className={`glass-card p-4 rounded-2xl mb-6 relative ${(isRaining || isFoggy) ? 'opacity-50 pointer-events-none' : ''}`}>
                         <p className="text-[10px] font-bold text-slate-400 uppercase mb-3">🗓️ Plan Restante ({futureFlights.length} Vuelos)</p>
                         {flights.length === 0 ? (
@@ -617,7 +604,6 @@
                         )}
                     </div>
 
-                    {/* Botonera Inferior */}
                     <div className="fixed bottom-0 left-0 w-full p-4 bg-[#0B0F19] flex justify-center items-center gap-2 z-40 border-t border-slate-800">
                         <div className="w-full max-w-[400px] mx-auto flex gap-2">
                              <button onClick={(e) => { e.stopPropagation(); handleLogManualFlight(); }} disabled={isRaining || isFoggy} className={`flex-1 font-black py-4 rounded-xl text-sm ${isRaining || isFoggy ? 'bg-slate-800 text-slate-600' : 'bg-indigo-600 hover:bg-indigo-500 text-white'}`}>
@@ -629,7 +615,7 @@
                         </div>
                     </div>
 
-                    {/* Modales */}
+                    {}
                     {settingsOpen && (
                         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4" onClick={(e) => e.stopPropagation()}>
                             <div className="bg-[#131826] border border-slate-800 rounded-2xl w-full max-w-[320px] p-5">
@@ -647,8 +633,9 @@
                         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4" onClick={(e) => e.stopPropagation()}>
                             <div className="bg-[#131826] border border-slate-800 rounded-2xl w-full max-w-[320px] p-5">
                                 <h2 className="text-base font-black text-indigo-400 mb-2">👨‍💼 Admin (Pilotos)</h2>
+                                <p className="text-[10px] text-slate-400 mb-4">La asignación ahora escanea el día y turno ("D" o "N") de tu matriz.</p>
                                 <input type="file" id="zohoUpload" accept=".csv, .xlsx" className="hidden" onChange={handleZohoUpload} />
-                                <button onClick={() => document.getElementById('zohoUpload').click()} className="w-full bg-emerald-700 text-white font-bold py-3 rounded-lg text-xs mb-4">📗 SUBIR ZOHO (SEMANA)</button>
+                                <button onClick={() => document.getElementById('zohoUpload').click()} className="w-full bg-emerald-700 hover:bg-emerald-600 text-white font-bold py-3 rounded-lg text-xs mb-4">📗 SUBIR ZOHO (MATRIZ)</button>
                                 
                                 <div className="mb-4 pt-4 border-t border-slate-800">
                                     <label className="block text-[10px] text-slate-400 uppercase mb-1">Corrección Manual</label>
