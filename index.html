@@ -72,6 +72,7 @@
             const windDataMapRef = useRef({});
             const shiftPeriodRef = useRef('');
             const dailyPeriodRef = useRef('');
+            const suspensionTimeRef = useRef(null);
 
             useEffect(() => {
                 let unsubscribe = () => {};
@@ -146,6 +147,16 @@
             };
 
             useEffect(() => {
+                if (isRaining || isFoggy) {
+                    if (suspensionTimeRef.current === null) {
+                        suspensionTimeRef.current = Date.now();
+                    }
+                } else {
+                    suspensionTimeRef.current = null;
+                }
+            }, [isRaining, isFoggy]);
+
+            useEffect(() => {
                 const timer = setInterval(() => {
                     const now = new Date();
                     setCurrentTime(now);
@@ -212,8 +223,15 @@
                             speak("Atención comandante. Es hora de elaborar los reportes de capé i y actualizar el clima.");
                         }
 
-                        if (m === 0 && (isRainingRef.current || isFoggyRef.current || (windDataMapRef.current[h] >= 40))) {
-                            speak("Atención piloto. Es hora de tomar evidencia fotográfica de las condiciones meteorológicas adversas.");
+                        if (isRainingRef.current || isFoggyRef.current) {
+                            if (suspensionTimeRef.current !== null) {
+                                const elapsedMins = Math.floor((now.getTime() - suspensionTimeRef.current) / 60000);
+                                if (elapsedMins > 0 && elapsedMins % 60 === 0) {
+                                    speak("Atención piloto. Es hora de tomar evidencia fotográfica de las condiciones meteorológicas adversas por suspensión.");
+                                }
+                            }
+                        } else if (m === 0 && windDataMapRef.current[h] >= 40) {
+                            speak("Atención piloto. Es hora de tomar evidencia fotográfica de las condiciones meteorológicas adversas por vientos fuertes.");
                         }
 
                         if (flightsRef.current && flightsRef.current.length > 0 && !isRainingRef.current && !isFoggyRef.current) {
