@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Audi México - Sistema Control de Vuelos & Bitácora Drone</title>
+
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <script>
@@ -36,13 +37,6 @@
         @keyframes pulse-red {
             0%, 100% { opacity: 1; transform: scale(1); }
             50% { opacity: .7; transform: scale(1.05); }
-        }
-        .pulse-amber {
-            animation: pulse-amber 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-        }
-        @keyframes pulse-amber {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.5; }
         }
         ::-webkit-scrollbar { width: 8px; height: 8px; }
         ::-webkit-scrollbar-track { background: #0f172a; }
@@ -117,7 +111,7 @@
                     <!-- Selector de Plan Semanal (Plan 1, 2, 3, 4) -->
                     <div class="flex items-center gap-2 bg-slate-950 p-1 rounded-xl border border-slate-800">
                         <span class="text-xs text-slate-400 font-medium px-2">Plan Semanal:</span>
-                        <select id="selectWeeklyPlan" onchange="changeWeeklyPlan(this.value, false)" class="bg-slate-800 text-xs font-bold text-white px-3 py-1.5 rounded-lg border border-slate-700 focus:outline-none focus:ring-2 focus:ring-audi-red">
+                        <select id="selectWeeklyPlan" onchange="changeWeeklyPlan(this.value, true)" class="bg-slate-800 text-xs font-bold text-white px-3 py-1.5 rounded-lg border border-slate-700 focus:outline-none focus:ring-2 focus:ring-audi-red">
                             <option value="1">Plan 1 (Semana 1)</option>
                             <option value="2">Plan 2 (Semana 2)</option>
                             <option value="3">Plan 3 (Semana 3)</option>
@@ -277,7 +271,7 @@
                         </tr>
                     </thead>
                     <tbody id="flightsTableBody" class="divide-y divide-slate-800/60 font-medium">
-                        <!-- Generado por JS -->
+                        <!-- Generado dinámicamente por JS -->
                     </tbody>
                 </table>
             </div>
@@ -291,7 +285,7 @@
                         <i class="fa-solid fa-book-bookmark text-emerald-400"></i>
                         Bitácora Oficial de Vuelos y Evidencias (Registro Auditoría)
                     </h3>
-                    <p class="text-xs text-slate-400">Registro con hora exacta, firma de operador y foto de evidencia si hubo suspensión.</p>
+                    <p class="text-xs text-slate-400">Registro permanente con hora exacta, firma de operador y foto de evidencia si hubo suspensión.</p>
                 </div>
                 <div class="flex items-center gap-2">
                     <button onclick="exportBitacoraCSV()" class="px-3 py-1.5 bg-emerald-700 hover:bg-emerald-600 text-white font-bold text-xs rounded-lg border border-emerald-500/30 transition flex items-center gap-1.5">
@@ -320,11 +314,6 @@
                     </thead>
                     <tbody id="bitacoraTableBody" class="divide-y divide-slate-800/60 font-medium">
                         <!-- Rellenado dinámicamente -->
-                        <tr>
-                            <td colspan="8" class="px-4 py-6 text-center text-slate-500 italic">
-                                No hay registros cargados aún en la bitácora de hoy. Realiza despegues o registra suspensiones arriba.
-                            </td>
-                        </tr>
                     </tbody>
                 </table>
             </div>
@@ -427,7 +416,7 @@
             </div>
             <div>
                 <h3 class="text-base font-bold text-white">¿Eliminar este Registro?</h3>
-                <p class="text-xs text-slate-400 mt-1">Esta acción conservará la integridad de la bitácora pero removerá permanentemente este registro seleccionado.</p>
+                <p class="text-xs text-slate-400 mt-1">Esta acción removerá permanentemente este registro seleccionado de la bitácora.</p>
             </div>
             <div id="deleteTargetInfo" class="bg-slate-950 p-3 rounded-xl border border-slate-800 text-xs font-mono text-slate-300">
                 --
@@ -566,7 +555,7 @@
             4: ["A", "A", "C", "B", "C", "C", "A", "A", "A", "B", "C", "B", "A", "A", "B", "D"]
         };
 
-        // Estructura Base de Horarios por Opción con restricción para cambios de turno
+        // Estructura Base de Horarios por Opción
         const scheduleTimeSlots = {
             op1: [
                 { id: 1, hora: "00:00", window: "23:40 - 00:00", isFixedShift: false },
@@ -606,281 +595,239 @@
             ]
         };
 
-        function updateLiveTargetAndAlerts(now) {
-            if (!flightsData || flightsData.length === 0) return;
+        let currentOption = 'op1';
+        let currentWeeklyPlan = 1;
+        let flightsData = [];
+        let bitacoraList = [];
+        let currentTargetIndex = 0;
+        let activeFlightModalIndex = null;
+        let activeEditBitacoraIndex = null;
+        let activeDeleteBitacoraIndex = null;
+        let activeModalPlanTab = 1;
+        let tempEvidenceDataUrl = null;
+        let tempEditEvidenceDataUrl = null;
+        let lastSystemDateStr = "";
 
-            const nowMins = now.getHours() * 60 + now.getMinutes();
+        // Control de Alertas de Voz por Vuelo
+        let alertWindowOpened = {};
+        let alertWindowWarning5m = {};
 
-            let activeOrNextIdx = -1;
-            let minDiff = 9999;
+        // Control de Suspensión
+        let activeSuspension = false;
+        let suspensionHourlyTimer = null;
 
-            flightsData.forEach((slot, idx) => {
-                const parts = slot.hora.split(':');
-                const slotMins = parseInt(parts[0]) * 60 + parseInt(parts[1]);
-                let diff = slotMins - nowMins;
+        function speakVoice(text) {
+            if ('speechSynthesis' in window) {
+                window.speechSynthesis.cancel();
+                // Elimina mención de Audi México por instrucción
+                const cleanText = text.replace(/Audi México/gi, '');
+                const utterance = new SpeechSynthesisUtterance(cleanText);
+                utterance.lang = 'es-MX';
+                utterance.rate = 0.95;
+                utterance.pitch = 1.0;
+                window.speechSynthesis.speak(utterance);
+            }
+        }
 
-                if (diff >= -20 && diff <= 10) {
-                    activeOrNextIdx = idx;
-                    minDiff = diff;
-                }
+        function testVoiceAlert() {
+            speakVoice("Prueba de sistema de alertas por voz activa. Monitoreo disuasivo de patrullaje drone listo para el turno.");
+        }
+
+        function saveStorage() {
+            try {
+                localStorage.setItem('audi_last_date', lastSystemDateStr);
+                localStorage.setItem('audi_weekly_plan', currentWeeklyPlan);
+                localStorage.setItem('audi_schedule_option', currentOption);
+                localStorage.setItem('audi_flights_data', JSON.stringify(flightsData));
+                localStorage.setItem('audi_bitacora', JSON.stringify(bitacoraList));
+            } catch (e) {
+                console.error("Error al guardar almacenamiento:", e);
+            }
+        }
+
+        function calculateAutoWeeklyPlan() {
+            const dayOfMonth = new Date().getDate();
+            if (dayOfMonth <= 7) return 1;
+            if (dayOfMonth <= 14) return 2;
+            if (dayOfMonth <= 21) return 3;
+            return 4;
+        }
+
+        function resetDailyFlightsForNewDay() {
+            const planTypes = weeklyPlanDefinitions[currentWeeklyPlan] || weeklyPlanDefinitions[1];
+            const slots = scheduleTimeSlots[currentOption];
+
+            flightsData = slots.map((slot, idx) => {
+                const tipo = planTypes[idx];
+                return {
+                    id: slot.id,
+                    hora: slot.hora,
+                    window: slot.window,
+                    isFixedShift: slot.isFixedShift,
+                    tipo: tipo,
+                    name: tipoDictionary[tipo] || "Recorrido",
+                    status: 'pending',
+                    takeoffTime: null,
+                    notes: '',
+                    pilot: '',
+                    evidenceImg: null
+                };
             });
 
-            if (activeOrNextIdx === -1) {
-                flightsData.forEach((slot, idx) => {
-                    const parts = slot.hora.split(':');
-                    const slotMins = parseInt(parts[0]) * 60 + parseInt(parts[1]);
-                    let diff = slotMins - nowMins;
-                    if (diff > 0 && diff < minDiff) {
-                        minDiff = diff;
-                        activeOrNextIdx = idx;
-                    }
-                });
-            }
+            alertWindowOpened = {};
+            alertWindowWarning5m = {};
+            activeSuspension = false;
+            if (suspensionHourlyTimer) clearInterval(suspensionHourlyTimer);
 
-            if (activeOrNextIdx === -1) activeOrNextIdx = 0;
+            saveStorage();
+        }
 
-            currentTargetIndex = activeOrNextIdx;
-            const target = flightsData[activeOrNextIdx];
-
-            // Renderizar Banner Target
-            document.getElementById('targetFlightTime').innerText = `${target.hora} hrs`;
+        function loadStorage() {
+            const now = new Date();
+            const todayStr = now.toLocaleDateString('es-MX');
             
-            const badgeEl = document.getElementById('targetFlightBadge');
-            if (target.isFixedShift || fixedShiftHours.includes(target.hora)) {
-                badgeEl.innerText = `TIPO B - CAMBIO DE TURNO (HORA FIJA EN ACCESOS)`;
-                badgeEl.className = "px-2.5 py-0.5 rounded-md text-xs font-black bg-amber-500 text-slate-950 animate-pulse";
-                document.getElementById('targetFlightDesc').innerHTML = `<strong>VUELO FIJO OBLIGATORIO DE CAMBIO DE TURNO:</strong> Cobertura directa de accesos en horario de relevo (<span class="text-amber-300 font-bold">${target.hora} hrs</span>).`;
-            } else {
-                badgeEl.innerText = `TIPO ${target.tipo} - ${target.name}`;
-                badgeEl.className = "px-2.5 py-0.5 rounded-md text-xs font-extrabold bg-audi-red text-white";
-                document.getElementById('targetFlightDesc').innerHTML = `Ventana de despegue permitida: <strong id="targetFlightWindow" class="text-emerald-400 font-mono">${target.window} hrs</strong> (-20 min disuasivo).`;
+            // Cargar bitácora histórica
+            const savedBitacora = localStorage.getItem('audi_bitacora');
+            if (savedBitacora) {
+                try { bitacoraList = JSON.parse(savedBitacora); } catch(e) { bitacoraList = []; }
             }
 
-            const parts = target.hora.split(':');
-            const targetMins = parseInt(parts[0]) * 60 + parseInt(parts[1]);
-            const diffMins = targetMins - nowMins;
-
-            const countdownEl = document.getElementById('targetCountdown');
-            if (diffMins > 0 && diffMins <= 20) {
-                countdownEl.innerText = target.isFixedShift ? `Relevo Fijo Activo (-${diffMins} min)` : `Ventana Abierta (-${diffMins} min)`;
-                countdownEl.className = "text-lg font-mono font-bold text-emerald-400 pulse-amber";
-
-                if (!alertWindowOpened[target.id]) {
-                    alertWindowOpened[target.id] = true;
-                    if (target.isFixedShift) {
-                        speakVoice(`Atención operador. Vuelo prioritario de cambio de turno de las ${target.hora} horas. Hora fija de sobrevuelo obligatorio en garitas y accesos.`);
-                    } else {
-                        speakVoice(`Atención operador. Ha iniciado la ventana operativa para el vuelo ${target.name} de las ${target.hora} horas. Puede iniciar despegue.`);
-                    }
-                }
-
-                if (diffMins === 5 && !alertWindowWarning5m[target.id]) {
-                    alertWindowWarning5m[target.id] = true;
-                    speakVoice(`Alerta. Faltan 5 minutos para la hora programada del vuelo ${target.name} de las ${target.hora} horas.`);
-                }
-            } else if (diffMins <= 0 && diffMins >= -20) {
-                countdownEl.innerText = `Hora Exacta (${target.hora} hrs)`;
-                countdownEl.className = "text-lg font-mono font-bold text-amber-400";
-            } else if (diffMins > 20) {
-                countdownEl.innerText = `En ${diffMins} min`;
-                countdownEl.className = "text-lg font-mono font-bold text-slate-300";
+            const savedPlan = localStorage.getItem('audi_weekly_plan');
+            if (savedPlan) {
+                currentWeeklyPlan = parseInt(savedPlan);
             } else {
-                countdownEl.innerText = `Pasado`;
-                countdownEl.className = "text-lg font-mono font-bold text-slate-500";
+                currentWeeklyPlan = calculateAutoWeeklyPlan();
             }
+
+            const savedOpt = localStorage.getItem('audi_schedule_option');
+            if (savedOpt) currentOption = savedOpt;
+
+            const savedDate = localStorage.getItem('audi_last_date');
+            lastSystemDateStr = todayStr;
+
+            if (savedDate !== todayStr) {
+                resetDailyFlightsForNewDay();
+            } else {
+                const savedFlights = localStorage.getItem('audi_flights_data');
+                if (savedFlights) {
+                    try { flightsData = JSON.parse(savedFlights); } catch(e) { flightsData = []; }
+                }
+                if (!flightsData || flightsData.length === 0) {
+                    resetDailyFlightsForNewDay();
+                }
+            }
+        }
+
+        function checkMidnightDateChange(now) {
+            const todayStr = now.toLocaleDateString('es-MX');
+            if (lastSystemDateStr && lastSystemDateStr !== todayStr) {
+                lastSystemDateStr = todayStr;
+                currentWeeklyPlan = calculateAutoWeeklyPlan();
+                const sel = document.getElementById('selectWeeklyPlan');
+                if (sel) sel.value = currentWeeklyPlan;
+
+                resetDailyFlightsForNewDay();
+                renderAllUI();
+                speakVoice("Atención operador. Ha iniciado un nuevo día de calendario. El cronograma diario de 16 vuelos se ha reiniciado a estado pendiente. La bitácora histórica se mantiene preservada.");
+            }
+        }
+
+        function changeWeeklyPlan(planNum, userSelected = true) {
+            currentWeeklyPlan = parseInt(planNum);
+            const planTypes = weeklyPlanDefinitions[currentWeeklyPlan] || weeklyPlanDefinitions[1];
+            
+            flightsData.forEach((f, idx) => {
+                f.tipo = planTypes[idx];
+                f.name = tipoDictionary[f.tipo] || "Recorrido";
+            });
+
+            saveStorage();
+            renderAllUI();
+            if (userSelected) {
+                showToast(`Plan Semanal ${currentWeeklyPlan} activado`, 'info');
+            }
+        }
+
+        function setOptionTime(opt) {
+            currentOption = opt;
+            const btn1 = document.getElementById('btnOpt1');
+            const btn2 = document.getElementById('btnOpt2');
+
+            if (opt === 'op1') {
+                btn1.className = "px-3 py-1.5 text-xs font-bold rounded-lg bg-audi-red text-white transition shadow";
+                btn2.className = "px-3 py-1.5 text-xs font-bold rounded-lg text-slate-400 hover:text-white transition";
+            } else {
+                btn2.className = "px-3 py-1.5 text-xs font-bold rounded-lg bg-audi-red text-white transition shadow";
+                btn1.className = "px-3 py-1.5 text-xs font-bold rounded-lg text-slate-400 hover:text-white transition";
+            }
+
+            resetDailyFlightsForNewDay();
+            renderAllUI();
+            showToast(`Cronograma cambiado a ${opt === 'op1' ? 'Opción 1 (00:00 hrs)' : 'Opción 2 (00:30 hrs)'}`, 'info');
         }
 
         function renderFlightsTable() {
             const tbody = document.getElementById('flightsTableBody');
             if (!tbody) return;
 
+            if (!flightsData || flightsData.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="7" class="px-4 py-4 text-center text-slate-500">Sin datos de vuelos cargados</td></tr>`;
+                return;
+            }
+
             tbody.innerHTML = flightsData.map((f, idx) => {
-                let statusBadge = `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-800 text-slate-400 border border-slate-700">Pendiente</span>`;
+                let badgeClass = "bg-blue-500/20 text-blue-400 border-blue-500/30";
+                if (f.tipo === 'B') badgeClass = "bg-amber-500/20 text-amber-400 border-amber-500/30";
+                if (f.tipo === 'C') badgeClass = "bg-emerald-500/20 text-emerald-400 border-emerald-500/30";
+                if (f.tipo === 'D') badgeClass = "bg-purple-500/20 text-purple-400 border-purple-500/30";
+                if (f.tipo === 'E') badgeClass = "bg-teal-500/20 text-teal-400 border-teal-500/30";
+
+                let statusHtml = `<span class="px-2 py-0.5 rounded text-[11px] font-bold bg-slate-800 text-slate-400 border border-slate-700">Pendiente</span>`;
                 if (f.status === 'flown') {
-                    statusBadge = `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-950 text-emerald-400 border border-emerald-800">Volado</span>`;
+                    statusHtml = `<span class="px-2 py-0.5 rounded text-[11px] font-bold bg-emerald-950 text-emerald-400 border border-emerald-800"><i class="fa-solid fa-check me-1"></i> Volado</span>`;
                 } else if (f.status === 'suspended') {
-                    statusBadge = `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-950 text-amber-400 border border-amber-800">Suspendido</span>`;
+                    statusHtml = `<span class="px-2 py-0.5 rounded text-[11px] font-bold bg-amber-950 text-amber-400 border border-amber-800"><i class="fa-solid fa-pause me-1"></i> Suspendido</span>`;
                 }
 
-                const isShiftFixed = f.isFixedShift || fixedShiftHours.includes(f.hora);
-                const rowClass = idx === currentTargetIndex 
-                    ? 'bg-blue-950/40 border-l-4 border-blue-500' 
-                    : (isShiftFixed ? 'bg-amber-950/20 hover:bg-slate-800/50' : 'hover:bg-slate-800/50');
+                const isTarget = idx === currentTargetIndex;
+                const rowBg = isTarget ? "bg-blue-950/30 hover:bg-blue-900/40 border-l-4 border-l-audi-red" : "hover:bg-slate-800/40";
 
                 return `
-                    <tr class="${rowClass} transition">
-                        <td class="px-4 py-3 font-mono text-slate-400 font-bold">#${f.id}</td>
-                        <td class="px-4 py-3 font-mono font-extrabold text-white text-sm">
-                            ${f.hora} hrs
-                            ${isShiftFixed ? `<span class="ml-1 text-[9px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-400 border border-amber-500/40 font-bold uppercase">Hora Fija Relevo</span>` : ''}
-                        </td>
-                        <td class="px-4 py-3 font-mono text-amber-300 text-xs">${f.window}</td>
+                    <tr class="${rowBg} transition">
+                        <td class="px-4 py-3 font-mono font-bold text-slate-400">${f.id}</td>
+                        <td class="px-4 py-3 font-mono font-bold text-white text-sm">${f.hora} hrs</td>
+                        <td class="px-4 py-3 font-mono text-slate-300">${f.window}</td>
                         <td class="px-4 py-3">
-                            <span class="px-2 py-0.5 rounded text-[10px] font-extrabold ${isShiftFixed ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30' : 'bg-blue-500/20 text-blue-300 border border-blue-500/30'}">
-                                TIPO ${f.tipo}
+                            <span class="px-2 py-0.5 rounded text-[11px] font-extrabold border ${badgeClass}">
+                                TIPO ${f.tipo} - ${f.name}
                             </span>
-                            <span class="text-slate-300 ml-1 font-semibold">${f.name}</span>
                         </td>
-                        <td class="px-4 py-3">${statusBadge}</td>
-                        <td class="px-4 py-3 font-mono text-xs text-slate-300">
-                            ${f.takeoffTime ? `<strong class="text-emerald-400">${f.takeoffTime} hrs</strong>` : (f.notes || '-')}
+                        <td class="px-4 py-3">${statusHtml}</td>
+                        <td class="px-4 py-3 font-mono text-slate-300">
+                            ${f.takeoffTime ? `<strong class="text-emerald-400">${f.takeoffTime} hrs</strong>` : (f.notes || '--')}
                         </td>
-                        <td class="px-4 py-3 text-right space-x-1 whitespace-nowrap">
-                            <button onclick="openTakeoffModal(${idx})" class="px-2.5 py-1 bg-emerald-900/80 hover:bg-emerald-800 text-emerald-200 border border-emerald-700/60 rounded-lg text-[11px] font-bold transition">
-                                <i class="fa-solid fa-plane-departure"></i> Despegar
-                            </button>
-                            <button onclick="openSuspensionModal(${idx})" class="px-2.5 py-1 bg-amber-900/80 hover:bg-amber-800 text-amber-200 border border-amber-700/60 rounded-lg text-[11px] font-bold transition">
-                                <i class="fa-solid fa-pause"></i> Suspender
-                            </button>
+                        <td class="px-4 py-3 text-right space-x-1">
+                            ${f.status === 'pending' ? `
+                                <button onclick="openTakeoffModalForIndex(${idx})" class="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-lg shadow transition">
+                                    <i class="fa-solid fa-plane-departure"></i> Despegar
+                                </button>
+                                <button onclick="openSuspensionModalForIndex(${idx})" class="px-2.5 py-1 bg-amber-600/40 hover:bg-amber-600 text-amber-200 font-bold text-xs rounded-lg border border-amber-500/40 transition">
+                                    <i class="fa-solid fa-pause"></i> Suspender
+                                </button>
+                            ` : `
+                                <span class="text-[11px] text-slate-500 italic">Registrado</span>
+                            `}
                         </td>
                     </tr>
                 `;
             }).join('');
         }
 
-        // Control de Modales
-        function openModal(id) { document.getElementById(id).classList.remove('hidden'); }
-        function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
-
-        // Registrar Despegue
-        function openTakeoffModal(index) {
-            activeFlightModalIndex = index;
-            const f = flightsData[index];
-            document.getElementById('takeoffFlightLabel').value = `Vuelo #${f.id} - ${f.hora} hrs (Tipo ${f.tipo})`;
-            
-            const now = new Date();
-            const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
-            document.getElementById('takeoffRealTime').value = timeStr;
-            openModal('modalTakeoff');
-        }
-
-        function quickRegisterTakeoff() {
-            let idx = currentTargetIndex;
-            if (idx < 0 || idx >= flightsData.length) idx = 0;
-            openTakeoffModal(idx);
-        }
-
-        function confirmTakeoff() {
-            if (activeFlightModalIndex === null) return;
-            const flight = flightsData[activeFlightModalIndex];
-            
-            const realTime = document.getElementById('takeoffRealTime').value;
-            const pilot = document.getElementById('takeoffPilotName').value;
-            const notes = document.getElementById('takeoffNotes').value;
-
-            flight.status = 'flown';
-            flight.takeoffTime = realTime;
-            flight.notes = notes || 'Vuelo normal sin novedades';
-            flight.pilot = pilot;
-
-            addToBitacora({
-                date: new Date().toLocaleDateString('es-MX'),
-                regTime: new Date().toLocaleTimeString('es-MX', { hour12: false }),
-                scheduledTime: flight.hora,
-                type: `TIPO ${flight.tipo}`,
-                status: 'VOLADO',
-                realTime: realTime,
-                notes: flight.notes,
-                evidenceImg: null
-            });
-
-            closeModal('modalTakeoff');
-            saveStorage();
-            renderAllUI();
-            speakVoice(`Vuelo de las ${flight.hora} registrado como volado a las ${realTime} horas.`);
-            showToast("Despegue registrado correctamente", "success");
-        }
-
-        // Registrar Suspensión y Evidencia
-        function openSuspensionModal(index) {
-            activeFlightModalIndex = index;
-            const f = flightsData[index];
-            document.getElementById('suspensionFlightLabel').value = `Vuelo #${f.id} - ${f.hora} hrs (Tipo ${f.tipo})`;
-            document.getElementById('suspensionNotes').value = "";
-            document.getElementById('evidencePreviewContainer').classList.add('hidden');
-            document.getElementById('suspensionEvidenceInput').value = "";
-            tempEvidenceDataUrl = null;
-            openModal('modalSuspension');
-        }
-
-        function openSuspensionModalForCurrent() {
-            let idx = currentTargetIndex;
-            if (idx < 0 || idx >= flightsData.length) idx = 0;
-            openSuspensionModal(idx);
-        }
-
-        function previewEvidenceImage(event) {
-            const file = event.target.files[0];
-            if (!file) return;
-
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                tempEvidenceDataUrl = e.target.result;
-                document.getElementById('evidencePreviewImg').src = tempEvidenceDataUrl;
-                document.getElementById('evidencePreviewContainer').classList.remove('hidden');
-            };
-            reader.readAsDataURL(file);
-        }
-
-        function confirmSuspension() {
-            if (activeFlightModalIndex === null) return;
-            const flight = flightsData[activeFlightModalIndex];
-            
-            const reason = document.getElementById('suspensionReasonSelect').value;
-            const notes = document.getElementById('suspensionNotes').value;
-
-            flight.status = 'suspended';
-            flight.notes = `${reason}. ${notes}`;
-            flight.evidenceImg = tempEvidenceDataUrl;
-
-            activateSuspensionHourlyReminders(reason);
-
-            addToBitacora({
-                date: new Date().toLocaleDateString('es-MX'),
-                regTime: new Date().toLocaleTimeString('es-MX', { hour12: false }),
-                scheduledTime: flight.hora,
-                type: `TIPO ${flight.tipo}`,
-                status: 'SUSPENDIDO',
-                realTime: 'N/A',
-                notes: flight.notes,
-                evidenceImg: tempEvidenceDataUrl
-            });
-
-            closeModal('modalSuspension');
-            saveStorage();
-            renderAllUI();
-            speakVoice(`Atención. Vuelo de las ${flight.hora} suspendido por ${reason}. Recordatorio de evidencia cada hora activado.`);
-            showToast("Suspensión registrada en bitácora", "warning");
-        }
-
-        function activateSuspensionHourlyReminders(reason) {
-            activeSuspension = true;
-            document.getElementById('suspensionStateDot').className = "fa-solid fa-circle text-amber-500 pulse-amber text-[10px]";
-            document.getElementById('suspensionStateText').innerText = `Suspensión Activa (${reason})`;
-            document.getElementById('suspensionStateText').className = "text-[11px] text-amber-400 font-bold mt-1";
-            document.getElementById('suspensionTimerText').innerText = "Recordatorio de Voz: Programado cada 60 min";
-
-            if (suspensionHourlyTimer) clearInterval(suspensionHourlyTimer);
-
-            suspensionHourlyTimer = setInterval(() => {
-                if (activeSuspension) {
-                    speakVoice("Recordatorio de protocolo de suspensión. Favor de capturar y subir la evidencia fotográfica del estado del clima o la emergencia a la bitácora.");
-                }
-            }, 3600000);
-        }
-
-        // Bitácora Histórica
-        function addToBitacora(item) {
-            bitacoraList.unshift(item);
-            saveStorage();
-            renderBitacoraTable();
-        }
-
         function renderBitacoraTable() {
             const tbody = document.getElementById('bitacoraTableBody');
             if (!tbody) return;
 
-            if (bitacoraList.length === 0) {
+            if (!bitacoraList || bitacoraList.length === 0) {
                 tbody.innerHTML = `
                     <tr>
                         <td colspan="8" class="px-4 py-6 text-center text-slate-500 italic">
@@ -893,33 +840,28 @@
 
             tbody.innerHTML = bitacoraList.map((item, idx) => {
                 const isVolado = item.status === 'VOLADO';
-                const statusBadge = isVolado 
+                const statusBadge = isVolado
                     ? `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-950 text-emerald-400 border border-emerald-800">VOLADO</span>`
                     : `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-950 text-amber-400 border border-amber-800">SUSPENDIDO</span>`;
 
-                const imgBtn = item.evidenceImg 
-                    ? `<div class="flex flex-col items-center gap-1.5 py-1">
-                        <img src="${item.evidenceImg}" alt="Evidencia" onclick="viewEvidenceModal(${idx})" class="h-16 w-24 object-cover rounded-lg border border-slate-700 cursor-pointer hover:scale-105 transition shadow">
-                        <button onclick="viewEvidenceModal(${idx})" class="px-2 py-0.5 bg-blue-950 text-blue-300 border border-blue-800/60 rounded text-[9px] font-bold hover:bg-blue-900 transition flex items-center gap-1">
-                            <i class="fa-solid fa-magnifying-glass"></i> Ampliar
-                        </button>
-                       </div>`
-                    : `<span class="text-slate-600 italic">Sin Evidencia</span>`;
+                const imgThumbnail = item.evidenceImg
+                    ? `<img src="${item.evidenceImg}" alt="Evidencia" onclick="openImageModal('${item.evidenceImg}', 'Evidencia Vuelo ${item.flightHora}')" class="h-10 w-16 object-cover rounded border border-slate-700 cursor-pointer hover:scale-105 transition mx-auto">`
+                    : `<span class="text-slate-600">Sin foto</span>`;
 
                 return `
-                    <tr class="hover:bg-slate-800/40 transition">
-                        <td class="px-4 py-3 font-mono text-slate-400">${item.date} ${item.regTime}</td>
-                        <td class="px-4 py-3 font-mono font-bold text-white">${item.scheduledTime} hrs</td>
-                        <td class="px-4 py-3 font-semibold text-slate-300">${item.type}</td>
+                    <tr class="hover:bg-slate-800/50 transition border-b border-slate-800/60">
+                        <td class="px-4 py-3 font-mono text-slate-300 text-[11px]">${item.date}<br>${item.timeRecorded}</td>
+                        <td class="px-4 py-3 font-mono font-bold text-white">${item.flightHora} hrs</td>
+                        <td class="px-4 py-3 font-semibold text-slate-200">${item.flightTipo} - ${item.flightName}</td>
                         <td class="px-4 py-3">${statusBadge}</td>
-                        <td class="px-4 py-3 font-mono text-emerald-400 font-bold">${item.realTime}</td>
-                        <td class="px-4 py-3 text-slate-300 max-w-xs break-words">${item.notes}</td>
-                        <td class="px-4 py-3 text-center">${imgBtn}</td>
-                        <td class="px-4 py-3 text-right space-x-1 whitespace-nowrap">
-                            <button onclick="openEditBitacoraModal(${idx})" title="Editar Registro" class="px-2 py-1 bg-blue-950 hover:bg-blue-900 text-blue-300 border border-blue-800/60 rounded-lg text-[11px] font-bold transition">
+                        <td class="px-4 py-3 font-mono text-emerald-400 font-bold">${item.realTime || 'N/A'}</td>
+                        <td class="px-4 py-3 text-slate-300 max-w-xs truncate" title="${item.notes}">${item.notes || '--'}</td>
+                        <td class="px-4 py-3 text-center">${imgThumbnail}</td>
+                        <td class="px-4 py-3 text-right space-x-1">
+                            <button onclick="openEditBitacoraModal(${idx})" class="p-1.5 bg-blue-900/80 hover:bg-blue-800 text-blue-200 rounded-lg text-xs transition" title="Editar Registro">
                                 <i class="fa-solid fa-pen-to-square"></i>
                             </button>
-                            <button onclick="openDeleteConfirmModal(${idx})" title="Eliminar Registro" class="px-2 py-1 bg-red-950 hover:bg-red-900 text-red-300 border border-red-800/60 rounded-lg text-[11px] font-bold transition">
+                            <button onclick="openDeleteConfirmModal(${idx})" class="p-1.5 bg-red-900/80 hover:bg-red-800 text-red-200 rounded-lg text-xs transition" title="Eliminar Registro">
                                 <i class="fa-solid fa-trash"></i>
                             </button>
                         </td>
@@ -928,186 +870,469 @@
             }).join('');
         }
 
-        // Editar Registro de Bitácora
-        function openEditBitacoraModal(idx) {
-            activeEditBitacoraIndex = idx;
-            const item = bitacoraList[idx];
-            if (!item) return;
+        function updateCounters() {
+            const flown = flightsData.filter(f => f.status === 'flown').length;
+            const suspended = flightsData.filter(f => f.status === 'suspended').length;
 
-            document.getElementById('editFlightLabel').value = `Vuelo ${item.scheduledTime} hrs (${item.type})`;
-            document.getElementById('editStatusSelect').value = item.status;
-            document.getElementById('editRealTime').value = item.realTime || 'N/A';
-            document.getElementById('editNotes').value = item.notes || '';
-            
-            tempEditEvidenceDataUrl = item.evidenceImg || null;
-            const prevContainer = document.getElementById('editEvidencePreviewContainer');
-            const prevImg = document.getElementById('editEvidencePreviewImg');
+            const cntTotal = document.getElementById('cntTotal');
+            const cntFlown = document.getElementById('cntFlown');
+            const cntSuspended = document.getElementById('cntSuspended');
 
-            if (tempEditEvidenceDataUrl) {
-                prevImg.src = tempEditEvidenceDataUrl;
-                prevContainer.classList.remove('hidden');
+            if (cntTotal) cntTotal.innerText = flightsData.length;
+            if (cntFlown) cntFlown.innerText = flown;
+            if (cntSuspended) cntSuspended.innerText = suspended;
+        }
+
+        function updateLiveTargetAndAlerts(now) {
+            if (!flightsData || flightsData.length === 0) return;
+
+            const nowHours = now.getHours();
+            const nowMinutes = now.getMinutes();
+            const nowSecs = now.getSeconds();
+            const totalNowMinutes = nowHours * 60 + nowMinutes + nowSecs / 60;
+
+            let targetIdx = 0;
+            let minDiff = 99999;
+
+            flightsData.forEach((f, idx) => {
+                const parts = f.hora.split(':');
+                const fHours = parseInt(parts[0]);
+                const fMins = parseInt(parts[1]);
+                let fTotalMins = fHours * 60 + fMins;
+
+                // Si estamos cerca de medianoche para el primer vuelo de 00:00
+                if (fHours === 0 && nowHours === 23) {
+                    fTotalMins += 24 * 60;
+                }
+
+                const diff = fTotalMins - totalNowMinutes;
+                if (diff >= -30 && diff < minDiff) {
+                    minDiff = diff;
+                    targetIdx = idx;
+                }
+            });
+
+            currentTargetIndex = targetIdx;
+            const targetFlight = flightsData[targetIdx];
+
+            // Renderizar Banner Vuelo Activo
+            const targetBadge = document.getElementById('targetFlightBadge');
+            const targetTime = document.getElementById('targetFlightTime');
+            const targetDesc = document.getElementById('targetFlightDesc');
+            const targetWindow = document.getElementById('targetFlightWindow');
+            const targetCountdown = document.getElementById('targetCountdown');
+
+            if (targetBadge) targetBadge.innerText = `TIPO ${targetFlight.tipo} - ${targetFlight.name}`;
+            if (targetTime) targetTime.innerText = `${targetFlight.hora} hrs`;
+            if (targetWindow) targetWindow.innerText = targetFlight.window;
+
+            // Calcular diferencia de tiempo en la ventana
+            const parts = targetFlight.hora.split(':');
+            let fMinsTarget = parseInt(parts[0]) * 60 + parseInt(parts[1]);
+            if (parseInt(parts[0]) === 0 && nowHours === 23) fMinsTarget += 24 * 60;
+
+            const windowStartMins = fMinsTarget - (targetFlight.isFixedShift ? 15 : 20);
+            const windowEndMins = fMinsTarget;
+
+            if (totalNowMinutes >= windowStartMins && totalNowMinutes <= windowEndMins) {
+                const minsLeft = Math.floor(windowEndMins - totalNowMinutes);
+                const secsLeft = Math.floor((windowEndMins - totalNowMinutes - minsLeft) * 60);
+                if (targetCountdown) {
+                    targetCountdown.innerHTML = `<span class="text-emerald-400 font-extrabold pulse-red"><i class="fa-solid fa-lock-open me-1"></i> VENTANA ABIERTA (${minsLeft}m ${secsLeft}s restantes)</span>`;
+                }
+
+                // Alerta de Voz al Abrir Ventana
+                if (!alertWindowOpened[targetFlight.id]) {
+                    alertWindowOpened[targetFlight.id] = true;
+                    if (targetFlight.isFixedShift) {
+                        speakVoice(`Atención operador. Inicia ventana operativa de hora fija para el vuelo de cambio de turno ${targetFlight.name} programado a las ${targetFlight.hora}. Realice el despegue e inspección de accesos.`);
+                    } else {
+                        speakVoice(`Atención operador. Ha iniciado la ventana operativa disuasiva para el vuelo ${targetFlight.name} programado a las ${targetFlight.hora}. Puede iniciar el despegue.`);
+                    }
+                }
+
+                // Alerta de Voz Faltando 5 Minutos
+                if (minsLeft <= 5 && !alertWindowWarning5m[targetFlight.id]) {
+                    alertWindowWarning5m[targetFlight.id] = true;
+                    speakVoice(`Atención operador. Faltan 5 minutos para finalizar la ventana de despegue del vuelo ${targetFlight.name} de las ${targetFlight.hora}. Proceda a despegar inmediatamente.`);
+                }
+            } else if (totalNowMinutes < windowStartMins) {
+                const minsUntil = Math.floor(windowStartMins - totalNowMinutes);
+                if (targetCountdown) {
+                    targetCountdown.innerText = `Ventana abre en ${minsUntil} min`;
+                    targetCountdown.className = "text-lg font-mono font-bold text-amber-400";
+                }
             } else {
-                prevContainer.classList.add('hidden');
+                if (targetCountdown) {
+                    targetCountdown.innerText = `Ventana Finalizada (${targetFlight.status === 'flown' ? 'Volado' : (targetFlight.status === 'suspended' ? 'Suspendido' : 'Pendiente')})`;
+                    targetCountdown.className = "text-sm font-mono font-bold text-slate-400";
+                }
             }
 
-            openModal('modalEditBitacora');
+            renderFlightsTable();
+        }
+
+        function closeModal(modalId) {
+            const modal = document.getElementById(modalId);
+            if (modal) modal.classList.add('hidden');
+        }
+
+        function openTakeoffModalForIndex(index) {
+            activeFlightModalIndex = index;
+            const f = flightsData[index];
+            const nowStr = new Date().toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', hour12: false });
+
+            document.getElementById('takeoffFlightLabel').value = `#${f.id} - ${f.hora} hrs (TIPO ${f.tipo} - ${f.name})`;
+            document.getElementById('takeoffRealTime').value = nowStr;
+            document.getElementById('takeoffNotes').value = "Vuelo ejecutado correctamente sin novedades en patrullaje.";
+            
+            const modal = document.getElementById('modalTakeoff');
+            if (modal) modal.classList.remove('hidden');
+        }
+
+        function quickRegisterTakeoff() {
+            openTakeoffModalForIndex(currentTargetIndex);
+        }
+
+        function confirmTakeoff() {
+            if (activeFlightModalIndex === null) return;
+            const f = flightsData[activeFlightModalIndex];
+            const realTime = document.getElementById('takeoffRealTime').value;
+            const pilotName = document.getElementById('takeoffPilotName').value;
+            const notes = document.getElementById('takeoffNotes').value;
+
+            f.status = 'flown';
+            f.takeoffTime = realTime;
+            f.pilot = pilotName;
+            f.notes = notes;
+
+            const now = new Date();
+            const bitacoraEntry = {
+                date: now.toLocaleDateString('es-MX'),
+                timeRecorded: now.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', hour12: false }),
+                flightHora: f.hora,
+                flightTipo: f.tipo,
+                flightName: f.name,
+                status: 'VOLADO',
+                realTime: realTime,
+                pilot: pilotName,
+                notes: notes,
+                evidenceImg: null
+            };
+
+            bitacoraList.unshift(bitacoraEntry);
+            saveStorage();
+            renderAllUI();
+            closeModal('modalTakeoff');
+            showToast(`Despegue de vuelo ${f.hora} hrs registrado con éxito`, 'success');
+        }
+
+        function openSuspensionModalForIndex(index) {
+            activeFlightModalIndex = index;
+            tempEvidenceDataUrl = null;
+            const f = flightsData[index];
+
+            document.getElementById('suspensionFlightLabel').value = `#${f.id} - ${f.hora} hrs (TIPO ${f.tipo} - ${f.name})`;
+            document.getElementById('suspensionNotes').value = "";
+            document.getElementById('evidencePreviewContainer').classList.add('hidden');
+            document.getElementById('suspensionEvidenceInput').value = "";
+
+            const modal = document.getElementById('modalSuspension');
+            if (modal) modal.classList.remove('hidden');
+        }
+
+        function openSuspensionModalForCurrent() {
+            openSuspensionModalForIndex(currentTargetIndex);
+        }
+
+        function previewEvidenceImage(event) {
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    tempEvidenceDataUrl = e.target.result;
+                    const img = document.getElementById('evidencePreviewImg');
+                    img.src = tempEvidenceDataUrl;
+                    document.getElementById('evidencePreviewContainer').classList.remove('hidden');
+                };
+                reader.readAsDataURL(file);
+            }
+        }
+
+        function confirmSuspension() {
+            if (activeFlightModalIndex === null) return;
+            const f = flightsData[activeFlightModalIndex];
+            const reason = document.getElementById('suspensionReasonSelect').value;
+            const notes = document.getElementById('suspensionNotes').value;
+
+            if (!tempEvidenceDataUrl) {
+                showToast("Es obligatorio adjuntar evidencia fotográfica para registrar la suspensión", 'danger');
+                return;
+            }
+
+            f.status = 'suspended';
+            f.notes = `${reason} - ${notes}`;
+            f.evidenceImg = tempEvidenceDataUrl;
+
+            const now = new Date();
+            const bitacoraEntry = {
+                date: now.toLocaleDateString('es-MX'),
+                timeRecorded: now.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', hour12: false }),
+                flightHora: f.hora,
+                flightTipo: f.tipo,
+                flightName: f.name,
+                status: 'SUSPENDIDO',
+                realTime: 'N/A',
+                pilot: 'Operador en Turno',
+                notes: `${reason}: ${notes}`,
+                evidenceImg: tempEvidenceDataUrl
+            };
+
+            bitacoraList.unshift(bitacoraEntry);
+
+            // Activar recordatorio por hora
+            activeSuspension = true;
+            document.getElementById('suspensionStateDot').className = "fa-solid fa-circle text-amber-500 text-[10px] pulse-amber";
+            document.getElementById('suspensionStateText').innerText = "Operación Suspendida (Lluvia / Clima / Emergencia)";
+            document.getElementById('suspensionStateText').className = "text-[11px] text-amber-400 font-bold mt-1";
+            document.getElementById('suspensionTimerText').innerText = "Recordatorio de voz activo cada hora para tomar nueva evidencia.";
+
+            if (suspensionHourlyTimer) clearInterval(suspensionHourlyTimer);
+            suspensionHourlyTimer = setInterval(() => {
+                if (activeSuspension) {
+                    speakVoice("Recordatorio para operador. Operación en suspensión activa. Es momento de capturar y subir una nueva fotografía de evidencia de las condiciones climáticas o de la emergencia.");
+                }
+            }, 3600000);
+
+            saveStorage();
+            renderAllUI();
+            closeModal('modalSuspension');
+            showToast(`Suspensión de vuelo ${f.hora} hrs registrada con evidencia`, 'warning');
+        }
+
+        function openEditBitacoraModal(index) {
+            activeEditBitacoraIndex = index;
+            const item = bitacoraList[index];
+            tempEditEvidenceDataUrl = item.evidenceImg;
+
+            document.getElementById('editFlightLabel').value = `${item.date} ${item.timeRecorded} - Vuelo ${item.flightHora} hrs (${item.flightTipo})`;
+            document.getElementById('editStatusSelect').value = item.status;
+            document.getElementById('editRealTime').value = item.realTime || '00:00';
+            document.getElementById('editNotes').value = item.notes || '';
+
+            const previewContainer = document.getElementById('editEvidencePreviewContainer');
+            const previewImg = document.getElementById('editEvidencePreviewImg');
+            if (item.evidenceImg) {
+                previewImg.src = item.evidenceImg;
+                previewContainer.classList.remove('hidden');
+            } else {
+                previewContainer.classList.add('hidden');
+            }
+
+            const modal = document.getElementById('modalEditBitacora');
+            if (modal) modal.classList.remove('hidden');
         }
 
         function previewEditEvidenceImage(event) {
             const file = event.target.files[0];
-            if (!file) return;
-
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                tempEditEvidenceDataUrl = e.target.result;
-                document.getElementById('editEvidencePreviewImg').src = tempEditEvidenceDataUrl;
-                document.getElementById('editEvidencePreviewContainer').classList.remove('hidden');
-            };
-            reader.readAsDataURL(file);
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    tempEditEvidenceDataUrl = e.target.result;
+                    const img = document.getElementById('editEvidencePreviewImg');
+                    img.src = tempEditEvidenceDataUrl;
+                    document.getElementById('editEvidencePreviewContainer').classList.remove('hidden');
+                };
+                reader.readAsDataURL(file);
+            }
         }
 
         function confirmEditBitacora() {
             if (activeEditBitacoraIndex === null) return;
             const item = bitacoraList[activeEditBitacoraIndex];
-            if (!item) return;
 
             item.status = document.getElementById('editStatusSelect').value;
             item.realTime = document.getElementById('editRealTime').value;
             item.notes = document.getElementById('editNotes').value;
             item.evidenceImg = tempEditEvidenceDataUrl;
 
-            const flightMatch = flightsData.find(f => f.hora === item.scheduledTime);
-            if (flightMatch) {
-                flightMatch.status = item.status === 'VOLADO' ? 'flown' : 'suspended';
-                flightMatch.takeoffTime = item.realTime !== 'N/A' ? item.realTime : null;
-                flightMatch.notes = item.notes;
-            }
-
             saveStorage();
+            renderBitacoraTable();
             closeModal('modalEditBitacora');
-            renderAllUI();
-            showToast("Registro de bitácora actualizado", 'success');
+            showToast("Registro de bitácora actualizado con éxito", 'success');
         }
 
-        // Eliminar Registro
-        function openDeleteConfirmModal(idx) {
-            activeDeleteBitacoraIndex = idx;
-            const item = bitacoraList[idx];
-            if (!item) return;
+        function openDeleteConfirmModal(index) {
+            activeDeleteBitacoraIndex = index;
+            const item = bitacoraList[index];
+            document.getElementById('deleteTargetInfo').innerText = `${item.date} ${item.timeRecorded} | Vuelo ${item.flightHora} hrs (${item.status})`;
 
-            document.getElementById('deleteTargetInfo').innerText = `Vuelo ${item.scheduledTime} hrs - ${item.status} (${item.date})`;
-            openModal('modalDeleteConfirm');
+            const modal = document.getElementById('modalDeleteConfirm');
+            if (modal) modal.classList.remove('hidden');
         }
 
         function confirmDeleteBitacora() {
             if (activeDeleteBitacoraIndex === null) return;
-            const deletedItem = bitacoraList[activeDeleteBitacoraIndex];
-
-            if (deletedItem) {
-                const flightMatch = flightsData.find(f => f.hora === deletedItem.scheduledTime);
-                if (flightMatch) {
-                    flightMatch.status = 'pending';
-                    flightMatch.takeoffTime = null;
-                    flightMatch.notes = '';
-                }
-            }
-
             bitacoraList.splice(activeDeleteBitacoraIndex, 1);
             saveStorage();
+            renderBitacoraTable();
             closeModal('modalDeleteConfirm');
-            renderAllUI();
-            showToast("Registro eliminado de la bitácora", 'danger');
+            showToast("Registro eliminado de la bitácora conservando integridad", 'info');
         }
 
-        function viewEvidenceModal(idx) {
-            const item = bitacoraList[idx];
-            if (!item || !item.evidenceImg) return;
-
-            document.getElementById('imageModalTarget').src = item.evidenceImg;
-            document.getElementById('imageModalTitle').innerText = `Evidencia de Suspensión - Vuelo ${item.scheduledTime} hrs (${item.date})`;
-            openModal('modalImagePreview');
+        function openImageModal(src, title) {
+            document.getElementById('imageModalTarget').src = src;
+            document.getElementById('imageModalTitle').innerText = title || "Evidencia Fotográfica";
+            const modal = document.getElementById('modalImagePreview');
+            if (modal) modal.classList.remove('hidden');
         }
 
         function viewOfficialPlansModal() {
-            activeModalPlanTab = parseInt(currentWeeklyPlan) || 1;
-            switchViewPlanTab(activeModalPlanTab);
-            openModal('modalOfficialPlans');
+            switchViewPlanTab(currentWeeklyPlan);
+            const modal = document.getElementById('modalOfficialPlans');
+            if (modal) modal.classList.remove('hidden');
         }
 
         function switchViewPlanTab(planNum) {
             activeModalPlanTab = planNum;
-            for (let i = 1; i <= 4; i++) {
-                const btn = document.getElementById(`tabPlan${i}`);
-                if (btn) {
-                    if (i === planNum) {
-                        btn.className = "px-3 py-1.5 rounded-lg text-xs font-bold bg-audi-red text-white shadow";
+            [1, 2, 3, 4].forEach(p => {
+                const tab = document.getElementById(`tabPlan${p}`);
+                if (tab) {
+                    if (p === planNum) {
+                        tab.className = "px-3 py-1.5 rounded-lg text-xs font-bold bg-audi-red text-white";
                     } else {
-                        btn.className = "px-3 py-1.5 rounded-lg text-xs font-bold text-slate-400 hover:text-white";
+                        tab.className = "px-3 py-1.5 rounded-lg text-xs font-bold text-slate-400 hover:text-white";
                     }
                 }
-            }
-            renderOfficialPlansModalTable();
-        }
+            });
 
-        function renderOfficialPlansModalTable() {
-            const tbody = document.getElementById('modalOfficialPlansTableBody');
-            if (!tbody) return;
-
+            const planTypes = weeklyPlanDefinitions[planNum] || weeklyPlanDefinitions[1];
             const slots = scheduleTimeSlots[currentOption];
-            const types = weeklyPlanDefinitions[activeModalPlanTab] || weeklyPlanDefinitions[1];
+            const tbody = document.getElementById('modalOfficialPlansTableBody');
 
-            tbody.innerHTML = slots.map((slot, idx) => {
-                const tipo = types[idx];
-                const desc = tipoDictionary[tipo] || "Recorrido";
-                const isShift = tipo === 'B';
-                const rowBg = isShift ? 'bg-amber-950/20' : 'hover:bg-slate-800/40';
-
-                return `
-                    <tr class="${rowBg}">
-                        <td class="p-2.5 font-mono text-slate-400 font-bold">#${slot.id}</td>
-                        <td class="p-2.5 font-mono text-white font-extrabold text-sm">${slot.hora} hrs</td>
-                        <td class="p-2.5">
-                            <span class="px-2 py-0.5 rounded text-[10px] font-extrabold ${isShift ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30' : 'bg-blue-500/20 text-blue-300 border border-blue-500/30'}">
-                                TIPO ${tipo}
-                            </span>
-                        </td>
-                        <td class="p-2.5 text-slate-200 font-semibold">${desc}</td>
-                    </tr>
-                `;
-            }).join('');
+            if (tbody) {
+                tbody.innerHTML = slots.map((slot, idx) => {
+                    const tipo = planTypes[idx];
+                    const desc = tipoDictionary[tipo] || "Recorrido";
+                    return `
+                        <tr class="hover:bg-slate-800/40 border-b border-slate-800/60">
+                            <td class="p-2.5 font-mono text-slate-400">${slot.id}</td>
+                            <td class="p-2.5 font-mono font-bold text-white">${slot.hora} hrs</td>
+                            <td class="p-2.5"><span class="px-2 py-0.5 rounded font-extrabold bg-slate-800 text-red-400 border border-red-900/40">TIPO ${tipo}</span></td>
+                            <td class="p-2.5 text-slate-300">${desc}</td>
+                        </tr>
+                    `;
+                }).join('');
+            }
         }
 
-        function updateCounters() {
-            const flown = flightsData.filter(f => f.status === 'flown').length;
-            const suspended = flightsData.filter(f => f.status === 'suspended').length;
-            
-            const flownEl = document.getElementById('cntFlown');
-            const suspEl = document.getElementById('cntSuspended');
-            if (flownEl) flownEl.innerText = flown;
-            if (suspEl) suspEl.innerText = suspended;
-        }
-
-        // Exportación CSV
         function exportBitacoraCSV() {
-            if (bitacoraList.length === 0) {
-                showToast("La bitácora está vacía. Registra vuelos antes de exportar.", 'warning');
+            if (!bitacoraList || bitacoraList.length === 0) {
+                showToast("No hay datos en la bitácora para exportar", 'warning');
                 return;
             }
 
-            let csvContent = "data:text/csv;charset=utf-8,Fecha,Hora Registro,Hora Programada,Tipo Vuelo,Estado,Hora Real Despegue,Observaciones\n";
-            
+            let csv = "Fecha,Hora Registro,Hora Programada,Tipo Vuelo,Nombre Recorrido,Estado,Hora Real Despegue,Piloto,Notas\n";
             bitacoraList.forEach(row => {
-                csvContent += `"${row.date}","${row.regTime}","${row.scheduledTime}","${row.type}","${row.status}","${row.realTime}","${row.notes.replace(/"/g, '""')}"\n`;
+                const cleanNotes = (row.notes || '').replace(/,/g, ' ');
+                csv += `"${row.date}","${row.timeRecorded}","${row.flightHora}","${row.flightTipo}","${row.flightName}","${row.status}","${row.realTime}","${row.pilot}","${cleanNotes}"\n`;
             });
 
-            const encodedUri = encodeURI(csvContent);
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
             const link = document.createElement("a");
-            link.setAttribute("href", encodedUri);
-            link.setAttribute("download", `Bitacora_Vuelos_Audi_Mexico_${new Date().toISOString().slice(0,10)}.csv`);
+            const url = URL.createObjectURL(blob);
+            link.setAttribute("href", url);
+            link.setAttribute("download", `bitacora_vuelos_drones_${new Date().toISOString().slice(0,10)}.csv`);
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
+            showToast("Bitácora exportada en archivo CSV / Excel", 'success');
         }
+
+        function showToast(message, type = 'info') {
+            const toast = document.getElementById('toastNotification');
+            const toastMsg = document.getElementById('toastMessage');
+            const toastIcon = document.getElementById('toastIcon');
+
+            if (!toast) return;
+
+            toastMsg.innerText = message;
+            if (type === 'success') {
+                toastIcon.className = "fa-solid fa-circle-check text-emerald-400 text-lg";
+            } else if (type === 'warning') {
+                toastIcon.className = "fa-solid fa-triangle-exclamation text-amber-400 text-lg";
+            } else if (type === 'danger') {
+                toastIcon.className = "fa-solid fa-circle-xmark text-red-400 text-lg";
+            } else {
+                toastIcon.className = "fa-solid fa-circle-info text-blue-400 text-lg";
+            }
+
+            toast.classList.remove('opacity-0', 'translate-y-5', 'pointer-events-none');
+            toast.classList.add('opacity-100', 'translate-y-0');
+
+            setTimeout(() => {
+                toast.classList.remove('opacity-100', 'translate-y-0');
+                toast.classList.add('opacity-0', 'translate-y-5', 'pointer-events-none');
+            }, 3500);
+        }
+
+        function renderAllUI() {
+            renderFlightsTable();
+            renderBitacoraTable();
+            updateCounters();
+        }
+
+        function startLiveClock() {
+            function updateClock() {
+                const now = new Date();
+                const timeStr = now.toLocaleTimeString('es-MX', { hour12: false });
+                const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+                const dateStr = now.toLocaleDateString('es-MX', options);
+
+                const clockEl = document.getElementById('liveClock');
+                const dateEl = document.getElementById('liveDate');
+                if (clockEl) clockEl.innerText = timeStr;
+                if (dateEl) dateEl.innerText = dateStr.charAt(0).toUpperCase() + dateStr.slice(1);
+
+                const hours = now.getHours();
+                const shiftBadge = document.getElementById('shiftBadge');
+                if (shiftBadge) {
+                    if (hours >= 6 && hours < 14) {
+                        shiftBadge.innerText = "Turno 1 (06:00 - 14:00)";
+                        shiftBadge.className = "text-xs font-bold px-2 py-0.5 rounded bg-blue-950/80 text-blue-400 border border-blue-800/40";
+                    } else if (hours >= 14 && hours < 22) {
+                        shiftBadge.innerText = "Turno 2 (14:00 - 22:00)";
+                        shiftBadge.className = "text-xs font-bold px-2 py-0.5 rounded bg-amber-950/80 text-amber-400 border border-amber-800/40";
+                    } else {
+                        shiftBadge.innerText = "Turno 3 (22:00 - 06:00 Nocturno)";
+                        shiftBadge.className = "text-xs font-bold px-2 py-0.5 rounded bg-purple-950/80 text-purple-400 border border-purple-800/40";
+                    }
+                }
+
+                checkMidnightDateChange(now);
+                updateLiveTargetAndAlerts(now);
+            }
+
+            updateClock();
+            setInterval(updateClock, 1000);
+        }
+
+        window.onload = function() {
+            loadStorage();
+
+            const selPlan = document.getElementById('selectWeeklyPlan');
+            if (selPlan) selPlan.value = currentWeeklyPlan;
+
+            if (currentOption === 'op2') {
+                const btn2 = document.getElementById('btnOpt2');
+                const btn1 = document.getElementById('btnOpt1');
+                if (btn2) btn2.className = "px-3 py-1.5 text-xs font-bold rounded-lg bg-audi-red text-white transition shadow";
+                if (btn1) btn1.className = "px-3 py-1.5 text-xs font-bold rounded-lg text-slate-400 hover:text-white transition";
+            }
+
+            renderAllUI();
+            startLiveClock();
+        };
     </script>
 </body>
 </html>
