@@ -44,6 +44,10 @@
         ::-webkit-scrollbar-thumb:hover { background: #475569; }
 
         @media print {
+            @page {
+                size: landscape;
+                margin: 8mm;
+            }
             * {
                 -webkit-print-color-adjust: exact !important;
                 print-color-adjust: exact !important;
@@ -51,23 +55,77 @@
             header, section:not(#bitacoraSection), button, label, select, input, .no-print, #nextFlightCard {
                 display: none !important;
             }
-            body { background: #ffffff !important; color: #000000 !important; }
-            #bitacoraSection { border: none !important; background: transparent !important; box-shadow: none !important; padding: 0 !important; width: 100% !important; }
-            #bitacoraSection h3, #bitacoraSection p { color: #000000 !important; }
-            table { width: 100% !important; border-collapse: collapse !important; border: 1px solid #cbd5e1 !important; }
-            th { background-color: #f1f5f9 !important; color: #0f172a !important; border: 1px solid #cbd5e1 !important; padding: 6px !important; }
-            td { border: 1px solid #cbd5e1 !important; color: #0f172a !important; padding: 6px !important; vertical-align: middle !important; }
+            body { 
+                background: #ffffff !important; 
+                color: #000000 !important; 
+                padding: 0 !important; 
+                margin: 0 !important;
+                font-size: 10px !important;
+            }
+            #bitacoraSection { 
+                border: none !important; 
+                background: transparent !important; 
+                box-shadow: none !important; 
+                padding: 0 !important; 
+                width: 100% !important; 
+            }
+            #bitacoraSection h3 { 
+                color: #000000 !important; 
+                font-size: 14px !important;
+                margin-bottom: 2px !important;
+            }
+            #bitacoraSection p { 
+                color: #475569 !important; 
+                font-size: 10px !important;
+                margin-bottom: 10px !important;
+            }
+            table { 
+                width: 100% !important; 
+                border-collapse: collapse !important; 
+                border: 1px solid #94a3b8 !important; 
+                table-layout: fixed !important;
+            }
+            th { 
+                background-color: #f1f5f9 !important; 
+                color: #0f172a !important; 
+                border: 1px solid #cbd5e1 !important; 
+                padding: 5px 4px !important; 
+                font-size: 9px !important;
+                text-transform: uppercase !important;
+                word-wrap: break-word !important;
+            }
+            td { 
+                border: 1px solid #cbd5e1 !important; 
+                color: #0f172a !important; 
+                padding: 4px 4px !important; 
+                vertical-align: middle !important; 
+                font-size: 9.5px !important;
+                word-wrap: break-word !important;
+                overflow-wrap: break-word !important;
+            }
+            
+            /* Distribución fija de ancho por columna para impresión */
+            th:nth-child(1), td:nth-child(1) { width: 13%; } /* Fecha/Hora */
+            th:nth-child(2), td:nth-child(2) { width: 9%; }  /* Programada */
+            th:nth-child(3), td:nth-child(3) { width: 14%; } /* Tipo Vuelo */
+            th:nth-child(4), td:nth-child(4) { width: 11%; } /* Operador */
+            th:nth-child(5), td:nth-child(5) { width: 10%; } /* Estado */
+            th:nth-child(6), td:nth-child(6) { width: 9%; }  /* Hora Real */
+            th:nth-child(7), td:nth-child(7) { width: 20%; } /* Detalle / Motivo */
+            th:nth-child(8), td:nth-child(8) { width: 14%; } /* Evidencia Fotográfica */
+
             .bitacora-img-print {
                 display: block !important;
-                max-width: 140px !important;
-                max-height: 90px !important;
+                max-width: 85px !important;
+                max-height: 60px !important;
                 width: auto !important;
                 height: auto !important;
-                margin: 4px auto !important;
-                border: 1px solid #334155 !important;
+                margin: 2px auto !important;
+                border: 1px solid #64748b !important;
                 border-radius: 4px !important;
                 visibility: visible !important;
                 opacity: 1 !important;
+                object-fit: cover !important;
             }
         }
     </style>
@@ -325,7 +383,7 @@
                             <th class="px-4 py-3">Hora Real Despegue</th>
                             <th class="px-4 py-3">Detalle / Motivo Suspensión</th>
                             <th class="px-4 py-3 text-center">Evidencia Fotográfica</th>
-                            <th class="px-4 py-3 text-right">Acciones</th>
+                            <th class="px-4 py-3 text-right no-print">Acciones</th>
                         </tr>
                     </thead>
                     <tbody id="bitacoraTableBody" class="divide-y divide-slate-800/60 font-medium">
