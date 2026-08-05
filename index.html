@@ -44,16 +44,31 @@
         ::-webkit-scrollbar-thumb:hover { background: #475569; }
 
         @media print {
+            * {
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+            }
             header, section:not(#bitacoraSection), button, label, select, input, .no-print, #nextFlightCard {
                 display: none !important;
             }
             body { background: #ffffff !important; color: #000000 !important; }
-            #bitacoraSection { border: none !important; background: transparent !important; box-shadow: none !important; padding: 0 !important; }
+            #bitacoraSection { border: none !important; background: transparent !important; box-shadow: none !important; padding: 0 !important; width: 100% !important; }
             #bitacoraSection h3, #bitacoraSection p { color: #000000 !important; }
             table { width: 100% !important; border-collapse: collapse !important; border: 1px solid #cbd5e1 !important; }
-            th { background-color: #f1f5f9 !important; color: #0f172a !important; border: 1px solid #cbd5e1 !important; }
-            td { border: 1px solid #cbd5e1 !important; color: #0f172a !important; }
-            img { display: block !important; max-height: 120px !important; margin: 4px auto !important; border: 1px solid #475569 !important; border-radius: 4px !important; }
+            th { background-color: #f1f5f9 !important; color: #0f172a !important; border: 1px solid #cbd5e1 !important; padding: 6px !important; }
+            td { border: 1px solid #cbd5e1 !important; color: #0f172a !important; padding: 6px !important; vertical-align: middle !important; }
+            .bitacora-img-print {
+                display: block !important;
+                max-width: 140px !important;
+                max-height: 90px !important;
+                width: auto !important;
+                height: auto !important;
+                margin: 4px auto !important;
+                border: 1px solid #334155 !important;
+                border-radius: 4px !important;
+                visibility: visible !important;
+                opacity: 1 !important;
+            }
         }
     </style>
 </head>
@@ -578,10 +593,10 @@
                 { timeOp1: "12:00", timeOp2: "12:30", type: "C", name: "Interior de planta" },
                 { timeOp1: "13:30", timeOp2: "14:00", type: "B", name: "Cambio de turno (Relevo 14:00 hrs)" },
                 { timeOp1: "15:00", timeOp2: "15:30", type: "A", name: "Recorrido perimetral" },
-                { timeOp1: "16:30", timeOp2: "17:00", type: "B", name: "Cambio de turno (Relevo 17:00 hrs)" },
+                { timeOp1: "16:30", timeOp2: "17:00", type: "B", name: "Cambio de turno (Relevo 17:00 hrs - 05:00 PM)" },
                 { timeOp1: "18:00", timeOp2: "18:30", type: "A", name: "Recorrido perimetral" },
                 { timeOp1: "19:30", timeOp2: "20:00", type: "A", name: "Recorrido perimetral" },
-                { timeOp1: "21:00", timeOp2: "21:30", type: "B", name: "Cambio de turno (Relevo 21:30 hrs)" },
+                { timeOp1: "21:00", timeOp2: "21:30", type: "B", name: "Cambio de turno (Relevo 21:30 hrs - 09:30 PM)" },
                 { timeOp1: "22:30", timeOp2: "23:00", type: "D", name: "Zonas lejanas" }
             ],
             "2": [
@@ -596,10 +611,10 @@
                 { timeOp1: "12:00", timeOp2: "12:30", type: "A", name: "Recorrido perimetral" },
                 { timeOp1: "13:30", timeOp2: "14:00", type: "B", name: "Cambio de turno (Relevo 14:00 hrs)" },
                 { timeOp1: "15:00", timeOp2: "15:30", type: "C", name: "Interior de planta" },
-                { timeOp1: "16:30", timeOp2: "17:00", type: "B", name: "Cambio de turno (Relevo 17:00 hrs)" },
+                { timeOp1: "16:30", timeOp2: "17:00", type: "B", name: "Cambio de turno (Relevo 17:00 hrs - 05:00 PM)" },
                 { timeOp1: "18:00", timeOp2: "18:30", type: "A", name: "Recorrido perimetral" },
                 { timeOp1: "19:30", timeOp2: "20:00", type: "A", name: "Recorrido perimetral" },
-                { timeOp1: "21:00", timeOp2: "21:30", type: "B", name: "Cambio de turno (Relevo 21:30 hrs)" },
+                { timeOp1: "21:00", timeOp2: "21:30", type: "B", name: "Cambio de turno (Relevo 21:30 hrs - 09:30 PM)" },
                 { timeOp1: "22:30", timeOp2: "23:00", type: "A", name: "Recorrido perimetral" }
             ],
             "3": [
@@ -614,10 +629,10 @@
                 { timeOp1: "12:00", timeOp2: "12:30", type: "D", name: "Zonas lejanas" },
                 { timeOp1: "13:30", timeOp2: "14:00", type: "B", name: "Cambio de turno (Relevo 14:00 hrs)" },
                 { timeOp1: "15:00", timeOp2: "15:30", type: "C", name: "Interior de planta" },
-                { timeOp1: "16:30", timeOp2: "17:00", type: "B", name: "Cambio de turno (Relevo 17:00 hrs)" },
+                { timeOp1: "16:30", timeOp2: "17:00", type: "B", name: "Cambio de turno (Relevo 17:00 hrs - 05:00 PM)" },
                 { timeOp1: "18:00", timeOp2: "18:30", type: "A", name: "Recorrido perimetral" },
                 { timeOp1: "19:30", timeOp2: "20:00", type: "A", name: "Recorrido perimetral" },
-                { timeOp1: "21:00", timeOp2: "21:30", type: "B", name: "Cambio de turno (Relevo 21:30 hrs)" },
+                { timeOp1: "21:00", timeOp2: "21:30", type: "B", name: "Cambio de turno (Relevo 21:30 hrs - 09:30 PM)" },
                 { timeOp1: "22:30", timeOp2: "23:00", type: "C", name: "Interior de planta" }
             ],
             "4": [
@@ -632,10 +647,10 @@
                 { timeOp1: "12:00", timeOp2: "12:30", type: "A", name: "Recorrido perimetral" },
                 { timeOp1: "13:30", timeOp2: "14:00", type: "B", name: "Cambio de turno (Relevo 14:00 hrs)" },
                 { timeOp1: "15:00", timeOp2: "15:30", type: "C", name: "Interior de planta" },
-                { timeOp1: "16:30", timeOp2: "17:00", type: "B", name: "Cambio de turno (Relevo 17:00 hrs)" },
+                { timeOp1: "16:30", timeOp2: "17:00", type: "B", name: "Cambio de turno (Relevo 17:00 hrs - 05:00 PM)" },
                 { timeOp1: "18:00", timeOp2: "18:30", type: "A", name: "Recorrido perimetral" },
                 { timeOp1: "19:30", timeOp2: "20:00", type: "A", name: "Recorrido perimetral" },
-                { timeOp1: "21:00", timeOp2: "21:30", type: "B", name: "Cambio de turno (Relevo 21:30 hrs)" },
+                { timeOp1: "21:00", timeOp2: "21:30", type: "B", name: "Cambio de turno (Relevo 21:30 hrs - 09:30 PM)" },
                 { timeOp1: "22:30", timeOp2: "23:00", type: "D", name: "Zonas lejanas" }
             ]
         };
@@ -794,8 +809,15 @@
                 }
 
                 const isShiftFlight = item.type === 'B';
-                const shiftHighlight = isShiftFlight ? 'bg-amber-950/20 hover:bg-amber-900/30 border-l-4 border-l-amber-500' : 'hover:bg-slate-800/50';
-                const shiftNote = isShiftFlight ? `<span class="ms-1.5 text-[10px] bg-amber-950 text-amber-300 font-bold px-2 py-0.5 rounded border border-amber-800"><i class="fa-solid fa-users me-1"></i> Relevo Accesos</span>` : '';
+                const shiftHighlight = isShiftFlight ? 'bg-amber-950/30 hover:bg-amber-900/40 border-l-4 border-l-amber-500' : 'hover:bg-slate-800/50';
+                
+                let targetShiftTimeLabel = '';
+                if (idx === 3) targetShiftTimeLabel = '(Relevo 06:00 AM)';
+                if (idx === 9) targetShiftTimeLabel = '(Relevo 02:00 PM)';
+                if (idx === 11) targetShiftTimeLabel = '(Relevo 05:00 PM / 17:00)';
+                if (idx === 14) targetShiftTimeLabel = '(Relevo 09:30 PM / 21:30)';
+
+                const shiftNote = isShiftFlight ? `<span class="ms-1.5 text-[10px] bg-amber-950 text-amber-300 font-bold px-2 py-0.5 rounded border border-amber-800"><i class="fa-solid fa-users me-1"></i> ${targetShiftTimeLabel}</span>` : '';
 
                 html += `
                     <tr class="${shiftHighlight} transition border-b border-slate-800/40">
@@ -845,7 +867,7 @@
             window.bitacoraList.forEach((item, index) => {
                 const evidenceCell = (item.evidenceImg && item.evidenceImg.length > 20) ? 
                     `<div class="flex flex-col items-center gap-1">
-                        <img src="${item.evidenceImg}" alt="Evidencia" class="h-14 w-24 object-cover rounded-lg border border-slate-700 shadow-md cursor-pointer hover:scale-105 transition" onclick="openLightboxImage('${item.evidenceImg}', '${item.scheduledTime} hrs - ${item.flightType}')">
+                        <img src="${item.evidenceImg}" alt="Evidencia" class="bitacora-img-print h-14 w-24 object-cover rounded-lg border border-slate-700 shadow-md cursor-pointer hover:scale-105 transition" onclick="openLightboxImage('${item.evidenceImg}', '${item.scheduledTime} hrs - ${item.flightType}')">
                         <span class="text-[9px] text-slate-400 no-print">Clic para ver</span>
                     </div>` : 
                     `<span class="text-slate-600 italic">Sin imagen</span>`;
