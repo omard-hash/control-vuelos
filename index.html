@@ -531,6 +531,13 @@
                 return;
             }
 
+            // Timeout guard: if Firebase takes > 5s, switch badge to helpful status
+            const connectionTimeout = setTimeout(() => {
+                if (document.getElementById('cloudStatusBadge') && document.getElementById('cloudStatusBadge').innerText.includes("Sincronizando")) {
+                    updateCloudBadge(false, "Modo Local (Sin Nube)");
+                }
+            }, 5000);
+
             try {
                 const app = initializeApp(firebaseConfigObj);
                 auth = getAuth(app);
@@ -549,6 +556,7 @@
                 }
 
                 onAuthStateChanged(auth, (user) => {
+                    clearTimeout(connectionTimeout);
                     if (user) {
                         updateCloudBadge(true, "Nube Live Sincronizada");
                         setupRealtimeSync();
@@ -557,8 +565,9 @@
                     }
                 });
             } catch (err) {
+                clearTimeout(connectionTimeout);
                 console.warn("Auth initialization error:", err);
-                updateCloudBadge(false, "Error Config Nube (Clic p/ Revisa)");
+                updateCloudBadge(false, "Modo Local (Clic p/ Revisa)");
             }
         }
 
@@ -574,4 +583,114 @@
                 }
             }
         }
-<!-- ... existing code -->
+
+        // Realtime Firestore synchronizer
+        function setupRealtimeSync() {
+            if (!db) return;
+
+            try {
+                // Sync daily flight statuses
+                const appDocRef = doc(db, 'audi_drones_apps', window.appId);
+                onSnapshot(appDocRef, (snapshot) => {
+                    if (snapshot.exists()) {
+                        const data = snapshot.data();
+                        if (data.flightStatuses) {
+                            window.dailyFlightStatuses = data.flightStatuses;
+                            localStorage.setItem('audi_flight_statuses', JSON.stringify(data.flightStatuses));
+                            if (typeof window.renderFlightsTable === 'function') {
+                                window.renderFlightsTable();
+                            }
+                        }
+                        if (data.currentWeeklyPlan) {
+                            window.currentWeeklyPlan = data.currentWeeklyPlan;
+                            const sel = document.getElementById('selectWeeklyPlan');
+                            if (sel && sel.value !== data.currentWeeklyPlan) {
+                                sel.value = data.currentWeeklyPlan;
+                            }
+                        }
+                        if (data.currentOptionTime) {
+                            window.currentOptionTime = data.currentOptionTime;
+                            if (typeof window.updateOptionTimeButtons === 'function') {
+                                window.updateOptionTimeButtons();
+                            }
+                        }
+                    }
+                }, (error) => {
+                    console.warn("Firestore snapshot error:", error);
+                });
+
+                // Sync Bitácora entries
+                const bitacoraCollRef = collection(db, 'audi_drones_apps', window.appId, 'bitacora');
+                onSnapshot(bitacoraCollRef, (snapshot) => {
+                    const cloudBitacora = [];
+                    snapshot.forEach((docSnap) => {
+                        cloudBitacora.push({ cloudId: docSnap.id, ...docSnap.data() });
+                    });
+                    if (cloudBitacora.length > 0) {
+                        cloudBitacora.sort((a, b) => new Date(b.timestamp || b.id) - new Date(a.timestamp || a.id));
+                        window.bitacoraList = cloudBitacora;
+                        localStorage.setItem('audi_bitacora_logs', JSON.stringify(cloudBitacora));
+                        if (typeof window.renderBitacoraTable === 'function') {
+                            window.renderBitacoraTable();
+                        }
+                    }
+                }, (error) => {
+                    console.warn("Firestore bitacora snapshot error:", error);
+                });
+
+            } catch (e) {
+                console.warn("Error setting up Firestore realtime listeners:", e);
+            }
+        }
+
+        // Global bridge methods for saving to Firestore
+        window.cloudSyncFlightStatus = async function(statuses) {
+            if (!db) return;
+            try {
+                const appDocRef = doc(db, 'audi_drones_apps', window.appId);
+                await setDoc(appDocRef, { 
+                    flightStatuses: statuses,
+                    currentWeeklyPlan: window.currentWeeklyPlan || '1',
+                    currentOptionTime: window.currentOptionTime || 'op1',
+                    lastUpdated: new Date().toISOString()
+                }, { merge: true });
+            } catch (err) {
+                console.warn("Cloud save error:", err);
+            }
+        };
+
+        window.cloudAddBitacoraItem = async function(item) {
+            if (!db) return;
+            try {
+                const bitacoraCollRef = collection(db, 'audi_drones_apps', window.appId, 'bitacora');
+                await addDoc(bitacoraCollRef, { ...item, timestamp: new Date().toISOString() });
+            } catch (err) {
+                console.warn("Cloud add bitacora error:", err);
+            }
+        };
+
+        window.cloudUpdateBitacoraItem = async function(cloudId, updatedFields) {
+            if (!db || !cloudId) return;
+            try {
+                const itemRef = doc(db, 'audi_drones_apps', window.appId, 'bitacora', cloudId);
+                await updateDoc(itemRef, updatedFields);
+            } catch (err) {
+                console.warn("Cloud update bitacora error:", err);
+            }
+        };
+
+        window.cloudDeleteBitacoraItem = async function(cloudId) {
+            if (!db || !cloudId) return;
+            try {
+                const itemRef = doc(db, 'audi_drones_apps', window.appId, 'bitacora', cloudId);
+                await deleteDoc(itemRef);
+            } catch (err) {
+                console.warn("Cloud delete bitacora error:", err);
+            }
+        };
+
+        // EXPLICIT START: Execute initialization as soon as module script loads
+        initAuthAndFirestore();
+    </script>
+</body>
+</html>
