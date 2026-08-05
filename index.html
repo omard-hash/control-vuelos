@@ -51,7 +51,7 @@
         ::-webkit-scrollbar-thumb:hover { background: #475569; }
 
         @media print {
-            header, section:not(#bitacoraSection), button, label, select, input, .no-print {
+            header, section:not(#bitacoraSection), button, label, select, input, .no-print, #nextFlightCard {
                 display: none !important;
             }
             body { background: #ffffff !important; color: #000000 !important; }
@@ -77,7 +77,7 @@
                     <div class="flex items-center gap-2">
                         <span class="text-xs font-bold tracking-widest uppercase bg-slate-800 text-red-400 px-2 py-0.5 rounded border border-red-900/30">Audi México</span>
                         <span id="shiftBadge" class="text-xs font-bold px-2 py-0.5 rounded bg-emerald-950/80 text-emerald-400 border border-emerald-800/40">Iniciando Turno...</span>
-                        <button id="cloudStatusBadge" onclick="openFirebaseConfigModal()" title="Haga clic para configurar la sincronización en la nube (Firebase)" class="text-xs font-bold px-2.5 py-1 rounded-lg bg-slate-800 text-slate-300 border border-slate-700 flex items-center gap-1.5 hover:bg-slate-700 transition cursor-pointer">
+                        <button id="cloudStatusBadge" onclick="openFirebaseConfigModal()" title="Haga clic para configurar la sincronización en la nube" class="text-xs font-bold px-2.5 py-1 rounded-lg bg-slate-800 text-slate-300 border border-slate-700 flex items-center gap-1.5 hover:bg-slate-700 transition cursor-pointer">
                             <i class="fa-solid fa-cloud text-[10px]"></i> Sincronizando Nube...
                         </button>
                     </div>
@@ -112,9 +112,9 @@
                 <div>
                     <h2 class="text-base font-bold text-white flex items-center gap-2">
                         <i class="fa-solid fa-sliders text-audi-red"></i>
-                        Configuración Inicial de Jornada (00:00 hrs)
+                        Configuración Inicial de Jornada
                     </h2>
-                    <p class="text-xs text-slate-400">Selecciona el plan semanal (1, 2, 3 o 4) o deja que el sistema lo determine automáticamente. Los cambios se sincronizan en vivo entre computadoras.</p>
+                    <p class="text-xs text-slate-400">Selecciona el plan semanal (1, 2, 3 o 4) o la opción de horario (00:00 vs 00:30). Sincronizado en tiempo real.</p>
                 </div>
                 
                 <div class="flex flex-wrap items-center gap-3">
@@ -210,7 +210,7 @@
                 <div class="flex items-center gap-4 bg-slate-950/80 p-3 rounded-xl border border-slate-800 w-full lg:w-auto justify-between lg:justify-end">
                     <div>
                         <div class="text-[10px] uppercase font-bold text-slate-400">Estado de Ventana</div>
-                        <div id="targetCountdown" class="text-lg font-mono font-bold text-emerald-400">Cargando...</div>
+                        <div id="targetCountdown" class="text-lg font-mono font-bold text-emerald-400">Calculando...</div>
                     </div>
                     <div class="flex items-center gap-2">
                         <button id="btnQuickFly" onclick="quickRegisterTakeoff()" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl shadow-lg shadow-emerald-900/40 transition flex items-center gap-2">
@@ -371,6 +371,53 @@
         </div>
     </div>
 
+    <!-- Modal para Registrar Suspensión y Subir Evidencia -->
+    <div id="modalSuspension" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-slate-900 border border-amber-500/40 rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-4">
+            <div class="flex justify-between items-center border-b border-slate-800 pb-3">
+                <h3 class="text-base font-bold text-amber-400 flex items-center gap-2">
+                    <i class="fa-solid fa-triangle-exclamation"></i> Registrar Suspensión de Vuelo
+                </h3>
+                <button onclick="closeModal('modalSuspension')" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark text-lg"></i></button>
+            </div>
+            
+            <div class="space-y-3 text-xs">
+                <div>
+                    <label class="block text-slate-400 font-semibold mb-1">Vuelo / Horario a Suspender:</label>
+                    <input type="text" id="suspendFlightLabel" readonly class="w-full bg-slate-950 border border-slate-800 text-slate-200 px-3 py-2 rounded-lg font-bold">
+                </div>
+                <div>
+                    <label class="block text-slate-400 font-semibold mb-1">Causa de Suspensión (Obligatorio):</label>
+                    <select id="suspendReasonSelect" class="w-full bg-slate-950 border border-slate-700 text-amber-300 px-3 py-2 rounded-lg font-bold focus:ring-1 focus:ring-amber-500">
+                        <option value="LLUVIA / PRECIPITACIÓN">Lluvia / Lluvia Fuerte</option>
+                        <option value="VIENTO FUERTE (> 35 km/h)">Viento Fuerte (> 35 km/h)</option>
+                        <option value="NEBLINA DENSA / NULA VISIBILIDAD">Neblina Densa / Nula Visibilidad</option>
+                        <option value="TORMENTA ELÉCTRICA">Tormenta Eléctrica</option>
+                        <option value="ATENCIÓN A EMERGENCIA REAL EN PLANTA">Atención a Emergencia Real en Planta</option>
+                        <option value="MANTENIMIENTO / FALLA TÉCNICA DRON">Mantenimiento / Falla Técnica Dron</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-slate-400 font-semibold mb-1">Detalle / Justificación de Seguridad:</label>
+                    <textarea id="suspendNotes" rows="2" placeholder="Describa el estado del clima o la emergencia en planta..." class="w-full bg-slate-950 border border-slate-700 text-slate-200 p-2.5 rounded-lg focus:outline-none focus:ring-1 focus:ring-amber-500"></textarea>
+                </div>
+                <div>
+                    <label class="block text-slate-400 font-semibold mb-1"><i class="fa-solid fa-camera"></i> Subir Evidencia Fotográfica (Foto / Screenshot Clima):</label>
+                    <input type="file" id="evidenceFileInput" accept="image/*" class="w-full bg-slate-950 text-slate-300 p-2 rounded-lg border border-slate-700 file:mr-3 file:py-1 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-amber-950 file:text-amber-300 hover:file:bg-amber-900" onchange="previewEvidenceImage(event)">
+                    <div id="evidencePreviewContainer" class="mt-2 hidden">
+                        <p class="text-[10px] text-slate-400 mb-1">Vista previa de evidencia:</p>
+                        <img id="evidencePreviewImg" src="" alt="Evidencia" class="h-28 w-full object-cover rounded-lg border border-slate-700">
+                    </div>
+                </div>
+            </div>
+
+            <div class="flex justify-end gap-2 pt-2 border-t border-slate-800">
+                <button onclick="closeModal('modalSuspension')" class="px-4 py-2 bg-slate-800 text-slate-300 font-semibold text-xs rounded-xl hover:bg-slate-700">Cancelar</button>
+                <button onclick="confirmSuspension()" class="px-4 py-2 bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs rounded-xl shadow">Confirmar Suspensión</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Modal para Editar Registro de Bitácora -->
     <div id="modalEditBitacora" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
         <div class="bg-slate-900 border border-blue-500/40 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
@@ -440,33 +487,62 @@
         </div>
     </div>
 
-    <!-- Modal para Registrar Suspensión y Subir Evidencia -->
-    <div id="modalSuspension" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
-        <div class="bg-slate-900 border border-amber-500/40 rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-4">
+    <!-- Modal Ver Matriz Oficial de los 4 Planes -->
+    <div id="modalOfficialPlans" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-slate-900 border border-blue-500/40 rounded-2xl max-w-4xl w-full p-6 shadow-2xl space-y-4 max-h-[90vh] flex flex-col">
             <div class="flex justify-between items-center border-b border-slate-800 pb-3">
+                <h3 class="text-base font-bold text-blue-400 flex items-center gap-2">
+                    <i class="fa-solid fa-table"></i> Matriz Oficial de Recorridos Audi México (Planes 1 a 4)
+                </h3>
+                <button onclick="closeModal('modalOfficialPlans')" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark text-lg"></i></button>
+            </div>
+            
+            <div class="overflow-y-auto flex-1 space-y-4 text-xs pr-1">
+                <p class="text-slate-300">
+                    Planes precargados inmutables según los requerimientos del cliente. Selecciona un plan arriba para aplicarlo al cronograma diario.
+                </p>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-xs border border-slate-800">
+                        <thead class="bg-slate-950 text-slate-400 uppercase font-bold border-b border-slate-800">
+                            <tr>
+                                <th class="p-2.5">Hora</th>
+                                <th class="p-2.5">Plan 1</th>
+                                <th class="p-2.5">Plan 2</th>
+                                <th class="p-2.5">Plan 3</th>
+                                <th class="p-2.5">Plan 4</th>
+                                <th class="p-2.5">Detalle / Tipo</th>
+                            </tr>
+                        </thead>
+                        <tbody id="officialPlansTableBody" class="divide-y divide-slate-800 font-mono text-slate-300">
+                            <!-- Rellenado dinámicamente -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="flex justify-end pt-2 border-t border-slate-800">
+                <button onclick="closeModal('modalOfficialPlans')" class="px-4 py-2 bg-slate-800 text-slate-300 font-semibold text-xs rounded-xl hover:bg-slate-700">Cerrar Visor</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Modal para Configurar Credenciales de Nube (Firebase) -->
     <div id="modalFirebaseConfig" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
         <div class="bg-slate-900 border border-blue-500/40 rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-4">
             <div class="flex justify-between items-center border-b border-slate-800 pb-3">
                 <h3 class="text-base font-bold text-blue-400 flex items-center gap-2">
-                    <i class="fa-solid fa-cloud-gear"></i> Configuración de Sincronización Nube
+                    <i class="fa-solid fa-cloud"></i> Configuración de Sincronización Nube
                 </h3>
                 <button onclick="closeModal('modalFirebaseConfig')" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark text-lg"></i></button>
             </div>
             
             <div class="space-y-3 text-xs">
                 <p class="text-slate-300 leading-relaxed">
-                    Para sincronizar múltiples computadoras en vivo desde <strong>GitHub Pages</strong> o cualquier red, pega aquí el código JSON de tu proyecto gratuito de Firebase.
+                    Sincronización en vivo desde <strong>GitHub Pages</strong> activa mediante Firebase Firestore.
                 </p>
                 <div>
                     <label class="block text-slate-400 font-semibold mb-1">Firebase Configuration JSON:</label>
                     <textarea id="firebaseConfigInput" rows="6" placeholder='{&#10;  "apiKey": "AIzaSy...",&#10;  "authDomain": "tu-proyecto.firebaseapp.com",&#10;  "projectId": "tu-proyecto",&#10;  "storageBucket": "tu-proyecto.appspot.com",&#10;  "messagingSenderId": "123456789",&#10;  "appId": "1:123456789:web:abcdef"&#10;}' class="w-full bg-slate-950 border border-slate-700 text-emerald-400 font-mono text-xs p-3 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500"></textarea>
-                </div>
-                <div class="bg-slate-950 p-3 rounded-xl border border-slate-800 text-[11px] text-slate-400 space-y-1">
-                    <p class="font-bold text-slate-200"><i class="fa-solid fa-circle-info text-blue-400"></i> ¿Cómo obtener este código gratuito?</p>
-                    <p>1. Ve a <a href="https://console.firebase.google.com" target="_blank" class="text-blue-400 underline">console.firebase.google.com</a> y crea un proyecto.</p>
-                    <p>2. Agrega una Aplicación Web y activa <strong>Cloud Firestore</strong>.</p>
-                    <p>3. Copia el objeto <code class="text-emerald-400">firebaseConfig</code> y pégalo arriba.</p>
                 </div>
             </div>
 
@@ -480,16 +556,744 @@
         </div>
     </div>
 
-    <!-- Firebase Module for Real-Time Sync across multiple computers -->
+    <!-- Main Application JavaScript Logic -->
+    <script>
+        // Official Plans Matrix (Plans 1, 2, 3, 4)
+        const OFFICIAL_PLANS = {
+            "1": [
+                { timeOp1: "00:00", timeOp2: "00:30", type: "A", name: "Recorrido perimetral" },
+                { timeOp1: "01:30", timeOp2: "02:00", type: "D", name: "Zonas lejanas" },
+                { timeOp1: "03:00", timeOp2: "03:30", type: "A", name: "Recorrido perimetral" },
+                { timeOp1: "04:30", timeOp2: "05:00", type: "B", name: "Cambio de turno" },
+                { timeOp1: "06:00", timeOp2: "06:30", type: "C", name: "Interior de planta" },
+                { timeOp1: "07:30", timeOp2: "08:00", type: "A", name: "Recorrido perimetral" },
+                { timeOp1: "09:00", timeOp2: "09:30", type: "A", name: "Recorrido perimetral" },
+                { timeOp1: "10:30", timeOp2: "11:00", type: "A", name: "Recorrido perimetral" },
+                { timeOp1: "12:00", timeOp2: "12:30", type: "C", name: "Interior de planta" },
+                { timeOp1: "13:30", timeOp2: "14:00", type: "B", name: "Cambio de turno" },
+                { timeOp1: "15:00", timeOp2: "15:30", type: "A", name: "Recorrido perimetral" },
+                { timeOp1: "16:30", timeOp2: "17:00", type: "B", name: "Cambio de turno" },
+                { timeOp1: "18:00", timeOp2: "18:30", type: "A", name: "Recorrido perimetral" },
+                { timeOp1: "19:30", timeOp2: "20:00", type: "A", name: "Recorrido perimetral" },
+                { timeOp1: "21:00", timeOp2: "21:30", type: "B", name: "Cambio de turno" },
+                { timeOp1: "22:30", timeOp2: "23:00", type: "D", name: "Zonas lejanas" }
+            ],
+            "2": [
+                { timeOp1: "00:00", timeOp2: "00:30", type: "C", name: "Interior de planta" },
+                { timeOp1: "01:30", timeOp2: "02:00", type: "A", name: "Recorrido perimetral" },
+                { timeOp1: "03:00", timeOp2: "03:30", type: "D", name: "Zonas lejanas" },
+                { timeOp1: "04:30", timeOp2: "05:00", type: "B", name: "Cambio de turno" },
+                { timeOp1: "06:00", timeOp2: "06:30", type: "A", name: "Recorrido perimetral" },
+                { timeOp1: "07:30", timeOp2: "08:00", type: "A", name: "Recorrido perimetral" },
+                { timeOp1: "09:00", timeOp2: "09:30", type: "A", name: "Recorrido perimetral" },
+                { timeOp1: "10:30", timeOp2: "11:00", type: "A", name: "Recorrido perimetral" },
+                { timeOp1: "12:00", timeOp2: "12:30", type: "A", name: "Recorrido perimetral" },
+                { timeOp1: "13:30", timeOp2: "14:00", type: "B", name: "Cambio de turno" },
+                { timeOp1: "15:00", timeOp2: "15:30", type: "C", name: "Interior de planta" },
+                { timeOp1: "16:30", timeOp2: "17:00", type: "B", name: "Cambio de turno" },
+                { timeOp1: "18:00", timeOp2: "18:30", type: "A", name: "Recorrido perimetral" },
+                { timeOp1: "19:30", timeOp2: "20:00", type: "A", name: "Recorrido perimetral" },
+                { timeOp1: "21:00", timeOp2: "21:30", type: "B", name: "Cambio de turno" },
+                { timeOp1: "22:30", timeOp2: "23:00", type: "A", name: "Recorrido perimetral" }
+            ],
+            "3": [
+                { timeOp1: "00:00", timeOp2: "00:30", type: "D", name: "Zonas lejanas" },
+                { timeOp1: "01:30", timeOp2: "02:00", type: "A", name: "Recorrido perimetral" },
+                { timeOp1: "03:00", timeOp2: "03:30", type: "A", name: "Recorrido perimetral" },
+                { timeOp1: "04:30", timeOp2: "05:00", type: "B", name: "Cambio de turno" },
+                { timeOp1: "06:00", timeOp2: "06:30", type: "C", name: "Interior de planta" },
+                { timeOp1: "07:30", timeOp2: "08:00", type: "A", name: "Recorrido perimetral" },
+                { timeOp1: "09:00", timeOp2: "09:30", type: "A", name: "Recorrido perimetral" },
+                { timeOp1: "10:30", timeOp2: "11:00", type: "A", name: "Recorrido perimetral" },
+                { timeOp1: "12:00", timeOp2: "12:30", type: "D", name: "Zonas lejanas" },
+                { timeOp1: "13:30", timeOp2: "14:00", type: "B", name: "Cambio de turno" },
+                { timeOp1: "15:00", timeOp2: "15:30", type: "C", name: "Interior de planta" },
+                { timeOp1: "16:30", timeOp2: "17:00", type: "B", name: "Cambio de turno" },
+                { timeOp1: "18:00", timeOp2: "18:30", type: "A", name: "Recorrido perimetral" },
+                { timeOp1: "19:30", timeOp2: "20:00", type: "A", name: "Recorrido perimetral" },
+                { timeOp1: "21:00", timeOp2: "21:30", type: "B", name: "Cambio de turno" },
+                { timeOp1: "22:30", timeOp2: "23:00", type: "C", name: "Interior de planta" }
+            ],
+            "4": [
+                { timeOp1: "00:00", timeOp2: "00:30", type: "A", name: "Recorrido perimetral" },
+                { timeOp1: "01:30", timeOp2: "02:00", type: "A", name: "Recorrido perimetral" },
+                { timeOp1: "03:00", timeOp2: "03:30", type: "C", name: "Interior de planta" },
+                { timeOp1: "04:30", timeOp2: "05:00", type: "B", name: "Cambio de turno" },
+                { timeOp1: "06:00", timeOp2: "06:30", type: "C", name: "Interior de planta" },
+                { timeOp1: "07:30", timeOp2: "08:00", type: "C", name: "Interior de planta" },
+                { timeOp1: "09:00", timeOp2: "09:30", type: "A", name: "Recorrido perimetral" },
+                { timeOp1: "10:30", timeOp2: "11:00", type: "A", name: "Recorrido perimetral" },
+                { timeOp1: "12:00", timeOp2: "12:30", type: "A", name: "Recorrido perimetral" },
+                { timeOp1: "13:30", timeOp2: "14:00", type: "B", name: "Cambio de turno" },
+                { timeOp1: "15:00", timeOp2: "15:30", type: "C", name: "Interior de planta" },
+                { timeOp1: "16:30", timeOp2: "17:00", type: "B", name: "Cambio de turno" },
+                { timeOp1: "18:00", timeOp2: "18:30", type: "A", name: "Recorrido perimetral" },
+                { timeOp1: "19:30", timeOp2: "20:00", type: "A", name: "Recorrido perimetral" },
+                { timeOp1: "21:00", timeOp2: "21:30", type: "B", name: "Cambio de turno" },
+                { timeOp1: "22:30", timeOp2: "23:00", type: "D", name: "Zonas lejanas" }
+            ]
+        };
+
+        // Application Global State
+        window.currentWeeklyPlan = "1";
+        window.currentOptionTime = "op1"; // op1: 00:00 hrs, op2: 00:30 hrs
+        window.dailyFlightStatuses = {}; // Key: flightIndex (0..15), Value: { status: 'PENDIENTES'|'VOLADO'|'SUSPENDIDO', realTime: '', note: '' }
+        window.bitacoraList = [];
+        window.activeModalIndex = null;
+        window.lastDateString = "";
+        window.tempImageData = "";
+        window.tempEditImageData = "";
+
+        function startLiveClock() {
+            function updateClock() {
+                const now = new Date();
+                
+                // Format time string
+                const hours = String(now.getHours()).padStart(2, '0');
+                const minutes = String(now.getMinutes()).padStart(2, '0');
+                const seconds = String(now.getSeconds()).padStart(2, '0');
+                const timeStr = `${hours}:${minutes}:${seconds}`;
+
+                // Format date string
+                const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+                const dateStr = now.toLocaleDateString('es-MX', options);
+                const capitalizedDate = dateStr.charAt(0).toUpperCase() + dateStr.slice(1);
+
+                const clockEl = document.getElementById('liveClock');
+                const dateEl = document.getElementById('liveDate');
+                if (clockEl) clockEl.innerText = timeStr;
+                if (dateEl) dateEl.innerText = capitalizedDate;
+
+                // Update Shift Badge
+                updateShiftBadge(now.getHours());
+
+                // Auto Midnight Reset Check
+                const todayKey = now.toISOString().split('T')[0];
+                if (window.lastDateString && window.lastDateString !== todayKey) {
+                    handleMidnightReset();
+                }
+                window.lastDateString = todayKey;
+
+                // Update Target Flight and Countdown Timer
+                updateTargetFlightBanner(now);
+            }
+
+            updateClock();
+            setInterval(updateClock, 1000);
+        }
+
+        function updateShiftBadge(currentHour) {
+            const shiftBadge = document.getElementById('shiftBadge');
+            if (!shiftBadge) return;
+
+            if (currentHour >= 6 && currentHour < 14) {
+                shiftBadge.innerText = "Turno 1 - Activo";
+                shiftBadge.className = "text-xs font-bold px-2 py-0.5 rounded bg-emerald-950/80 text-emerald-400 border border-emerald-800/40";
+            } else if (currentHour >= 14 && currentHour < 22) {
+                shiftBadge.innerText = "Turno 2 - Activo";
+                shiftBadge.className = "text-xs font-bold px-2 py-0.5 rounded bg-blue-950/80 text-blue-400 border border-blue-800/40";
+            } else {
+                shiftBadge.innerText = "Turno 3 - Activo";
+                shiftBadge.className = "text-xs font-bold px-2 py-0.5 rounded bg-purple-950/80 text-purple-400 border border-purple-800/40";
+            }
+        }
+
+        function updateTargetFlightBanner(nowDate) {
+            const plan = OFFICIAL_PLANS[window.currentWeeklyPlan] || OFFICIAL_PLANS["1"];
+            const currentMin = nowDate.getHours() * 60 + nowDate.getMinutes();
+
+            let targetIdx = 0;
+            let minDiff = Infinity;
+
+            plan.forEach((item, idx) => {
+                const timeStr = window.currentOptionTime === 'op2' ? item.timeOp2 : item.timeOp1;
+                const [h, m] = timeStr.split(':').map(Number);
+                const flightMin = h * 60 + m;
+
+                // Window is flightMin - 20 to flightMin
+                let diff = flightMin - currentMin;
+                if (diff < -30) diff += 1440; // wrap around for tomorrow
+
+                if (diff < minDiff && diff >= -30) {
+                    minDiff = diff;
+                    targetIdx = idx;
+                }
+            });
+
+            const currentTarget = plan[targetIdx];
+            const targetTimeStr = window.currentOptionTime === 'op2' ? currentTarget.timeOp2 : currentTarget.timeOp1;
+            const [th, tm] = targetTimeStr.split(':').map(Number);
+            const targetTotalMin = th * 60 + tm;
+
+            // Compute window bounds
+            const winStartTotal = targetTotalMin - 20;
+            const formatMinStr = (tot) => {
+                let norm = (tot + 1440) % 1440;
+                let hh = String(Math.floor(norm / 60)).padStart(2, '0');
+                let mm = String(norm % 60).padStart(2, '0');
+                return `${hh}:${mm}`;
+            };
+
+            const targetTimeEl = document.getElementById('targetFlightTime');
+            const targetBadgeEl = document.getElementById('targetFlightBadge');
+            const targetWindowEl = document.getElementById('targetFlightWindow');
+            const targetCountdownEl = document.getElementById('targetCountdown');
+
+            if (targetTimeEl) targetTimeEl.innerText = `${targetTimeStr} hrs`;
+            if (targetBadgeEl) {
+                targetBadgeEl.innerText = `TIPO ${currentTarget.type} - ${currentTarget.name}`;
+            }
+            if (targetWindowEl) {
+                targetWindowEl.innerText = `${formatMinStr(winStartTotal)} - ${targetTimeStr} hrs`;
+            }
+
+            // Countdown state
+            const diffMin = targetTotalMin - currentMin;
+            if (targetCountdownEl) {
+                if (currentMin >= winStartTotal && currentMin <= targetTotalMin) {
+                    targetCountdownEl.innerText = "VENTANA ABIERTA (DESPEGAR)";
+                    targetCountdownEl.className = "text-lg font-mono font-bold text-emerald-400 pulse-green";
+                } else if (diffMin > 0 && diffMin <= 40) {
+                    targetCountdownEl.innerText = `En ${diffMin} min`;
+                    targetCountdownEl.className = "text-lg font-mono font-bold text-amber-400";
+                } else {
+                    targetCountdownEl.innerText = "Programado";
+                    targetCountdownEl.className = "text-lg font-mono font-bold text-slate-300";
+                }
+            }
+
+            window.activeTargetIdx = targetIdx;
+        }
+
+        function renderFlightsTable() {
+            const tbody = document.getElementById('flightsTableBody');
+            if (!tbody) return;
+
+            const plan = OFFICIAL_PLANS[window.currentWeeklyPlan] || OFFICIAL_PLANS["1"];
+            let html = '';
+
+            let flownCount = 0;
+            let suspendedCount = 0;
+
+            plan.forEach((item, idx) => {
+                const timeStr = window.currentOptionTime === 'op2' ? item.timeOp2 : item.timeOp1;
+                const statusObj = window.dailyFlightStatuses[idx] || { status: 'PENDIENTE', realTime: '', note: '' };
+
+                if (statusObj.status === 'VOLADO') flownCount++;
+                if (statusObj.status === 'SUSPENDIDO') suspendedCount++;
+
+                // Window bounds (-20 min)
+                const [h, m] = timeStr.split(':').map(Number);
+                const flightTotal = h * 60 + m;
+                const winStartTotal = (flightTotal - 20 + 1440) % 1440;
+                const winStartStr = `${String(Math.floor(winStartTotal / 60)).padStart(2, '0')}:${String(winStartTotal % 60).padStart(2, '0')}`;
+                const windowText = `${winStartStr} - ${timeStr}`;
+
+                let statusBadge = `<span class="px-2.5 py-1 rounded-md text-[11px] font-bold bg-slate-800 text-slate-400 border border-slate-700">PENDIENTE</span>`;
+                if (statusObj.status === 'VOLADO') {
+                    statusBadge = `<span class="px-2.5 py-1 rounded-md text-[11px] font-bold bg-emerald-950 text-emerald-400 border border-emerald-800"><i class="fa-solid fa-check me-1"></i> VOLADO</span>`;
+                } else if (statusObj.status === 'SUSPENDIDO') {
+                    statusBadge = `<span class="px-2.5 py-1 rounded-md text-[11px] font-bold bg-amber-950 text-amber-400 border border-amber-800"><i class="fa-solid fa-pause me-1"></i> SUSPENDIDO</span>`;
+                }
+
+                const isFixedShift = item.type === 'B' || ["06:00", "14:00", "17:00", "21:30"].includes(timeStr);
+                const shiftNote = isFixedShift ? `<span class="ms-1 text-[10px] text-amber-400 font-bold">(Hora Fija)</span>` : '';
+
+                html += `
+                    <tr class="hover:bg-slate-800/50 transition border-b border-slate-800/40">
+                        <td class="px-4 py-3 font-mono text-slate-400">${idx + 1}</td>
+                        <td class="px-4 py-3 font-mono font-extrabold text-amber-300 text-sm">${timeStr} hrs ${shiftNote}</td>
+                        <td class="px-4 py-3 font-mono text-slate-400 text-[11px]">${windowText}</td>
+                        <td class="px-4 py-3 font-semibold text-slate-200">
+                            <span class="px-2 py-0.5 text-[10px] font-bold rounded bg-slate-800 border border-slate-700 text-slate-300 me-1">TIPO ${item.type}</span>
+                            ${item.name}
+                        </td>
+                        <td class="px-4 py-3">${statusBadge}</td>
+                        <td class="px-4 py-3 font-mono text-xs text-slate-300">${statusObj.realTime || statusObj.note || '--'}</td>
+                        <td class="px-4 py-3 text-right space-x-1">
+                            <button onclick="openTakeoffModalForIdx(${idx})" class="px-2.5 py-1 bg-emerald-700 hover:bg-emerald-600 text-white font-bold rounded-lg transition text-[11px]">
+                                <i class="fa-solid fa-plane-departure"></i> Despegue
+                            </button>
+                            <button onclick="openSuspensionModalForIdx(${idx})" class="px-2.5 py-1 bg-amber-800 hover:bg-amber-700 text-amber-200 font-bold rounded-lg transition text-[11px]">
+                                <i class="fa-solid fa-pause"></i> Suspender
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            });
+
+            tbody.innerHTML = html;
+
+            // Update Counters
+            const flownEl = document.getElementById('cntFlown');
+            const suspendedEl = document.getElementById('cntSuspended');
+            if (flownEl) flownEl.innerText = flownCount;
+            if (suspendedEl) suspendedEl.innerText = suspendedCount;
+        }
+
+        function renderBitacoraTable() {
+            const tbody = document.getElementById('bitacoraTableBody');
+            if (!tbody) return;
+
+            if (!window.bitacoraList || window.bitacoraList.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="8" class="text-center py-6 text-slate-500 italic">No hay registros guardados en la bitácora para hoy.</td>
+                    </tr>
+                `;
+                return;
+            }
+
+            let html = '';
+            window.bitacoraList.forEach((item, index) => {
+                const evidenceCell = item.evidenceImg ? 
+                    `<img src="${item.evidenceImg}" alt="Evidencia" class="h-12 w-20 object-cover rounded border border-slate-700 mx-auto cursor-pointer hover:scale-110 transition" onclick="window.open('${item.evidenceImg}')">` : 
+                    `<span class="text-slate-600 italic">Sin imagen</span>`;
+
+                const statusColor = item.status === 'VOLADO' ? 'text-emerald-400 bg-emerald-950/60' : 'text-amber-400 bg-amber-950/60';
+
+                html += `
+                    <tr class="hover:bg-slate-800/40 transition">
+                        <td class="px-4 py-3 font-mono text-slate-300 text-[11px]">${item.timestampFormatted || item.timestamp || '--'}</td>
+                        <td class="px-4 py-3 font-mono font-bold text-amber-300 text-xs">${item.scheduledTime} hrs</td>
+                        <td class="px-4 py-3 font-semibold text-slate-200">${item.flightType || 'TIPO A'}</td>
+                        <td class="px-4 py-3"><span class="px-2 py-0.5 rounded text-[10px] font-bold ${statusColor}">${item.status}</span></td>
+                        <td class="px-4 py-3 font-mono text-emerald-400 text-xs">${item.realTime || 'N/A'}</td>
+                        <td class="px-4 py-3 text-slate-300 text-xs max-w-xs truncate">${item.notes || '--'}</td>
+                        <td class="px-4 py-3 text-center">${evidenceCell}</td>
+                        <td class="px-4 py-3 text-right space-x-1">
+                            <button onclick="openEditBitacoraModal(${index})" class="p-1.5 bg-blue-900/60 hover:bg-blue-800 text-blue-300 rounded-lg border border-blue-700/50 transition" title="Editar">
+                                <i class="fa-solid fa-pen-to-square"></i>
+                            </button>
+                            <button onclick="openDeleteBitacoraModal(${index})" class="p-1.5 bg-red-900/60 hover:bg-red-800 text-red-300 rounded-lg border border-red-700/50 transition" title="Eliminar">
+                                <i class="fa-solid fa-trash"></i>
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            });
+
+            tbody.innerHTML = html;
+        }
+
+        function changeWeeklyPlan(val, announce = true) {
+            window.currentWeeklyPlan = String(val);
+            localStorage.setItem('audi_current_plan', window.currentWeeklyPlan);
+            renderFlightsTable();
+            if (announce) {
+                speakAlert(`Plan Semanal ${val} seleccionado.`);
+                showToast(`Plan Semanal ${val} activado`, 'info');
+            }
+            if (window.cloudSyncFlightStatus) {
+                window.cloudSyncFlightStatus(window.dailyFlightStatuses);
+            }
+        }
+
+        function setOptionTime(opt) {
+            window.currentOptionTime = opt;
+            localStorage.setItem('audi_current_opt', opt);
+            updateOptionTimeButtons();
+            renderFlightsTable();
+            speakAlert(opt === 'op1' ? "Opción 1 activada inicio 00:00 horas" : "Opción 2 activada inicio 00:30 horas");
+            showToast(opt === 'op1' ? 'Opción 1 (00:00) Activada' : 'Opción 2 (00:30) Activada', 'info');
+            if (window.cloudSyncFlightStatus) {
+                window.cloudSyncFlightStatus(window.dailyFlightStatuses);
+            }
+        }
+
+        function updateOptionTimeButtons() {
+            const btn1 = document.getElementById('btnOpt1');
+            const btn2 = document.getElementById('btnOpt2');
+            if (!btn1 || !btn2) return;
+
+            if (window.currentOptionTime === 'op1') {
+                btn1.className = "px-3 py-1.5 text-xs font-bold rounded-lg bg-audi-red text-white transition shadow";
+                btn2.className = "px-3 py-1.5 text-xs font-bold rounded-lg text-slate-400 hover:text-white transition";
+            } else {
+                btn2.className = "px-3 py-1.5 text-xs font-bold rounded-lg bg-emerald-600 text-white transition shadow";
+                btn1.className = "px-3 py-1.5 text-xs font-bold rounded-lg text-slate-400 hover:text-white transition";
+            }
+        }
+
+        function openTakeoffModalForIdx(idx) {
+            window.activeModalIndex = idx;
+            const plan = OFFICIAL_PLANS[window.currentWeeklyPlan] || OFFICIAL_PLANS["1"];
+            const item = plan[idx];
+            const timeStr = window.currentOptionTime === 'op2' ? item.timeOp2 : item.timeOp1;
+
+            const now = new Date();
+            const timeNow = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+
+            document.getElementById('takeoffFlightLabel').value = `Vuelo #${idx + 1} - ${timeStr} hrs (TIPO ${item.type} - ${item.name})`;
+            document.getElementById('takeoffRealTime').value = timeNow;
+            document.getElementById('takeoffNotes').value = "Vuelo normal sin novedades, patrullaje completo.";
+            openModal('modalTakeoff');
+        }
+
+        function quickRegisterTakeoff() {
+            openTakeoffModalForIdx(window.activeTargetIdx || 0);
+        }
+
+        function confirmTakeoff() {
+            const idx = window.activeModalIndex;
+            const plan = OFFICIAL_PLANS[window.currentWeeklyPlan] || OFFICIAL_PLANS["1"];
+            const item = plan[idx];
+            const timeStr = window.currentOptionTime === 'op2' ? item.timeOp2 : item.timeOp1;
+
+            const realTime = document.getElementById('takeoffRealTime').value || '--';
+            const pilot = document.getElementById('takeoffPilotName').value || 'Piloto en Turno';
+            const notes = document.getElementById('takeoffNotes').value || '';
+
+            // Update status
+            window.dailyFlightStatuses[idx] = {
+                status: 'VOLADO',
+                realTime: realTime,
+                note: notes
+            };
+            localStorage.setItem('audi_flight_statuses', JSON.stringify(window.dailyFlightStatuses));
+
+            // Add to bitácora
+            const now = new Date();
+            const bitacoraEntry = {
+                id: Date.now(),
+                timestampFormatted: now.toLocaleString('es-MX'),
+                scheduledTime: timeStr,
+                flightType: `TIPO ${item.type} - ${item.name}`,
+                status: 'VOLADO',
+                realTime: realTime,
+                pilot: pilot,
+                notes: notes,
+                evidenceImg: ''
+            };
+
+            window.bitacoraList.unshift(bitacoraEntry);
+            localStorage.setItem('audi_bitacora_logs', JSON.stringify(window.bitacoraList));
+
+            if (window.cloudSyncFlightStatus) window.cloudSyncFlightStatus(window.dailyFlightStatuses);
+            if (window.cloudAddBitacoraItem) window.cloudAddBitacoraItem(bitacoraEntry);
+
+            closeModal('modalTakeoff');
+            renderFlightsTable();
+            renderBitacoraTable();
+            showToast('Despegue de vuelo registrado con éxito', 'success');
+            speakAlert(`Despegue de vuelo ${timeStr} horas registrado`);
+        }
+
+        function openSuspensionModalForIdx(idx) {
+            window.activeModalIndex = idx;
+            const plan = OFFICIAL_PLANS[window.currentWeeklyPlan] || OFFICIAL_PLANS["1"];
+            const item = plan[idx];
+            const timeStr = window.currentOptionTime === 'op2' ? item.timeOp2 : item.timeOp1;
+
+            document.getElementById('suspendFlightLabel').value = `Vuelo #${idx + 1} - ${timeStr} hrs (TIPO ${item.type})`;
+            document.getElementById('suspendNotes').value = "";
+            document.getElementById('evidenceFileInput').value = "";
+            document.getElementById('evidencePreviewContainer').classList.add('hidden');
+            window.tempImageData = "";
+            openModal('modalSuspension');
+        }
+
+        function openSuspensionModalForCurrent() {
+            openSuspensionModalForIdx(window.activeTargetIdx || 0);
+        }
+
+        function previewEvidenceImage(e) {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(evt) {
+                    window.tempImageData = evt.target.result;
+                    document.getElementById('evidencePreviewImg').src = evt.target.result;
+                    document.getElementById('evidencePreviewContainer').classList.remove('hidden');
+                };
+                reader.readAsDataURL(file);
+            }
+        }
+
+        function confirmSuspension() {
+            const idx = window.activeModalIndex;
+            const plan = OFFICIAL_PLANS[window.currentWeeklyPlan] || OFFICIAL_PLANS["1"];
+            const item = plan[idx];
+            const timeStr = window.currentOptionTime === 'op2' ? item.timeOp2 : item.timeOp1;
+
+            const reason = document.getElementById('suspendReasonSelect').value;
+            const notes = document.getElementById('suspendNotes').value;
+
+            window.dailyFlightStatuses[idx] = {
+                status: 'SUSPENDIDO',
+                realTime: 'N/A',
+                note: `${reason} - ${notes}`
+            };
+            localStorage.setItem('audi_flight_statuses', JSON.stringify(window.dailyFlightStatuses));
+
+            const now = new Date();
+            const bitacoraEntry = {
+                id: Date.now(),
+                timestampFormatted: now.toLocaleString('es-MX'),
+                scheduledTime: timeStr,
+                flightType: `TIPO ${item.type} - ${item.name}`,
+                status: 'SUSPENDIDO',
+                realTime: 'N/A',
+                notes: `${reason}: ${notes}`,
+                evidenceImg: window.tempImageData || ''
+            };
+
+            window.bitacoraList.unshift(bitacoraEntry);
+            localStorage.setItem('audi_bitacora_logs', JSON.stringify(window.bitacoraList));
+
+            if (window.cloudSyncFlightStatus) window.cloudSyncFlightStatus(window.dailyFlightStatuses);
+            if (window.cloudAddBitacoraItem) window.cloudAddBitacoraItem(bitacoraEntry);
+
+            closeModal('modalSuspension');
+            renderFlightsTable();
+            renderBitacoraTable();
+            showToast('Suspensión de vuelo registrada con evidencia', 'warning');
+            speakAlert(`Vuelo de las ${timeStr} horas suspendido por ${reason}`);
+        }
+
+        function openEditBitacoraModal(idx) {
+            window.activeEditIndex = idx;
+            const item = window.bitacoraList[idx];
+            if (!item) return;
+
+            document.getElementById('editFlightLabel').value = `${item.scheduledTime} hrs - ${item.flightType}`;
+            document.getElementById('editStatusSelect').value = item.status;
+            document.getElementById('editRealTime').value = item.realTime || '';
+            document.getElementById('editNotes').value = item.notes || '';
+            window.tempEditImageData = item.evidenceImg || '';
+
+            if (item.evidenceImg) {
+                document.getElementById('editEvidencePreviewImg').src = item.evidenceImg;
+                document.getElementById('editEvidencePreviewContainer').classList.remove('hidden');
+            } else {
+                document.getElementById('editEvidencePreviewContainer').classList.add('hidden');
+            }
+
+            openModal('modalEditBitacora');
+        }
+
+        function previewEditEvidenceImage(e) {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(evt) {
+                    window.tempEditImageData = evt.target.result;
+                    document.getElementById('editEvidencePreviewImg').src = evt.target.result;
+                    document.getElementById('editEvidencePreviewContainer').classList.remove('hidden');
+                };
+                reader.readAsDataURL(file);
+            }
+        }
+
+        function confirmEditBitacora() {
+            const idx = window.activeEditIndex;
+            if (idx === undefined || !window.bitacoraList[idx]) return;
+
+            const item = window.bitacoraList[idx];
+            item.status = document.getElementById('editStatusSelect').value;
+            item.realTime = document.getElementById('editRealTime').value;
+            item.notes = document.getElementById('editNotes').value;
+            item.evidenceImg = window.tempEditImageData;
+
+            localStorage.setItem('audi_bitacora_logs', JSON.stringify(window.bitacoraList));
+            if (window.cloudUpdateBitacoraItem && item.cloudId) {
+                window.cloudUpdateBitacoraItem(item.cloudId, item);
+            }
+
+            closeModal('modalEditBitacora');
+            renderBitacoraTable();
+            showToast('Registro de bitácora actualizado', 'info');
+        }
+
+        function openDeleteBitacoraModal(idx) {
+            window.activeDeleteIndex = idx;
+            const item = window.bitacoraList[idx];
+            if (!item) return;
+
+            document.getElementById('deleteTargetInfo').innerText = `${item.timestampFormatted} | ${item.scheduledTime} hrs | ${item.status}`;
+            openModal('modalDeleteConfirm');
+        }
+
+        function confirmDeleteBitacora() {
+            const idx = window.activeDeleteIndex;
+            if (idx !== undefined && window.bitacoraList[idx]) {
+                const item = window.bitacoraList[idx];
+                window.bitacoraList.splice(idx, 1);
+                localStorage.setItem('audi_bitacora_logs', JSON.stringify(window.bitacoraList));
+                if (window.cloudDeleteBitacoraItem && item.cloudId) {
+                    window.cloudDeleteBitacoraItem(item.cloudId);
+                }
+            }
+            closeModal('modalDeleteConfirm');
+            renderBitacoraTable();
+            showToast('Registro eliminado de la bitácora', 'warning');
+        }
+
+        function viewOfficialPlansModal() {
+            const tbody = document.getElementById('officialPlansTableBody');
+            if (!tbody) return;
+
+            let html = '';
+            for (let i = 0; i < 16; i++) {
+                const p1 = OFFICIAL_PLANS["1"][i];
+                const p2 = OFFICIAL_PLANS["2"][i];
+                const p3 = OFFICIAL_PLANS["3"][i];
+                const p4 = OFFICIAL_PLANS["4"][i];
+
+                html += `
+                    <tr class="hover:bg-slate-800/60">
+                        <td class="p-2.5 font-bold text-amber-300">${p1.timeOp1} hrs</td>
+                        <td class="p-2.5"><span class="px-2 py-0.5 rounded bg-slate-800 border border-slate-700">TIPO ${p1.type}</span></td>
+                        <td class="p-2.5"><span class="px-2 py-0.5 rounded bg-slate-800 border border-slate-700">TIPO ${p2.type}</span></td>
+                        <td class="p-2.5"><span class="px-2 py-0.5 rounded bg-slate-800 border border-slate-700">TIPO ${p3.type}</span></td>
+                        <td class="p-2.5"><span class="px-2 py-0.5 rounded bg-slate-800 border border-slate-700">TIPO ${p4.type}</span></td>
+                        <td class="p-2.5 font-sans text-slate-300 text-xs">${p1.name}</td>
+                    </tr>
+                `;
+            }
+            tbody.innerHTML = html;
+            openModal('modalOfficialPlans');
+        }
+
+        function exportBitacoraCSV() {
+            if (!window.bitacoraList || window.bitacoraList.length === 0) {
+                showToast('No hay datos en la bitácora para exportar', 'warning');
+                return;
+            }
+
+            let csv = 'Fecha,Hora Programada,Tipo Vuelo,Estado,Hora Real Despegue,Observaciones\n';
+            window.bitacoraList.forEach(item => {
+                csv += `"${item.timestampFormatted}","${item.scheduledTime}","${item.flightType}","${item.status}","${item.realTime}","${item.notes}"\n`;
+            });
+
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `bitacora_vuelos_audi_${new Date().toISOString().split('T')[0]}.csv`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            showToast('Bitácora exportada a CSV/Excel', 'success');
+        }
+
+        function speakAlert(text) {
+            if ('speechSynthesis' in window) {
+                window.speechSynthesis.cancel();
+                const utterance = new SpeechSynthesisUtterance(text);
+                utterance.lang = 'es-MX';
+                utterance.rate = 1.0;
+                window.speechSynthesis.speak(utterance);
+            }
+        }
+
+        function testVoiceAlert() {
+            speakAlert("Prueba del sistema de alertas de voz de control de vuelos.");
+            showToast('Prueba de voz reproducida', 'info');
+        }
+
+        function showToast(msg, type = 'info') {
+            const toast = document.getElementById('toastNotification');
+            const messageEl = document.getElementById('toastMessage');
+            const iconEl = document.getElementById('toastIcon');
+            if (!toast || !messageEl) return;
+
+            messageEl.innerText = msg;
+            if (type === 'success') {
+                iconEl.className = "fa-solid fa-circle-check text-emerald-400 text-lg";
+            } else if (type === 'warning') {
+                iconEl.className = "fa-solid fa-triangle-exclamation text-amber-400 text-lg";
+            } else {
+                iconEl.className = "fa-solid fa-circle-info text-blue-400 text-lg";
+            }
+
+            toast.classList.remove('opacity-0', 'translate-y-5', 'pointer-events-none');
+            setTimeout(() => {
+                toast.classList.add('opacity-0', 'translate-y-5', 'pointer-events-none');
+            }, 3500);
+        }
+
+        function openModal(id) {
+            const modal = document.getElementById(id);
+            if (modal) modal.classList.remove('hidden');
+        }
+
+        function closeModal(id) {
+            const modal = document.getElementById(id);
+            if (modal) modal.classList.add('hidden');
+        }
+
+        function openFirebaseConfigModal() {
+            const saved = localStorage.getItem('audi_custom_firebase_config') || '';
+            document.getElementById('firebaseConfigInput').value = saved;
+            openModal('modalFirebaseConfig');
+        }
+
+        function saveFirebaseConfig(useLocalOnly) {
+            if (useLocalOnly) {
+                localStorage.removeItem('audi_custom_firebase_config');
+                showToast('Modo local activado', 'info');
+            } else {
+                const val = document.getElementById('firebaseConfigInput').value.trim();
+                if (val) {
+                    try {
+                        JSON.parse(val);
+                        localStorage.setItem('audi_custom_firebase_config', val);
+                        showToast('Configuración Firebase guardada. Recargando...', 'success');
+                        setTimeout(() => location.reload(), 1000);
+                    } catch (e) {
+                        showToast('El JSON de Firebase no es válido', 'warning');
+                        return;
+                    }
+                }
+            }
+            closeModal('modalFirebaseConfig');
+        }
+
+        function handleMidnightReset() {
+            window.dailyFlightStatuses = {};
+            localStorage.setItem('audi_flight_statuses', JSON.stringify(window.dailyFlightStatuses));
+            renderFlightsTable();
+            showToast('Ciclo diario reiniciado para la nueva jornada (00:00 hrs)', 'info');
+        }
+
+        window.addEventListener('DOMContentLoaded', () => {
+            // Restore stored options
+            const savedPlan = localStorage.getItem('audi_current_plan');
+            if (savedPlan) window.currentWeeklyPlan = savedPlan;
+
+            const savedOpt = localStorage.getItem('audi_current_opt');
+            if (savedOpt) window.currentOptionTime = savedOpt;
+
+            const savedStatuses = localStorage.getItem('audi_flight_statuses');
+            if (savedStatuses) {
+                try { window.dailyFlightStatuses = JSON.parse(savedStatuses); } catch(e) {}
+            }
+
+            const savedBitacora = localStorage.getItem('audi_bitacora_logs');
+            if (savedBitacora) {
+                try { window.bitacoraList = JSON.parse(savedBitacora); } catch(e) {}
+            }
+
+            // Sync dropdown element
+            const selectPlan = document.getElementById('selectWeeklyPlan');
+            if (selectPlan) selectPlan.value = window.currentWeeklyPlan;
+
+            updateOptionTimeButtons();
+            startLiveClock();
+            renderFlightsTable();
+            renderBitacoraTable();
+        });
+    </script>
+
+    <!-- Firebase Realtime Synchronizer Module -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, setDoc, getDoc, collection, onSnapshot, addDoc, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, setDoc, collection, onSnapshot, addDoc, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // Global Firebase state
         window.appId = typeof __app_id !== 'undefined' ? __app_id : 'audi-drones-app-default';
-        
-        // Embedded default configuration for control-vuelos project
+
         const defaultFirebaseConfig = {
             apiKey: "AIzaSyDXjwv133-dIKyprCktTUkjx_adAz1DhAY",
             authDomain: "control-vuelos.firebaseapp.com",
@@ -500,41 +1304,20 @@
         };
 
         let firebaseConfigObj = defaultFirebaseConfig;
-
-        // 1. Check environment variable __firebase_config
-        if (typeof __firebase_config !== 'undefined' && __firebase_config) {
-            try {
-                firebaseConfigObj = JSON.parse(__firebase_config);
-            } catch (e) {
-                console.warn("Error parsing environment __firebase_config:", e);
-            }
-        }
-
-        // 2. Check custom configuration stored in localStorage if user customized it
         const savedCustomConfig = localStorage.getItem('audi_custom_firebase_config');
         if (savedCustomConfig) {
-            try {
-                firebaseConfigObj = JSON.parse(savedCustomConfig);
-            } catch (e) {
-                console.warn("Error parsing saved custom firebase config:", e);
-            }
+            try { firebaseConfigObj = JSON.parse(savedCustomConfig); } catch (e) {}
         }
-
-        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
 
         let db = null;
         let auth = null;
 
         async function initAuthAndFirestore() {
-            if (!firebaseConfigObj) {
-                updateCloudBadge(false, "Modo Local (Clic p/ Configurar)");
-                return;
-            }
-
-            // Timeout guard: if Firebase takes > 5s, switch badge to helpful status
-            const connectionTimeout = setTimeout(() => {
-                if (document.getElementById('cloudStatusBadge') && document.getElementById('cloudStatusBadge').innerText.includes("Sincronizando")) {
-                    updateCloudBadge(false, "Modo Local (Sin Nube)");
+            const timeoutGuard = setTimeout(() => {
+                const badge = document.getElementById('cloudStatusBadge');
+                if (badge && badge.innerText.includes('Sincronizando')) {
+                    badge.className = "text-xs font-bold px-2.5 py-1 rounded-lg bg-slate-800 text-slate-300 border border-slate-700 flex items-center gap-1.5 cursor-pointer";
+                    badge.innerHTML = `<i class="fa-solid fa-cloud text-[10px]"></i> Modo Local (Sin Nube)`;
                 }
             }, 5000);
 
@@ -543,53 +1326,27 @@
                 auth = getAuth(app);
                 db = getFirestore(app);
 
-                // Attempt custom token authentication with fallback to anonymous
-                if (initialAuthToken) {
-                    try {
-                        await signInWithCustomToken(auth, initialAuthToken);
-                    } catch (tokenErr) {
-                        console.warn("Custom token failed, falling back to anonymous auth:", tokenErr);
-                        await signInAnonymously(auth);
-                    }
-                } else {
-                    await signInAnonymously(auth);
-                }
+                await signInAnonymously(auth);
 
                 onAuthStateChanged(auth, (user) => {
-                    clearTimeout(connectionTimeout);
-                    if (user) {
-                        updateCloudBadge(true, "Nube Live Sincronizada");
+                    clearTimeout(timeoutGuard);
+                    const badge = document.getElementById('cloudStatusBadge');
+                    if (user && badge) {
+                        badge.className = "text-xs font-bold px-2.5 py-1 rounded-lg bg-emerald-950/80 text-emerald-400 border border-emerald-800/40 flex items-center gap-1.5 cursor-pointer";
+                        badge.innerHTML = `<i class="fa-solid fa-cloud-check text-[10px]"></i> Nube Live Sincronizada`;
                         setupRealtimeSync();
-                    } else {
-                        updateCloudBadge(false, "Sin Conexión Nube");
                     }
                 });
             } catch (err) {
-                clearTimeout(connectionTimeout);
-                console.warn("Auth initialization error:", err);
-                updateCloudBadge(false, "Modo Local (Clic p/ Revisa)");
+                clearTimeout(timeoutGuard);
+                console.warn("Firebase Auth Warning:", err);
             }
         }
 
-        function updateCloudBadge(online, text) {
-            const badge = document.getElementById('cloudStatusBadge');
-            if (badge) {
-                if (online) {
-                    badge.className = "text-xs font-bold px-2.5 py-1 rounded-lg bg-emerald-950/80 text-emerald-400 border border-emerald-800/40 flex items-center gap-1.5 cursor-pointer hover:bg-emerald-900 transition";
-                    badge.innerHTML = `<i class="fa-solid fa-cloud-check text-[10px]"></i> ${text}`;
-                } else {
-                    badge.className = "text-xs font-bold px-2.5 py-1 rounded-lg bg-slate-800 text-slate-300 border border-slate-700 flex items-center gap-1.5 cursor-pointer hover:bg-slate-700 transition";
-                    badge.innerHTML = `<i class="fa-solid fa-cloud text-[10px]"></i> ${text}`;
-                }
-            }
-        }
-
-        // Realtime Firestore synchronizer
         function setupRealtimeSync() {
             if (!db) return;
 
             try {
-                // Sync daily flight statuses
                 const appDocRef = doc(db, 'audi_drones_apps', window.appId);
                 onSnapshot(appDocRef, (snapshot) => {
                     if (snapshot.exists()) {
@@ -597,29 +1354,20 @@
                         if (data.flightStatuses) {
                             window.dailyFlightStatuses = data.flightStatuses;
                             localStorage.setItem('audi_flight_statuses', JSON.stringify(data.flightStatuses));
-                            if (typeof window.renderFlightsTable === 'function') {
-                                window.renderFlightsTable();
-                            }
+                            if (typeof window.renderFlightsTable === 'function') window.renderFlightsTable();
                         }
                         if (data.currentWeeklyPlan) {
                             window.currentWeeklyPlan = data.currentWeeklyPlan;
                             const sel = document.getElementById('selectWeeklyPlan');
-                            if (sel && sel.value !== data.currentWeeklyPlan) {
-                                sel.value = data.currentWeeklyPlan;
-                            }
+                            if (sel) sel.value = data.currentWeeklyPlan;
                         }
                         if (data.currentOptionTime) {
                             window.currentOptionTime = data.currentOptionTime;
-                            if (typeof window.updateOptionTimeButtons === 'function') {
-                                window.updateOptionTimeButtons();
-                            }
+                            if (typeof window.updateOptionTimeButtons === 'function') window.updateOptionTimeButtons();
                         }
                     }
-                }, (error) => {
-                    console.warn("Firestore snapshot error:", error);
                 });
 
-                // Sync Bitácora entries
                 const bitacoraCollRef = collection(db, 'audi_drones_apps', window.appId, 'bitacora');
                 onSnapshot(bitacoraCollRef, (snapshot) => {
                     const cloudBitacora = [];
@@ -627,23 +1375,17 @@
                         cloudBitacora.push({ cloudId: docSnap.id, ...docSnap.data() });
                     });
                     if (cloudBitacora.length > 0) {
-                        cloudBitacora.sort((a, b) => new Date(b.timestamp || b.id) - new Date(a.timestamp || a.id));
+                        cloudBitacora.sort((a, b) => new Date(b.timestampFormatted || b.id) - new Date(a.timestampFormatted || a.id));
                         window.bitacoraList = cloudBitacora;
                         localStorage.setItem('audi_bitacora_logs', JSON.stringify(cloudBitacora));
-                        if (typeof window.renderBitacoraTable === 'function') {
-                            window.renderBitacoraTable();
-                        }
+                        if (typeof window.renderBitacoraTable === 'function') window.renderBitacoraTable();
                     }
-                }, (error) => {
-                    console.warn("Firestore bitacora snapshot error:", error);
                 });
-
             } catch (e) {
-                console.warn("Error setting up Firestore realtime listeners:", e);
+                console.warn("Snapshot Listener Warning:", e);
             }
         }
 
-        // Global bridge methods for saving to Firestore
         window.cloudSyncFlightStatus = async function(statuses) {
             if (!db) return;
             try {
@@ -654,9 +1396,7 @@
                     currentOptionTime: window.currentOptionTime || 'op1',
                     lastUpdated: new Date().toISOString()
                 }, { merge: true });
-            } catch (err) {
-                console.warn("Cloud save error:", err);
-            }
+            } catch (err) { console.warn("Cloud Sync Error:", err); }
         };
 
         window.cloudAddBitacoraItem = async function(item) {
@@ -664,9 +1404,7 @@
             try {
                 const bitacoraCollRef = collection(db, 'audi_drones_apps', window.appId, 'bitacora');
                 await addDoc(bitacoraCollRef, { ...item, timestamp: new Date().toISOString() });
-            } catch (err) {
-                console.warn("Cloud add bitacora error:", err);
-            }
+            } catch (err) { console.warn("Cloud Add Error:", err); }
         };
 
         window.cloudUpdateBitacoraItem = async function(cloudId, updatedFields) {
@@ -674,9 +1412,7 @@
             try {
                 const itemRef = doc(db, 'audi_drones_apps', window.appId, 'bitacora', cloudId);
                 await updateDoc(itemRef, updatedFields);
-            } catch (err) {
-                console.warn("Cloud update bitacora error:", err);
-            }
+            } catch (err) { console.warn("Cloud Update Error:", err); }
         };
 
         window.cloudDeleteBitacoraItem = async function(cloudId) {
@@ -684,12 +1420,9 @@
             try {
                 const itemRef = doc(db, 'audi_drones_apps', window.appId, 'bitacora', cloudId);
                 await deleteDoc(itemRef);
-            } catch (err) {
-                console.warn("Cloud delete bitacora error:", err);
-            }
+            } catch (err) { console.warn("Cloud Delete Error:", err); }
         };
 
-        // EXPLICIT START: Execute initialization as soon as module script loads
         initAuthAndFirestore();
     </script>
 </body>
