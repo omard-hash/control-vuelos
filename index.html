@@ -249,7 +249,7 @@
                     <strong class="font-bold">TIPO A:</strong> Recorrido perimetral
                 </div>
                 <div class="bg-slate-950/80 p-2 rounded-lg border border-amber-500/30 text-amber-300">
-                    <strong class="font-bold">TIPO B:</strong> Accesos
+                    <strong class="font-bold">TIPO B:</strong> Accesos (Hora Fija 06:00, 14:00, 17:00, 21:30)
                 </div>
                 <div class="bg-slate-950/80 p-2 rounded-lg border border-emerald-500/30 text-emerald-300">
                     <strong class="font-bold">TIPO C:</strong> Interior de planta
@@ -549,11 +549,14 @@
         // Diccionario Oficial de Recorridos
         const tipoDictionary = {
             A: "Recorrido perimetral",
-            B: "Accesos (Cambio de Turno)",
+            B: "Accesos (Cambio de Turno - Hora Fija)",
             C: "Interior de planta",
             D: "Zonas lejanas",
             E: "Patios de camionetas"
         };
+
+        // Horarios Inflexibles Fijos de Cambio de Turno en Planta
+        const fixedShiftHours = ["06:00", "14:00", "17:00", "21:30"];
 
         // Matriz Oficial Predeterminada de los 4 Planes Semanales
         const weeklyPlanDefinitions = {
@@ -563,219 +566,51 @@
             4: ["A", "A", "C", "B", "C", "C", "A", "A", "A", "B", "C", "B", "A", "A", "B", "D"]
         };
 
-        // Estructura Base de Horarios por Opción
+        // Estructura Base de Horarios por Opción con restricción para cambios de turno
         const scheduleTimeSlots = {
             op1: [
-                { id: 1, hora: "00:00", window: "23:40 - 00:00", shift: false },
-                { id: 2, hora: "01:30", window: "01:10 - 01:30", shift: false },
-                { id: 3, hora: "03:00", window: "02:40 - 03:00", shift: false },
-                { id: 4, hora: "04:30", window: "04:10 - 04:30", shift: true },
-                { id: 5, hora: "06:00", window: "05:40 - 06:00", shift: false },
-                { id: 6, hora: "07:30", window: "07:10 - 07:30", shift: false },
-                { id: 7, hora: "09:00", window: "08:40 - 09:00", shift: false },
-                { id: 8, hora: "10:30", window: "10:10 - 10:30", shift: false },
-                { id: 9, hora: "12:00", window: "11:40 - 12:00", shift: false },
-                { id: 10, hora: "13:30", window: "13:10 - 13:30", shift: true },
-                { id: 11, hora: "15:00", window: "14:40 - 15:00", shift: false },
-                { id: 12, hora: "16:30", window: "16:10 - 16:30", shift: true },
-                { id: 13, hora: "18:00", window: "17:40 - 18:00", shift: false },
-                { id: 14, hora: "19:30", window: "19:10 - 19:30", shift: false },
-                { id: 15, hora: "21:00", window: "20:40 - 21:00", shift: true },
-                { id: 16, hora: "22:30", window: "22:10 - 22:30", shift: false }
+                { id: 1, hora: "00:00", window: "23:40 - 00:00", isFixedShift: false },
+                { id: 2, hora: "01:30", window: "01:10 - 01:30", isFixedShift: false },
+                { id: 3, hora: "03:00", window: "02:40 - 03:00", isFixedShift: false },
+                { id: 4, hora: "04:30", window: "04:10 - 04:30", isFixedShift: false },
+                { id: 5, hora: "06:00", window: "05:45 - 06:00 (Hora Fija Relevo 6 AM)", isFixedShift: true },
+                { id: 6, hora: "07:30", window: "07:10 - 07:30", isFixedShift: false },
+                { id: 7, hora: "09:00", window: "08:40 - 09:00", isFixedShift: false },
+                { id: 8, hora: "10:30", window: "10:10 - 10:30", isFixedShift: false },
+                { id: 9, hora: "12:00", window: "11:40 - 12:00", isFixedShift: false },
+                { id: 10, hora: "14:00", window: "13:45 - 14:00 (Hora Fija Relevo 2 PM)", isFixedShift: true },
+                { id: 11, hora: "15:00", window: "14:40 - 15:00", isFixedShift: false },
+                { id: 12, hora: "17:00", window: "16:45 - 17:00 (Hora Fija Relevo 5 PM)", isFixedShift: true },
+                { id: 13, hora: "18:00", window: "17:40 - 18:00", isFixedShift: false },
+                { id: 14, hora: "19:30", window: "19:10 - 19:30", isFixedShift: false },
+                { id: 15, hora: "21:30", window: "21:15 - 21:30 (Hora Fija Relevo 9:30 PM)", isFixedShift: true },
+                { id: 16, hora: "22:30", window: "22:10 - 22:30", isFixedShift: false }
             ],
             op2: [
-                { id: 1, hora: "00:30", window: "00:10 - 00:30", shift: false },
-                { id: 2, hora: "02:00", window: "01:40 - 02:00", shift: false },
-                { id: 3, hora: "03:30", window: "03:10 - 03:30", shift: false },
-                { id: 4, hora: "05:00", window: "04:40 - 05:00", shift: true },
-                { id: 5, hora: "06:30", window: "06:10 - 06:30", shift: false },
-                { id: 6, hora: "08:00", window: "07:40 - 08:00", shift: false },
-                { id: 7, hora: "09:30", window: "09:10 - 09:30", shift: false },
-                { id: 8, hora: "11:00", window: "10:40 - 11:00", shift: false },
-                { id: 9, hora: "12:30", window: "12:10 - 12:30", shift: false },
-                { id: 10, hora: "14:00", window: "13:40 - 14:00", shift: true },
-                { id: 11, hora: "15:30", window: "15:10 - 15:30", shift: false },
-                { id: 12, hora: "17:00", window: "16:40 - 17:00", shift: true },
-                { id: 13, hora: "18:30", window: "18:10 - 18:30", shift: false },
-                { id: 14, hora: "20:00", window: "19:40 - 20:00", shift: false },
-                { id: 15, hora: "21:30", window: "21:10 - 21:30", shift: true },
-                { id: 16, hora: "23:00", window: "22:40 - 23:00", shift: false }
+                { id: 1, hora: "00:30", window: "00:10 - 00:30", isFixedShift: false },
+                { id: 2, hora: "02:00", window: "01:40 - 02:00", isFixedShift: false },
+                { id: 3, hora: "03:30", window: "03:10 - 03:30", isFixedShift: false },
+                { id: 4, hora: "05:00", window: "04:45 - 05:00", isFixedShift: false },
+                { id: 5, hora: "06:00", window: "05:45 - 06:00 (Hora Fija Relevo 6 AM)", isFixedShift: true },
+                { id: 6, hora: "08:00", window: "07:40 - 08:00", isFixedShift: false },
+                { id: 7, hora: "09:30", window: "09:10 - 09:30", isFixedShift: false },
+                { id: 8, hora: "11:00", window: "10:40 - 11:00", isFixedShift: false },
+                { id: 9, hora: "12:30", window: "12:10 - 12:30", isFixedShift: false },
+                { id: 10, hora: "14:00", window: "13:45 - 14:00 (Hora Fija Relevo 2 PM)", isFixedShift: true },
+                { id: 11, hora: "15:30", window: "15:10 - 15:30", isFixedShift: false },
+                { id: 12, hora: "17:00", window: "16:45 - 17:00 (Hora Fija Relevo 5 PM)", isFixedShift: true },
+                { id: 13, hora: "18:30", window: "18:10 - 18:30", isFixedShift: false },
+                { id: 14, hora: "20:00", window: "19:40 - 20:00", isFixedShift: false },
+                { id: 15, hora: "21:30", window: "21:15 - 21:30 (Hora Fija Relevo 9:30 PM)", isFixedShift: true },
+                { id: 16, hora: "23:00", window: "22:40 - 23:00", isFixedShift: false }
             ]
         };
-
-        // Estado Global del Sistema
-        let currentOption = localStorage.getItem('audi_currentOption') || 'op1';
-        let currentWeeklyPlan = localStorage.getItem('audi_currentWeeklyPlan') || '1';
-        let flightsData = [];
-        let bitacoraList = [];
-        let activeSuspension = false;
-        let suspensionHourlyTimer = null;
-        let activeFlightModalIndex = null;
-        let activeEditBitacoraIndex = null;
-        let activeDeleteBitacoraIndex = null;
-        let tempEditEvidenceDataUrl = null;
-        let tempEvidenceDataUrl = null;
-        let currentTargetIndex = 0;
-        let alertWindowOpened = {};
-        let alertWindowWarning5m = {};
-        let activeModalPlanTab = 1;
-
-        window.onload = function() {
-            // Cargar bitácora persistente
-            const savedBitacora = localStorage.getItem('audi_bitacoraList');
-            if (savedBitacora) {
-                try { bitacoraList = JSON.parse(savedBitacora); } catch(e) {}
-            }
-
-            // Seleccionar Plan según la fecha o guardado
-            const selectEl = document.getElementById('selectWeeklyPlan');
-            if (selectEl) {
-                if (!localStorage.getItem('audi_currentWeeklyPlan')) {
-                    autoSelectWeeklyPlanByDate();
-                } else {
-                    selectEl.value = currentWeeklyPlan;
-                }
-            }
-
-            // Cargar o inicializar vuelos del día
-            const todayKey = 'audi_flightsData_' + new Date().toISOString().slice(0, 10) + '_' + currentWeeklyPlan + '_' + currentOption;
-            const storedFlights = localStorage.getItem(todayKey);
-            if (storedFlights) {
-                try { flightsData = JSON.parse(storedFlights); } catch(e) { initFlightsData(); }
-            } else {
-                initFlightsData();
-            }
-
-            updateOptionButtonsUI();
-            renderAllUI();
-            startLiveClock();
-        };
-
-        function autoSelectWeeklyPlanByDate() {
-            const day = new Date().getDate();
-            let plan = "1";
-            if (day > 7 && day <= 14) plan = "2";
-            else if (day > 14 && day <= 21) plan = "3";
-            else if (day > 21) plan = "4";
-
-            currentWeeklyPlan = plan;
-            const selectEl = document.getElementById('selectWeeklyPlan');
-            if (selectEl) selectEl.value = plan;
-        }
-
-        function saveStorage() {
-            try {
-                localStorage.setItem('audi_currentOption', currentOption);
-                localStorage.setItem('audi_currentWeeklyPlan', currentWeeklyPlan);
-                localStorage.setItem('audi_bitacoraList', JSON.stringify(bitacoraList));
-                
-                const todayKey = 'audi_flightsData_' + new Date().toISOString().slice(0, 10) + '_' + currentWeeklyPlan + '_' + currentOption;
-                localStorage.setItem(todayKey, JSON.stringify(flightsData));
-            } catch(e) {
-                console.error("Error guardando datos en localStorage", e);
-            }
-        }
-
-        function initFlightsData() {
-            const timeSlots = scheduleTimeSlots[currentOption];
-            const planTypes = weeklyPlanDefinitions[currentWeeklyPlan] || weeklyPlanDefinitions[1];
-
-            flightsData = timeSlots.map((slot, idx) => {
-                const tipo = planTypes[idx] || "A";
-                return {
-                    ...slot,
-                    tipo: tipo,
-                    name: tipoDictionary[tipo] || "Recorrido perimetral",
-                    status: 'pending',
-                    takeoffTime: null,
-                    notes: '',
-                    evidenceImg: null,
-                    pilot: 'Piloto Turno'
-                };
-            });
-            alertWindowOpened = {};
-            alertWindowWarning5m = {};
-            saveStorage();
-        }
-
-        function changeWeeklyPlan(planKey, isAuto = false) {
-            currentWeeklyPlan = planKey;
-            initFlightsData();
-            renderAllUI();
-            saveStorage();
-            if (!isAuto) {
-                showToast(`Se ha activado el Plan ${planKey}`, 'success');
-                speakVoice(`Se ha seleccionado el Plan ${planKey} oficialmente.`);
-            }
-        }
-
-        function setOptionTime(op) {
-            currentOption = op;
-            updateOptionButtonsUI();
-            initFlightsData();
-            renderAllUI();
-            saveStorage();
-        }
-
-        function updateOptionButtonsUI() {
-            const b1 = document.getElementById('btnOpt1');
-            const b2 = document.getElementById('btnOpt2');
-            if (!b1 || !b2) return;
-
-            if (currentOption === 'op1') {
-                b1.className = "px-3 py-1.5 text-xs font-bold rounded-lg bg-audi-red text-white transition shadow";
-                b2.className = "px-3 py-1.5 text-xs font-bold rounded-lg text-slate-400 hover:text-white transition";
-            } else {
-                b2.className = "px-3 py-1.5 text-xs font-bold rounded-lg bg-emerald-600 text-white transition shadow";
-                b1.className = "px-3 py-1.5 text-xs font-bold rounded-lg text-slate-400 hover:text-white transition";
-            }
-        }
-
-        function startLiveClock() {
-            updateLiveClock();
-            setInterval(updateLiveClock, 1000);
-        }
-
-        function updateLiveClock() {
-            const now = new Date();
-            const hrs = String(now.getHours()).padStart(2, '0');
-            const mins = String(now.getMinutes()).padStart(2, '0');
-            const secs = String(now.getSeconds()).padStart(2, '0');
-
-            const liveClock = document.getElementById('liveClock');
-            if (liveClock) liveClock.innerText = `${hrs}:${mins}:${secs}`;
-
-            const liveDate = document.getElementById('liveDate');
-            if (liveDate) {
-                const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
-                liveDate.innerText = now.toLocaleDateString('es-MX', options);
-            }
-
-            // Actualizar Turno Activo
-            const curH = now.getHours();
-            const shiftBadge = document.getElementById('shiftBadge');
-            if (shiftBadge) {
-                if (curH >= 6 && curH < 14) {
-                    shiftBadge.innerText = "Turno 1 (06:00 - 14:00) - Activo";
-                    shiftBadge.className = "text-xs font-bold px-2 py-0.5 rounded bg-emerald-950/80 text-emerald-400 border border-emerald-800/40";
-                } else if (curH >= 14 && curH < 22) {
-                    shiftBadge.innerText = "Turno 2 (14:00 - 22:00) - Activo";
-                    shiftBadge.className = "text-xs font-bold px-2 py-0.5 rounded bg-blue-950/80 text-blue-400 border border-blue-800/40";
-                } else {
-                    shiftBadge.innerText = "Turno 3 (22:00 - 06:00) - Activo";
-                    shiftBadge.className = "text-xs font-bold px-2 py-0.5 rounded bg-purple-950/80 text-purple-400 border border-purple-800/40";
-                }
-            }
-
-            updateLiveTargetAndAlerts(now);
-        }
 
         function updateLiveTargetAndAlerts(now) {
             if (!flightsData || flightsData.length === 0) return;
 
             const nowMins = now.getHours() * 60 + now.getMinutes();
 
-            // Buscar slot activo o próximo
             let activeOrNextIdx = -1;
             let minDiff = 9999;
 
@@ -784,14 +619,12 @@
                 const slotMins = parseInt(parts[0]) * 60 + parseInt(parts[1]);
                 let diff = slotMins - nowMins;
 
-                // Si está dentro de la ventana de despegue (-20 min a 0 min)
                 if (diff >= -20 && diff <= 10) {
                     activeOrNextIdx = idx;
                     minDiff = diff;
                 }
             });
 
-            // Si no hay ninguno justo en ventana, buscar el siguiente en el futuro
             if (activeOrNextIdx === -1) {
                 flightsData.forEach((slot, idx) => {
                     const parts = slot.hora.split(':');
@@ -804,15 +637,24 @@
                 });
             }
 
-            if (activeOrNextIdx === -1) activeOrNextIdx = 0; // Default al primero
+            if (activeOrNextIdx === -1) activeOrNextIdx = 0;
 
             currentTargetIndex = activeOrNextIdx;
             const target = flightsData[activeOrNextIdx];
 
             // Renderizar Banner Target
             document.getElementById('targetFlightTime').innerText = `${target.hora} hrs`;
-            document.getElementById('targetFlightBadge').innerText = `TIPO ${target.tipo} - ${target.name}`;
-            document.getElementById('targetFlightWindow').innerText = `${target.window} hrs`;
+            
+            const badgeEl = document.getElementById('targetFlightBadge');
+            if (target.isFixedShift || fixedShiftHours.includes(target.hora)) {
+                badgeEl.innerText = `TIPO B - CAMBIO DE TURNO (HORA FIJA EN ACCESOS)`;
+                badgeEl.className = "px-2.5 py-0.5 rounded-md text-xs font-black bg-amber-500 text-slate-950 animate-pulse";
+                document.getElementById('targetFlightDesc').innerHTML = `<strong>VUELO FIJO OBLIGATORIO DE CAMBIO DE TURNO:</strong> Cobertura directa de accesos en horario de relevo (<span class="text-amber-300 font-bold">${target.hora} hrs</span>).`;
+            } else {
+                badgeEl.innerText = `TIPO ${target.tipo} - ${target.name}`;
+                badgeEl.className = "px-2.5 py-0.5 rounded-md text-xs font-extrabold bg-audi-red text-white";
+                document.getElementById('targetFlightDesc').innerHTML = `Ventana de despegue permitida: <strong id="targetFlightWindow" class="text-emerald-400 font-mono">${target.window} hrs</strong> (-20 min disuasivo).`;
+            }
 
             const parts = target.hora.split(':');
             const targetMins = parseInt(parts[0]) * 60 + parseInt(parts[1]);
@@ -820,19 +662,21 @@
 
             const countdownEl = document.getElementById('targetCountdown');
             if (diffMins > 0 && diffMins <= 20) {
-                countdownEl.innerText = `Ventana Abierta (-${diffMins} min)`;
+                countdownEl.innerText = target.isFixedShift ? `Relevo Fijo Activo (-${diffMins} min)` : `Ventana Abierta (-${diffMins} min)`;
                 countdownEl.className = "text-lg font-mono font-bold text-emerald-400 pulse-amber";
 
-                // Alerta de voz apertura de ventana
                 if (!alertWindowOpened[target.id]) {
                     alertWindowOpened[target.id] = true;
-                    speakVoice(`Atención operador. Ha iniciado la ventana operativa para el vuelo ${target.name} de las ${target.hora} horas. Puede iniciar despegue.`);
+                    if (target.isFixedShift) {
+                        speakVoice(`Atención operador. Vuelo prioritario de cambio de turno de las ${target.hora} horas. Hora fija de sobrevuelo obligatorio en garitas y accesos.`);
+                    } else {
+                        speakVoice(`Atención operador. Ha iniciado la ventana operativa para el vuelo ${target.name} de las ${target.hora} horas. Puede iniciar despegue.`);
+                    }
                 }
 
-                // Alerta 5 min antes
                 if (diffMins === 5 && !alertWindowWarning5m[target.id]) {
                     alertWindowWarning5m[target.id] = true;
-                    speakVoice(`Alerta. Faltan 5 minutos para que finalice la ventana de despegue del vuelo ${target.name} de las ${target.hora} horas.`);
+                    speakVoice(`Alerta. Faltan 5 minutos para la hora programada del vuelo ${target.name} de las ${target.hora} horas.`);
                 }
             } else if (diffMins <= 0 && diffMins >= -20) {
                 countdownEl.innerText = `Hora Exacta (${target.hora} hrs)`;
@@ -844,54 +688,6 @@
                 countdownEl.innerText = `Pasado`;
                 countdownEl.className = "text-lg font-mono font-bold text-slate-500";
             }
-        }
-
-        function speakVoice(text) {
-            if (!('speechSynthesis' in window)) return;
-            try {
-                window.speechSynthesis.cancel();
-                const utterance = new SpeechSynthesisUtterance(text);
-                utterance.lang = 'es-MX';
-                utterance.rate = 1.0;
-                utterance.pitch = 1.0;
-                window.speechSynthesis.speak(utterance);
-            } catch (e) {
-                console.error("Error al sintetizar voz:", e);
-            }
-        }
-
-        function testVoiceAlert() {
-            speakVoice("Prueba del sistema de voz activada. Ventana operativa de patrullaje lista.");
-            showToast("Prueba de audio ejecutada", "info");
-        }
-
-        function showToast(msg, type = 'info') {
-            const toast = document.getElementById('toastNotification');
-            const toastMsg = document.getElementById('toastMessage');
-            const toastIcon = document.getElementById('toastIcon');
-            if (!toast || !toastMsg || !toastIcon) return;
-
-            toastMsg.innerText = msg;
-            if (type === 'success') {
-                toastIcon.className = "fa-solid fa-circle-check text-emerald-400 text-lg";
-            } else if (type === 'danger') {
-                toastIcon.className = "fa-solid fa-circle-xmark text-red-400 text-lg";
-            } else if (type === 'warning') {
-                toastIcon.className = "fa-solid fa-triangle-exclamation text-amber-400 text-lg";
-            } else {
-                toastIcon.className = "fa-solid fa-circle-info text-blue-400 text-lg";
-            }
-
-            toast.classList.remove('opacity-0', 'translate-y-5', 'pointer-events-none');
-            setTimeout(() => {
-                toast.classList.add('opacity-0', 'translate-y-5', 'pointer-events-none');
-            }, 3500);
-        }
-
-        function renderAllUI() {
-            renderFlightsTable();
-            renderBitacoraTable();
-            updateCounters();
         }
 
         function renderFlightsTable() {
@@ -906,18 +702,21 @@
                     statusBadge = `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-950 text-amber-400 border border-amber-800">Suspendido</span>`;
                 }
 
-                const isShift = f.tipo === 'B';
+                const isShiftFixed = f.isFixedShift || fixedShiftHours.includes(f.hora);
                 const rowClass = idx === currentTargetIndex 
                     ? 'bg-blue-950/40 border-l-4 border-blue-500' 
-                    : (isShift ? 'bg-amber-950/10 hover:bg-slate-800/50' : 'hover:bg-slate-800/50');
+                    : (isShiftFixed ? 'bg-amber-950/20 hover:bg-slate-800/50' : 'hover:bg-slate-800/50');
 
                 return `
                     <tr class="${rowClass} transition">
                         <td class="px-4 py-3 font-mono text-slate-400 font-bold">#${f.id}</td>
-                        <td class="px-4 py-3 font-mono font-extrabold text-white text-sm">${f.hora} hrs</td>
+                        <td class="px-4 py-3 font-mono font-extrabold text-white text-sm">
+                            ${f.hora} hrs
+                            ${isShiftFixed ? `<span class="ml-1 text-[9px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-400 border border-amber-500/40 font-bold uppercase">Hora Fija Relevo</span>` : ''}
+                        </td>
                         <td class="px-4 py-3 font-mono text-amber-300 text-xs">${f.window}</td>
                         <td class="px-4 py-3">
-                            <span class="px-2 py-0.5 rounded text-[10px] font-extrabold ${isShift ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30' : 'bg-blue-500/20 text-blue-300 border border-blue-500/30'}">
+                            <span class="px-2 py-0.5 rounded text-[10px] font-extrabold ${isShiftFixed ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30' : 'bg-blue-500/20 text-blue-300 border border-blue-500/30'}">
                                 TIPO ${f.tipo}
                             </span>
                             <span class="text-slate-300 ml-1 font-semibold">${f.name}</span>
