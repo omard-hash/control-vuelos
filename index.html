@@ -320,6 +320,7 @@
                             <th class="px-4 py-3">Fecha / Hora Registro</th>
                             <th class="px-4 py-3">Hora Programada</th>
                             <th class="px-4 py-3">Tipo Vuelo</th>
+                            <th class="px-4 py-3">Operador / Piloto</th>
                             <th class="px-4 py-3">Estado</th>
                             <th class="px-4 py-3">Hora Real Despegue</th>
                             <th class="px-4 py-3">Detalle / Motivo Suspensión</th>
@@ -400,6 +401,10 @@
                     <input type="text" id="suspendFlightLabel" readonly class="w-full bg-slate-950 border border-slate-800 text-slate-200 px-3 py-2 rounded-lg font-bold">
                 </div>
                 <div>
+                    <label class="block text-slate-400 font-semibold mb-1">Nombre / Firma Operador:</label>
+                    <input type="text" id="suspendPilotName" value="Piloto en Turno" class="w-full bg-slate-950 border border-slate-700 text-slate-200 px-3 py-2 rounded-lg focus:outline-none focus:ring-1 focus:ring-amber-500">
+                </div>
+                <div>
                     <label class="block text-slate-400 font-semibold mb-1">Causa de Suspensión (Obligatorio):</label>
                     <select id="suspendReasonSelect" class="w-full bg-slate-950 border border-slate-700 text-amber-300 px-3 py-2 rounded-lg font-bold focus:ring-1 focus:ring-amber-500">
                         <option value="LLUVIA / PRECIPITACIÓN">Lluvia / Lluvia Fuerte</option>
@@ -445,6 +450,10 @@
                 <div>
                     <label class="block text-slate-400 font-semibold mb-1">Vuelo / Horario:</label>
                     <input type="text" id="editFlightLabel" readonly class="w-full bg-slate-950 border border-slate-800 text-slate-200 px-3 py-2 rounded-lg font-bold">
+                </div>
+                <div>
+                    <label class="block text-slate-400 font-semibold mb-1">Nombre / Firma Operador:</label>
+                    <input type="text" id="editPilotName" class="w-full bg-slate-950 border border-slate-700 text-slate-200 px-3 py-2 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500">
                 </div>
                 <div>
                     <label class="block text-slate-400 font-semibold mb-1">Estado del Registro:</label>
@@ -873,7 +882,7 @@
             if (!window.bitacoraList || window.bitacoraList.length === 0) {
                 tbody.innerHTML = `
                     <tr>
-                        <td colspan="8" class="text-center py-6 text-slate-500 italic">No hay registros guardados en la bitácora.</td>
+                        <td colspan="9" class="text-center py-6 text-slate-500 italic">No hay registros guardados en la bitácora.</td>
                     </tr>
                 `;
                 return;
@@ -889,12 +898,14 @@
                     `<span class="text-slate-600 italic">Sin imagen</span>`;
 
                 const statusColor = item.status === 'VOLADO' ? 'text-emerald-400 bg-emerald-950/60 border border-emerald-800/40' : 'text-amber-400 bg-amber-950/60 border border-amber-800/40';
+                const pilotName = item.pilot || 'Piloto en Turno';
 
                 html += `
                     <tr class="hover:bg-slate-800/40 transition border-b border-slate-800/40">
                         <td class="px-4 py-3 font-mono text-slate-300 text-[11px]">${item.timestampFormatted || item.timestamp || '--'}</td>
                         <td class="px-4 py-3 font-mono font-bold text-amber-300 text-xs">${item.scheduledTime} hrs</td>
                         <td class="px-4 py-3 font-semibold text-slate-200">${item.flightType || 'TIPO A'}</td>
+                        <td class="px-4 py-3 font-bold text-slate-200 text-xs">${pilotName}</td>
                         <td class="px-4 py-3"><span class="px-2 py-0.5 rounded text-[10px] font-bold ${statusColor}">${item.status}</span></td>
                         <td class="px-4 py-3 font-mono text-emerald-400 text-xs">${item.realTime || 'N/A'}</td>
                         <td class="px-4 py-3 text-slate-300 text-xs max-w-xs truncate">${item.notes || '--'}</td>
@@ -1086,6 +1097,7 @@
             const timeStr = window.currentOptionTime === 'op2' ? item.timeOp2 : item.timeOp1;
 
             document.getElementById('suspendFlightLabel').value = `Vuelo #${idx + 1} - ${timeStr} hrs (TIPO ${item.type} - ${item.name})`;
+            document.getElementById('suspendPilotName').value = "Piloto en Turno";
             document.getElementById('suspendNotes').value = "";
             document.getElementById('evidenceFileInput').value = "";
             document.getElementById('evidencePreviewContainer').classList.add('hidden');
@@ -1103,6 +1115,7 @@
             const item = plan[idx];
             const timeStr = window.currentOptionTime === 'op2' ? item.timeOp2 : item.timeOp1;
 
+            const pilot = document.getElementById('suspendPilotName').value || 'Piloto en Turno';
             const reason = document.getElementById('suspendReasonSelect').value;
             const notes = document.getElementById('suspendNotes').value;
 
@@ -1121,6 +1134,7 @@
                 flightType: `TIPO ${item.type} - ${item.name}`,
                 status: 'SUSPENDIDO',
                 realTime: 'N/A',
+                pilot: pilot,
                 notes: `${reason}: ${notes}`,
                 evidenceImg: window.tempImageData || ''
             };
@@ -1144,6 +1158,7 @@
             if (!item) return;
 
             document.getElementById('editFlightLabel').value = `${item.scheduledTime} hrs - ${item.flightType}`;
+            document.getElementById('editPilotName').value = item.pilot || 'Piloto en Turno';
             document.getElementById('editStatusSelect').value = item.status;
             document.getElementById('editRealTime').value = item.realTime || '';
             document.getElementById('editNotes').value = item.notes || '';
@@ -1164,6 +1179,7 @@
             if (idx === undefined || !window.bitacoraList[idx]) return;
 
             const item = window.bitacoraList[idx];
+            item.pilot = document.getElementById('editPilotName').value || 'Piloto en Turno';
             item.status = document.getElementById('editStatusSelect').value;
             item.realTime = document.getElementById('editRealTime').value;
             item.notes = document.getElementById('editNotes').value;
@@ -1235,10 +1251,11 @@
                 return;
             }
 
-            let csv = 'Fecha/Hora,Hora Programada,Tipo Vuelo,Estado,Hora Real Despegue,Observaciones,Tiene Evidencia Fotográfica\n';
+            let csv = 'Fecha/Hora,Hora Programada,Tipo Vuelo,Operador / Piloto,Estado,Hora Real Despegue,Observaciones,Tiene Evidencia Fotográfica\n';
             window.bitacoraList.forEach(item => {
                 const hasImg = (item.evidenceImg && item.evidenceImg.length > 20) ? 'SI' : 'NO';
-                csv += `"${item.timestampFormatted}","${item.scheduledTime}","${item.flightType}","${item.status}","${item.realTime}","${item.notes}","${hasImg}"\n`;
+                const pilot = item.pilot || 'Piloto en Turno';
+                csv += `"${item.timestampFormatted}","${item.scheduledTime}","${item.flightType}","${pilot}","${item.status}","${item.realTime}","${item.notes}","${hasImg}"\n`;
             });
 
             const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
