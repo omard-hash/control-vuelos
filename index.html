@@ -403,7 +403,7 @@
                     <label class="block text-slate-400 font-semibold mb-1">Causa de Suspensión (Obligatorio):</label>
                     <select id="suspendReasonSelect" class="w-full bg-slate-950 border border-slate-700 text-amber-300 px-3 py-2 rounded-lg font-bold focus:ring-1 focus:ring-amber-500">
                         <option value="LLUVIA / PRECIPITACIÓN">Lluvia / Lluvia Fuerte</option>
-                        <option value="VIENTO FUERTE (> 35 km/h)">Viento Fuerte (> 35 km/h)</option>
+                        <option value="VIENTO FUERTE (> 43 km/h)">Viento Fuerte (> 43 km/h)</option>
                         <option value="NEBLINA DENSA / NULA VISIBILIDAD">Neblina Densa / Nula Visibilidad</option>
                         <option value="TORMENTA ELÉCTRICA">Tormenta Eléctrica</option>
                         <option value="ATENCIÓN A EMERGENCIA REAL EN PLANTA">Atención a Emergencia Real en Planta</option>
@@ -716,21 +716,21 @@
 
         function updateTargetFlightBanner(nowDate) {
             const plan = OFFICIAL_PLANS[window.currentWeeklyPlan] || OFFICIAL_PLANS["1"];
-            const currentMin = nowDate.getHours() * 60 + nowDate.getMinutes();
+            const currentSec = nowDate.getHours() * 3600 + nowDate.getMinutes() * 60 + nowDate.getSeconds();
 
             let targetIdx = 0;
-            let minDiff = Infinity;
+            let minDiffSec = Infinity;
 
             plan.forEach((item, idx) => {
                 const timeStr = window.currentOptionTime === 'op2' ? item.timeOp2 : item.timeOp1;
                 const [h, m] = timeStr.split(':').map(Number);
-                const flightMin = h * 60 + m;
+                let flightSec = h * 3600 + m * 60;
 
-                let diff = flightMin - currentMin;
-                if (diff < -30) diff += 1440;
+                let diffSec = flightSec - currentSec;
+                if (diffSec < -1800) diffSec += 86400;
 
-                if (diff < minDiff && diff >= -30) {
-                    minDiff = diff;
+                if (diffSec < minDiffSec && diffSec >= -1800) {
+                    minDiffSec = diffSec;
                     targetIdx = idx;
                 }
             });
@@ -738,13 +738,19 @@
             const currentTarget = plan[targetIdx];
             const targetTimeStr = window.currentOptionTime === 'op2' ? currentTarget.timeOp2 : currentTarget.timeOp1;
             const [th, tm] = targetTimeStr.split(':').map(Number);
-            const targetTotalMin = th * 60 + tm;
+            let targetSec = th * 3600 + tm * 60;
+            let winStartSec = targetSec - 20 * 60;
 
-            const winStartTotal = targetTotalMin - 20;
-            const formatMinStr = (tot) => {
-                let norm = (tot + 1440) % 1440;
-                let hh = String(Math.floor(norm / 60)).padStart(2, '0');
-                let mm = String(norm % 60).padStart(2, '0');
+            let currentSecNorm = currentSec;
+            if (targetSec === 0 && currentSecNorm >= 86400 - 1200) {
+                targetSec += 86400;
+                winStartSec = targetSec - 1200;
+            }
+
+            const formatMinStr = (sec) => {
+                let norm = (sec + 86400) % 86400;
+                let hh = String(Math.floor(norm / 3600)).padStart(2, '0');
+                let mm = String(Math.floor((norm % 3600) / 60)).padStart(2, '0');
                 return `${hh}:${mm}`;
             };
 
@@ -758,20 +764,28 @@
                 targetBadgeEl.innerText = `TIPO ${currentTarget.type} - ${currentTarget.name}`;
             }
             if (targetWindowEl) {
-                targetWindowEl.innerText = `${formatMinStr(winStartTotal)} - ${targetTimeStr} hrs`;
+                targetWindowEl.innerText = `${formatMinStr(winStartSec)} - ${targetTimeStr} hrs`;
             }
 
-            const diffMin = targetTotalMin - currentMin;
             if (targetCountdownEl) {
-                if (currentMin >= winStartTotal && currentMin <= targetTotalMin) {
-                    targetCountdownEl.innerText = "VENTANA ABIERTA (DESPEGAR)";
-                    targetCountdownEl.className = "text-lg font-mono font-bold text-emerald-400 pulse-red";
-                } else if (diffMin > 0 && diffMin <= 40) {
-                    targetCountdownEl.innerText = `En ${diffMin} min`;
+                const secToWinStart = winStartSec - currentSecNorm;
+                const secToTargetEnd = targetSec - currentSecNorm;
+
+                if (secToWinStart > 0) {
+                    // La ventana aún no abre: muestra minutos y segundos faltantes
+                    const mins = Math.floor(secToWinStart / 60);
+                    const secs = secToWinStart % 60;
+                    targetCountdownEl.innerText = `Ventana abre en ${mins}m ${String(secs).padStart(2, '0')}s`;
                     targetCountdownEl.className = "text-lg font-mono font-bold text-amber-400";
+                } else if (secToTargetEnd >= 0) {
+                    // Ventana abierta actualmente
+                    const mins = Math.floor(secToTargetEnd / 60);
+                    const secs = secToTargetEnd % 60;
+                    targetCountdownEl.innerText = `VENTANA ABIERTA (${mins}m ${String(secs).padStart(2, '0')}s restantes)`;
+                    targetCountdownEl.className = "text-lg font-mono font-bold text-emerald-400 pulse-red";
                 } else {
                     targetCountdownEl.innerText = "Programado";
-                    targetCountdownEl.className = "text-lg font-mono font-bold text-slate-300";
+                    targetCountdownEl.className = "text-lg font-mono font-bold text-slate-400";
                 }
             }
 
