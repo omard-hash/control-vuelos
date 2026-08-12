@@ -751,22 +751,14 @@
                 }
                 window.lastDateString = todayKey;
 
-            updateTargetFlightBanner(now);
-            checkSuspensionVoiceAlerts(now);
-        }
-
-        updateClock();
-        setInterval(updateClock, 1000);
-    }
+                updateTargetFlightBanner(now);
+                checkSuspensionVoiceAlerts(now);
+            }
 
             updateClock();
             setInterval(updateClock, 1000);
         }
 
-        // Programación Automática según Fechas Solicitadas:
-        // - Del 13 al 16 de Agosto: Plan 1
-        // - Del 17 al 23 de Agosto: Plan 2
-        // - Del 24 al 31 de Agosto: Plan 3
         function autoSelectPlanByDate(nowDate) {
             const day = nowDate.getDate();
             let targetPlan = "1";
@@ -1313,6 +1305,212 @@
             }
             renderFlightsTable();
             showToast('Jornada diaria reiniciada a las 12:00 AM (00:00 hrs)', 'info');
+        }
+
+        function renderFlightsTable() {
+            const tbody = document.getElementById('flightsTableBody');
+            if (!tbody) return;
+
+            const plan = OFFICIAL_PLANS[window.currentWeeklyPlan] || OFFICIAL_PLANS["1"];
+            let html = '';
+
+            let totalFlown = 0;
+            let totalSuspended = 0;
+
+            plan.forEach((item, idx) => {
+                const statusObj = window.dailyFlightStatuses[idx] || { status: 'PENDIENTE', realTime: '--', note: '' };
+                const timeStr = item.timeOp2;
+
+                if (statusObj.status === 'VOLADO') totalFlown++;
+                if (statusObj.status === 'SUSPENDIDO') totalSuspended++;
+
+                const [h, m] = timeStr.split(':').map(Number);
+                let startSec = h * 3600 + m * 60 - 1800; // -30m
+                let endSec = h * 3600 + m * 60 + 1800;   // +30m
+
+                const formatTime = (sec) => {
+                    let norm = (sec + 86400) % 86400;
+                    let hh = String(Math.floor(norm / 3600)).padStart(2, '0');
+                    let mm = String(Math.floor((norm % 3600) / 60)).padStart(2, '0');
+                    return `${hh}:${mm}`;
+                };
+
+                const windowStr = `${formatTime(startSec)} - ${formatTime(endSec)} hrs`;
+
+                let statusBadge = '<span class="px-2.5 py-1 rounded-md text-[11px] font-bold bg-slate-800 text-slate-400 border border-slate-700">PENDIENTE</span>';
+                if (statusObj.status === 'VOLADO') {
+                    statusBadge = '<span class="px-2.5 py-1 rounded-md text-[11px] font-bold bg-emerald-950 text-emerald-400 border border-emerald-800/60"><i class="fa-solid fa-check me-1"></i>VOLADO</span>';
+                } else if (statusObj.status === 'SUSPENDIDO') {
+                    statusBadge = '<span class="px-2.5 py-1 rounded-md text-[11px] font-bold bg-amber-950 text-amber-300 border border-amber-800/60"><i class="fa-solid fa-pause me-1"></i>SUSPENDIDO</span>';
+                }
+
+                const isShiftB = item.type === 'B';
+
+                html += `
+                    <tr class="${idx === window.activeTargetIdx ? 'bg-blue-950/30' : 'hover:bg-slate-800/40'} transition">
+                        <td class="px-3 py-3 font-bold text-slate-400">${idx + 1}</td>
+                        <td class="px-3 py-3 font-mono font-bold text-amber-300 flex items-center gap-1.5">
+                            ${timeStr} hrs
+                            ${isShiftB ? '<span class="px-1.5 py-0.5 rounded text-[9px] font-extrabold bg-amber-950 text-amber-300 border border-amber-800" title="Horario Fijo de Cambio de Turno"><i class="fa-solid fa-users"></i> Relevo</span>' : ''}
+                        </td>
+                        <td class="px-3 py-3 font-mono text-slate-300 text-[11px]">${windowStr}</td>
+                        <td class="px-3 py-3">
+                            <span class="px-2 py-0.5 rounded text-[11px] font-bold ${isShiftB ? 'bg-amber-950 text-amber-300 border border-amber-800' : 'bg-slate-800 text-slate-200 border border-slate-700'}">
+                                TIPO ${item.type}
+                            </span>
+                            <span class="text-slate-300 text-xs ms-1">${item.name}</span>
+                        </td>
+                        <td class="px-3 py-3">${statusBadge}</td>
+                        <td class="px-3 py-3 font-mono text-xs text-slate-300">
+                            ${statusObj.status === 'VOLADO' ? `<strong class="text-emerald-400">${statusObj.realTime} hrs</strong>` : ''}
+                            ${statusObj.status === 'SUSPENDIDO' ? `<span class="text-amber-300 text-[11px]">${statusObj.note || 'Suspendido'}</span>` : ''}
+                            ${statusObj.status === 'PENDIENTE' ? '<span class="text-slate-500">--</span>' : ''}
+                        </td>
+                        <td class="px-3 py-3 text-right">
+                            <div class="flex items-center justify-end gap-1.5">
+                                <button onclick="openTakeoffModalForIdx(${idx})" class="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-[11px] rounded-lg transition shadow">
+                                    <i class="fa-solid fa-plane-departure"></i> Despegue
+                                </button>
+                                <button onclick="openSuspensionModalForIdx(${idx})" class="px-2 py-1 bg-amber-600/30 hover:bg-amber-600/40 text-amber-300 font-semibold text-[11px] rounded-lg border border-amber-500/30 transition">
+                                    <i class="fa-solid fa-pause"></i>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+            });
+
+            tbody.innerHTML = html;
+
+            const cntFlownEl = document.getElementById('cntFlown');
+            const cntSuspendedEl = document.getElementById('cntSuspended');
+            if (cntFlownEl) cntFlownEl.innerText = totalFlown;
+            if (cntSuspendedEl) cntSuspendedEl.innerText = totalSuspended;
+        }
+
+        function renderBitacoraTable() {
+            const tbody = document.getElementById('bitacoraTableBody');
+            if (!tbody) return;
+
+            if (!window.bitacoraList || window.bitacoraList.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="9" class="px-4 py-8 text-center text-slate-500">
+                            <i class="fa-solid fa-folder-open text-2xl mb-2 block"></i>
+                            No hay registros guardados en la bitácora auditora.
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+
+            let html = '';
+            window.bitacoraList.forEach((item, idx) => {
+                const isFlown = item.status === 'VOLADO';
+                const statusBadge = isFlown 
+                    ? '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-950 text-emerald-400 border border-emerald-800">VOLADO</span>'
+                    : '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-950 text-amber-300 border border-amber-800">SUSPENDIDO</span>';
+
+                let imgCell = '<span class="text-slate-600 text-[10px]">Sin Imagen</span>';
+                if (item.evidenceImg && item.evidenceImg.length > 20) {
+                    imgCell = `
+                        <div class="flex justify-center">
+                            <img src="${item.evidenceImg}" alt="Evidencia" onclick="openLightbox('${item.evidenceImg}', '${item.scheduledTime} - ${item.status}')" class="h-10 w-14 object-cover rounded border border-slate-700 cursor-pointer hover:opacity-80 transition bitacora-img-print">
+                        </div>
+                    `;
+                }
+
+                html += `
+                    <tr class="hover:bg-slate-800/50">
+                        <td class="px-4 py-2.5 font-mono text-[11px] text-slate-300">${item.timestampFormatted || '--'}</td>
+                        <td class="px-4 py-2.5 font-mono font-bold text-amber-300">${item.scheduledTime} hrs</td>
+                        <td class="px-4 py-2.5 text-slate-200">${item.flightType}</td>
+                        <td class="px-4 py-2.5 font-semibold text-slate-200">${item.pilot || 'Piloto en Turno'}</td>
+                        <td class="px-4 py-2.5">${statusBadge}</td>
+                        <td class="px-4 py-2.5 font-mono text-emerald-400">${item.realTime || 'N/A'}</td>
+                        <td class="px-4 py-2.5 text-slate-300 text-[11px] max-w-xs truncate">${item.notes || '--'}</td>
+                        <td class="px-4 py-2.5 text-center">${imgCell}</td>
+                        <td class="px-4 py-2.5 text-right space-x-1 no-print">
+                            <button onclick="openEditBitacoraModal(${idx})" class="p-1.5 rounded bg-blue-950 hover:bg-blue-900 text-blue-300 border border-blue-800 transition" title="Editar registro">
+                                <i class="fa-solid fa-pen-to-square text-xs"></i>
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            });
+
+            tbody.innerHTML = html;
+        }
+
+        function openLightbox(src, caption) {
+            document.getElementById('lightboxImg').src = src;
+            document.getElementById('lightboxCaption').innerText = caption || 'Evidencia de Vuelo';
+            openModal('modalImageLightbox');
+        }
+
+        function previewTakeoffImage(event) {
+            compressAndPreviewImage(event, 'takeoffPreviewImg', 'takeoffPreviewContainer', (dataUrl) => {
+                window.tempTakeoffImageData = dataUrl;
+            });
+        }
+
+        function previewEvidenceImage(event) {
+            compressAndPreviewImage(event, 'evidencePreviewImg', 'evidencePreviewContainer', (dataUrl) => {
+                window.tempImageData = dataUrl;
+            });
+        }
+
+        function previewEditEvidenceImage(event) {
+            compressAndPreviewImage(event, 'editEvidencePreviewImg', 'editEvidencePreviewContainer', (dataUrl) => {
+                window.tempEditImageData = dataUrl;
+            });
+        }
+
+        function compressAndPreviewImage(event, imgId, containerId, callback) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const img = new Image();
+                img.onload = function() {
+                    const canvas = document.createElement('canvas');
+                    const MAX_WIDTH = 600;
+                    let width = img.width;
+                    let height = img.height;
+
+                    if (width > MAX_WIDTH) {
+                        height = Math.round((height * MAX_WIDTH) / width);
+                        width = MAX_WIDTH;
+                    }
+
+                    canvas.width = width;
+                    canvas.height = height;
+
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, width, height);
+
+                    const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.5);
+
+                    const previewImg = document.getElementById(imgId);
+                    const container = document.getElementById(containerId);
+                    if (previewImg) previewImg.src = compressedDataUrl;
+                    if (container) container.classList.remove('hidden');
+
+                    callback(compressedDataUrl);
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function changeWeeklyPlan(planNum, isAuto = false) {
+            window.currentWeeklyPlan = String(planNum);
+            renderFlightsTable();
+            if (!isAuto) {
+                showToast(`Plan ${planNum} seleccionado`, 'info');
+                speakAlert(`Plan de vuelos número ${planNum} activado`);
+            }
         }
 
         window.addEventListener('DOMContentLoaded', () => {
