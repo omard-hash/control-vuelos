@@ -789,7 +789,7 @@
                 let flightSec = h * 3600 + m * 60;
 
                 let diffSec = flightSec - currentSec;
-                if (diffSec < -2700) diffSec += 86400; // 45 min threshold for rollover
+                if (diffSec < -2700) diffSec += 86400;
 
                 if (diffSec < minDiffSec && diffSec >= -2700) {
                     minDiffSec = diffSec;
@@ -931,148 +931,6 @@
             if (suspendedEl) suspendedEl.innerText = suspendedCount;
         }
 
-        function handleMidnightReset() {
-            window.dailyFlightStatuses = {};
-            localStorage.setItem('audi_flight_statuses', JSON.stringify(window.dailyFlightStatuses));
-            if (window.cloudSyncFlightStatus) {
-                window.cloudSyncFlightStatus(window.dailyFlightStatuses);
-            }
-            renderFlightsTable();
-            showToast('Jornada diaria reiniciada a las 12:00 AM (00:00 hrs)', 'info');
-        }
-            });
-
-            const currentTarget = plan[targetIdx];
-            const targetTimeStr = window.currentOptionTime === 'op2' ? currentTarget.timeOp2 : currentTarget.timeOp1;
-            const [th, tm] = targetTimeStr.split(':').map(Number);
-            let targetSec = th * 3600 + tm * 60;
-            let winStartSec = targetSec - 20 * 60;
-
-            let currentSecNorm = currentSec;
-            if (targetSec === 0 && currentSecNorm >= 86400 - 1200) {
-                targetSec += 86400;
-                winStartSec = targetSec - 1200;
-            }
-
-            const formatMinStr = (sec) => {
-                let norm = (sec + 86400) % 86400;
-                let hh = String(Math.floor(norm / 3600)).padStart(2, '0');
-                let mm = String(Math.floor((norm % 3600) / 60)).padStart(2, '0');
-                return `${hh}:${mm}`;
-            };
-
-            const targetTimeEl = document.getElementById('targetFlightTime');
-            const targetBadgeEl = document.getElementById('targetFlightBadge');
-            const targetWindowEl = document.getElementById('targetFlightWindow');
-            const targetCountdownEl = document.getElementById('targetCountdown');
-
-            if (targetTimeEl) targetTimeEl.innerText = `${targetTimeStr} hrs`;
-            if (targetBadgeEl) {
-                targetBadgeEl.innerText = `TIPO ${currentTarget.type} - ${currentTarget.name}`;
-            }
-            if (targetWindowEl) {
-                targetWindowEl.innerText = `${formatMinStr(winStartSec)} - ${targetTimeStr} hrs`;
-            }
-
-            if (targetCountdownEl) {
-                const secToWinStart = winStartSec - currentSecNorm;
-                const secToTargetEnd = targetSec - currentSecNorm;
-
-                if (secToWinStart > 0) {
-                    // La ventana aún no abre: muestra minutos y segundos faltantes
-                    const mins = Math.floor(secToWinStart / 60);
-                    const secs = secToWinStart % 60;
-                    targetCountdownEl.innerText = `Ventana abre en ${mins}m ${String(secs).padStart(2, '0')}s`;
-                    targetCountdownEl.className = "text-lg font-mono font-bold text-amber-400";
-                } else if (secToTargetEnd >= 0) {
-                    // Ventana abierta actualmente
-                    const mins = Math.floor(secToTargetEnd / 60);
-                    const secs = secToTargetEnd % 60;
-                    targetCountdownEl.innerText = `VENTANA ABIERTA (${mins}m ${String(secs).padStart(2, '0')}s restantes)`;
-                    targetCountdownEl.className = "text-lg font-mono font-bold text-emerald-400 pulse-red";
-                } else {
-                    targetCountdownEl.innerText = "Programado";
-                    targetCountdownEl.className = "text-lg font-mono font-bold text-slate-400";
-                }
-            }
-
-            window.activeTargetIdx = targetIdx;
-        }
-
-        function renderFlightsTable() {
-            const tbody = document.getElementById('flightsTableBody');
-            if (!tbody) return;
-
-            const plan = OFFICIAL_PLANS[window.currentWeeklyPlan] || OFFICIAL_PLANS["1"];
-            let html = '';
-
-            let flownCount = 0;
-            let suspendedCount = 0;
-
-            plan.forEach((item, idx) => {
-                const timeStr = window.currentOptionTime === 'op2' ? item.timeOp2 : item.timeOp1;
-                const statusObj = window.dailyFlightStatuses[idx] || { status: 'PENDIENTE', realTime: '', note: '' };
-
-                if (statusObj.status === 'VOLADO') flownCount++;
-                if (statusObj.status === 'SUSPENDIDO') suspendedCount++;
-
-                const [h, m] = timeStr.split(':').map(Number);
-                const flightTotal = h * 60 + m;
-                const winStartTotal = (flightTotal - 20 + 1440) % 1440;
-                const winStartStr = `${String(Math.floor(winStartTotal / 60)).padStart(2, '0')}:${String(winStartTotal % 60).padStart(2, '0')}`;
-                const windowText = `${winStartStr} - ${timeStr}`;
-
-                let statusBadge = `<span class="px-2.5 py-1 rounded-md text-[11px] font-bold bg-slate-800 text-slate-400 border border-slate-700">PENDIENTE</span>`;
-                if (statusObj.status === 'VOLADO') {
-                    statusBadge = `<span class="px-2.5 py-1 rounded-md text-[11px] font-bold bg-emerald-950 text-emerald-400 border border-emerald-800"><i class="fa-solid fa-check me-1"></i> VOLADO</span>`;
-                } else if (statusObj.status === 'SUSPENDIDO') {
-                    statusBadge = `<span class="px-2.5 py-1 rounded-md text-[11px] font-bold bg-amber-950 text-amber-400 border border-amber-800"><i class="fa-solid fa-pause me-1"></i> SUSPENDIDO</span>`;
-                }
-
-                const isShiftFlight = item.type === 'B';
-                const shiftHighlight = isShiftFlight ? 'bg-amber-950/30 hover:bg-amber-900/40 border-l-4 border-l-amber-500' : 'hover:bg-slate-800/50';
-                
-                let targetShiftTimeLabel = '';
-                if (isShiftFlight) {
-                    if (timeStr === '06:00') targetShiftTimeLabel = '(Relevo Fijo 06:00 AM)';
-                    if (timeStr === '14:00') targetShiftTimeLabel = '(Relevo Fijo 02:00 PM)';
-                    if (timeStr === '17:00') targetShiftTimeLabel = '(Relevo Fijo 05:00 PM / 17:00)';
-                    if (timeStr === '21:30') targetShiftTimeLabel = '(Relevo Fijo 09:30 PM / 21:30)';
-                }
-
-                const shiftNote = isShiftFlight ? `<span class="ms-1.5 text-[10px] bg-amber-950 text-amber-300 font-bold px-2 py-0.5 rounded border border-amber-800"><i class="fa-solid fa-users me-1"></i> ${targetShiftTimeLabel}</span>` : '';
-
-                html += `
-                    <tr class="${shiftHighlight} transition border-b border-slate-800/40">
-                        <td class="px-4 py-3 font-mono text-slate-400">${idx + 1}</td>
-                        <td class="px-4 py-3 font-mono font-extrabold text-amber-300 text-sm">${timeStr} hrs ${shiftNote}</td>
-                        <td class="px-4 py-3 font-mono text-slate-400 text-[11px]">${windowText}</td>
-                        <td class="px-4 py-3 font-semibold text-slate-200">
-                            <span class="px-2 py-0.5 text-[10px] font-bold rounded ${isShiftFlight ? 'bg-amber-900/80 text-amber-200 border border-amber-700' : 'bg-slate-800 text-slate-300 border border-slate-700'} me-1">TIPO ${item.type}</span>
-                            ${item.name}
-                        </td>
-                        <td class="px-4 py-3">${statusBadge}</td>
-                        <td class="px-4 py-3 font-mono text-xs text-slate-300">${statusObj.realTime || statusObj.note || '--'}</td>
-                        <td class="px-4 py-3 text-right space-x-1">
-                            <button onclick="openTakeoffModalForIdx(${idx})" class="px-2.5 py-1 bg-emerald-700 hover:bg-emerald-600 text-white font-bold rounded-lg transition text-[11px]">
-                                <i class="fa-solid fa-plane-departure"></i> Despegue
-                            </button>
-                            <button onclick="openSuspensionModalForIdx(${idx})" class="px-2.5 py-1 bg-amber-800 hover:bg-amber-700 text-amber-200 font-bold rounded-lg transition text-[11px]">
-                                <i class="fa-solid fa-pause"></i> Suspender
-                            </button>
-                        </td>
-                    </tr>
-                `;
-            });
-
-            tbody.innerHTML = html;
-
-            const flownEl = document.getElementById('cntFlown');
-            const suspendedEl = document.getElementById('cntSuspended');
-            if (flownEl) flownEl.innerText = flownCount;
-            if (suspendedEl) suspendedEl.innerText = suspendedCount;
-        }
-
         function renderBitacoraTable() {
             const tbody = document.getElementById('bitacoraTableBody');
             if (!tbody) return;
@@ -1134,7 +992,7 @@
                     const canvas = document.createElement('canvas');
                     let width = img.width;
                     let height = img.height;
-                    const maxDim = 600; // Resize to max 600px for high efficiency (~30-40KB)
+                    const maxDim = 600;
 
                     if (width > maxDim || height > maxDim) {
                         if (width > height) {
@@ -1215,11 +1073,11 @@
             if (!btn1 || !btn2) return;
 
             if (window.currentOptionTime === 'op1') {
-                btn1.className = "px-3 py-1.5 text-xs font-bold rounded-lg bg-audi-red text-white transition shadow";
-                btn2.className = "px-3 py-1.5 text-xs font-bold rounded-lg text-slate-400 hover:text-white transition";
+                btn1.className = "px-3 py-1 text-xs font-bold rounded-lg bg-audi-red text-white transition shadow";
+                btn2.className = "px-3 py-1 text-xs font-bold rounded-lg text-slate-400 hover:text-white transition";
             } else {
-                btn2.className = "px-3 py-1.5 text-xs font-bold rounded-lg bg-emerald-600 text-white transition shadow";
-                btn1.className = "px-3 py-1.5 text-xs font-bold rounded-lg text-slate-400 hover:text-white transition";
+                btn2.className = "px-3 py-1 text-xs font-bold rounded-lg bg-emerald-600 text-white transition shadow";
+                btn1.className = "px-3 py-1 text-xs font-bold rounded-lg text-slate-400 hover:text-white transition";
             }
         }
 
@@ -1543,8 +1401,11 @@
         function handleMidnightReset() {
             window.dailyFlightStatuses = {};
             localStorage.setItem('audi_flight_statuses', JSON.stringify(window.dailyFlightStatuses));
+            if (window.cloudSyncFlightStatus) {
+                window.cloudSyncFlightStatus(window.dailyFlightStatuses);
+            }
             renderFlightsTable();
-            showToast('Ciclo diario reiniciado para la nueva jornada (00:00 hrs)', 'info');
+            showToast('Jornada diaria reiniciada a las 12:00 AM (00:00 hrs)', 'info');
         }
 
         window.addEventListener('DOMContentLoaded', () => {
