@@ -16,9 +16,9 @@
                         audi: {
                             red: '#bb0a30',
                             redDark: '#8b0520',
-                            darkBg: '#0b0f19',
-                            cardBg: '#1e293b',
-                            slateAccent: '#334155'
+                            darkBg: '#090d16',
+                            cardBg: '#131b2e',
+                            slateAccent: '#1e293b'
                         }
                     }
                 }
@@ -27,18 +27,19 @@
     </script>
     <style>
         body {
-            background-color: #0b0f19;
+            background-color: #090d16;
             color: #f1f5f9;
             font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            overflow-x: hidden;
         }
-        .pulse-red {
-            animation: pulse-red 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        .pulse-green {
+            animation: pulse-green 1.8s cubic-bezier(0.4, 0, 0.6, 1) infinite;
         }
-        @keyframes pulse-red {
+        @keyframes pulse-green {
             0%, 100% { opacity: 1; transform: scale(1); }
-            50% { opacity: .7; transform: scale(1.05); }
+            50% { opacity: .8; transform: scale(1.02); }
         }
-        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
         ::-webkit-scrollbar-track { background: #0f172a; }
         ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
         ::-webkit-scrollbar-thumb:hover { background: #475569; }
@@ -105,15 +106,14 @@
                 overflow-wrap: break-word !important;
             }
             
-            /* Distribución fija de ancho por columna para impresión */
-            th:nth-child(1), td:nth-child(1) { width: 13%; } /* Fecha/Hora */
-            th:nth-child(2), td:nth-child(2) { width: 8%; }  /* Programada */
-            th:nth-child(3), td:nth-child(3) { width: 14%; } /* Tipo Vuelo */
-            th:nth-child(4), td:nth-child(4) { width: 12%; } /* Operador */
-            th:nth-child(5), td:nth-child(5) { width: 9%; }  /* Estado */
-            th:nth-child(6), td:nth-child(6) { width: 8%; }  /* Hora Real */
-            th:nth-child(7), td:nth-child(7) { width: 22%; } /* Detalle / Motivo */
-            th:nth-child(8), td:nth-child(8) { width: 14%; } /* Evidencia Fotográfica */
+            th:nth-child(1), td:nth-child(1) { width: 13%; }
+            th:nth-child(2), td:nth-child(2) { width: 8%; }
+            th:nth-child(3), td:nth-child(3) { width: 14%; }
+            th:nth-child(4), td:nth-child(4) { width: 12%; }
+            th:nth-child(5), td:nth-child(5) { width: 9%; }
+            th:nth-child(6), td:nth-child(6) { width: 8%; }
+            th:nth-child(7), td:nth-child(7) { width: 22%; }
+            th:nth-child(8), td:nth-child(8) { width: 14%; }
 
             .bitacora-img-print {
                 display: block !important;
@@ -133,248 +133,189 @@
 </head>
 <body class="min-h-screen flex flex-col bg-slate-950 text-slate-100 antialiased selection:bg-red-600 selection:text-white">
 
-    <!-- Header Principal -->
-    <header class="bg-slate-900 border-b border-slate-800 sticky top-0 z-40 shadow-xl">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex flex-wrap justify-between items-center gap-4">
-            <div class="flex items-center space-x-3">
-                <div class="p-2.5 bg-audi-red text-white rounded-xl shadow-lg shadow-red-900/40 flex items-center justify-center">
-                    <i class="fa-solid fa-plane-departure text-2xl"></i>
+    <header class="bg-slate-900 border-b border-slate-800 sticky top-0 z-40 shadow-xl py-2 px-3">
+        <div class="max-w-7xl mx-auto flex flex-wrap justify-between items-center gap-2">
+            <div class="flex items-center space-x-2">
+                <div class="p-1.5 bg-audi-red text-white rounded-lg shadow flex items-center justify-center">
+                    <i class="fa-solid fa-plane-departure text-base"></i>
                 </div>
                 <div>
-                    <div class="flex items-center gap-2">
-                        <span class="text-xs font-bold tracking-widest uppercase bg-slate-800 text-red-400 px-2 py-0.5 rounded border border-red-900/30">Audi México</span>
-                        <span id="shiftBadge" class="text-xs font-bold px-2 py-0.5 rounded bg-emerald-950/80 text-emerald-400 border border-emerald-800/40">Iniciando Turno...</span>
-                        <button id="cloudStatusBadge" onclick="openFirebaseConfigModal()" title="Estado de Sincronización Nube" class="text-xs font-bold px-2.5 py-1 rounded-lg bg-slate-800 text-slate-300 border border-slate-700 flex items-center gap-1.5 hover:bg-slate-700 transition cursor-pointer">
-                            <i class="fa-solid fa-cloud text-[10px]"></i> Sincronizando Nube...
+                    <div class="flex items-center gap-1.5 flex-wrap">
+                        <span class="text-[10px] font-bold tracking-widest uppercase bg-slate-800 text-red-400 px-1.5 py-0.5 rounded border border-red-900/30">Audi México</span>
+                        <span id="shiftBadge" class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-950/80 text-emerald-400 border border-emerald-800/40">Iniciando Turno...</span>
+                        <button id="cloudStatusBadge" onclick="openFirebaseConfigModal()" title="Configurar Sincronización Nube" class="text-[10px] font-bold px-2 py-0.5 rounded-lg bg-slate-800 text-slate-300 border border-slate-700 flex items-center gap-1 hover:bg-slate-700 transition cursor-pointer">
+                            <i class="fa-solid fa-cloud text-[9px]"></i> Sincronizando Nube...
                         </button>
                     </div>
-                    <h1 class="text-lg font-bold text-white tracking-tight">Centro de Control de Vuelos Drone</h1>
                 </div>
             </div>
 
-            <div class="flex items-center gap-3 bg-slate-950/80 px-4 py-2 rounded-xl border border-slate-800">
+            <!-- Reloj e Indicadores Compactos -->
+            <div class="flex items-center gap-2 bg-slate-950/90 px-2.5 py-1 rounded-xl border border-slate-800">
                 <div class="text-right">
-                    <div id="liveClock" class="text-xl font-mono font-bold text-slate-100 tracking-wider">00:00:00</div>
-                    <div id="liveDate" class="text-[11px] text-slate-400 font-medium">Cargando fecha...</div>
+                    <div id="liveClock" class="text-lg font-mono font-black text-amber-300 tracking-wider leading-none">00:00:00</div>
+                    <div id="liveDate" class="text-[9.5px] text-slate-400 font-medium">Cargando fecha...</div>
                 </div>
-                <div class="h-8 w-px bg-slate-800"></div>
                 
-                <button onclick="toggleBitacoraVisibility()" id="btnToggleBitacora" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition flex items-center gap-1.5" title="Mostrar u ocultar la bitácora para mantener la vista limpia">
+                <button onclick="toggleBitacoraVisibility()" id="btnToggleBitacora" class="px-2 py-1 rounded-lg text-[10.5px] font-bold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition flex items-center gap-1" title="Ver / Ocultar Bitácora Auditora">
                     <i class="fa-solid fa-eye text-emerald-400"></i>
-                    <span id="btnToggleBitacoraText">Ver Bitácora</span>
+                    <span id="btnToggleBitacoraText" class="hidden sm:inline">Bitácora</span>
                 </button>
 
-                <button onclick="testVoiceAlert()" title="Probar Alerta de Voz" class="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs border border-slate-700 transition">
+                <button onclick="testVoiceAlert()" title="Probar Alerta de Voz" class="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs border border-slate-700 transition">
                     <i class="fa-solid fa-bullhorn text-emerald-400"></i>
                 </button>
             </div>
         </div>
     </header>
 
-    <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+    <main class="flex-1 max-w-7xl w-full mx-auto px-2 sm:px-4 py-3 space-y-3">
 
-        <!-- Banner de Selección Automática de Plan Semanal -->
-        <section class="bg-slate-900/90 p-4 rounded-2xl border border-slate-800 shadow-xl space-y-3">
-            <div class="flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-slate-800/80 pb-3">
-                <div>
-                    <h2 class="text-sm font-bold text-white flex items-center gap-2">
-                        <i class="fa-solid fa-calendar-check text-audi-red"></i>
-                        Programación Automática de Jornada (Opción 2 - 00:30 hrs)
-                    </h2>
-                    <p id="autoCalendarNote" class="text-[11px] text-emerald-400 font-semibold mt-0.5">Cargando regla de calendario...</p>
-                </div>
+        <section id="nextFlightCard" class="bg-gradient-to-r from-slate-900 via-blue-950/60 to-slate-900 p-3.5 rounded-2xl border border-blue-500/40 shadow-2xl relative overflow-hidden">
+            <div class="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
                 
-                <div class="flex flex-wrap items-center gap-2">
-                    <div class="flex items-center gap-2 bg-slate-950 px-3 py-1.5 rounded-xl border border-slate-800">
-                        <span class="text-xs text-slate-400 font-medium">Plan Activo:</span>
-                        <span id="activePlanBadge" class="text-xs font-extrabold text-amber-300 bg-amber-950 px-2.5 py-0.5 rounded border border-amber-800">Plan 1</span>
-                    </div>
-
-                    <div class="flex items-center bg-slate-950 px-3 py-1.5 rounded-xl border border-slate-800 text-xs font-bold text-emerald-400 border-emerald-900/60">
-                        <i class="fa-solid fa-clock me-1.5"></i> Opción 2 (00:30 hrs)
-                    </div>
-                </div>
-            </div>
-
-            <div class="grid grid-cols-1 lg:grid-cols-3 gap-3 text-xs">
-                <div class="bg-slate-950/60 p-3 rounded-xl border border-slate-800/80 flex items-center justify-between">
-                    <div>
-                        <span class="font-bold text-slate-200 text-xs flex items-center gap-2">
-                            <i class="fa-solid fa-table-list text-blue-400"></i> Matriz Audi (16 Vuelos)
-                        </span>
-                        <p class="text-[10.5px] text-slate-400 mt-0.5">Ventana flexible de 60 min (&plusmn;30 min respecto a hora base).</p>
-                    </div>
-                    <button onclick="viewOfficialPlansModal()" class="px-2.5 py-1.5 bg-blue-900/80 hover:bg-blue-800 text-blue-200 font-bold text-[11px] rounded-lg border border-blue-700/60 transition flex items-center gap-1 shadow">
-                        <i class="fa-solid fa-eye"></i> Ver Planes
-                    </button>
-                </div>
-
-                <!-- Resumen de Contadores del Día -->
-                <div class="bg-slate-950/60 p-2.5 rounded-xl border border-slate-800/80 grid grid-cols-3 text-center gap-2">
-                    <div class="flex flex-col justify-center border-r border-slate-800 pr-1">
-                        <span class="text-[9.5px] uppercase font-bold text-slate-400">Jornada</span>
-                        <span id="cntTotal" class="text-lg font-extrabold text-white">16</span>
-                        <span class="text-[8.5px] text-slate-500">12am-11:59pm</span>
-                    </div>
-                    <div class="flex flex-col justify-center border-r border-slate-800 pr-1">
-                        <span class="text-[9.5px] uppercase font-bold text-emerald-400">Volados</span>
-                        <span id="cntFlown" class="text-lg font-extrabold text-emerald-400">0</span>
-                        <span class="text-[8.5px] text-slate-500">Completados</span>
-                    </div>
-                    <div class="flex flex-col justify-center">
-                        <span class="text-[9.5px] uppercase font-bold text-amber-400">Suspendidos</span>
-                        <span id="cntSuspended" class="text-lg font-extrabold text-amber-400">0</span>
-                        <span class="text-[8.5px] text-slate-500">Con motivo</span>
-                    </div>
-                </div>
-
-                <!-- Estado Operativo y Alerta -->
-                <div id="suspensionAlertCard" class="bg-slate-950/60 p-3 rounded-xl border border-slate-800/80 flex items-center justify-between">
-                    <div>
-                        <span class="font-bold text-slate-200 text-xs flex items-center gap-2">
-                            <i id="suspensionStateDot" class="fa-solid fa-circle text-emerald-500 text-[9px]"></i>
-                            Estado Operativo
-                        </span>
-                        <p id="suspensionStateText" class="text-[11px] text-emerald-400 font-semibold mt-0.5">Operación Normal</p>
-                    </div>
-                    <button onclick="openSuspensionModalForCurrent()" class="px-2.5 py-1.5 bg-amber-950/80 hover:bg-amber-900 text-amber-300 font-bold text-[11px] rounded-lg border border-amber-800/60 transition flex items-center gap-1 shadow">
-                        <i class="fa-solid fa-cloud-bolt text-amber-400"></i> Suspender
-                    </button>
-                </div>
-            </div>
-        </section>
-
-        <!-- Tarjeta de Vuelo Siguiente / Activo -->
-        <section id="nextFlightCard" class="bg-gradient-to-r from-slate-900 via-blue-950/40 to-slate-900 p-4 rounded-2xl border border-blue-900/50 shadow-xl relative overflow-hidden">
-            <div class="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-3">
+                <!-- Detalle del Vuelo Activo -->
                 <div class="space-y-1">
-                    <div class="flex items-center gap-2">
-                        <span class="px-2 py-0.5 rounded text-[11px] font-bold bg-blue-500/20 text-blue-400 border border-blue-500/30">Vuelo Siguiente / Activo</span>
-                        <span id="targetFlightBadge" class="px-2 py-0.5 rounded text-[11px] font-extrabold bg-audi-red text-white">TIPO A - Perimetral</span>
+                    <div class="flex items-center gap-1.5 flex-wrap">
+                        <span class="px-2 py-0.5 rounded text-[10px] font-extrabold bg-blue-500/20 text-blue-300 border border-blue-500/30 uppercase tracking-wide">
+                            <i class="fa-solid fa-crosshairs me-1"></i>Vuelo Siguiente / Activo
+                        </span>
+                        <span id="targetFlightBadge" class="px-2 py-0.5 rounded text-[10px] font-extrabold bg-audi-red text-white">
+                            TIPO A - Perimetral
+                        </span>
+                        <span id="activePlanBadge" class="text-[10px] font-bold text-amber-300 bg-amber-950/80 px-2 py-0.5 rounded border border-amber-800">
+                            Plan 1
+                        </span>
                     </div>
-                    <h2 class="text-xl font-black text-white flex items-center gap-2">
-                        Hora Base: <span id="targetFlightTime" class="font-mono text-amber-300">00:30 hrs</span>
-                    </h2>
-                    <p id="targetFlightDesc" class="text-xs text-slate-300">Ventana de vuelo permitida: <strong id="targetFlightWindow" class="text-emerald-400 font-mono">00:00 - 01:00 hrs</strong> (Margen de 60 min: -30m / +30m)</p>
+
+                    <div class="flex items-baseline gap-2">
+                        <h2 class="text-xl sm:text-2xl font-black text-white tracking-tight">
+                            Hora Base: <span id="targetFlightTime" class="font-mono text-amber-300">00:30 hrs</span>
+                        </h2>
+                    </div>
+
+                    <p class="text-xs text-slate-300 flex items-center gap-1 flex-wrap">
+                        <span>Ventana (&plusmn;30m):</span>
+                        <strong id="targetFlightWindow" class="text-emerald-400 font-mono text-xs bg-slate-950/80 px-1.5 py-0.5 rounded border border-slate-800">00:00 - 01:00 hrs</strong>
+                    </p>
                 </div>
 
-                <div class="flex items-center gap-3 bg-slate-950/80 p-2.5 rounded-xl border border-slate-800 w-full lg:w-auto justify-between lg:justify-end">
-                    <div>
+                <!-- CONTROLES PRINCIPALES (DESPEGUE Y SUSPENDER EN LA PARTE SUPERIOR) -->
+                <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 bg-slate-950/90 p-2.5 rounded-xl border border-slate-800/90">
+                    <div class="text-center sm:text-right pr-1">
                         <div class="text-[9px] uppercase font-bold text-slate-400">Estado Ventana</div>
-                        <div id="targetCountdown" class="text-base font-mono font-bold text-emerald-400">Calculando...</div>
+                        <div id="targetCountdown" class="text-sm sm:text-base font-mono font-black text-emerald-400">Calculando...</div>
                     </div>
+
+                    <!-- Botones de Acción Inmediata de Arriba -->
                     <div class="flex items-center gap-2">
-                        <button id="btnQuickFly" onclick="quickRegisterTakeoff()" class="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-lg shadow-md transition flex items-center gap-1.5">
-                            <i class="fa-solid fa-plane-departure"></i> Despegue
+                        <button id="btnQuickFly" onclick="quickRegisterTakeoff()" class="flex-1 sm:flex-none px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs sm:text-sm rounded-xl shadow-lg shadow-emerald-900/40 transition flex items-center justify-center gap-2 border border-emerald-400/30 cursor-pointer">
+                            <i class="fa-solid fa-plane-departure text-base"></i> DESPEGUE
                         </button>
-                        <button onclick="openSuspensionModalForCurrent()" class="px-2.5 py-1.5 bg-amber-600/30 hover:bg-amber-600/40 text-amber-300 font-semibold text-xs rounded-lg border border-amber-500/30 transition">
-                            <i class="fa-solid fa-pause"></i> Suspender
+                        <button onclick="openSuspensionModalForCurrent()" class="flex-1 sm:flex-none px-3.5 py-2.5 bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs sm:text-sm rounded-xl shadow-lg shadow-amber-900/40 border border-amber-400/30 transition flex items-center justify-center gap-1.5 cursor-pointer">
+                            <i class="fa-solid fa-pause text-base"></i> SUSPENDER
                         </button>
                     </div>
                 </div>
+
             </div>
         </section>
 
-        <!-- Seccion Cronograma de Vuelos -->
-        <section class="bg-slate-900 p-4 rounded-2xl border border-slate-800 shadow-xl space-y-3">
-            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800 pb-2">
+        <section class="bg-slate-900/90 p-2.5 rounded-xl border border-slate-800 shadow-lg grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+            <div class="bg-slate-950/80 p-2 rounded-lg border border-slate-800/80 text-center flex flex-col justify-center">
+                <span class="text-[9px] uppercase font-bold text-slate-400">Jornada 24h</span>
+                <span id="cntTotal" class="text-base font-black text-white">16 Vuelos</span>
+                <span class="text-[8.5px] text-slate-500">12:00 AM - 11:59 PM</span>
+            </div>
+            
+            <div class="bg-slate-950/80 p-2 rounded-lg border border-emerald-900/30 text-center flex flex-col justify-center">
+                <span class="text-[9px] uppercase font-bold text-emerald-400">Volados</span>
+                <span id="cntFlown" class="text-base font-black text-emerald-400">0</span>
+                <span class="text-[8.5px] text-slate-500">Ejecutados</span>
+            </div>
+
+            <div class="bg-slate-950/80 p-2 rounded-lg border border-amber-900/30 text-center flex flex-col justify-center">
+                <span class="text-[9px] uppercase font-bold text-amber-400">Suspendidos</span>
+                <span id="cntSuspended" class="text-base font-black text-amber-400">0</span>
+                <span class="text-[8.5px] text-slate-500">Con evidencia</span>
+            </div>
+
+            <div class="bg-slate-950/80 p-2 rounded-lg border border-slate-800/80 flex items-center justify-between px-2.5">
                 <div>
-                    <h3 class="text-sm font-bold text-white flex items-center gap-2">
-                        <i class="fa-solid fa-list-check text-audi-red"></i>
-                        Cronograma Diario de Vuelos (Ciclo 12:00 AM - 11:59 PM)
-                    </h3>
-                    <p class="text-[11px] text-slate-400">Cada vuelo tiene un margen de 60 min (30 min antes y 30 min después de la hora base).</p>
+                    <span class="text-[9px] uppercase font-bold text-slate-400 block">Regla Calendario</span>
+                    <span id="autoCalendarNote" class="text-[10px] text-emerald-400 font-bold truncate block max-w-[120px]">Opción 2 (00:30)</span>
                 </div>
-                <div class="flex items-center gap-2 text-[11px]">
-                    <span class="flex items-center gap-1 text-slate-300 bg-slate-950 px-2 py-0.5 rounded border border-slate-800">
-                        <span class="w-2 h-2 rounded-full bg-emerald-500"></span> Volado
-                    </span>
-                    <span class="flex items-center gap-1 text-slate-300 bg-slate-950 px-2 py-0.5 rounded border border-slate-800">
-                        <span class="w-2 h-2 rounded-full bg-amber-500"></span> Suspendido
-                    </span>
-                    <span class="flex items-center gap-1 text-slate-300 bg-slate-950 px-2 py-0.5 rounded border border-slate-800">
-                        <span class="w-2 h-2 rounded-full bg-slate-600"></span> Pendiente
-                    </span>
-                </div>
+                <button onclick="viewOfficialPlansModal()" class="p-1.5 bg-blue-900/60 hover:bg-blue-800 text-blue-200 font-bold text-[10px] rounded-md border border-blue-700/60 transition" title="Ver Matriz Completa de los 4 Planes">
+                    <i class="fa-solid fa-table text-xs"></i>
+                </button>
+            </div>
+        </section>
+
+        <section class="bg-slate-900 p-3 rounded-2xl border border-slate-800 shadow-xl space-y-2">
+            <div class="flex items-center justify-between border-b border-slate-800 pb-2">
+                <h3 class="text-xs font-bold text-white flex items-center gap-1.5">
+                    <i class="fa-solid fa-list-check text-audi-red"></i>
+                    Cronograma Diario (Ciclo 12:00 AM - 11:59 PM)
+                </h3>
+                <span class="text-[10px] text-slate-400 font-mono">Ventana: &plusmn;30 min</span>
             </div>
 
-            <!-- Leyenda de Tipos de Recorrido -->
-            <div class="grid grid-cols-2 sm:grid-cols-5 gap-2 text-[10.5px] pt-1 pb-2 border-b border-slate-800/80">
-                <div class="bg-slate-950/80 p-1.5 rounded border border-blue-500/30 text-blue-300">
-                    <strong class="font-bold">TIPO A:</strong> Recorrido perimetral
-                </div>
-                <div class="bg-amber-950/60 p-1.5 rounded border border-amber-500/50 text-amber-300">
-                    <strong class="font-bold">TIPO B:</strong> Relevos fijos (06:00, 14:00, 17:00, 21:30)
-                </div>
-                <div class="bg-slate-950/80 p-1.5 rounded border border-emerald-500/30 text-emerald-300">
-                    <strong class="font-bold">TIPO C:</strong> Interior de planta
-                </div>
-                <div class="bg-slate-950/80 p-1.5 rounded border border-purple-500/30 text-purple-300">
-                    <strong class="font-bold">TIPO D:</strong> Zonas lejanas
-                </div>
-                <div class="bg-slate-950/80 p-1.5 rounded border border-teal-500/30 text-teal-300">
-                    <strong class="font-bold">TIPO E:</strong> Patios de camionetas
-                </div>
-            </div>
-
-            <!-- Tabla de Vuelos -->
+            <!-- Tabla de Vuelos Reducida para 1/4 de Pantalla -->
             <div class="overflow-x-auto">
-                <table class="w-full text-left text-xs">
-                    <thead class="bg-slate-950 text-slate-400 uppercase font-bold tracking-wider border-b border-slate-800">
+                <table class="w-full text-left text-xs min-w-[500px]">
+                    <thead class="bg-slate-950 text-slate-400 uppercase font-bold tracking-wider border-b border-slate-800 text-[10px]">
                         <tr>
-                            <th class="px-3 py-2.5">#</th>
-                            <th class="px-3 py-2.5">Hora Base</th>
-                            <th class="px-3 py-2.5">Ventana (-30m / +30m)</th>
-                            <th class="px-3 py-2.5">Tipo / Recorrido</th>
-                            <th class="px-3 py-2.5">Estado Actual</th>
-                            <th class="px-3 py-2.5">Hora Despegue / Motivo</th>
-                            <th class="px-3 py-2.5 text-right">Acciones de Bitácora</th>
+                            <th class="px-2 py-2">#</th>
+                            <th class="px-2 py-2">Hora Base</th>
+                            <th class="px-2 py-2">Ventana (&plusmn;30m)</th>
+                            <th class="px-2 py-2">Tipo / Recorrido</th>
+                            <th class="px-2 py-2">Estado Actual</th>
+                            <th class="px-2 py-2">Despegue / Motivo</th>
+                            <th class="px-2 py-2 text-right">Acciones</th>
                         </tr>
                     </thead>
-                    <tbody id="flightsTableBody" class="divide-y divide-slate-800/60 font-medium">
+                    <tbody id="flightsTableBody" class="divide-y divide-slate-800/60 font-medium text-xs">
                         <!-- Rellenado dinámicamente -->
                     </tbody>
                 </table>
             </div>
         </section>
 
-        <!-- Seccion Bitacora Oficial (Oculta por defecto para pantalla más sencilla) -->
-        <section id="bitacoraSection" class="bg-slate-900 p-5 rounded-2xl border border-slate-800 shadow-xl space-y-4 hidden">
-            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800 pb-3">
+        <section id="bitacoraSection" class="bg-slate-900 p-4 rounded-2xl border border-slate-800 shadow-xl space-y-3 hidden">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800 pb-3">
                 <div>
-                    <h3 class="text-base font-bold text-white flex items-center gap-2">
+                    <h3 class="text-sm font-bold text-white flex items-center gap-2">
                         <i class="fa-solid fa-book-bookmark text-emerald-400"></i>
                         Bitácora Oficial de Vuelos y Evidencias (Registro Auditoría)
                     </h3>
-                    <p class="text-xs text-slate-400">Registro permanente con hora exacta, firma de operador y foto de evidencia adjunta.</p>
+                    <p class="text-[11px] text-slate-400">Registro inmutable permanente con firmas de operadores e imágenes de evidencia.</p>
                 </div>
-                <div class="flex items-center gap-2">
-                    <button onclick="exportBitacoraCSV()" class="px-3 py-1.5 bg-emerald-700 hover:bg-emerald-600 text-white font-bold text-xs rounded-lg border border-emerald-500/30 transition flex items-center gap-1.5">
-                        <i class="fa-solid fa-file-excel"></i> Exportar Excel / CSV
+                <div class="flex items-center gap-1.5 flex-wrap">
+                    <button onclick="exportBitacoraCSV()" class="px-2.5 py-1.5 bg-emerald-700 hover:bg-emerald-600 text-white font-bold text-xs rounded-lg border border-emerald-500/30 transition flex items-center gap-1">
+                        <i class="fa-solid fa-file-excel text-xs"></i> Excel
                     </button>
-                    <button onclick="window.print()" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs rounded-lg border border-slate-700 transition flex items-center gap-1.5">
-                        <i class="fa-solid fa-print"></i> Imprimir / PDF
+                    <button onclick="window.print()" class="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs rounded-lg border border-slate-700 transition flex items-center gap-1">
+                        <i class="fa-solid fa-print text-xs"></i> PDF / Imprimir
                     </button>
-                    <button onclick="openClearBitacoraModal()" class="px-3 py-1.5 bg-red-950/80 hover:bg-red-900 text-red-300 font-bold text-xs rounded-lg border border-red-800/60 transition flex items-center gap-1.5 shadow" title="Vaciar todos los registros guardados en la bitácora">
-                        <i class="fa-solid fa-trash-can"></i> Vaciar Bitácora
+                    <button onclick="openClearBitacoraModal()" class="px-2.5 py-1.5 bg-red-950/80 hover:bg-red-900 text-red-300 font-bold text-xs rounded-lg border border-red-800/60 transition flex items-center gap-1" title="Vaciar bitácora para reiniciar">
+                        <i class="fa-solid fa-trash-can text-xs"></i> Vaciar
                     </button>
                 </div>
             </div>
 
-            <!-- Tabla de Bitácora Guardada -->
             <div class="overflow-x-auto">
                 <table class="w-full text-left text-xs">
                     <thead class="bg-slate-950 text-slate-400 uppercase font-bold tracking-wider border-b border-slate-800">
                         <tr>
-                            <th class="px-4 py-3">Fecha / Hora Registro</th>
-                            <th class="px-4 py-3">Hora Programada</th>
-                            <th class="px-4 py-3">Tipo Vuelo</th>
-                            <th class="px-4 py-3">Operador / Piloto</th>
-                            <th class="px-4 py-3">Estado</th>
-                            <th class="px-4 py-3">Hora Real Despegue</th>
-                            <th class="px-4 py-3">Detalle / Motivo Suspensión</th>
-                            <th class="px-4 py-3 text-center">Evidencia Fotográfica</th>
-                            <th class="px-4 py-3 text-right no-print">Acciones</th>
+                            <th class="px-3 py-2.5">Fecha / Hora</th>
+                            <th class="px-3 py-2.5">Programada</th>
+                            <th class="px-3 py-2.5">Tipo Vuelo</th>
+                            <th class="px-3 py-2.5">Operador / Piloto</th>
+                            <th class="px-3 py-2.5">Estado</th>
+                            <th class="px-3 py-2.5">Hora Real</th>
+                            <th class="px-3 py-2.5">Detalle / Motivo</th>
+                            <th class="px-3 py-2.5 text-center">Evidencia</th>
+                            <th class="px-3 py-2.5 text-right no-print">Editar</th>
                         </tr>
                     </thead>
                     <tbody id="bitacoraTableBody" class="divide-y divide-slate-800/60 font-medium">
@@ -386,211 +327,149 @@
 
     </main>
 
-    <!-- Notification Toast Banner -->
-    <div id="toastNotification" class="fixed bottom-5 right-5 bg-slate-900 border border-slate-700 text-white px-4 py-3 rounded-xl shadow-2xl z-50 flex items-center gap-3 transition-all duration-300 opacity-0 translate-y-5 pointer-events-none">
-        <i id="toastIcon" class="fa-solid fa-circle-info text-blue-400 text-lg"></i>
-        <span id="toastMessage" class="text-xs font-semibold">Notificación</span>
+    <div id="toastNotification" class="fixed bottom-4 right-4 bg-slate-900 border border-slate-700 text-white px-3.5 py-2.5 rounded-xl shadow-2xl z-50 flex items-center gap-2.5 transition-all duration-300 opacity-0 translate-y-5 pointer-events-none max-w-xs text-xs">
+        <i id="toastIcon" class="fa-solid fa-circle-info text-blue-400 text-base"></i>
+        <span id="toastMessage" class="font-semibold">Notificación</span>
     </div>
 
     <!-- Modal Registrar Despegue -->
-    <div id="modalTakeoff" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
-        <div class="bg-slate-900 border border-emerald-500/40 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
-            <div class="flex justify-between items-center border-b border-slate-800 pb-3">
-                <h3 class="text-base font-bold text-emerald-400 flex items-center gap-2">
-                    <i class="fa-solid fa-plane-departure"></i> Registrar Despegue de Vuelo
+    <div id="modalTakeoff" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-3 hidden">
+        <div class="bg-slate-900 border border-emerald-500/40 rounded-2xl max-w-sm w-full p-5 shadow-2xl space-y-3 max-h-[90vh] overflow-y-auto">
+            <div class="flex justify-between items-center border-b border-slate-800 pb-2">
+                <h3 class="text-sm font-bold text-emerald-400 flex items-center gap-1.5">
+                    <i class="fa-solid fa-plane-departure"></i> Registrar Despegue
                 </h3>
-                <button onclick="closeModal('modalTakeoff')" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark text-lg"></i></button>
+                <button onclick="closeModal('modalTakeoff')" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark text-base"></i></button>
             </div>
-            <div class="space-y-3 text-xs">
+            <div class="space-y-2.5 text-xs">
                 <div>
                     <label class="block text-slate-400 font-semibold mb-1">Vuelo / Horario:</label>
-                    <input type="text" id="takeoffFlightLabel" readonly class="w-full bg-slate-950 border border-slate-800 text-slate-200 px-3 py-2 rounded-lg font-bold">
+                    <input type="text" id="takeoffFlightLabel" readonly class="w-full bg-slate-950 border border-slate-800 text-slate-200 px-2.5 py-1.5 rounded-lg font-bold">
                 </div>
                 <div>
                     <label class="block text-slate-400 font-semibold mb-1">Hora Real de Despegue:</label>
-                    <input type="text" id="takeoffRealTime" class="w-full bg-slate-950 border border-slate-700 text-emerald-400 font-mono text-sm font-bold px-3 py-2 rounded-lg focus:outline-none focus:ring-1 focus:ring-emerald-500">
+                    <input type="text" id="takeoffRealTime" class="w-full bg-slate-950 border border-slate-700 text-emerald-400 font-mono text-xs font-bold px-2.5 py-1.5 rounded-lg focus:outline-none focus:ring-1 focus:ring-emerald-500">
                 </div>
                 <div>
                     <label class="block text-slate-400 font-semibold mb-1">Nombre / Firma Operador:</label>
-                    <input type="text" id="takeoffPilotName" value="Piloto en Turno" class="w-full bg-slate-950 border border-slate-700 text-slate-200 px-3 py-2 rounded-lg focus:outline-none focus:ring-1 focus:ring-emerald-500">
+                    <input type="text" id="takeoffPilotName" value="Piloto en Turno" class="w-full bg-slate-950 border border-slate-700 text-slate-200 px-2.5 py-1.5 rounded-lg focus:outline-none focus:ring-1 focus:ring-emerald-500">
                 </div>
                 <div>
-                    <label class="block text-slate-400 font-semibold mb-1">Observaciones / Novedades:</label>
-                    <textarea id="takeoffNotes" rows="2" placeholder="Vuelo normal sin novedades, patrullaje completo..." class="w-full bg-slate-950 border border-slate-700 text-slate-200 p-2.5 rounded-lg focus:outline-none focus:ring-1 focus:ring-emerald-500"></textarea>
+                    <label class="block text-slate-400 font-semibold mb-1">Observaciones:</label>
+                    <textarea id="takeoffNotes" rows="2" placeholder="Patrullaje completo sin novedades..." class="w-full bg-slate-950 border border-slate-700 text-slate-200 p-2 rounded-lg focus:outline-none focus:ring-1 focus:ring-emerald-500"></textarea>
                 </div>
                 <div>
-                    <label class="block text-slate-400 font-semibold mb-1"><i class="fa-solid fa-camera"></i> Foto / Evidencia de Vuelo (Opcional):</label>
-                    <input type="file" id="takeoffFileInput" accept="image/*" class="w-full bg-slate-950 text-slate-300 p-2 rounded-lg border border-slate-700 file:mr-3 file:py-1 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-emerald-950 file:text-emerald-300 hover:file:bg-emerald-900" onchange="previewTakeoffImage(event)">
+                    <label class="block text-slate-400 font-semibold mb-1"><i class="fa-solid fa-camera"></i> Foto / Evidencia (Opcional):</label>
+                    <input type="file" id="takeoffFileInput" accept="image/*" class="w-full bg-slate-950 text-slate-300 p-1.5 rounded-lg border border-slate-700 file:mr-2 file:py-0.5 file:px-2 file:rounded-md file:border-0 file:text-[10px] file:font-semibold file:bg-emerald-950 file:text-emerald-300" onchange="previewTakeoffImage(event)">
                     <div id="takeoffPreviewContainer" class="mt-2 hidden">
-                        <p class="text-[10px] text-slate-400 mb-1">Vista previa de imagen (optimizada):</p>
-                        <img id="takeoffPreviewImg" src="" alt="Evidencia Despegue" class="h-28 w-full object-cover rounded-lg border border-slate-700">
+                        <img id="takeoffPreviewImg" src="" alt="Evidencia Despegue" class="h-24 w-full object-cover rounded-lg border border-slate-700">
                     </div>
                 </div>
             </div>
             <div class="flex justify-end gap-2 pt-2 border-t border-slate-800">
-                <button onclick="closeModal('modalTakeoff')" class="px-4 py-2 bg-slate-800 text-slate-300 font-semibold text-xs rounded-xl hover:bg-slate-700">Cancelar</button>
-                <button onclick="confirmTakeoff()" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl shadow">Confirmar Despegue</button>
+                <button onclick="closeModal('modalTakeoff')" class="px-3 py-1.5 bg-slate-800 text-slate-300 font-semibold text-xs rounded-xl hover:bg-slate-700">Cancelar</button>
+                <button onclick="confirmTakeoff()" class="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl shadow">Confirmar Despegue</button>
             </div>
         </div>
     </div>
 
-    <!-- Modal Registrar Suspensión y Subir Evidencia -->
-    <div id="modalSuspension" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
-        <div class="bg-slate-900 border border-amber-500/40 rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
-            <div class="flex justify-between items-center border-b border-slate-800 pb-3">
-                <h3 class="text-base font-bold text-amber-400 flex items-center gap-2">
-                    <i class="fa-solid fa-triangle-exclamation"></i> Registrar Suspensión de Vuelo
+    <!-- Modal Registrar Suspensión -->
+    <div id="modalSuspension" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-3 hidden">
+        <div class="bg-slate-900 border border-amber-500/40 rounded-2xl max-w-sm w-full p-5 shadow-2xl space-y-3 max-h-[90vh] overflow-y-auto">
+            <div class="flex justify-between items-center border-b border-slate-800 pb-2">
+                <h3 class="text-sm font-bold text-amber-400 flex items-center gap-1.5">
+                    <i class="fa-solid fa-triangle-exclamation"></i> Registrar Suspensión
                 </h3>
-                <button onclick="closeModal('modalSuspension')" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark text-lg"></i></button>
+                <button onclick="closeModal('modalSuspension')" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark text-base"></i></button>
             </div>
             
-            <div class="space-y-3 text-xs">
+            <div class="space-y-2.5 text-xs">
                 <div>
-                    <label class="block text-slate-400 font-semibold mb-1">Vuelo / Horario a Suspender:</label>
-                    <input type="text" id="suspendFlightLabel" readonly class="w-full bg-slate-950 border border-slate-800 text-slate-200 px-3 py-2 rounded-lg font-bold">
+                    <label class="block text-slate-400 font-semibold mb-1">Vuelo / Horario:</label>
+                    <input type="text" id="suspendFlightLabel" readonly class="w-full bg-slate-950 border border-slate-800 text-slate-200 px-2.5 py-1.5 rounded-lg font-bold">
                 </div>
                 <div>
                     <label class="block text-slate-400 font-semibold mb-1">Nombre / Firma Operador:</label>
-                    <input type="text" id="suspendPilotName" value="Piloto en Turno" class="w-full bg-slate-950 border border-slate-700 text-slate-200 px-3 py-2 rounded-lg focus:outline-none focus:ring-1 focus:ring-amber-500">
+                    <input type="text" id="suspendPilotName" value="Piloto en Turno" class="w-full bg-slate-950 border border-slate-700 text-slate-200 px-2.5 py-1.5 rounded-lg focus:outline-none focus:ring-1 focus:ring-amber-500">
                 </div>
                 <div>
-                    <label class="block text-slate-400 font-semibold mb-1">Causa de Suspensión (Obligatorio):</label>
-                    <select id="suspendReasonSelect" class="w-full bg-slate-950 border border-slate-700 text-amber-300 px-3 py-2 rounded-lg font-bold focus:ring-1 focus:ring-amber-500">
-                        <option value="LLUVIA / PRECIPITACIÓN">Lluvia / Lluvia Fuerte</option>
+                    <label class="block text-slate-400 font-semibold mb-1">Causa de Suspensión:</label>
+                    <select id="suspendReasonSelect" class="w-full bg-slate-950 border border-slate-700 text-amber-300 px-2.5 py-1.5 rounded-lg font-bold focus:ring-1 focus:ring-amber-500 text-xs">
+                        <option value="LLUVIA / PRECIPITACIÓN">Lluvia / Precipitación</option>
                         <option value="VIENTO FUERTE (> 43 km/h)">Viento Fuerte (> 43 km/h)</option>
-                        <option value="NEBLINA DENSA / NULA VISIBILIDAD">Neblina Densa / Nula Visibilidad</option>
+                        <option value="NEBLINA DENSA / NULA VISIBILIDAD">Neblina Densa / Visibilidad Nula</option>
                         <option value="TORMENTA ELÉCTRICA">Tormenta Eléctrica</option>
-                        <option value="ATENCIÓN A EMERGENCIA REAL EN PLANTA">Atención a Emergencia Real en Planta</option>
+                        <option value="ATENCIÓN A EMERGENCIA REAL EN PLANTA">Atención a Emergencia en Planta</option>
                         <option value="MANTENIMIENTO / FALLA TÉCNICA DRON">Mantenimiento / Falla Técnica Dron</option>
                     </select>
                 </div>
                 <div>
-                    <label class="block text-slate-400 font-semibold mb-1">Detalle / Justificación de Seguridad:</label>
-                    <textarea id="suspendNotes" rows="2" placeholder="Describa el estado del clima o la emergencia en planta..." class="w-full bg-slate-950 border border-slate-700 text-slate-200 p-2.5 rounded-lg focus:outline-none focus:ring-1 focus:ring-amber-500"></textarea>
+                    <label class="block text-slate-400 font-semibold mb-1">Detalle / Justificación:</label>
+                    <textarea id="suspendNotes" rows="2" placeholder="Detalle la condición meteorológica o el evento..." class="w-full bg-slate-950 border border-slate-700 text-slate-200 p-2 rounded-lg focus:outline-none focus:ring-1 focus:ring-amber-500"></textarea>
                 </div>
                 <div>
-                    <label class="block text-slate-400 font-semibold mb-1"><i class="fa-solid fa-camera"></i> Subir Evidencia Fotográfica (Foto / Screenshot Clima):</label>
-                    <input type="file" id="evidenceFileInput" accept="image/*" class="w-full bg-slate-950 text-slate-300 p-2 rounded-lg border border-slate-700 file:mr-3 file:py-1 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-amber-950 file:text-amber-300 hover:file:bg-amber-900" onchange="previewEvidenceImage(event)">
+                    <label class="block text-slate-400 font-semibold mb-1"><i class="fa-solid fa-camera"></i> Subir Foto de Evidencia:</label>
+                    <input type="file" id="evidenceFileInput" accept="image/*" class="w-full bg-slate-950 text-slate-300 p-1.5 rounded-lg border border-slate-700 file:mr-2 file:py-0.5 file:px-2 file:rounded-md file:border-0 file:text-[10px] file:font-semibold file:bg-amber-950 file:text-amber-300" onchange="previewEvidenceImage(event)">
                     <div id="evidencePreviewContainer" class="mt-2 hidden">
-                        <p class="text-[10px] text-slate-400 mb-1">Vista previa de evidencia (optimizada):</p>
-                        <img id="evidencePreviewImg" src="" alt="Evidencia" class="h-28 w-full object-cover rounded-lg border border-slate-700">
+                        <img id="evidencePreviewImg" src="" alt="Evidencia" class="h-24 w-full object-cover rounded-lg border border-slate-700">
                     </div>
                 </div>
             </div>
 
             <div class="flex justify-end gap-2 pt-2 border-t border-slate-800">
-                <button onclick="closeModal('modalSuspension')" class="px-4 py-2 bg-slate-800 text-slate-300 font-semibold text-xs rounded-xl hover:bg-slate-700">Cancelar</button>
-                <button onclick="confirmSuspension()" class="px-4 py-2 bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs rounded-xl shadow">Confirmar Suspensión</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Modal Editar Registro de Bitácora -->
-    <div id="modalEditBitacora" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
-        <div class="bg-slate-900 border border-blue-500/40 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
-            <div class="flex justify-between items-center border-b border-slate-800 pb-3">
-                <h3 class="text-base font-bold text-blue-400 flex items-center gap-2">
-                    <i class="fa-solid fa-pen-to-square"></i> Editar Registro de Bitácora
-                </h3>
-                <button onclick="closeModal('modalEditBitacora')" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark text-lg"></i></button>
-            </div>
-            
-            <div class="space-y-3 text-xs">
-                <div>
-                    <label class="block text-slate-400 font-semibold mb-1">Vuelo / Horario:</label>
-                    <input type="text" id="editFlightLabel" readonly class="w-full bg-slate-950 border border-slate-800 text-slate-200 px-3 py-2 rounded-lg font-bold">
-                </div>
-                <div>
-                    <label class="block text-slate-400 font-semibold mb-1">Nombre / Firma Operador:</label>
-                    <input type="text" id="editPilotName" class="w-full bg-slate-950 border border-slate-700 text-slate-200 px-3 py-2 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500">
-                </div>
-                <div>
-                    <label class="block text-slate-400 font-semibold mb-1">Estado del Registro:</label>
-                    <select id="editStatusSelect" class="w-full bg-slate-950 border border-slate-700 text-slate-200 px-3 py-2 rounded-lg font-bold focus:ring-1 focus:ring-blue-500">
-                        <option value="VOLADO">VOLADO</option>
-                        <option value="SUSPENDIDO">SUSPENDIDO</option>
-                    </select>
-                </div>
-                <div>
-                    <label class="block text-slate-400 font-semibold mb-1">Hora Real de Despegue (o N/A):</label>
-                    <input type="text" id="editRealTime" class="w-full bg-slate-950 border border-slate-700 text-emerald-400 font-mono text-sm font-bold px-3 py-2 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500">
-                </div>
-                <div>
-                    <label class="block text-slate-400 font-semibold mb-1">Observaciones / Motivo:</label>
-                    <textarea id="editNotes" rows="3" class="w-full bg-slate-950 border border-slate-700 text-slate-200 p-2.5 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500"></textarea>
-                </div>
-                <div>
-                    <label class="block text-slate-400 font-semibold mb-1"><i class="fa-solid fa-image"></i> Cambiar / Subir Evidencia Fotográfica:</label>
-                    <input type="file" id="editEvidenceInput" accept="image/*" class="w-full bg-slate-950 text-slate-300 p-2 rounded-lg border border-slate-700 file:mr-3 file:py-1 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-blue-950 file:text-blue-300 hover:file:bg-blue-900" onchange="previewEditEvidenceImage(event)">
-                    <div id="editEvidencePreviewContainer" class="mt-2 hidden">
-                        <p class="text-[10px] text-slate-400 mb-1">Vista previa de evidencia actualizada:</p>
-                        <img id="editEvidencePreviewImg" src="" alt="Evidencia" class="h-28 w-full object-cover rounded-lg border border-slate-700">
-                    </div>
-                </div>
-            </div>
-
-            <div class="flex justify-end gap-2 pt-2 border-t border-slate-800">
-                <button onclick="closeModal('modalEditBitacora')" class="px-4 py-2 bg-slate-800 text-slate-300 font-semibold text-xs rounded-xl hover:bg-slate-700">Cancelar</button>
-                <button onclick="confirmEditBitacora()" class="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs rounded-xl shadow">Guardar Cambios</button>
+                <button onclick="closeModal('modalSuspension')" class="px-3 py-1.5 bg-slate-800 text-slate-300 font-semibold text-xs rounded-xl hover:bg-slate-700">Cancelar</button>
+                <button onclick="confirmSuspension()" class="px-3.5 py-1.5 bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs rounded-xl shadow">Confirmar Suspensión</button>
             </div>
         </div>
     </div>
 
     <!-- Modal Lightbox Ampliación de Evidencia -->
-    <div id="modalImageLightbox" class="fixed inset-0 bg-slate-950/90 backdrop-blur-md z-50 flex items-center justify-center p-4 hidden" onclick="closeModal('modalImageLightbox')">
-        <div class="relative max-w-3xl w-full p-2 flex flex-col items-center" onclick="event.stopPropagation()">
-            <button onclick="closeModal('modalImageLightbox')" class="absolute -top-10 right-0 text-white text-2xl hover:text-red-400"><i class="fa-solid fa-xmark"></i></button>
-            <img id="lightboxImg" src="" alt="Evidencia Completa" class="max-h-[80vh] w-auto max-w-full rounded-xl border border-slate-700 shadow-2xl object-contain">
-            <p id="lightboxCaption" class="text-xs text-slate-300 mt-3 text-center font-semibold bg-slate-900/80 px-4 py-2 rounded-lg border border-slate-800"></p>
+    <div id="modalImageLightbox" class="fixed inset-0 bg-slate-950/90 backdrop-blur-md z-50 flex items-center justify-center p-3 hidden" onclick="closeModal('modalImageLightbox')">
+        <div class="relative max-w-xl w-full p-2 flex flex-col items-center" onclick="event.stopPropagation()">
+            <button onclick="closeModal('modalImageLightbox')" class="absolute -top-8 right-0 text-white text-xl hover:text-red-400"><i class="fa-solid fa-xmark"></i></button>
+            <img id="lightboxImg" src="" alt="Evidencia Completa" class="max-h-[75vh] w-auto max-w-full rounded-xl border border-slate-700 shadow-2xl object-contain">
+            <p id="lightboxCaption" class="text-xs text-slate-300 mt-2 text-center font-semibold bg-slate-900/80 px-3 py-1 rounded-lg border border-slate-800"></p>
         </div>
     </div>
 
-    <!-- Modal Confirmación Vaciar Bitácora Completa -->
-    <div id="modalClearBitacoraConfirm" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
-        <div class="bg-slate-900 border border-red-500/50 rounded-2xl max-w-sm w-full p-6 shadow-2xl space-y-4 text-center">
-            <div class="w-12 h-12 bg-red-950/80 border border-red-800/60 rounded-full flex items-center justify-center mx-auto text-red-400 text-xl">
+    <!-- Modal Confirmación Vaciar Bitácora -->
+    <div id="modalClearBitacoraConfirm" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-3 hidden">
+        <div class="bg-slate-900 border border-red-500/50 rounded-2xl max-w-xs w-full p-5 shadow-2xl space-y-3 text-center">
+            <div class="w-10 h-10 bg-red-950/80 border border-red-800/60 rounded-full flex items-center justify-center mx-auto text-red-400 text-lg">
                 <i class="fa-solid fa-triangle-exclamation"></i>
             </div>
             <div>
-                <h3 class="text-base font-bold text-white">¿Vaciar toda la Bitácora?</h3>
-                <p class="text-xs text-slate-400 mt-1">Esta acción eliminará TODOS los registros de vuelos y fotos almacenados localmente y en la nube.</p>
-            </div>
-            <div class="bg-red-950/40 p-3 rounded-xl border border-red-900/50 text-xs font-semibold text-red-300">
-                ⚠️ Te recomendamos exportar primero a Excel/CSV antes de vaciar la base de datos.
+                <h3 class="text-sm font-bold text-white">¿Vaciar Bitácora?</h3>
+                <p class="text-[11px] text-slate-400 mt-1">Se eliminarán los registros guardados localmente y en la nube.</p>
             </div>
             <div class="flex justify-center gap-2 pt-2 border-t border-slate-800">
-                <button onclick="closeModal('modalClearBitacoraConfirm')" class="px-4 py-2 bg-slate-800 text-slate-300 font-semibold text-xs rounded-xl hover:bg-slate-700">Cancelar</button>
-                <button onclick="confirmClearAllBitacora()" class="px-4 py-2 bg-red-600 hover:bg-red-500 text-white font-bold text-xs rounded-xl shadow flex items-center gap-1.5">
-                    <i class="fa-solid fa-trash-can"></i> Sí, Vaciar Todo
-                </button>
+                <button onclick="closeModal('modalClearBitacoraConfirm')" class="px-3 py-1.5 bg-slate-800 text-slate-300 font-semibold text-xs rounded-xl hover:bg-slate-700">Cancelar</button>
+                <button onclick="confirmClearAllBitacora()" class="px-3.5 py-1.5 bg-red-600 hover:bg-red-500 text-white font-bold text-xs rounded-xl shadow">Vaciar Todo</button>
             </div>
         </div>
     </div>
 
     <!-- Modal Ver Matriz Oficial de los 4 Planes -->
-    <div id="modalOfficialPlans" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
-        <div class="bg-slate-900 border border-blue-500/40 rounded-2xl max-w-4xl w-full p-6 shadow-2xl space-y-4 max-h-[90vh] flex flex-col">
-            <div class="flex justify-between items-center border-b border-slate-800 pb-3">
-                <h3 class="text-base font-bold text-blue-400 flex items-center gap-2">
-                    <i class="fa-solid fa-table"></i> Matriz Oficial de Recorridos Audi México (Planes 1 a 4)
+    <div id="modalOfficialPlans" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-3 hidden">
+        <div class="bg-slate-900 border border-blue-500/40 rounded-2xl max-w-3xl w-full p-5 shadow-2xl space-y-3 max-h-[85vh] flex flex-col">
+            <div class="flex justify-between items-center border-b border-slate-800 pb-2">
+                <h3 class="text-sm font-bold text-blue-400 flex items-center gap-1.5">
+                    <i class="fa-solid fa-table"></i> Matriz Oficial Audi México (Planes 1 a 4)
                 </h3>
-                <button onclick="closeModal('modalOfficialPlans')" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark text-lg"></i></button>
+                <button onclick="closeModal('modalOfficialPlans')" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark text-base"></i></button>
             </div>
             
-            <div class="overflow-y-auto flex-1 space-y-4 text-xs pr-1">
-                <p class="text-slate-300">
-                    Planes precargados inmutables según normativa de planta. Los vuelos <strong class="text-amber-400">Tipo B</strong> representan la vigilancia en garitas durante los relevos fijos de personal (06:00, 14:00, 17:00, 21:30 hrs).
-                </p>
+            <div class="overflow-y-auto flex-1 space-y-2 text-xs pr-1">
                 <div class="overflow-x-auto">
                     <table class="w-full text-left text-xs border border-slate-800">
                         <thead class="bg-slate-950 text-slate-400 uppercase font-bold border-b border-slate-800">
                             <tr>
-                                <th class="p-2.5">Hora Base (Opción 2)</th>
-                                <th class="p-2.5">Plan 1</th>
-                                <th class="p-2.5">Plan 2</th>
-                                <th class="p-2.5">Plan 3</th>
-                                <th class="p-2.5">Plan 4</th>
-                                <th class="p-2.5">Detalle / Tipo</th>
+                                <th class="p-2">Hora Base</th>
+                                <th class="p-2">Plan 1</th>
+                                <th class="p-2">Plan 2</th>
+                                <th class="p-2">Plan 3</th>
+                                <th class="p-2">Plan 4</th>
+                                <th class="p-2">Detalle / Tipo</th>
                             </tr>
                         </thead>
                         <tbody id="officialPlansTableBody" class="divide-y divide-slate-800 font-mono text-slate-300">
@@ -601,42 +480,36 @@
             </div>
 
             <div class="flex justify-end pt-2 border-t border-slate-800">
-                <button onclick="closeModal('modalOfficialPlans')" class="px-4 py-2 bg-slate-800 text-slate-300 font-semibold text-xs rounded-xl hover:bg-slate-700">Cerrar Visor</button>
+                <button onclick="closeModal('modalOfficialPlans')" class="px-3.5 py-1.5 bg-slate-800 text-slate-300 font-semibold text-xs rounded-xl hover:bg-slate-700">Cerrar</button>
             </div>
         </div>
     </div>
 
-    <!-- Modal Credenciales de Nube -->
-    <div id="modalFirebaseConfig" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
-        <div class="bg-slate-900 border border-blue-500/40 rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-4">
-            <div class="flex justify-between items-center border-b border-slate-800 pb-3">
-                <h3 class="text-base font-bold text-blue-400 flex items-center gap-2">
-                    <i class="fa-solid fa-cloud"></i> Configuración de Sincronización Nube
+    <!-- Modal Credenciales Nube -->
+    <div id="modalFirebaseConfig" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-3 hidden">
+        <div class="bg-slate-900 border border-blue-500/40 rounded-2xl max-w-sm w-full p-5 shadow-2xl space-y-3">
+            <div class="flex justify-between items-center border-b border-slate-800 pb-2">
+                <h3 class="text-sm font-bold text-blue-400 flex items-center gap-1.5">
+                    <i class="fa-solid fa-cloud"></i> Configuración Firebase
                 </h3>
-                <button onclick="closeModal('modalFirebaseConfig')" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark text-lg"></i></button>
+                <button onclick="closeModal('modalFirebaseConfig')" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark text-base"></i></button>
             </div>
             
-            <div class="space-y-3 text-xs">
-                <p class="text-slate-300 leading-relaxed">
-                    Sincronización en vivo activa mediante Firebase Firestore.
-                </p>
-                <div>
-                    <label class="block text-slate-400 font-semibold mb-1">Firebase Configuration JSON:</label>
-                    <textarea id="firebaseConfigInput" rows="6" placeholder='{&#10;  "apiKey": "...",&#10;  "authDomain": "...",&#10;  "projectId": "...",&#10;  "storageBucket": "...",&#10;  "messagingSenderId": "...",&#10;  "appId": "..."&#10;}' class="w-full bg-slate-950 border border-slate-700 text-emerald-400 font-mono text-xs p-3 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500"></textarea>
-                </div>
+            <div class="space-y-2 text-xs">
+                <label class="block text-slate-400 font-semibold mb-1">Firebase Configuration JSON:</label>
+                <textarea id="firebaseConfigInput" rows="5" placeholder='{ "apiKey": "...", "projectId": "..." }' class="w-full bg-slate-950 border border-slate-700 text-emerald-400 font-mono text-[11px] p-2 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500"></textarea>
             </div>
 
             <div class="flex justify-between items-center pt-2 border-t border-slate-800">
-                <button onclick="saveFirebaseConfig(true)" class="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-xs rounded-xl">Usar Modo Local</button>
-                <div class="flex gap-2">
-                    <button onclick="closeModal('modalFirebaseConfig')" class="px-4 py-2 bg-slate-800 text-slate-300 font-semibold text-xs rounded-xl hover:bg-slate-700">Cancelar</button>
-                    <button onclick="saveFirebaseConfig(false)" class="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs rounded-xl shadow">Guardar y Conectar</button>
+                <button onclick="saveFirebaseConfig(true)" class="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-xs rounded-xl">Modo Local</button>
+                <div class="flex gap-1.5">
+                    <button onclick="closeModal('modalFirebaseConfig')" class="px-3 py-1.5 bg-slate-800 text-slate-300 font-semibold text-xs rounded-xl hover:bg-slate-700">Cancelar</button>
+                    <button onclick="saveFirebaseConfig(false)" class="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs rounded-xl shadow">Guardar</button>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Main Application JavaScript Logic -->
     <script>
         const OFFICIAL_PLANS = {
             "1": [
@@ -714,14 +587,13 @@
         };
 
         window.currentWeeklyPlan = "1";
-        window.currentOptionTime = "op2"; // Opción 2 permanente fija por solicitud
+        window.currentOptionTime = "op2";
         window.dailyFlightStatuses = {};
         window.bitacoraList = [];
         window.activeModalIndex = null;
         window.lastDateString = "";
         window.tempImageData = "";
         window.tempTakeoffImageData = "";
-        window.tempEditImageData = "";
         window.spokenFlightAlerts = {};
 
         function startLiveClock() {
@@ -766,16 +638,16 @@
 
             if (day >= 13 && day <= 16) {
                 targetPlan = "1";
-                noteText = "Asignación Automática: 13 al 16 de Agosto ➔ Plan 1 (Semana 1)";
+                noteText = "Plan 1 (13-16 Ago)";
             } else if (day >= 17 && day <= 23) {
                 targetPlan = "2";
-                noteText = "Asignación Automática: 17 al 23 de Agosto ➔ Plan 2 (Semana 2)";
+                noteText = "Plan 2 (17-23 Ago)";
             } else if (day >= 24 && day <= 31) {
                 targetPlan = "3";
-                noteText = "Asignación Automática: 24 al 31 de Agosto ➔ Plan 3 (Semana 3)";
+                noteText = "Plan 3 (24-31 Ago)";
             } else {
                 targetPlan = "1";
-                noteText = "Asignación Automática Predeterminada ➔ Plan 1";
+                noteText = "Plan 1 Activo";
             }
 
             const noteEl = document.getElementById('autoCalendarNote');
@@ -794,14 +666,14 @@
             if (!shiftBadge) return;
 
             if (currentHour >= 6 && currentHour < 14) {
-                shiftBadge.innerText = "Turno 1 - Activo";
-                shiftBadge.className = "text-xs font-bold px-2 py-0.5 rounded bg-emerald-950/80 text-emerald-400 border border-emerald-800/40";
+                shiftBadge.innerText = "Turno 1";
+                shiftBadge.className = "text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-950/80 text-emerald-400 border border-emerald-800/40";
             } else if (currentHour >= 14 && currentHour < 22) {
-                shiftBadge.innerText = "Turno 2 - Activo";
-                shiftBadge.className = "text-xs font-bold px-2 py-0.5 rounded bg-blue-950/80 text-blue-400 border border-blue-800/40";
+                shiftBadge.innerText = "Turno 2";
+                shiftBadge.className = "text-[10px] font-bold px-1.5 py-0.5 rounded bg-blue-950/80 text-blue-400 border border-blue-800/40";
             } else {
-                shiftBadge.innerText = "Turno 3 - Activo";
-                shiftBadge.className = "text-xs font-bold px-2 py-0.5 rounded bg-purple-950/80 text-purple-400 border border-purple-800/40";
+                shiftBadge.innerText = "Turno 3";
+                shiftBadge.className = "text-[10px] font-bold px-1.5 py-0.5 rounded bg-purple-950/80 text-purple-400 border border-purple-800/40";
             }
         }
 
@@ -812,11 +684,11 @@
 
             if (sec.classList.contains('hidden')) {
                 sec.classList.remove('hidden');
-                if (btnText) btnText.innerText = "Ocultar Bitácora";
+                if (btnText) btnText.innerText = "Ocultar";
                 showToast('Bitácora visible', 'info');
             } else {
                 sec.classList.add('hidden');
-                if (btnText) btnText.innerText = "Ver Bitácora";
+                if (btnText) btnText.innerText = "Bitácora";
                 showToast('Bitácora ocultada (Vista limpia)', 'info');
             }
         }
@@ -829,7 +701,7 @@
             let minDiffSec = Infinity;
 
             plan.forEach((item, idx) => {
-                const timeStr = item.timeOp2; // Siempre Opción 2 (00:30 hrs)
+                const timeStr = item.timeOp2;
                 const [h, m] = timeStr.split(':').map(Number);
                 let flightSec = h * 3600 + m * 60;
 
@@ -846,8 +718,8 @@
             const targetTimeStr = currentTarget.timeOp2;
             const [th, tm] = targetTimeStr.split(':').map(Number);
             let targetSec = th * 3600 + tm * 60;
-            let winStartSec = targetSec - 30 * 60; // 30 mins antes
-            let winEndSec = targetSec + 30 * 60;   // 30 mins después
+            let winStartSec = targetSec - 30 * 60;
+            let winEndSec = targetSec + 30 * 60;
 
             let currentSecNorm = currentSec;
             if (targetSec === 0 && currentSecNorm >= 86400 - 1800) {
@@ -883,22 +755,21 @@
                 if (secToWinStart > 0) {
                     const mins = Math.floor(secToWinStart / 60);
                     const secs = secToWinStart % 60;
-                    targetCountdownEl.innerText = `Ventana abre en ${mins}m ${String(secs).padStart(2, '0')}s`;
-                    targetCountdownEl.className = "text-base font-mono font-bold text-amber-400";
+                    targetCountdownEl.innerText = `Abre en ${mins}m ${String(secs).padStart(2, '0')}s`;
+                    targetCountdownEl.className = "text-xs sm:text-sm font-mono font-bold text-amber-400";
                 } else if (secToTargetEnd >= 0) {
                     const mins = Math.floor(secToTargetEnd / 60);
                     const secs = secToTargetEnd % 60;
-                    targetCountdownEl.innerText = `VENTANA ABIERTA (${mins}m ${String(secs).padStart(2, '0')}s restantes)`;
-                    targetCountdownEl.className = "text-base font-mono font-bold text-emerald-400 pulse-red";
+                    targetCountdownEl.innerText = `ABIERTA (${mins}m ${String(secs).padStart(2, '0')}s)`;
+                    targetCountdownEl.className = "text-xs sm:text-sm font-mono font-bold text-emerald-400 pulse-green";
                 } else {
                     targetCountdownEl.innerText = "Programado";
-                    targetCountdownEl.className = "text-base font-mono font-bold text-slate-400";
+                    targetCountdownEl.className = "text-xs sm:text-sm font-mono font-bold text-slate-400";
                 }
             }
 
             window.activeTargetIdx = targetIdx;
 
-            // Alertas de voz automáticas cada 10 minutos durante la ventana de 60 min
             checkVoiceAlertsForTarget(currentTarget, targetIdx, targetTimeStr, winStartSec, winEndSec, currentSecNorm);
         }
 
@@ -910,7 +781,7 @@
             const elapsedSec = currentSecNorm - winStartSec;
             const remainingSec = winEndSec - currentSecNorm;
 
-            if (elapsedSec < 0 || remainingSec < 0) return; // Fuera de ventana
+            if (elapsedSec < 0 || remainingSec < 0) return;
 
             const elapsedMins = Math.floor(elapsedSec / 60);
 
@@ -919,7 +790,7 @@
 
             if (elapsedMins === 0) {
                 alertCode = "OPEN_0M";
-                textToSpeak = `Atención piloto. Se abre la ventana de vuelo para el horario de las ${targetTimeStr} horas. Recorrido ${currentTarget.name}.`;
+                textToSpeak = `Atención piloto. Se abre la ventana de vuelo para las ${targetTimeStr} horas. Recorrido ${currentTarget.name}.`;
             } else if (elapsedMins === 10) {
                 alertCode = "WARN_10M";
                 textToSpeak = `Recordatorio de vuelo de las ${targetTimeStr} horas. Restan 40 minutos de ventana permitida.`;
@@ -1090,7 +961,6 @@
 
             const elapsedSec = Math.floor((nowDate.getTime() - lastSuspendTime) / 1000);
             
-            // Cada 60 minutos exactos (3600 segundos) emitir recordatorio de evidencia
             if (elapsedSec > 0 && elapsedSec % 3600 === 0) {
                 const hoursElapsed = Math.floor(elapsedSec / 3600);
                 const key = `suspend_reminder_${lastSuspendTime}_${hoursElapsed}h`;
@@ -1098,61 +968,10 @@
                 if (!window.spokenFlightAlerts[key]) {
                     window.spokenFlightAlerts[key] = true;
                     const hourText = hoursElapsed === 1 ? "1 hora" : `${hoursElapsed} horas`;
-                    speakAlert(`Recordatorio de seguridad. Ha transcurrido ${hourText} desde la suspensión del vuelo. Favor de tomar y verificar la evidencia fotográfica del estado del clima.`);
+                    speakAlert(`Recordatorio de seguridad. Ha transcurrido ${hourText} desde la suspensión del vuelo. Favor de tomar y verificar la evidencia fotográfica.`);
                     showToast(`Recordatorio de Evidencia (${hourText}): Favor de actualizar la fotografía`, 'warning');
                 }
             }
-        }
-
-        function openEditBitacoraModal(idx) {
-            window.activeEditIndex = idx;
-            const item = window.bitacoraList[idx];
-            if (!item) return;
-
-            document.getElementById('editFlightLabel').value = `${item.scheduledTime} hrs - ${item.flightType}`;
-            document.getElementById('editPilotName').value = item.pilot || 'Piloto en Turno';
-            document.getElementById('editStatusSelect').value = item.status;
-            document.getElementById('editRealTime').value = item.realTime || '';
-            document.getElementById('editNotes').value = item.notes || '';
-            window.tempEditImageData = item.evidenceImg || '';
-
-            if (item.evidenceImg) {
-                document.getElementById('editEvidencePreviewImg').src = item.evidenceImg;
-                document.getElementById('editEvidencePreviewContainer').classList.remove('hidden');
-            } else {
-                document.getElementById('editEvidencePreviewContainer').classList.add('hidden');
-            }
-
-            openModal('modalEditBitacora');
-        }
-
-        function confirmEditBitacora() {
-            const idx = window.activeEditIndex;
-            if (idx === undefined || !window.bitacoraList[idx]) return;
-
-            const item = window.bitacoraList[idx];
-            item.pilot = document.getElementById('editPilotName').value || 'Piloto en Turno';
-            item.status = document.getElementById('editStatusSelect').value;
-            item.realTime = document.getElementById('editRealTime').value;
-            item.notes = document.getElementById('editNotes').value;
-            item.evidenceImg = window.tempEditImageData;
-
-            localStorage.setItem('audi_bitacora_logs', JSON.stringify(window.bitacoraList));
-            if (window.cloudUpdateBitacoraItem && item.cloudId) {
-                window.cloudUpdateBitacoraItem(item.cloudId, item);
-            }
-
-            closeModal('modalEditBitacora');
-            renderBitacoraTable();
-            showToast('Registro de bitácora actualizado', 'info');
-        }
-
-        function openDeleteBitacoraModal(idx) {
-            window.activeDeleteIndex = idx;
-            const item = window.bitacoraList[idx];
-            if (!item) return;
-
-            openModal('modalDeleteConfirm');
         }
 
         function openClearBitacoraModal() {
@@ -1186,12 +1005,12 @@
 
                 html += `
                     <tr class="hover:bg-slate-800/60">
-                        <td class="p-2.5 font-bold text-amber-300">${p1.timeOp2} hrs</td>
-                        <td class="p-2.5"><span class="px-2 py-0.5 rounded ${p1.type === 'B' ? 'bg-amber-950 text-amber-300 border border-amber-800' : 'bg-slate-800 border border-slate-700'}">TIPO ${p1.type}</span></td>
-                        <td class="p-2.5"><span class="px-2 py-0.5 rounded ${p2.type === 'B' ? 'bg-amber-950 text-amber-300 border border-amber-800' : 'bg-slate-800 border border-slate-700'}">TIPO ${p2.type}</span></td>
-                        <td class="p-2.5"><span class="px-2 py-0.5 rounded ${p3.type === 'B' ? 'bg-amber-950 text-amber-300 border border-amber-800' : 'bg-slate-800 border border-slate-700'}">TIPO ${p3.type}</span></td>
-                        <td class="p-2.5"><span class="px-2 py-0.5 rounded ${p4.type === 'B' ? 'bg-amber-950 text-amber-300 border border-amber-800' : 'bg-slate-800 border border-slate-700'}">TIPO ${p4.type}</span></td>
-                        <td class="p-2.5 font-sans text-slate-300 text-xs">${p1.name}</td>
+                        <td class="p-2 font-bold text-amber-300">${p1.timeOp2} hrs</td>
+                        <td class="p-2"><span class="px-1.5 py-0.5 rounded text-[10px] ${p1.type === 'B' ? 'bg-amber-950 text-amber-300 border border-amber-800' : 'bg-slate-800 border border-slate-700'}">TIPO ${p1.type}</span></td>
+                        <td class="p-2"><span class="px-1.5 py-0.5 rounded text-[10px] ${p2.type === 'B' ? 'bg-amber-950 text-amber-300 border border-amber-800' : 'bg-slate-800 border border-slate-700'}">TIPO ${p2.type}</span></td>
+                        <td class="p-2"><span class="px-1.5 py-0.5 rounded text-[10px] ${p3.type === 'B' ? 'bg-amber-950 text-amber-300 border border-amber-800' : 'bg-slate-800 border border-slate-700'}">TIPO ${p3.type}</span></td>
+                        <td class="p-2"><span class="px-1.5 py-0.5 rounded text-[10px] ${p4.type === 'B' ? 'bg-amber-950 text-amber-300 border border-amber-800' : 'bg-slate-800 border border-slate-700'}">TIPO ${p4.type}</span></td>
+                        <td class="p-2 font-sans text-slate-300 text-[11px]">${p1.name}</td>
                     </tr>
                 `;
             }
@@ -1220,7 +1039,7 @@
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
-            showToast('Bitácora exportada a CSV/Excel', 'success');
+            showToast('Bitácora exportada a Excel/CSV', 'success');
         }
 
         function speakAlert(text) {
@@ -1246,17 +1065,17 @@
 
             messageEl.innerText = msg;
             if (type === 'success') {
-                iconEl.className = "fa-solid fa-circle-check text-emerald-400 text-lg";
+                iconEl.className = "fa-solid fa-circle-check text-emerald-400 text-base";
             } else if (type === 'warning') {
-                iconEl.className = "fa-solid fa-triangle-exclamation text-amber-400 text-lg";
+                iconEl.className = "fa-solid fa-triangle-exclamation text-amber-400 text-base";
             } else {
-                iconEl.className = "fa-solid fa-circle-info text-blue-400 text-lg";
+                iconEl.className = "fa-solid fa-circle-info text-blue-400 text-base";
             }
 
             toast.classList.remove('opacity-0', 'translate-y-5', 'pointer-events-none');
             setTimeout(() => {
                 toast.classList.add('opacity-0', 'translate-y-5', 'pointer-events-none');
-            }, 3500);
+            }, 3000);
         }
 
         function openModal(id) {
@@ -1285,10 +1104,10 @@
                     try {
                         JSON.parse(val);
                         localStorage.setItem('audi_custom_firebase_config', val);
-                        showToast('Configuración Firebase guardada. Recargando...', 'success');
+                        showToast('Configuración guardada. Recargando...', 'success');
                         setTimeout(() => location.reload(), 1000);
                     } catch (e) {
-                        showToast('El JSON de Firebase no es válido', 'warning');
+                        showToast('JSON inválido', 'warning');
                         return;
                     }
                 }
@@ -1304,7 +1123,7 @@
                 window.cloudSyncFlightStatus(window.dailyFlightStatuses);
             }
             renderFlightsTable();
-            showToast('Jornada diaria reiniciada a las 12:00 AM (00:00 hrs)', 'info');
+            showToast('Jornada reiniciada a las 12:00 AM', 'info');
         }
 
         function renderFlightsTable() {
@@ -1325,8 +1144,8 @@
                 if (statusObj.status === 'SUSPENDIDO') totalSuspended++;
 
                 const [h, m] = timeStr.split(':').map(Number);
-                let startSec = h * 3600 + m * 60 - 1800; // -30m
-                let endSec = h * 3600 + m * 60 + 1800;   // +30m
+                let startSec = h * 3600 + m * 60 - 1800;
+                let endSec = h * 3600 + m * 60 + 1800;
 
                 const formatTime = (sec) => {
                     let norm = (sec + 86400) % 86400;
@@ -1335,43 +1154,42 @@
                     return `${hh}:${mm}`;
                 };
 
-                const windowStr = `${formatTime(startSec)} - ${formatTime(endSec)} hrs`;
+                const windowStr = `${formatTime(startSec)}-${formatTime(endSec)}`;
 
-                let statusBadge = '<span class="px-2.5 py-1 rounded-md text-[11px] font-bold bg-slate-800 text-slate-400 border border-slate-700">PENDIENTE</span>';
+                let statusBadge = '<span class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-slate-800 text-slate-400 border border-slate-700">PENDIENTE</span>';
                 if (statusObj.status === 'VOLADO') {
-                    statusBadge = '<span class="px-2.5 py-1 rounded-md text-[11px] font-bold bg-emerald-950 text-emerald-400 border border-emerald-800/60"><i class="fa-solid fa-check me-1"></i>VOLADO</span>';
+                    statusBadge = '<span class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-950 text-emerald-400 border border-emerald-800/60"><i class="fa-solid fa-check me-0.5"></i>VOLADO</span>';
                 } else if (statusObj.status === 'SUSPENDIDO') {
-                    statusBadge = '<span class="px-2.5 py-1 rounded-md text-[11px] font-bold bg-amber-950 text-amber-300 border border-amber-800/60"><i class="fa-solid fa-pause me-1"></i>SUSPENDIDO</span>';
+                    statusBadge = '<span class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-950 text-amber-300 border border-amber-800/60"><i class="fa-solid fa-pause me-0.5"></i>SUSPENDIDO</span>';
                 }
 
                 const isShiftB = item.type === 'B';
 
                 html += `
-                    <tr class="${idx === window.activeTargetIdx ? 'bg-blue-950/30' : 'hover:bg-slate-800/40'} transition">
-                        <td class="px-3 py-3 font-bold text-slate-400">${idx + 1}</td>
-                        <td class="px-3 py-3 font-mono font-bold text-amber-300 flex items-center gap-1.5">
+                    <tr class="${idx === window.activeTargetIdx ? 'bg-blue-950/40' : 'hover:bg-slate-800/40'} transition">
+                        <td class="px-2 py-2 font-bold text-slate-400">${idx + 1}</td>
+                        <td class="px-2 py-2 font-mono font-bold text-amber-300">
                             ${timeStr} hrs
-                            ${isShiftB ? '<span class="px-1.5 py-0.5 rounded text-[9px] font-extrabold bg-amber-950 text-amber-300 border border-amber-800" title="Horario Fijo de Cambio de Turno"><i class="fa-solid fa-users"></i> Relevo</span>' : ''}
                         </td>
-                        <td class="px-3 py-3 font-mono text-slate-300 text-[11px]">${windowStr}</td>
-                        <td class="px-3 py-3">
-                            <span class="px-2 py-0.5 rounded text-[11px] font-bold ${isShiftB ? 'bg-amber-950 text-amber-300 border border-amber-800' : 'bg-slate-800 text-slate-200 border border-slate-700'}">
+                        <td class="px-2 py-2 font-mono text-slate-300 text-[10px]">${windowStr}</td>
+                        <td class="px-2 py-2">
+                            <span class="px-1.5 py-0.5 rounded text-[10px] font-bold ${isShiftB ? 'bg-amber-950 text-amber-300 border border-amber-800' : 'bg-slate-800 text-slate-200 border border-slate-700'}">
                                 TIPO ${item.type}
                             </span>
-                            <span class="text-slate-300 text-xs ms-1">${item.name}</span>
+                            <span class="text-slate-300 text-[11px] ms-1 hidden sm:inline">${item.name}</span>
                         </td>
-                        <td class="px-3 py-3">${statusBadge}</td>
-                        <td class="px-3 py-3 font-mono text-xs text-slate-300">
+                        <td class="px-2 py-2">${statusBadge}</td>
+                        <td class="px-2 py-2 font-mono text-[11px] text-slate-300">
                             ${statusObj.status === 'VOLADO' ? `<strong class="text-emerald-400">${statusObj.realTime} hrs</strong>` : ''}
-                            ${statusObj.status === 'SUSPENDIDO' ? `<span class="text-amber-300 text-[11px]">${statusObj.note || 'Suspendido'}</span>` : ''}
+                            ${statusObj.status === 'SUSPENDIDO' ? `<span class="text-amber-300 text-[10px] truncate max-w-[100px] block">${statusObj.note || 'Suspendido'}</span>` : ''}
                             ${statusObj.status === 'PENDIENTE' ? '<span class="text-slate-500">--</span>' : ''}
                         </td>
-                        <td class="px-3 py-3 text-right">
-                            <div class="flex items-center justify-end gap-1.5">
-                                <button onclick="openTakeoffModalForIdx(${idx})" class="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-[11px] rounded-lg transition shadow">
-                                    <i class="fa-solid fa-plane-departure"></i> Despegue
+                        <td class="px-2 py-2 text-right">
+                            <div class="flex items-center justify-end gap-1">
+                                <button onclick="openTakeoffModalForIdx(${idx})" class="px-2 py-0.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-[10px] rounded transition shadow" title="Registrar Despegue">
+                                    <i class="fa-solid fa-plane-departure"></i>
                                 </button>
-                                <button onclick="openSuspensionModalForIdx(${idx})" class="px-2 py-1 bg-amber-600/30 hover:bg-amber-600/40 text-amber-300 font-semibold text-[11px] rounded-lg border border-amber-500/30 transition">
+                                <button onclick="openSuspensionModalForIdx(${idx})" class="px-1.5 py-0.5 bg-amber-600/30 hover:bg-amber-600/40 text-amber-300 font-semibold text-[10px] rounded border border-amber-500/30 transition" title="Suspender Vuelo">
                                     <i class="fa-solid fa-pause"></i>
                                 </button>
                             </div>
@@ -1395,9 +1213,9 @@
             if (!window.bitacoraList || window.bitacoraList.length === 0) {
                 tbody.innerHTML = `
                     <tr>
-                        <td colspan="9" class="px-4 py-8 text-center text-slate-500">
-                            <i class="fa-solid fa-folder-open text-2xl mb-2 block"></i>
-                            No hay registros guardados en la bitácora auditora.
+                        <td colspan="9" class="px-3 py-6 text-center text-slate-500">
+                            <i class="fa-solid fa-folder-open text-xl mb-1 block"></i>
+                            Sin registros en la bitácora auditora.
                         </td>
                     </tr>
                 `;
@@ -1408,32 +1226,30 @@
             window.bitacoraList.forEach((item, idx) => {
                 const isFlown = item.status === 'VOLADO';
                 const statusBadge = isFlown 
-                    ? '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-950 text-emerald-400 border border-emerald-800">VOLADO</span>'
-                    : '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-950 text-amber-300 border border-amber-800">SUSPENDIDO</span>';
+                    ? '<span class="px-1.5 py-0.5 rounded text-[9px] font-bold bg-emerald-950 text-emerald-400 border border-emerald-800">VOLADO</span>'
+                    : '<span class="px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-950 text-amber-300 border border-amber-800">SUSPENDIDO</span>';
 
-                let imgCell = '<span class="text-slate-600 text-[10px]">Sin Imagen</span>';
+                let imgCell = '<span class="text-slate-600 text-[9px]">Sin Foto</span>';
                 if (item.evidenceImg && item.evidenceImg.length > 20) {
                     imgCell = `
                         <div class="flex justify-center">
-                            <img src="${item.evidenceImg}" alt="Evidencia" onclick="openLightbox('${item.evidenceImg}', '${item.scheduledTime} - ${item.status}')" class="h-10 w-14 object-cover rounded border border-slate-700 cursor-pointer hover:opacity-80 transition bitacora-img-print">
+                            <img src="${item.evidenceImg}" alt="Evidencia" onclick="openLightbox('${item.evidenceImg}', '${item.scheduledTime} - ${item.status}')" class="h-8 w-12 object-cover rounded border border-slate-700 cursor-pointer hover:opacity-80 transition bitacora-img-print">
                         </div>
                     `;
                 }
 
                 html += `
                     <tr class="hover:bg-slate-800/50">
-                        <td class="px-4 py-2.5 font-mono text-[11px] text-slate-300">${item.timestampFormatted || '--'}</td>
-                        <td class="px-4 py-2.5 font-mono font-bold text-amber-300">${item.scheduledTime} hrs</td>
-                        <td class="px-4 py-2.5 text-slate-200">${item.flightType}</td>
-                        <td class="px-4 py-2.5 font-semibold text-slate-200">${item.pilot || 'Piloto en Turno'}</td>
-                        <td class="px-4 py-2.5">${statusBadge}</td>
-                        <td class="px-4 py-2.5 font-mono text-emerald-400">${item.realTime || 'N/A'}</td>
-                        <td class="px-4 py-2.5 text-slate-300 text-[11px] max-w-xs truncate">${item.notes || '--'}</td>
-                        <td class="px-4 py-2.5 text-center">${imgCell}</td>
-                        <td class="px-4 py-2.5 text-right space-x-1 no-print">
-                            <button onclick="openEditBitacoraModal(${idx})" class="p-1.5 rounded bg-blue-950 hover:bg-blue-900 text-blue-300 border border-blue-800 transition" title="Editar registro">
-                                <i class="fa-solid fa-pen-to-square text-xs"></i>
-                            </button>
+                        <td class="px-3 py-2 font-mono text-[10px] text-slate-300">${item.timestampFormatted || '--'}</td>
+                        <td class="px-3 py-2 font-mono font-bold text-amber-300">${item.scheduledTime} hrs</td>
+                        <td class="px-3 py-2 text-slate-200 text-[11px]">${item.flightType}</td>
+                        <td class="px-3 py-2 font-semibold text-slate-200 text-[11px]">${item.pilot || 'Piloto en Turno'}</td>
+                        <td class="px-3 py-2">${statusBadge}</td>
+                        <td class="px-3 py-2 font-mono text-emerald-400 text-[11px]">${item.realTime || 'N/A'}</td>
+                        <td class="px-3 py-2 text-slate-300 text-[10px] max-w-xs truncate">${item.notes || '--'}</td>
+                        <td class="px-3 py-2 text-center">${imgCell}</td>
+                        <td class="px-3 py-2 text-right no-print">
+                            <span class="text-slate-500 text-[10px]"><i class="fa-solid fa-lock me-1"></i>Guardado</span>
                         </td>
                     </tr>
                 `;
@@ -1460,12 +1276,6 @@
             });
         }
 
-        function previewEditEvidenceImage(event) {
-            compressAndPreviewImage(event, 'editEvidencePreviewImg', 'editEvidencePreviewContainer', (dataUrl) => {
-                window.tempEditImageData = dataUrl;
-            });
-        }
-
         function compressAndPreviewImage(event, imgId, containerId, callback) {
             const file = event.target.files[0];
             if (!file) return;
@@ -1475,7 +1285,7 @@
                 const img = new Image();
                 img.onload = function() {
                     const canvas = document.createElement('canvas');
-                    const MAX_WIDTH = 600;
+                    const MAX_WIDTH = 500;
                     let width = img.width;
                     let height = img.height;
 
@@ -1530,7 +1340,6 @@
         });
     </script>
 
-    <!-- Firebase Realtime Synchronizer Module -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
@@ -1560,10 +1369,10 @@
             const timeoutGuard = setTimeout(() => {
                 const badge = document.getElementById('cloudStatusBadge');
                 if (badge && badge.innerText.includes('Sincronizando')) {
-                    badge.className = "text-xs font-bold px-2.5 py-1 rounded-lg bg-slate-800 text-slate-300 border border-slate-700 flex items-center gap-1.5 cursor-pointer";
-                    badge.innerHTML = `<i class="fa-solid fa-cloud text-[10px]"></i> Modo Local (Sin Nube)`;
+                    badge.className = "text-[10px] font-bold px-2 py-0.5 rounded-lg bg-slate-800 text-slate-300 border border-slate-700 flex items-center gap-1 cursor-pointer";
+                    badge.innerHTML = `<i class="fa-solid fa-cloud text-[9px]"></i> Modo Local`;
                 }
-            }, 5000);
+            }, 4000);
 
             try {
                 const app = initializeApp(firebaseConfigObj);
@@ -1576,8 +1385,8 @@
                     clearTimeout(timeoutGuard);
                     const badge = document.getElementById('cloudStatusBadge');
                     if (user && badge) {
-                        badge.className = "text-xs font-bold px-2.5 py-1 rounded-lg bg-emerald-950/80 text-emerald-400 border border-emerald-800/40 flex items-center gap-1.5 cursor-pointer";
-                        badge.innerHTML = `<i class="fa-solid fa-cloud-check text-[10px]"></i> Nube Live Sincronizada`;
+                        badge.className = "text-[10px] font-bold px-2 py-0.5 rounded-lg bg-emerald-950/80 text-emerald-400 border border-emerald-800/40 flex items-center gap-1 cursor-pointer";
+                        badge.innerHTML = `<i class="fa-solid fa-cloud-check text-[9px]"></i> Nube Live`;
                         setupRealtimeSync();
                     }
                 });
@@ -1640,22 +1449,6 @@
                 const bitacoraCollRef = collection(db, 'audi_drones_apps', window.appId, 'bitacora');
                 await addDoc(bitacoraCollRef, { ...item, timestamp: new Date().toISOString() });
             } catch (err) { console.warn("Cloud Add Error:", err); }
-        };
-
-        window.cloudUpdateBitacoraItem = async function(cloudId, updatedFields) {
-            if (!db || !cloudId) return;
-            try {
-                const itemRef = doc(db, 'audi_drones_apps', window.appId, 'bitacora', cloudId);
-                await updateDoc(itemRef, updatedFields);
-            } catch (err) { console.warn("Cloud Update Error:", err); }
-        };
-
-        window.cloudDeleteBitacoraItem = async function(cloudId) {
-            if (!db || !cloudId) return;
-            try {
-                const itemRef = doc(db, 'audi_drones_apps', window.appId, 'bitacora', cloudId);
-                await deleteDoc(itemRef);
-            } catch (err) { console.warn("Cloud Delete Error:", err); }
         };
 
         window.cloudClearAllBitacora = async function() {
