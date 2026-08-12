@@ -209,10 +209,10 @@
 
                     <!-- Botones de Acción Inmediata de Arriba -->
                     <div class="flex items-center gap-2">
-                        <button id="btnQuickFly" onclick="quickRegisterTakeoff()" class="flex-1 sm:flex-none px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs sm:text-sm rounded-xl shadow-lg shadow-emerald-900/40 transition flex items-center justify-center gap-2 border border-emerald-400/30 cursor-pointer">
+                        <button id="btnQuickFly" onclick="quickRegisterTakeoff()" class="flex-1 sm:flex-none px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs sm:text-sm rounded-xl shadow-lg shadow-emerald-900/40 transition flex items-center justify-center gap-2 border border-emerald-400/30 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed disabled:bg-slate-800 disabled:border-slate-700 disabled:shadow-none">
                             <i class="fa-solid fa-plane-departure text-base"></i> DESPEGUE
                         </button>
-                        <button onclick="openSuspensionModalForCurrent()" class="flex-1 sm:flex-none px-3.5 py-2.5 bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs sm:text-sm rounded-xl shadow-lg shadow-amber-900/40 border border-amber-400/30 transition flex items-center justify-center gap-1.5 cursor-pointer">
+                        <button id="btnQuickSuspend" onclick="openSuspensionModalForCurrent()" class="flex-1 sm:flex-none px-3.5 py-2.5 bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs sm:text-sm rounded-xl shadow-lg shadow-amber-900/40 border border-amber-400/30 transition flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed disabled:bg-slate-800 disabled:border-slate-700 disabled:shadow-none">
                             <i class="fa-solid fa-pause text-base"></i> SUSPENDER
                         </button>
                     </div>
@@ -262,7 +262,7 @@
 
             <!-- Tabla de Vuelos Reducida para 1/4 de Pantalla -->
             <div class="overflow-x-auto">
-                <table class="w-full text-left text-xs min-w-[500px]">
+                <table class="w-full text-left text-xs min-w-[450px]">
                     <thead class="bg-slate-950 text-slate-400 uppercase font-bold tracking-wider border-b border-slate-800 text-[10px]">
                         <tr>
                             <th class="px-2 py-2">#</th>
@@ -271,7 +271,6 @@
                             <th class="px-2 py-2">Tipo / Recorrido</th>
                             <th class="px-2 py-2">Estado Actual</th>
                             <th class="px-2 py-2">Despegue / Motivo</th>
-                            <th class="px-2 py-2 text-right">Acciones</th>
                         </tr>
                     </thead>
                     <tbody id="flightsTableBody" class="divide-y divide-slate-800/60 font-medium text-xs">
@@ -770,6 +769,28 @@
 
             window.activeTargetIdx = targetIdx;
 
+            // Control de habilitación de botones de acción
+            const statusObj = window.dailyFlightStatuses[targetIdx] || { status: 'PENDIENTE' };
+            const btnFly = document.getElementById('btnQuickFly');
+            const btnSuspend = document.getElementById('btnQuickSuspend');
+
+            const secToWinStart = winStartSec - currentSecNorm;
+            const secToTargetEnd = winEndSec - currentSecNorm;
+
+            const isWindowOpen = (secToWinStart <= 0 && secToTargetEnd >= 0);
+            window.isTargetWindowOpen = isWindowOpen;
+
+            if (statusObj.status !== 'PENDIENTE') {
+                if (btnFly) btnFly.disabled = true;
+                if (btnSuspend) btnSuspend.disabled = true;
+            } else if (isWindowOpen) {
+                if (btnFly) btnFly.disabled = false;
+                if (btnSuspend) btnSuspend.disabled = false;
+            } else {
+                if (btnFly) btnFly.disabled = true;
+                if (btnSuspend) btnSuspend.disabled = true;
+            }
+
             checkVoiceAlertsForTarget(currentTarget, targetIdx, targetTimeStr, winStartSec, winEndSec, currentSecNorm);
         }
 
@@ -839,7 +860,33 @@
         }
 
         function quickRegisterTakeoff() {
-            openTakeoffModalForIdx(window.activeTargetIdx || 0);
+            const idx = window.activeTargetIdx || 0;
+            const statusObj = window.dailyFlightStatuses[idx] || { status: 'PENDIENTE' };
+
+            if (statusObj.status !== 'PENDIENTE') {
+                showToast('Este vuelo ya ha sido registrado hoy', 'warning');
+                return;
+            }
+            if (window.isTargetWindowOpen === false) {
+                showToast('No se puede despegar aún. La ventana de vuelo no está abierta', 'warning');
+                return;
+            }
+            openTakeoffModalForIdx(idx);
+        }
+
+        function openSuspensionModalForCurrent() {
+            const idx = window.activeTargetIdx || 0;
+            const statusObj = window.dailyFlightStatuses[idx] || { status: 'PENDIENTE' };
+
+            if (statusObj.status !== 'PENDIENTE') {
+                showToast('Este vuelo ya ha sido registrado hoy', 'warning');
+                return;
+            }
+            if (window.isTargetWindowOpen === false) {
+                showToast('No se puede suspender aún. La ventana de vuelo no está abierta', 'warning');
+                return;
+            }
+            openSuspensionModalForIdx(idx);
         }
 
         function confirmTakeoff() {
@@ -1184,16 +1231,6 @@
                             ${statusObj.status === 'SUSPENDIDO' ? `<span class="text-amber-300 text-[10px] truncate max-w-[100px] block">${statusObj.note || 'Suspendido'}</span>` : ''}
                             ${statusObj.status === 'PENDIENTE' ? '<span class="text-slate-500">--</span>' : ''}
                         </td>
-                        <td class="px-2 py-2 text-right">
-                            <div class="flex items-center justify-end gap-1">
-                                <button onclick="openTakeoffModalForIdx(${idx})" class="px-2 py-0.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-[10px] rounded transition shadow" title="Registrar Despegue">
-                                    <i class="fa-solid fa-plane-departure"></i>
-                                </button>
-                                <button onclick="openSuspensionModalForIdx(${idx})" class="px-1.5 py-0.5 bg-amber-600/30 hover:bg-amber-600/40 text-amber-300 font-semibold text-[10px] rounded border border-amber-500/30 transition" title="Suspender Vuelo">
-                                    <i class="fa-solid fa-pause"></i>
-                                </button>
-                            </div>
-                        </td>
                     </tr>
                 `;
             });
@@ -1324,10 +1361,9 @@
         }
 
         window.addEventListener('DOMContentLoaded', () => {
-            const savedStatuses = localStorage.getItem('audi_flight_statuses');
-            if (savedStatuses) {
-                try { window.dailyFlightStatuses = JSON.parse(savedStatuses); } catch(e) {}
-            }
+            // Reiniciar estado de vuelos de hoy a limpia (PENDIENTE)
+            window.dailyFlightStatuses = {};
+            localStorage.setItem('audi_flight_statuses', JSON.stringify(window.dailyFlightStatuses));
 
             const savedBitacora = localStorage.getItem('audi_bitacora_logs');
             if (savedBitacora) {
