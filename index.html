@@ -171,21 +171,20 @@
     <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
 
         <!-- Banner de Selección de Plan de Vuelo Semanal -->
-        <section class="bg-gradient-to-r from-slate-900 via-slate-900 to-slate-800 p-5 rounded-2xl border border-slate-800 shadow-xl space-y-4">
-            <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-800 pb-4">
+        <section class="bg-slate-900/90 p-4 rounded-2xl border border-slate-800 shadow-xl space-y-3">
+            <div class="flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-slate-800/80 pb-3">
                 <div>
-                    <h2 class="text-base font-bold text-white flex items-center gap-2">
+                    <h2 class="text-sm font-bold text-white flex items-center gap-2">
                         <i class="fa-solid fa-sliders text-audi-red"></i>
-                        Configuración Inicial de Jornada
+                        Configuración de Jornada (Ciclo 12:00 AM - 11:59 PM)
                     </h2>
-                    <p class="text-xs text-slate-400">Selecciona el plan semanal (1, 2, 3 o 4) o la opción de horario (00:00 vs 00:30). Sincronizado en tiempo real.</p>
+                    <p class="text-[11px] text-slate-400">Selecciona el plan semanal y opción de horario. Los 16 vuelos se reinician cada medianoche.</p>
                 </div>
                 
-                <div class="flex flex-wrap items-center gap-3">
-                    <!-- Selector de Plan Semanal (Plan 1, 2, 3, 4) -->
+                <div class="flex flex-wrap items-center gap-2">
                     <div class="flex items-center gap-2 bg-slate-950 p-1 rounded-xl border border-slate-800">
-                        <span class="text-xs text-slate-400 font-medium px-2">Plan Semanal:</span>
-                        <select id="selectWeeklyPlan" onchange="changeWeeklyPlan(this.value, true)" class="bg-slate-800 text-xs font-bold text-white px-3 py-1.5 rounded-lg border border-slate-700 focus:outline-none focus:ring-2 focus:ring-audi-red">
+                        <span class="text-[11px] text-slate-400 font-medium px-2">Plan:</span>
+                        <select id="selectWeeklyPlan" onchange="changeWeeklyPlan(this.value, true)" class="bg-slate-800 text-xs font-bold text-white px-2.5 py-1 rounded-lg border border-slate-700 focus:outline-none focus:ring-1 focus:ring-audi-red">
                             <option value="1">Plan 1 (Semana 1)</option>
                             <option value="2">Plan 2 (Semana 2)</option>
                             <option value="3">Plan 3 (Semana 3)</option>
@@ -193,93 +192,89 @@
                         </select>
                     </div>
 
-                    <!-- Selector Opción de Horario (00:00 vs 00:30) -->
                     <div class="flex items-center bg-slate-950 p-1 rounded-xl border border-slate-800">
-                        <button id="btnOpt1" onclick="setOptionTime('op1')" class="px-3 py-1.5 text-xs font-bold rounded-lg bg-audi-red text-white transition shadow">
+                        <button id="btnOpt1" onclick="setOptionTime('op1')" class="px-3 py-1 text-xs font-bold rounded-lg bg-audi-red text-white transition shadow">
                             Opción 1 (00:00)
                         </button>
-                        <button id="btnOpt2" onclick="setOptionTime('op2')" class="px-3 py-1.5 text-xs font-bold rounded-lg text-slate-400 hover:text-white transition">
+                        <button id="btnOpt2" onclick="setOptionTime('op2')" class="px-3 py-1 text-xs font-bold rounded-lg text-slate-400 hover:text-white transition">
                             Opción 2 (00:30)
                         </button>
                     </div>
                 </div>
             </div>
 
-            <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 text-xs">
-                <div class="bg-slate-950/60 p-3.5 rounded-xl border border-slate-800/80 flex flex-col justify-between">
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-3 text-xs">
+                <div class="bg-slate-950/60 p-3 rounded-xl border border-slate-800/80 flex items-center justify-between">
                     <div>
-                        <span class="font-bold text-slate-200 flex items-center gap-2">
-                            <i class="fa-solid fa-table-list text-blue-400"></i> Matriz de Recorridos Oficiales Audi
+                        <span class="font-bold text-slate-200 text-xs flex items-center gap-2">
+                            <i class="fa-solid fa-table-list text-blue-400"></i> Matriz Audi (16 Vuelos)
                         </span>
-                        <p class="text-[11px] text-slate-400 mt-1">Planes 1, 2, 3 y 4 precargados inmutables. Mantiene relevos fijos en 06:00, 14:00, 17:00 y 21:30 hrs.</p>
+                        <p class="text-[10.5px] text-slate-400 mt-0.5">Ventana flexible de 60 min (&plusmn;30 min respecto a hora base).</p>
                     </div>
-                    <div class="mt-3 flex items-center gap-2">
-                        <button onclick="viewOfficialPlansModal()" class="px-3 py-2 bg-blue-900/80 hover:bg-blue-800 text-blue-200 font-bold rounded-lg border border-blue-700/60 transition flex items-center gap-1.5 shadow">
-                            <i class="fa-solid fa-eye"></i> Ver Matriz de los 4 Planes
-                        </button>
-                    </div>
+                    <button onclick="viewOfficialPlansModal()" class="px-2.5 py-1.5 bg-blue-900/80 hover:bg-blue-800 text-blue-200 font-bold text-[11px] rounded-lg border border-blue-700/60 transition flex items-center gap-1 shadow">
+                        <i class="fa-solid fa-eye"></i> Ver Planes
+                    </button>
                 </div>
 
                 <!-- Resumen de Contadores del Día -->
-                <div class="bg-slate-950/60 p-3.5 rounded-xl border border-slate-800/80 grid grid-cols-3 text-center gap-2">
-                    <div class="flex flex-col justify-center border-r border-slate-800 pr-2">
-                        <span class="text-[10px] uppercase font-bold text-slate-400">Programados</span>
-                        <span id="cntTotal" class="text-xl font-extrabold text-white mt-1">16</span>
-                        <span class="text-[9px] text-slate-500">Cada 90 min</span>
+                <div class="bg-slate-950/60 p-2.5 rounded-xl border border-slate-800/80 grid grid-cols-3 text-center gap-2">
+                    <div class="flex flex-col justify-center border-r border-slate-800 pr-1">
+                        <span class="text-[9.5px] uppercase font-bold text-slate-400">Jornada</span>
+                        <span id="cntTotal" class="text-lg font-extrabold text-white">16</span>
+                        <span class="text-[8.5px] text-slate-500">12am-11:59pm</span>
                     </div>
-                    <div class="flex flex-col justify-center border-r border-slate-800 pr-2">
-                        <span class="text-[10px] uppercase font-bold text-emerald-400">Volados</span>
-                        <span id="cntFlown" class="text-xl font-extrabold text-emerald-400 mt-1">0</span>
-                        <span class="text-[9px] text-slate-500">Ejecutados</span>
+                    <div class="flex flex-col justify-center border-r border-slate-800 pr-1">
+                        <span class="text-[9.5px] uppercase font-bold text-emerald-400">Volados</span>
+                        <span id="cntFlown" class="text-lg font-extrabold text-emerald-400">0</span>
+                        <span class="text-[8.5px] text-slate-500">Completados</span>
                     </div>
                     <div class="flex flex-col justify-center">
-                        <span class="text-[10px] uppercase font-bold text-amber-400">Suspendidos</span>
-                        <span id="cntSuspended" class="text-xl font-extrabold text-amber-400 mt-1">0</span>
-                        <span class="text-[9px] text-slate-500">Con evidencia</span>
+                        <span class="text-[9.5px] uppercase font-bold text-amber-400">Suspendidos</span>
+                        <span id="cntSuspended" class="text-lg font-extrabold text-amber-400">0</span>
+                        <span class="text-[8.5px] text-slate-500">Con motivo</span>
                     </div>
                 </div>
 
                 <!-- Estado Operativo y Alerta -->
-                <div id="suspensionAlertCard" class="bg-slate-950/60 p-3.5 rounded-xl border border-slate-800/80 flex items-center justify-between">
+                <div id="suspensionAlertCard" class="bg-slate-950/60 p-3 rounded-xl border border-slate-800/80 flex items-center justify-between">
                     <div>
-                        <span class="font-bold text-slate-200 flex items-center gap-2">
-                            <i id="suspensionStateDot" class="fa-solid fa-circle text-emerald-500 text-[10px]"></i>
-                            Estado Operativo Actual
+                        <span class="font-bold text-slate-200 text-xs flex items-center gap-2">
+                            <i id="suspensionStateDot" class="fa-solid fa-circle text-emerald-500 text-[9px]"></i>
+                            Estado Operativo
                         </span>
-                        <p id="suspensionStateText" class="text-[11px] text-emerald-400 font-medium mt-1">Operación Normal</p>
-                        <p id="suspensionTimerText" class="text-[10px] text-slate-400 italic">Recordatorio de evidencia: Inactivo</p>
+                        <p id="suspensionStateText" class="text-[11px] text-emerald-400 font-semibold mt-0.5">Operación Normal</p>
                     </div>
-                    <button onclick="openSuspensionModalForCurrent()" class="px-3 py-2 bg-amber-950/80 hover:bg-amber-900 text-amber-300 font-bold text-xs rounded-lg border border-amber-800/60 transition flex items-center gap-1.5 shadow">
-                        <i class="fa-solid fa-cloud-bolt text-amber-400"></i> Registrar Suspensión
+                    <button onclick="openSuspensionModalForCurrent()" class="px-2.5 py-1.5 bg-amber-950/80 hover:bg-amber-900 text-amber-300 font-bold text-[11px] rounded-lg border border-amber-800/60 transition flex items-center gap-1 shadow">
+                        <i class="fa-solid fa-cloud-bolt text-amber-400"></i> Suspender
                     </button>
                 </div>
             </div>
         </section>
 
         <!-- Tarjeta de Vuelo Siguiente / Activo -->
-        <section id="nextFlightCard" class="bg-gradient-to-r from-slate-900 via-blue-950/30 to-slate-900 p-5 rounded-2xl border border-blue-900/50 shadow-2xl relative overflow-hidden">
-            <div class="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
+        <section id="nextFlightCard" class="bg-gradient-to-r from-slate-900 via-blue-950/40 to-slate-900 p-4 rounded-2xl border border-blue-900/50 shadow-xl relative overflow-hidden">
+            <div class="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-3">
                 <div class="space-y-1">
                     <div class="flex items-center gap-2">
-                        <span class="px-2.5 py-0.5 rounded-md text-xs font-bold bg-blue-500/20 text-blue-400 border border-blue-500/30">Vuelo Siguiente / Activo</span>
-                        <span id="targetFlightBadge" class="px-2.5 py-0.5 rounded-md text-xs font-extrabold bg-audi-red text-white">TIPO A - Perimetral</span>
+                        <span class="px-2 py-0.5 rounded text-[11px] font-bold bg-blue-500/20 text-blue-400 border border-blue-500/30">Vuelo Siguiente / Activo</span>
+                        <span id="targetFlightBadge" class="px-2 py-0.5 rounded text-[11px] font-extrabold bg-audi-red text-white">TIPO A - Perimetral</span>
                     </div>
-                    <h2 class="text-2xl font-black text-white flex items-center gap-3">
-                        Hora Programada: <span id="targetFlightTime" class="font-mono text-amber-300">00:00 hrs</span>
+                    <h2 class="text-xl font-black text-white flex items-center gap-2">
+                        Hora Base: <span id="targetFlightTime" class="font-mono text-amber-300">00:00 hrs</span>
                     </h2>
-                    <p id="targetFlightDesc" class="text-xs text-slate-300">Ventana de despegue permitida: <strong id="targetFlightWindow" class="text-emerald-400 font-mono">23:40 - 00:00 hrs</strong> (-20 min disuasivo)</p>
+                    <p id="targetFlightDesc" class="text-xs text-slate-300">Ventana de vuelo permitida: <strong id="targetFlightWindow" class="text-emerald-400 font-mono">23:30 - 00:30 hrs</strong> (Margen de 60 min: -30m / +30m)</p>
                 </div>
 
-                <div class="flex items-center gap-4 bg-slate-950/80 p-3 rounded-xl border border-slate-800 w-full lg:w-auto justify-between lg:justify-end">
+                <div class="flex items-center gap-3 bg-slate-950/80 p-2.5 rounded-xl border border-slate-800 w-full lg:w-auto justify-between lg:justify-end">
                     <div>
-                        <div class="text-[10px] uppercase font-bold text-slate-400">Estado de Ventana</div>
-                        <div id="targetCountdown" class="text-lg font-mono font-bold text-emerald-400">Calculando...</div>
+                        <div class="text-[9px] uppercase font-bold text-slate-400">Estado Ventana</div>
+                        <div id="targetCountdown" class="text-base font-mono font-bold text-emerald-400">Calculando...</div>
                     </div>
                     <div class="flex items-center gap-2">
-                        <button id="btnQuickFly" onclick="quickRegisterTakeoff()" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl shadow-lg shadow-emerald-900/40 transition flex items-center gap-2">
-                            <i class="fa-solid fa-plane-departure"></i> Registrar Despegue
+                        <button id="btnQuickFly" onclick="quickRegisterTakeoff()" class="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-lg shadow-md transition flex items-center gap-1.5">
+                            <i class="fa-solid fa-plane-departure"></i> Despegue
                         </button>
-                        <button onclick="openSuspensionModalForCurrent()" class="px-3 py-2 bg-amber-600/30 hover:bg-amber-600/40 text-amber-300 font-semibold text-xs rounded-xl border border-amber-500/30 transition">
+                        <button onclick="openSuspensionModalForCurrent()" class="px-2.5 py-1.5 bg-amber-600/30 hover:bg-amber-600/40 text-amber-300 font-semibold text-xs rounded-lg border border-amber-500/30 transition">
                             <i class="fa-solid fa-pause"></i> Suspender
                         </button>
                     </div>
@@ -288,43 +283,43 @@
         </section>
 
         <!-- Seccion Cronograma de Vuelos -->
-        <section class="bg-slate-900 p-5 rounded-2xl border border-slate-800 shadow-xl space-y-4">
-            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800 pb-3">
+        <section class="bg-slate-900 p-4 rounded-2xl border border-slate-800 shadow-xl space-y-3">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800 pb-2">
                 <div>
-                    <h3 class="text-base font-bold text-white flex items-center gap-2">
+                    <h3 class="text-sm font-bold text-white flex items-center gap-2">
                         <i class="fa-solid fa-list-check text-audi-red"></i>
-                        Cronograma Diario de Vuelos (Intervalo &le; 90 min)
+                        Cronograma Diario de Vuelos (Ciclo 12:00 AM - 11:59 PM)
                     </h3>
-                    <p class="text-xs text-slate-400">Presiona "Registrar Despegue" o "Suspender" en la fila del vuelo correspondiente.</p>
+                    <p class="text-[11px] text-slate-400">Cada vuelo tiene un margen de 60 min (30 min antes y 30 min después de la hora base).</p>
                 </div>
-                <div class="flex items-center gap-2 text-xs">
-                    <span class="flex items-center gap-1.5 text-slate-300 bg-slate-950 px-2.5 py-1 rounded-md border border-slate-800">
-                        <span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span> Volado
+                <div class="flex items-center gap-2 text-[11px]">
+                    <span class="flex items-center gap-1 text-slate-300 bg-slate-950 px-2 py-0.5 rounded border border-slate-800">
+                        <span class="w-2 h-2 rounded-full bg-emerald-500"></span> Volado
                     </span>
-                    <span class="flex items-center gap-1.5 text-slate-300 bg-slate-950 px-2.5 py-1 rounded-md border border-slate-800">
-                        <span class="w-2.5 h-2.5 rounded-full bg-amber-500"></span> Suspendido
+                    <span class="flex items-center gap-1 text-slate-300 bg-slate-950 px-2 py-0.5 rounded border border-slate-800">
+                        <span class="w-2 h-2 rounded-full bg-amber-500"></span> Suspendido
                     </span>
-                    <span class="flex items-center gap-1.5 text-slate-300 bg-slate-950 px-2.5 py-1 rounded-md border border-slate-800">
-                        <span class="w-2.5 h-2.5 rounded-full bg-slate-600"></span> Pendiente
+                    <span class="flex items-center gap-1 text-slate-300 bg-slate-950 px-2 py-0.5 rounded border border-slate-800">
+                        <span class="w-2 h-2 rounded-full bg-slate-600"></span> Pendiente
                     </span>
                 </div>
             </div>
 
             <!-- Leyenda de Tipos de Recorrido -->
-            <div class="grid grid-cols-2 sm:grid-cols-5 gap-2 text-[11px] pt-1 pb-2 border-b border-slate-800/80">
-                <div class="bg-slate-950/80 p-2 rounded-lg border border-blue-500/30 text-blue-300">
+            <div class="grid grid-cols-2 sm:grid-cols-5 gap-2 text-[10.5px] pt-1 pb-2 border-b border-slate-800/80">
+                <div class="bg-slate-950/80 p-1.5 rounded border border-blue-500/30 text-blue-300">
                     <strong class="font-bold">TIPO A:</strong> Recorrido perimetral
                 </div>
-                <div class="bg-amber-950/60 p-2 rounded-lg border border-amber-500/50 text-amber-300">
-                    <strong class="font-bold">TIPO B:</strong> Cambio de Turno (Relevos: 06:00, 14:00, 17:00, 21:30)
+                <div class="bg-amber-950/60 p-1.5 rounded border border-amber-500/50 text-amber-300">
+                    <strong class="font-bold">TIPO B:</strong> Relevos fijos (06:00, 14:00, 17:00, 21:30)
                 </div>
-                <div class="bg-slate-950/80 p-2 rounded-lg border border-emerald-500/30 text-emerald-300">
+                <div class="bg-slate-950/80 p-1.5 rounded border border-emerald-500/30 text-emerald-300">
                     <strong class="font-bold">TIPO C:</strong> Interior de planta
                 </div>
-                <div class="bg-slate-950/80 p-2 rounded-lg border border-purple-500/30 text-purple-300">
+                <div class="bg-slate-950/80 p-1.5 rounded border border-purple-500/30 text-purple-300">
                     <strong class="font-bold">TIPO D:</strong> Zonas lejanas
                 </div>
-                <div class="bg-slate-950/80 p-2 rounded-lg border border-teal-500/30 text-teal-300">
+                <div class="bg-slate-950/80 p-1.5 rounded border border-teal-500/30 text-teal-300">
                     <strong class="font-bold">TIPO E:</strong> Patios de camionetas
                 </div>
             </div>
@@ -334,13 +329,13 @@
                 <table class="w-full text-left text-xs">
                     <thead class="bg-slate-950 text-slate-400 uppercase font-bold tracking-wider border-b border-slate-800">
                         <tr>
-                            <th class="px-4 py-3">#</th>
-                            <th class="px-4 py-3">Hora Base</th>
-                            <th class="px-4 py-3">Ventana (-20m)</th>
-                            <th class="px-4 py-3">Tipo / Recorrido</th>
-                            <th class="px-4 py-3">Estado Actual</th>
-                            <th class="px-4 py-3">Hora Despegue / Motivo</th>
-                            <th class="px-4 py-3 text-right">Acciones de Bitácora</th>
+                            <th class="px-3 py-2.5">#</th>
+                            <th class="px-3 py-2.5">Hora Base</th>
+                            <th class="px-3 py-2.5">Ventana (-30m / +30m)</th>
+                            <th class="px-3 py-2.5">Tipo / Recorrido</th>
+                            <th class="px-3 py-2.5">Estado Actual</th>
+                            <th class="px-3 py-2.5">Hora Despegue / Motivo</th>
+                            <th class="px-3 py-2.5 text-right">Acciones de Bitácora</th>
                         </tr>
                     </thead>
                     <tbody id="flightsTableBody" class="divide-y divide-slate-800/60 font-medium">
@@ -794,12 +789,157 @@
                 let flightSec = h * 3600 + m * 60;
 
                 let diffSec = flightSec - currentSec;
-                if (diffSec < -1800) diffSec += 86400;
+                if (diffSec < -2700) diffSec += 86400; // 45 min threshold for rollover
 
-                if (diffSec < minDiffSec && diffSec >= -1800) {
+                if (diffSec < minDiffSec && diffSec >= -2700) {
                     minDiffSec = diffSec;
                     targetIdx = idx;
                 }
+            });
+
+            const currentTarget = plan[targetIdx];
+            const targetTimeStr = window.currentOptionTime === 'op2' ? currentTarget.timeOp2 : currentTarget.timeOp1;
+            const [th, tm] = targetTimeStr.split(':').map(Number);
+            let targetSec = th * 3600 + tm * 60;
+            let winStartSec = targetSec - 30 * 60; // 30 mins before
+            let winEndSec = targetSec + 30 * 60;   // 30 mins after
+
+            let currentSecNorm = currentSec;
+            if (targetSec === 0 && currentSecNorm >= 86400 - 1800) {
+                targetSec += 86400;
+                winStartSec = targetSec - 1800;
+                winEndSec = targetSec + 1800;
+            }
+
+            const formatMinStr = (sec) => {
+                let norm = (sec + 86400) % 86400;
+                let hh = String(Math.floor(norm / 3600)).padStart(2, '0');
+                let mm = String(Math.floor((norm % 3600) / 60)).padStart(2, '0');
+                return `${hh}:${mm}`;
+            };
+
+            const targetTimeEl = document.getElementById('targetFlightTime');
+            const targetBadgeEl = document.getElementById('targetFlightBadge');
+            const targetWindowEl = document.getElementById('targetFlightWindow');
+            const targetCountdownEl = document.getElementById('targetCountdown');
+
+            if (targetTimeEl) targetTimeEl.innerText = `${targetTimeStr} hrs`;
+            if (targetBadgeEl) {
+                targetBadgeEl.innerText = `TIPO ${currentTarget.type} - ${currentTarget.name}`;
+            }
+            if (targetWindowEl) {
+                targetWindowEl.innerText = `${formatMinStr(winStartSec)} - ${formatMinStr(winEndSec)} hrs`;
+            }
+
+            if (targetCountdownEl) {
+                const secToWinStart = winStartSec - currentSecNorm;
+                const secToTargetEnd = winEndSec - currentSecNorm;
+
+                if (secToWinStart > 0) {
+                    const mins = Math.floor(secToWinStart / 60);
+                    const secs = secToWinStart % 60;
+                    targetCountdownEl.innerText = `Ventana abre en ${mins}m ${String(secs).padStart(2, '0')}s`;
+                    targetCountdownEl.className = "text-base font-mono font-bold text-amber-400";
+                } else if (secToTargetEnd >= 0) {
+                    const mins = Math.floor(secToTargetEnd / 60);
+                    const secs = secToTargetEnd % 60;
+                    targetCountdownEl.innerText = `VENTANA ABIERTA (${mins}m ${String(secs).padStart(2, '0')}s restantes)`;
+                    targetCountdownEl.className = "text-base font-mono font-bold text-emerald-400 pulse-red";
+                } else {
+                    targetCountdownEl.innerText = "Programado";
+                    targetCountdownEl.className = "text-base font-mono font-bold text-slate-400";
+                }
+            }
+
+            window.activeTargetIdx = targetIdx;
+        }
+
+        function renderFlightsTable() {
+            const tbody = document.getElementById('flightsTableBody');
+            if (!tbody) return;
+
+            const plan = OFFICIAL_PLANS[window.currentWeeklyPlan] || OFFICIAL_PLANS["1"];
+            let html = '';
+
+            let flownCount = 0;
+            let suspendedCount = 0;
+
+            plan.forEach((item, idx) => {
+                const timeStr = window.currentOptionTime === 'op2' ? item.timeOp2 : item.timeOp1;
+                const statusObj = window.dailyFlightStatuses[idx] || { status: 'PENDIENTE', realTime: '', note: '' };
+
+                if (statusObj.status === 'VOLADO') flownCount++;
+                if (statusObj.status === 'SUSPENDIDO') suspendedCount++;
+
+                const [h, m] = timeStr.split(':').map(Number);
+                const flightTotal = h * 60 + m;
+                const winStartTotal = (flightTotal - 30 + 1440) % 1440; // -30m
+                const winEndTotal = (flightTotal + 30 + 1440) % 1440;   // +30m
+                
+                const winStartStr = `${String(Math.floor(winStartTotal / 60)).padStart(2, '0')}:${String(winStartTotal % 60).padStart(2, '0')}`;
+                const winEndStr = `${String(Math.floor(winEndTotal / 60)).padStart(2, '0')}:${String(winEndTotal % 60).padStart(2, '0')}`;
+                const windowText = `${winStartStr} - ${winEndStr}`;
+
+                let statusBadge = `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-800 text-slate-400 border border-slate-700">PENDIENTE</span>`;
+                if (statusObj.status === 'VOLADO') {
+                    statusBadge = `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-950 text-emerald-400 border border-emerald-800"><i class="fa-solid fa-check me-1"></i> VOLADO</span>`;
+                } else if (statusObj.status === 'SUSPENDIDO') {
+                    statusBadge = `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-950 text-amber-400 border border-amber-800"><i class="fa-solid fa-pause me-1"></i> SUSPENDIDO</span>`;
+                }
+
+                const isShiftFlight = item.type === 'B';
+                const shiftHighlight = isShiftFlight ? 'bg-amber-950/30 hover:bg-amber-900/40 border-l-4 border-l-amber-500' : 'hover:bg-slate-800/50';
+                
+                let targetShiftTimeLabel = '';
+                if (isShiftFlight) {
+                    if (timeStr === '06:00') targetShiftTimeLabel = '(Relevo Fijo 06:00 AM)';
+                    if (timeStr === '14:00') targetShiftTimeLabel = '(Relevo Fijo 02:00 PM)';
+                    if (timeStr === '17:00') targetShiftTimeLabel = '(Relevo Fijo 05:00 PM / 17:00)';
+                    if (timeStr === '21:30') targetShiftTimeLabel = '(Relevo Fijo 09:30 PM / 21:30)';
+                }
+
+                const shiftNote = isShiftFlight ? `<span class="ms-1.5 text-[9.5px] bg-amber-950 text-amber-300 font-bold px-1.5 py-0.5 rounded border border-amber-800"><i class="fa-solid fa-users me-1"></i> ${targetShiftTimeLabel}</span>` : '';
+
+                html += `
+                    <tr class="${shiftHighlight} transition border-b border-slate-800/40">
+                        <td class="px-3 py-2.5 font-mono text-slate-400">${idx + 1}</td>
+                        <td class="px-3 py-2.5 font-mono font-extrabold text-amber-300 text-xs">${timeStr} hrs ${shiftNote}</td>
+                        <td class="px-3 py-2.5 font-mono text-slate-400 text-[11px]">${windowText}</td>
+                        <td class="px-3 py-2.5 font-semibold text-slate-200">
+                            <span class="px-1.5 py-0.5 text-[9.5px] font-bold rounded ${isShiftFlight ? 'bg-amber-900/80 text-amber-200 border border-amber-700' : 'bg-slate-800 text-slate-300 border border-slate-700'} me-1">TIPO ${item.type}</span>
+                            ${item.name}
+                        </td>
+                        <td class="px-3 py-2.5">${statusBadge}</td>
+                        <td class="px-3 py-2.5 font-mono text-xs text-slate-300">${statusObj.realTime || statusObj.note || '--'}</td>
+                        <td class="px-3 py-2.5 text-right space-x-1">
+                            <button onclick="openTakeoffModalForIdx(${idx})" class="px-2 py-1 bg-emerald-700 hover:bg-emerald-600 text-white font-bold rounded-lg transition text-[10.5px]">
+                                <i class="fa-solid fa-plane-departure"></i> Despegue
+                            </button>
+                            <button onclick="openSuspensionModalForIdx(${idx})" class="px-2 py-1 bg-amber-800 hover:bg-amber-700 text-amber-200 font-bold rounded-lg transition text-[10.5px]">
+                                <i class="fa-solid fa-pause"></i> Suspender
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            });
+
+            tbody.innerHTML = html;
+
+            const flownEl = document.getElementById('cntFlown');
+            const suspendedEl = document.getElementById('cntSuspended');
+            if (flownEl) flownEl.innerText = flownCount;
+            if (suspendedEl) suspendedEl.innerText = suspendedCount;
+        }
+
+        function handleMidnightReset() {
+            window.dailyFlightStatuses = {};
+            localStorage.setItem('audi_flight_statuses', JSON.stringify(window.dailyFlightStatuses));
+            if (window.cloudSyncFlightStatus) {
+                window.cloudSyncFlightStatus(window.dailyFlightStatuses);
+            }
+            renderFlightsTable();
+            showToast('Jornada diaria reiniciada a las 12:00 AM (00:00 hrs)', 'info');
+        }
             });
 
             const currentTarget = plan[targetIdx];
