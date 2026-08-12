@@ -868,6 +868,10 @@
                     alertCode = "FORCED_5M";
                     textToSpeak = `Alerta importante. Faltan solo 5 minutos para el vuelo forzoso de las ${targetTimeStr} horas. Preparar despegue inmediato.`;
                     toastType = "warning";
+                } else if (diffMins === 0) {
+                    alertCode = "FORCED_0M";
+                    textToSpeak = `Alerta. Hora exacta del vuelo forzoso de cambio de turno de las ${targetTimeStr} horas. Iniciar despegue inmediatamente.`;
+                    toastType = "warning";
                 }
 
                 if (alertCode && textToSpeak) {
@@ -876,7 +880,7 @@
                         window.spokenFlightAlerts[key] = true;
                         speakAlert(textToSpeak);
                         showToast(textToSpeak, toastType);
-                        sendDesktopNotification("Vuelo Forzoso Audi", textToSpeak);
+                        sendDesktopNotification("Vuelo Forzoso", textToSpeak);
                     }
                 }
                 return;
