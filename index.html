@@ -271,6 +271,7 @@
                             <th class="px-2 py-2">Tipo / Recorrido</th>
                             <th class="px-2 py-2">Estado Actual</th>
                             <th class="px-2 py-2">Despegue / Motivo</th>
+                            <th class="px-2 py-2 text-right">Acciones</th>
                         </tr>
                     </thead>
                     <tbody id="flightsTableBody" class="divide-y divide-slate-800/60 font-medium text-xs">
@@ -1211,6 +1212,7 @@
                 }
 
                 const isShiftB = item.type === 'B';
+                const isCurrentActiveWindow = (idx === window.activeTargetIdx) && (window.isTargetWindowOpen === true);
 
                 html += `
                     <tr class="${idx === window.activeTargetIdx ? 'bg-blue-950/40' : 'hover:bg-slate-800/40'} transition">
@@ -1230,6 +1232,18 @@
                             ${statusObj.status === 'VOLADO' ? `<strong class="text-emerald-400">${statusObj.realTime} hrs</strong>` : ''}
                             ${statusObj.status === 'SUSPENDIDO' ? `<span class="text-amber-300 text-[10px] truncate max-w-[100px] block">${statusObj.note || 'Suspendido'}</span>` : ''}
                             ${statusObj.status === 'PENDIENTE' ? '<span class="text-slate-500">--</span>' : ''}
+                        </td>
+                        <td class="px-2 py-2 text-right">
+                            ${statusObj.status === 'PENDIENTE' ? `
+                                <div class="flex items-center justify-end gap-1">
+                                    <button onclick="openTakeoffModalForIdx(${idx})" ${isCurrentActiveWindow ? '' : 'disabled'} class="px-2 py-1 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-30 disabled:cursor-not-allowed text-white text-[10px] font-bold rounded-lg border border-emerald-500/30 transition" title="${isCurrentActiveWindow ? 'Registrar despegue' : 'Ventana no disponible'}">
+                                        <i class="fa-solid fa-plane-departure me-0.5"></i>Despegue
+                                    </button>
+                                    <button onclick="openSuspensionModalForIdx(${idx})" ${isCurrentActiveWindow ? '' : 'disabled'} class="px-2 py-1 bg-amber-600 hover:bg-amber-500 disabled:opacity-30 disabled:cursor-not-allowed text-white text-[10px] font-bold rounded-lg border border-amber-500/30 transition" title="${isCurrentActiveWindow ? 'Registrar suspensión' : 'Ventana no disponible'}">
+                                        <i class="fa-solid fa-pause me-0.5"></i>Suspender
+                                    </button>
+                                </div>
+                            ` : `<span class="text-[10px] text-slate-400 font-semibold"><i class="fa-solid fa-circle-check text-emerald-400 me-0.5"></i>Registrado</span>`}
                         </td>
                     </tr>
                 `;
@@ -1364,6 +1378,9 @@
             // Reiniciar estado de vuelos de hoy a limpia (PENDIENTE)
             window.dailyFlightStatuses = {};
             localStorage.setItem('audi_flight_statuses', JSON.stringify(window.dailyFlightStatuses));
+            if (window.cloudSyncFlightStatus) {
+                window.cloudSyncFlightStatus(window.dailyFlightStatuses);
+            }
 
             const savedBitacora = localStorage.getItem('audi_bitacora_logs');
             if (savedBitacora) {
