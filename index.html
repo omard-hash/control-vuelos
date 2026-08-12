@@ -151,10 +151,10 @@
             </div>
 
             <!-- Reloj e Indicadores Compactos -->
-            <div class="flex items-center gap-2 bg-slate-950/90 px-2.5 py-1 rounded-xl border border-slate-800">
+            <div class="flex items-center gap-2 bg-slate-950/90 px-3 py-1.5 rounded-xl border border-slate-800">
                 <div class="text-right">
-                    <div id="liveClock" class="text-lg font-mono font-black text-amber-300 tracking-wider leading-none">00:00:00</div>
-                    <div id="liveDate" class="text-[9.5px] text-slate-400 font-medium">Cargando fecha...</div>
+                    <div id="liveClock" class="text-2xl sm:text-3xl font-mono font-black text-amber-300 tracking-wider leading-none">00:00:00</div>
+                    <div id="liveDate" class="text-[10px] text-slate-400 font-semibold mt-0.5">Cargando fecha...</div>
                 </div>
                 
                 <button onclick="toggleBitacoraVisibility()" id="btnToggleBitacora" class="px-2 py-1 rounded-lg text-[10.5px] font-bold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition flex items-center gap-1" title="Ver / Ocultar Bitácora Auditora">
@@ -173,48 +173,48 @@
     <main class="flex-1 max-w-7xl w-full mx-auto px-2 sm:px-4 py-3 space-y-3">
 
         <section id="nextFlightCard" class="bg-gradient-to-r from-slate-900 via-blue-950/60 to-slate-900 p-3.5 rounded-2xl border border-blue-500/40 shadow-2xl relative overflow-hidden">
-            <div class="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+        <section id="nextFlightCard" class="bg-gradient-to-r from-slate-900 via-blue-950/60 to-slate-900 p-4 rounded-2xl border border-blue-500/40 shadow-2xl relative overflow-hidden">
+            <div class="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
                 
                 <!-- Detalle del Vuelo Activo -->
-                <div class="space-y-1">
-                    <div class="flex items-center gap-1.5 flex-wrap">
-                        <span class="px-2 py-0.5 rounded text-[10px] font-extrabold bg-blue-500/20 text-blue-300 border border-blue-500/30 uppercase tracking-wide">
+                <div class="space-y-2">
+                    <div class="flex items-center gap-2 flex-wrap">
+                        <span class="px-2.5 py-1 rounded-md text-[11px] font-extrabold bg-blue-500/20 text-blue-300 border border-blue-500/30 uppercase tracking-wide">
                             <i class="fa-solid fa-crosshairs me-1"></i>Vuelo Siguiente / Activo
                         </span>
-                        <span id="targetFlightBadge" class="px-2 py-0.5 rounded text-[10px] font-extrabold bg-audi-red text-white">
+                        <span id="targetFlightBadge" class="px-2.5 py-1 rounded-md text-[11px] font-extrabold bg-audi-red text-white">
                             TIPO A - Perimetral
                         </span>
-                        <span id="activePlanBadge" class="text-[10px] font-bold text-amber-300 bg-amber-950/80 px-2 py-0.5 rounded border border-amber-800">
+                        <span id="activePlanBadge" class="text-[11px] font-bold text-amber-300 bg-amber-950/80 px-2.5 py-1 rounded-md border border-amber-800">
                             Plan 1
                         </span>
                     </div>
 
-                    <div class="flex items-baseline gap-2">
-                        <h2 class="text-xl sm:text-2xl font-black text-white tracking-tight">
-                            Hora Base: <span id="targetFlightTime" class="font-mono text-amber-300">00:30 hrs</span>
-                        </h2>
+                    <div class="flex items-baseline gap-2 flex-wrap">
+                        <span class="text-sm sm:text-base font-bold text-slate-300 uppercase tracking-wider">Hora Base:</span>
+                        <h2 id="targetFlightTime" class="text-3xl sm:text-5xl font-mono font-black text-amber-300 tracking-tight">00:30 hrs</h2>
                     </div>
 
-                    <p class="text-xs text-slate-300 flex items-center gap-1 flex-wrap">
-                        <span>Ventana (&plusmn;30m):</span>
-                        <strong id="targetFlightWindow" class="text-emerald-400 font-mono text-xs bg-slate-950/80 px-1.5 py-0.5 rounded border border-slate-800">00:00 - 01:00 hrs</strong>
+                    <p class="text-sm text-slate-300 flex items-center gap-2 flex-wrap">
+                        <span class="font-semibold text-slate-400">Ventana (&plusmn;30m):</span>
+                        <strong id="targetFlightWindow" class="text-sm sm:text-base text-emerald-400 font-mono font-bold bg-slate-950/90 px-3 py-1 rounded-lg border border-emerald-500/40 shadow-inner">00:00 - 01:00 hrs</strong>
                     </p>
                 </div>
 
                 <!-- CONTROLES PRINCIPALES (DESPEGUE Y SUSPENDER) -->
-                <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 bg-slate-950/90 p-2.5 rounded-xl border border-slate-800/90">
-                    <div class="text-center sm:text-right pr-1">
-                        <div class="text-[9px] uppercase font-bold text-slate-400">Estado Ventana</div>
-                        <div id="targetCountdown" class="text-sm sm:text-base font-mono font-black text-emerald-400">Calculando...</div>
+                <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 bg-slate-950/90 p-3 rounded-xl border border-slate-800/90 shadow-lg">
+                    <div class="text-center sm:text-right px-2.5 py-1 bg-slate-900/80 rounded-lg border border-slate-800">
+                        <div class="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Estado Ventana / Cronómetro</div>
+                        <div id="targetCountdown" class="text-lg sm:text-2xl font-mono font-black text-emerald-400 mt-0.5">Calculando...</div>
                     </div>
 
                     <!-- Botones de Acción Inmediata -->
                     <div class="flex items-center gap-2">
-                        <button id="btnQuickFly" onclick="quickRegisterTakeoff()" class="flex-1 sm:flex-none px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs sm:text-sm rounded-xl shadow-lg shadow-emerald-900/40 transition flex items-center justify-center gap-2 border border-emerald-400/30 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed disabled:bg-slate-800 disabled:border-slate-700 disabled:shadow-none">
-                            <i class="fa-solid fa-plane-departure text-base"></i> DESPEGUE
+                        <button id="btnQuickFly" onclick="quickRegisterTakeoff()" class="flex-1 sm:flex-none px-5 py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-sm sm:text-base rounded-xl shadow-lg shadow-emerald-900/40 transition flex items-center justify-center gap-2 border border-emerald-400/30 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed disabled:bg-slate-800 disabled:border-slate-700 disabled:shadow-none">
+                            <i class="fa-solid fa-plane-departure text-lg"></i> DESPEGUE
                         </button>
-                        <button id="btnQuickSuspend" onclick="openSuspensionModalForCurrent()" class="flex-1 sm:flex-none px-3.5 py-2.5 bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs sm:text-sm rounded-xl shadow-lg shadow-amber-900/40 border border-amber-400/30 transition flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed disabled:bg-slate-800 disabled:border-slate-700 disabled:shadow-none">
-                            <i class="fa-solid fa-pause text-base"></i> SUSPENDER
+                        <button id="btnQuickSuspend" onclick="openSuspensionModalForCurrent()" class="flex-1 sm:flex-none px-4 py-3 bg-amber-600 hover:bg-amber-500 text-white font-bold text-sm sm:text-base rounded-xl shadow-lg shadow-amber-900/40 border border-amber-400/30 transition flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed disabled:bg-slate-800 disabled:border-slate-700 disabled:shadow-none">
+                            <i class="fa-solid fa-pause text-lg"></i> SUSPENDER
                         </button>
                     </div>
                 </div>
@@ -792,15 +792,15 @@
                     const mins = Math.floor(secToWinStart / 60);
                     const secs = secToWinStart % 60;
                     targetCountdownEl.innerText = `Abre en ${mins}m ${String(secs).padStart(2, '0')}s`;
-                    targetCountdownEl.className = "text-xs sm:text-sm font-mono font-bold text-amber-400";
+                    targetCountdownEl.className = "text-base sm:text-2xl font-mono font-black text-amber-400";
                 } else if (secToTargetEnd >= 0) {
                     const mins = Math.floor(secToTargetEnd / 60);
                     const secs = secToTargetEnd % 60;
                     targetCountdownEl.innerText = `ABIERTA (${mins}m ${String(secs).padStart(2, '0')}s)`;
-                    targetCountdownEl.className = "text-xs sm:text-sm font-mono font-bold text-emerald-400 pulse-green";
+                    targetCountdownEl.className = "text-base sm:text-2xl font-mono font-black text-emerald-400 pulse-green";
                 } else {
                     targetCountdownEl.innerText = "Programado";
-                    targetCountdownEl.className = "text-xs sm:text-sm font-mono font-bold text-slate-400";
+                    targetCountdownEl.className = "text-base sm:text-xl font-mono font-black text-slate-400";
                 }
             }
 
