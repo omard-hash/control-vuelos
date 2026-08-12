@@ -216,6 +216,9 @@
                         <button id="btnQuickSuspend" onclick="openSuspensionModalForCurrent()" class="flex-1 sm:flex-none px-4 py-3 bg-amber-600 hover:bg-amber-500 text-white font-bold text-sm sm:text-base rounded-xl shadow-lg shadow-amber-900/40 border border-amber-400/30 transition flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed disabled:bg-slate-800 disabled:border-slate-700 disabled:shadow-none">
                             <i class="fa-solid fa-pause text-lg"></i> SUSPENDER
                         </button>
+                        <button id="btnQuickReactivate" onclick="reactivateFlightForCurrent()" class="hidden flex-1 sm:flex-none px-4 py-3 bg-blue-600 hover:bg-blue-500 text-white font-bold text-sm sm:text-base rounded-xl shadow-lg shadow-blue-900/40 border border-blue-400/30 transition flex items-center justify-center gap-1.5 cursor-pointer">
+                            <i class="fa-solid fa-rotate-left text-lg"></i> QUITAR SUSPENSIÓN
+                        </button>
                     </div>
                 </div>
 
@@ -819,6 +822,7 @@
             const statusObj = window.dailyFlightStatuses[targetIdx] || { status: 'PENDIENTE' };
             const btnFly = document.getElementById('btnQuickFly');
             const btnSuspend = document.getElementById('btnQuickSuspend');
+            const btnReactivate = document.getElementById('btnQuickReactivate');
 
             const secToWinStart = winStartSec - currentSecNorm;
             const secToTargetEnd = winEndSec - currentSecNorm;
@@ -826,15 +830,25 @@
             const isWindowOpen = (secToWinStart <= 0 && secToTargetEnd >= 0);
             window.isTargetWindowOpen = isWindowOpen;
 
-            if (statusObj.status !== 'PENDIENTE') {
-                if (btnFly) btnFly.disabled = true;
-                if (btnSuspend) btnSuspend.disabled = true;
-            } else if (isWindowOpen) {
-                if (btnFly) btnFly.disabled = false;
-                if (btnSuspend) btnSuspend.disabled = false;
+            if (statusObj.status === 'SUSPENDIDO') {
+                if (btnFly) btnFly.classList.add('hidden');
+                if (btnSuspend) btnSuspend.classList.add('hidden');
+                if (btnReactivate) btnReactivate.classList.remove('hidden');
             } else {
-                if (btnFly) btnFly.disabled = true;
-                if (btnSuspend) btnSuspend.disabled = true;
+                if (btnFly) btnFly.classList.remove('hidden');
+                if (btnSuspend) btnSuspend.classList.remove('hidden');
+                if (btnReactivate) btnReactivate.classList.add('hidden');
+
+                if (statusObj.status !== 'PENDIENTE') {
+                    if (btnFly) btnFly.disabled = true;
+                    if (btnSuspend) btnSuspend.disabled = true;
+                } else if (isWindowOpen) {
+                    if (btnFly) btnFly.disabled = false;
+                    if (btnSuspend) btnSuspend.disabled = false;
+                } else {
+                    if (btnFly) btnFly.disabled = true;
+                    if (btnSuspend) btnSuspend.disabled = true;
+                }
             }
 
             checkVoiceAlertsForTarget(currentTarget, targetIdx, targetTimeStr, winStartSec, winEndSec, currentSecNorm);
@@ -986,6 +1000,46 @@
 
         function openSuspensionModalForCurrent() {
             openSuspensionModalForIdx(window.activeTargetIdx || 0);
+        }
+
+        function reactivateFlightForCurrent() {
+            reactivateFlight(window.activeTargetIdx || 0);
+        }
+
+        function reactivateFlight(idx) {
+            if (idx === undefined || idx === null) return;
+            const plan = OFFICIAL_PLANS[window.currentWeeklyPlan] || OFFICIAL_PLANS["1"];
+            const item = plan[idx];
+            if (!item) return;
+
+            window.dailyFlightStatuses[idx] = { status: 'PENDIENTE' };
+            localStorage.setItem('audi_flight_statuses', JSON.stringify(window.dailyFlightStatuses));
+
+            if (window.cloudSyncFlightStatus) window.cloudSyncFlightStatus(window.dailyFlightStatuses);
+
+            const now = new Date();
+            const bitacoraEntry = {
+                id: Date.now(),
+                timestampFormatted: now.toLocaleString('es-MX'),
+                scheduledTime: item.timeOp2,
+                flightType: `TIPO ${item.type} - ${item.name}`,
+                status: 'REACTIVADO',
+                realTime: '--',
+                pilot: 'Piloto en Turno',
+                notes: 'Suspensión levantada / Vuelo reactivado a estado pendiente',
+                evidenceImg: ''
+            };
+
+            window.bitacoraList.unshift(bitacoraEntry);
+            localStorage.setItem('audi_bitacora_logs', JSON.stringify(window.bitacoraList));
+            if (window.cloudAddBitacoraItem) window.cloudAddBitacoraItem(bitacoraEntry);
+
+            renderFlightsTable();
+            renderBitacoraTable();
+            updateTargetFlightBanner(new Date());
+
+            showToast(`Suspensión levantada. Vuelo de las ${item.timeOp2} hrs reactivado`, 'success');
+            speakAlert(`Suspensión levantada. Vuelo de las ${item.timeOp2} horas reactivado.`);
         }
 
         function confirmTakeoff() {
@@ -1385,6 +1439,12 @@
                                     </button>
                                     <button onclick="openSuspensionModalForIdx(${idx})" ${isPastOrActive ? '' : 'disabled'} class="px-1.5 py-0.5 bg-amber-600 hover:bg-amber-500 disabled:opacity-30 disabled:cursor-not-allowed text-white text-[9.5px] font-bold rounded-md border border-amber-500/30 transition" title="${isPastOrActive ? 'Registrar suspensión' : 'Vuelo futuro - Aún no disponible'}">
                                         <i class="fa-solid fa-pause me-0.5"></i>Suspender
+                                    </button>
+                                </div>
+                            ` : statusObj.status === 'SUSPENDIDO' ? `
+                                <div class="flex items-center justify-end gap-1">
+                                    <button onclick="reactivateFlight(${idx})" class="px-2 py-0.5 bg-blue-600 hover:bg-blue-500 text-white text-[9.5px] font-bold rounded-md border border-blue-400/30 transition" title="Quitar suspensión y reactivar vuelo">
+                                        <i class="fa-solid fa-rotate-left me-0.5"></i>Quitar Suspensión
                                     </button>
                                 </div>
                             ` : `<span class="text-[9.5px] text-slate-400 font-semibold"><i class="fa-solid fa-circle-check text-emerald-400 me-0.5"></i>Registrado</span>`}
