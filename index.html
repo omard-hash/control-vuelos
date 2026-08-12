@@ -260,21 +260,21 @@
                 <span class="text-[10px] text-slate-400 font-mono">Ventana: &plusmn;30 min</span>
             </div>
 
-            <!-- Tabla de Vuelos Reducida para 1/4 de Pantalla -->
-            <div class="overflow-x-auto">
-                <table class="w-full text-left text-xs min-w-[450px]">
-                    <thead class="bg-slate-950 text-slate-400 uppercase font-bold tracking-wider border-b border-slate-800 text-[10px]">
+            <!-- Tabla de Vuelos Reducida y Deslizable (Scroll Compacto para 1/4 de Pantalla) -->
+            <div class="max-h-52 sm:max-h-60 overflow-y-auto pr-1 custom-scrollbar">
+                <table class="w-full text-left text-xs min-w-[420px]">
+                    <thead class="bg-slate-950 text-slate-400 uppercase font-bold tracking-wider border-b border-slate-800 text-[9.5px] sticky top-0 z-10 shadow">
                         <tr>
-                            <th class="px-2 py-2">#</th>
-                            <th class="px-2 py-2">Hora Base</th>
-                            <th class="px-2 py-2">Ventana (&plusmn;30m)</th>
-                            <th class="px-2 py-2">Tipo / Recorrido</th>
-                            <th class="px-2 py-2">Estado Actual</th>
-                            <th class="px-2 py-2">Despegue / Motivo</th>
-                            <th class="px-2 py-2 text-right">Acciones</th>
+                            <th class="px-2 py-1.5">#</th>
+                            <th class="px-2 py-1.5">Hora Base</th>
+                            <th class="px-2 py-1.5">Ventana (&plusmn;30m)</th>
+                            <th class="px-2 py-1.5">Tipo / Recorrido</th>
+                            <th class="px-2 py-1.5">Estado Actual</th>
+                            <th class="px-2 py-1.5">Hora Real / Motivo</th>
+                            <th class="px-2 py-1.5 text-right">Acciones</th>
                         </tr>
                     </thead>
-                    <tbody id="flightsTableBody" class="divide-y divide-slate-800/60 font-medium text-xs">
+                    <tbody id="flightsTableBody" class="divide-y divide-slate-800/60 font-medium text-[11px]">
                         <!-- Rellenado dinámicamente -->
                     </tbody>
                 </table>
@@ -1184,6 +1184,9 @@
             let totalFlown = 0;
             let totalSuspended = 0;
 
+            const now = new Date();
+            const currentSecNorm = now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds();
+
             plan.forEach((item, idx) => {
                 const statusObj = window.dailyFlightStatuses[idx] || { status: 'PENDIENTE', realTime: '--', note: '' };
                 const timeStr = item.timeOp2;
@@ -1192,8 +1195,9 @@
                 if (statusObj.status === 'SUSPENDIDO') totalSuspended++;
 
                 const [h, m] = timeStr.split(':').map(Number);
-                let startSec = h * 3600 + m * 60 - 1800;
-                let endSec = h * 3600 + m * 60 + 1800;
+                let flightSec = h * 3600 + m * 60;
+                let startSec = flightSec - 1800;
+                let endSec = flightSec + 1800;
 
                 const formatTime = (sec) => {
                     let norm = (sec + 86400) % 86400;
@@ -1204,46 +1208,50 @@
 
                 const windowStr = `${formatTime(startSec)}-${formatTime(endSec)}`;
 
-                let statusBadge = '<span class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-slate-800 text-slate-400 border border-slate-700">PENDIENTE</span>';
+                let statusBadge = '<span class="px-1.5 py-0.5 rounded text-[9.5px] font-bold bg-slate-800 text-slate-400 border border-slate-700">PENDIENTE</span>';
                 if (statusObj.status === 'VOLADO') {
-                    statusBadge = '<span class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-950 text-emerald-400 border border-emerald-800/60"><i class="fa-solid fa-check me-0.5"></i>VOLADO</span>';
+                    statusBadge = '<span class="px-1.5 py-0.5 rounded text-[9.5px] font-bold bg-emerald-950 text-emerald-400 border border-emerald-800/60"><i class="fa-solid fa-check me-0.5"></i>VOLADO</span>';
                 } else if (statusObj.status === 'SUSPENDIDO') {
-                    statusBadge = '<span class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-950 text-amber-300 border border-amber-800/60"><i class="fa-solid fa-pause me-0.5"></i>SUSPENDIDO</span>';
+                    statusBadge = '<span class="px-1.5 py-0.5 rounded text-[9.5px] font-bold bg-amber-950 text-amber-300 border border-amber-800/60"><i class="fa-solid fa-pause me-0.5"></i>SUSPENDIDO</span>';
                 }
 
                 const isShiftB = item.type === 'B';
-                const isCurrentActiveWindow = (idx === window.activeTargetIdx) && (window.isTargetWindowOpen === true);
+                
+                // REGLA SOLICITADA:
+                // Permitir habilitar los vuelos pasados y el vuelo activo actual,
+                // pero deshabilitar los vuelos futuros que aún no han llegado a su ventana de vuelo.
+                const isPastOrActive = (startSec <= currentSecNorm) || (idx <= (window.activeTargetIdx ?? 0));
 
                 html += `
                     <tr class="${idx === window.activeTargetIdx ? 'bg-blue-950/40' : 'hover:bg-slate-800/40'} transition">
-                        <td class="px-2 py-2 font-bold text-slate-400">${idx + 1}</td>
-                        <td class="px-2 py-2 font-mono font-bold text-amber-300">
+                        <td class="px-2 py-1.5 font-bold text-slate-400 text-[10px]">${idx + 1}</td>
+                        <td class="px-2 py-1.5 font-mono font-bold text-amber-300 text-[11px]">
                             ${timeStr} hrs
                         </td>
-                        <td class="px-2 py-2 font-mono text-slate-300 text-[10px]">${windowStr}</td>
-                        <td class="px-2 py-2">
-                            <span class="px-1.5 py-0.5 rounded text-[10px] font-bold ${isShiftB ? 'bg-amber-950 text-amber-300 border border-amber-800' : 'bg-slate-800 text-slate-200 border border-slate-700'}">
+                        <td class="px-2 py-1.5 font-mono text-slate-300 text-[9.5px]">${windowStr}</td>
+                        <td class="px-2 py-1.5">
+                            <span class="px-1 py-0.5 rounded text-[9px] font-bold ${isShiftB ? 'bg-amber-950 text-amber-300 border border-amber-800' : 'bg-slate-800 text-slate-200 border border-slate-700'}">
                                 TIPO ${item.type}
                             </span>
-                            <span class="text-slate-300 text-[11px] ms-1 hidden sm:inline">${item.name}</span>
+                            <span class="text-slate-300 text-[10.5px] ms-1 hidden sm:inline">${item.name}</span>
                         </td>
-                        <td class="px-2 py-2">${statusBadge}</td>
-                        <td class="px-2 py-2 font-mono text-[11px] text-slate-300">
+                        <td class="px-2 py-1.5">${statusBadge}</td>
+                        <td class="px-2 py-1.5 font-mono text-[10.5px] text-slate-300">
                             ${statusObj.status === 'VOLADO' ? `<strong class="text-emerald-400">${statusObj.realTime} hrs</strong>` : ''}
-                            ${statusObj.status === 'SUSPENDIDO' ? `<span class="text-amber-300 text-[10px] truncate max-w-[100px] block">${statusObj.note || 'Suspendido'}</span>` : ''}
+                            ${statusObj.status === 'SUSPENDIDO' ? `<span class="text-amber-300 text-[9.5px] truncate max-w-[90px] block">${statusObj.note || 'Suspendido'}</span>` : ''}
                             ${statusObj.status === 'PENDIENTE' ? '<span class="text-slate-500">--</span>' : ''}
                         </td>
-                        <td class="px-2 py-2 text-right">
+                        <td class="px-2 py-1.5 text-right">
                             ${statusObj.status === 'PENDIENTE' ? `
                                 <div class="flex items-center justify-end gap-1">
-                                    <button onclick="openTakeoffModalForIdx(${idx})" ${isCurrentActiveWindow ? '' : 'disabled'} class="px-2 py-1 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-30 disabled:cursor-not-allowed text-white text-[10px] font-bold rounded-lg border border-emerald-500/30 transition" title="${isCurrentActiveWindow ? 'Registrar despegue' : 'Ventana no disponible'}">
+                                    <button onclick="openTakeoffModalForIdx(${idx})" ${isPastOrActive ? '' : 'disabled'} class="px-1.5 py-0.5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-30 disabled:cursor-not-allowed text-white text-[9.5px] font-bold rounded-md border border-emerald-500/30 transition" title="${isPastOrActive ? 'Registrar despegue' : 'Vuelo futuro - Aún no disponible'}">
                                         <i class="fa-solid fa-plane-departure me-0.5"></i>Despegue
                                     </button>
-                                    <button onclick="openSuspensionModalForIdx(${idx})" ${isCurrentActiveWindow ? '' : 'disabled'} class="px-2 py-1 bg-amber-600 hover:bg-amber-500 disabled:opacity-30 disabled:cursor-not-allowed text-white text-[10px] font-bold rounded-lg border border-amber-500/30 transition" title="${isCurrentActiveWindow ? 'Registrar suspensión' : 'Ventana no disponible'}">
+                                    <button onclick="openSuspensionModalForIdx(${idx})" ${isPastOrActive ? '' : 'disabled'} class="px-1.5 py-0.5 bg-amber-600 hover:bg-amber-500 disabled:opacity-30 disabled:cursor-not-allowed text-white text-[9.5px] font-bold rounded-md border border-amber-500/30 transition" title="${isPastOrActive ? 'Registrar suspensión' : 'Vuelo futuro - Aún no disponible'}">
                                         <i class="fa-solid fa-pause me-0.5"></i>Suspender
                                     </button>
                                 </div>
-                            ` : `<span class="text-[10px] text-slate-400 font-semibold"><i class="fa-solid fa-circle-check text-emerald-400 me-0.5"></i>Registrado</span>`}
+                            ` : `<span class="text-[9.5px] text-slate-400 font-semibold"><i class="fa-solid fa-circle-check text-emerald-400 me-0.5"></i>Registrado</span>`}
                         </td>
                     </tr>
                 `;
