@@ -162,9 +162,9 @@
                     <span id="btnToggleBitacoraText" class="hidden sm:inline">Bitácora</span>
                 </button>
 
-                <button onclick="testVoiceAlert()" title="Probar Alerta de Voz y Activar Sonido" class="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs border border-slate-700 transition flex items-center gap-1">
+                <button id="btnTestVoice" onclick="testVoiceAlert()" title="Probar Alerta de Voz y Activar Sonido" class="p-1.5 rounded-lg bg-emerald-950/80 hover:bg-emerald-900 text-emerald-300 text-xs border border-emerald-700/60 transition flex items-center gap-1">
                     <i class="fa-solid fa-bullhorn text-emerald-400"></i>
-                    <span class="text-[9px] font-bold text-emerald-400 hidden xs:inline">Probar Voz</span>
+                    <span class="text-[10px] font-bold text-emerald-300 hidden xs:inline">Probar Sonido</span>
                 </button>
             </div>
         </div>
@@ -1113,23 +1113,81 @@
         }
 
         function speakAlert(text) {
+            playAudioChime();
+            
             if ('speechSynthesis' in window) {
-                window.speechSynthesis.cancel();
-                const utterance = new SpeechSynthesisUtterance(text);
-                utterance.lang = 'es-MX';
-                utterance.rate = 1.0;
-                utterance.pitch = 1.0;
-                window.speechSynthesis.speak(utterance);
+                try {
+                    window.speechSynthesis.resume();
+                    window.speechSynthesis.cancel();
+
+                    const utterance = new SpeechSynthesisUtterance(text);
+                    utterance.lang = 'es-MX';
+                    utterance.rate = 1.0;
+                    utterance.pitch = 1.0;
+
+                    const voices = window.speechSynthesis.getVoices();
+                    if (voices && voices.length > 0) {
+                        const spanishVoice = voices.find(v => v.lang.startsWith('es-MX') || v.lang.startsWith('es'));
+                        if (spanishVoice) utterance.voice = spanishVoice;
+                    }
+
+                    setTimeout(() => {
+                        window.speechSynthesis.speak(utterance);
+                    }, 100);
+                } catch(e) {
+                    console.warn("Speech Synthesis Warning:", e);
+                }
+            }
+        }
+
+        function playAudioChime() {
+            try {
+                const AudioCtx = window.AudioContext || window.webkitAudioContext;
+                if (!AudioCtx) return;
+                
+                if (!window.audioCtx) {
+                    window.audioCtx = new AudioCtx();
+                }
+                if (window.audioCtx.state === 'suspended') {
+                    window.audioCtx.resume();
+                }
+
+                const now = window.audioCtx.currentTime;
+                
+                const osc1 = window.audioCtx.createOscillator();
+                const gain1 = window.audioCtx.createGain();
+                osc1.type = 'sine';
+                osc1.frequency.setValueAtTime(587.33, now); // D5
+                gain1.gain.setValueAtTime(0.15, now);
+                gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
+                osc1.connect(gain1);
+                gain1.connect(window.audioCtx.destination);
+                osc1.start(now);
+                osc1.stop(now + 0.25);
+
+                const osc2 = window.audioCtx.createOscillator();
+                const gain2 = window.audioCtx.createGain();
+                osc2.type = 'sine';
+                osc2.frequency.setValueAtTime(880, now + 0.15); // A5
+                gain2.gain.setValueAtTime(0.2, now + 0.15);
+                gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.55);
+                osc2.connect(gain2);
+                gain2.connect(window.audioCtx.destination);
+                osc2.start(now + 0.15);
+                osc2.stop(now + 0.55);
+
+            } catch (err) {
+                console.warn("Audio Chime Error:", err);
             }
         }
 
         window.speechUnlocked = false;
         function unlockAudioSpeech() {
-            if (!window.speechUnlocked && 'speechSynthesis' in window) {
-                window.speechSynthesis.resume();
-                const silentUtterance = new SpeechSynthesisUtterance('');
-                silentUtterance.volume = 0;
-                window.speechSynthesis.speak(silentUtterance);
+            if (!window.speechUnlocked) {
+                if (window.speechSynthesis) {
+                    window.speechSynthesis.resume();
+                }
+                playAudioChime();
                 window.speechUnlocked = true;
             }
             if ("Notification" in window && Notification.permission === "default") {
@@ -1147,8 +1205,14 @@
 
         function testVoiceAlert() {
             unlockAudioSpeech();
-            speakAlert("Prueba del sistema de alertas de voz de control de vuelos. Sistema activado y funcionando.");
-            showToast('Prueba de voz y notificaciones activadas correctamente', 'success');
+            speakAlert("Atención. Sistema de alertas de voz de Audi México activado correctamente.");
+            showToast('Sonido de alerta y voz probados correctamente', 'success');
+        }
+
+        if ('speechSynthesis' in window) {
+            window.speechSynthesis.onvoiceschanged = () => {
+                window.speechSynthesis.getVoices();
+            };
         }
 
         document.addEventListener('click', unlockAudioSpeech, { once: true });
