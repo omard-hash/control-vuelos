@@ -162,8 +162,9 @@
                     <span id="btnToggleBitacoraText" class="hidden sm:inline">Bitácora</span>
                 </button>
 
-                <button onclick="testVoiceAlert()" title="Probar Alerta de Voz" class="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs border border-slate-700 transition">
+                <button onclick="testVoiceAlert()" title="Probar Alerta de Voz y Activar Sonido" class="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs border border-slate-700 transition flex items-center gap-1">
                     <i class="fa-solid fa-bullhorn text-emerald-400"></i>
+                    <span class="text-[9px] font-bold text-emerald-400 hidden xs:inline">Probar Voz</span>
                 </button>
             </div>
         </div>
@@ -200,14 +201,14 @@
                     </p>
                 </div>
 
-                <!-- CONTROLES PRINCIPALES (DESPEGUE Y SUSPENDER EN LA PARTE SUPERIOR) -->
+                <!-- CONTROLES PRINCIPALES (DESPEGUE Y SUSPENDER) -->
                 <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 bg-slate-950/90 p-2.5 rounded-xl border border-slate-800/90">
                     <div class="text-center sm:text-right pr-1">
                         <div class="text-[9px] uppercase font-bold text-slate-400">Estado Ventana</div>
                         <div id="targetCountdown" class="text-sm sm:text-base font-mono font-black text-emerald-400">Calculando...</div>
                     </div>
 
-                    <!-- Botones de Acción Inmediata de Arriba -->
+                    <!-- Botones de Acción Inmediata -->
                     <div class="flex items-center gap-2">
                         <button id="btnQuickFly" onclick="quickRegisterTakeoff()" class="flex-1 sm:flex-none px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs sm:text-sm rounded-xl shadow-lg shadow-emerald-900/40 transition flex items-center justify-center gap-2 border border-emerald-400/30 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed disabled:bg-slate-800 disabled:border-slate-700 disabled:shadow-none">
                             <i class="fa-solid fa-plane-departure text-base"></i> DESPEGUE
@@ -251,6 +252,7 @@
             </div>
         </section>
 
+        <!-- Tabla de Vuelos -->
         <section class="bg-slate-900 p-3 rounded-2xl border border-slate-800 shadow-xl space-y-2">
             <div class="flex items-center justify-between border-b border-slate-800 pb-2">
                 <h3 class="text-xs font-bold text-white flex items-center gap-1.5">
@@ -260,7 +262,7 @@
                 <span class="text-[10px] text-slate-400 font-mono">Ventana: &plusmn;30 min</span>
             </div>
 
-            <!-- Tabla de Vuelos Reducida y Deslizable (Scroll Compacto para 1/4 de Pantalla) -->
+            <!-- Tabla de Vuelos Reducida y Deslizable -->
             <div class="max-h-52 sm:max-h-60 overflow-y-auto pr-1 custom-scrollbar">
                 <table class="w-full text-left text-xs min-w-[420px]">
                     <thead class="bg-slate-950 text-slate-400 uppercase font-bold tracking-wider border-b border-slate-800 text-[9.5px] sticky top-0 z-10 shadow">
@@ -315,7 +317,7 @@
                             <th class="px-3 py-2.5">Hora Real</th>
                             <th class="px-3 py-2.5">Detalle / Motivo</th>
                             <th class="px-3 py-2.5 text-center">Evidencia</th>
-                            <th class="px-3 py-2.5 text-right no-print">Editar</th>
+                            <th class="px-3 py-2.5 text-right no-print">Estado</th>
                         </tr>
                     </thead>
                     <tbody id="bitacoraTableBody" class="divide-y divide-slate-800/60 font-medium">
@@ -596,6 +598,40 @@
         window.tempTakeoffImageData = "";
         window.spokenFlightAlerts = {};
 
+        function openModal(id) {
+            const modal = document.getElementById(id);
+            if (modal) modal.classList.remove('hidden');
+        }
+
+        function closeModal(id) {
+            const modal = document.getElementById(id);
+            if (modal) modal.classList.add('hidden');
+        }
+
+        function showToast(message, type = 'info') {
+            const toast = document.getElementById('toastNotification');
+            const toastMsg = document.getElementById('toastMessage');
+            const toastIcon = document.getElementById('toastIcon');
+            if (!toast || !toastMsg) return;
+
+            toastMsg.innerText = message;
+            if (type === 'success') {
+                toastIcon.className = "fa-solid fa-circle-check text-emerald-400 text-base";
+                toast.className = "fixed bottom-4 right-4 bg-slate-900 border border-emerald-500/50 text-white px-3.5 py-2.5 rounded-xl shadow-2xl z-50 flex items-center gap-2.5 transition-all duration-300 opacity-100 translate-y-0 max-w-xs text-xs";
+            } else if (type === 'warning') {
+                toastIcon.className = "fa-solid fa-triangle-exclamation text-amber-400 text-base";
+                toast.className = "fixed bottom-4 right-4 bg-slate-900 border border-amber-500/50 text-white px-3.5 py-2.5 rounded-xl shadow-2xl z-50 flex items-center gap-2.5 transition-all duration-300 opacity-100 translate-y-0 max-w-xs text-xs";
+            } else {
+                toastIcon.className = "fa-solid fa-circle-info text-blue-400 text-base";
+                toast.className = "fixed bottom-4 right-4 bg-slate-900 border border-blue-500/50 text-white px-3.5 py-2.5 rounded-xl shadow-2xl z-50 flex items-center gap-2.5 transition-all duration-300 opacity-100 translate-y-0 max-w-xs text-xs";
+            }
+
+            clearTimeout(window.toastTimer);
+            window.toastTimer = setTimeout(() => {
+                toast.className = "fixed bottom-4 right-4 bg-slate-900 border border-slate-700 text-white px-3.5 py-2.5 rounded-xl shadow-2xl z-50 flex items-center gap-2.5 transition-all duration-300 opacity-0 translate-y-5 pointer-events-none max-w-xs text-xs";
+            }, 3500);
+        }
+
         function startLiveClock() {
             function updateClock() {
                 const now = new Date();
@@ -770,7 +806,6 @@
 
             window.activeTargetIdx = targetIdx;
 
-            // Control de habilitación de botones de acción
             const statusObj = window.dailyFlightStatuses[targetIdx] || { status: 'PENDIENTE' };
             const btnFly = document.getElementById('btnQuickFly');
             const btnSuspend = document.getElementById('btnQuickSuspend');
@@ -809,28 +844,28 @@
 
             let alertCode = null;
             let textToSpeak = "";
+            let toastType = "info";
 
             if (elapsedMins === 0) {
                 alertCode = "OPEN_0M";
                 textToSpeak = `Atención piloto. Se abre la ventana de vuelo para las ${targetTimeStr} horas. Recorrido ${currentTarget.name}.`;
-            } else if (elapsedMins === 10) {
-                alertCode = "WARN_10M";
-                textToSpeak = `Recordatorio de vuelo de las ${targetTimeStr} horas. Restan 40 minutos de ventana permitida.`;
-            } else if (elapsedMins === 20) {
-                alertCode = "WARN_20M";
-                textToSpeak = `Recordatorio de vuelo de las ${targetTimeStr} horas. Restan 30 minutos de ventana permitida.`;
+                toastType = "info";
+            } else if (elapsedMins === 15) {
+                alertCode = "ACTIVE_15M";
+                textToSpeak = `Recordatorio de vuelo. La ventana de las ${targetTimeStr} horas está activa. Restan 45 minutos de ventana.`;
+                toastType = "info";
             } else if (elapsedMins === 30) {
                 alertCode = "BASE_30M";
                 textToSpeak = `Atención. Hora base alcanzada para el vuelo de las ${targetTimeStr} horas. Quedan 30 minutos de ventana.`;
-            } else if (elapsedMins === 40) {
-                alertCode = "WARN_40M";
-                textToSpeak = `Recordatorio de vuelo de las ${targetTimeStr} horas. Restan 20 minutos de ventana permitida.`;
-            } else if (elapsedMins === 50) {
-                alertCode = "WARN_50M";
-                textToSpeak = `Atención piloto. Quedan solo 10 minutos para el cierre de la ventana de vuelo de las ${targetTimeStr} horas.`;
+                toastType = "warning";
+            } else if (elapsedMins === 45) {
+                alertCode = "ACTIVE_45M";
+                textToSpeak = `Recordatorio de vuelo. La ventana de las ${targetTimeStr} horas está activa. Restan 15 minutos de ventana.`;
+                toastType = "warning";
             } else if (elapsedMins === 55) {
                 alertCode = "FINAL_55M";
-                textToSpeak = `Alerta. La ventana de vuelo de las ${targetTimeStr} horas está por finalizar. Favor de registrar despegue o suspensión.`;
+                textToSpeak = `Alerta. La ventana de vuelo de las ${targetTimeStr} horas está por finalizar. Quedan solo 5 minutos para el cierre. Favor de registrar despegue o suspensión.`;
+                toastType = "warning";
             }
 
             if (alertCode && textToSpeak) {
@@ -838,6 +873,8 @@
                 if (!window.spokenFlightAlerts[key]) {
                     window.spokenFlightAlerts[key] = true;
                     speakAlert(textToSpeak);
+                    showToast(textToSpeak, toastType);
+                    sendDesktopNotification("Alerta de Vuelo Drone Audi", textToSpeak);
                 }
             }
         }
@@ -875,19 +912,23 @@
             openTakeoffModalForIdx(idx);
         }
 
-        function openSuspensionModalForCurrent() {
-            const idx = window.activeTargetIdx || 0;
-            const statusObj = window.dailyFlightStatuses[idx] || { status: 'PENDIENTE' };
+        function openSuspensionModalForIdx(idx) {
+            window.activeModalIndex = idx;
+            const plan = OFFICIAL_PLANS[window.currentWeeklyPlan] || OFFICIAL_PLANS["1"];
+            const item = plan[idx];
+            const timeStr = item.timeOp2;
 
-            if (statusObj.status !== 'PENDIENTE') {
-                showToast('Este vuelo ya ha sido registrado hoy', 'warning');
-                return;
-            }
-            if (window.isTargetWindowOpen === false) {
-                showToast('No se puede suspender aún. La ventana de vuelo no está abierta', 'warning');
-                return;
-            }
-            openSuspensionModalForIdx(idx);
+            document.getElementById('suspendFlightLabel').value = `Vuelo #${idx + 1} - ${timeStr} hrs (TIPO ${item.type} - ${item.name})`;
+            document.getElementById('suspendPilotName').value = "Piloto en Turno";
+            document.getElementById('suspendNotes').value = "";
+            document.getElementById('evidenceFileInput').value = "";
+            document.getElementById('evidencePreviewContainer').classList.add('hidden');
+            window.tempImageData = "";
+            openModal('modalSuspension');
+        }
+
+        function openSuspensionModalForCurrent() {
+            openSuspensionModalForIdx(window.activeTargetIdx || 0);
         }
 
         function confirmTakeoff() {
@@ -931,25 +972,6 @@
             renderBitacoraTable();
             showToast('Despegue de vuelo registrado con éxito', 'success');
             speakAlert(`Despegue de vuelo ${timeStr} horas registrado`);
-        }
-
-        function openSuspensionModalForIdx(idx) {
-            window.activeModalIndex = idx;
-            const plan = OFFICIAL_PLANS[window.currentWeeklyPlan] || OFFICIAL_PLANS["1"];
-            const item = plan[idx];
-            const timeStr = item.timeOp2;
-
-            document.getElementById('suspendFlightLabel').value = `Vuelo #${idx + 1} - ${timeStr} hrs (TIPO ${item.type} - ${item.name})`;
-            document.getElementById('suspendPilotName').value = "Piloto en Turno";
-            document.getElementById('suspendNotes').value = "";
-            document.getElementById('evidenceFileInput').value = "";
-            document.getElementById('evidencePreviewContainer').classList.add('hidden');
-            window.tempImageData = "";
-            openModal('modalSuspension');
-        }
-
-        function openSuspensionModalForCurrent() {
-            openSuspensionModalForIdx(window.activeTargetIdx || 0);
         }
 
         function confirmSuspension() {
@@ -1096,45 +1118,41 @@
                 const utterance = new SpeechSynthesisUtterance(text);
                 utterance.lang = 'es-MX';
                 utterance.rate = 1.0;
+                utterance.pitch = 1.0;
                 window.speechSynthesis.speak(utterance);
             }
         }
 
-        function testVoiceAlert() {
-            speakAlert("Prueba del sistema de alertas de voz de control de vuelos.");
-            showToast('Prueba de voz reproducida', 'info');
-        }
-
-        function showToast(msg, type = 'info') {
-            const toast = document.getElementById('toastNotification');
-            const messageEl = document.getElementById('toastMessage');
-            const iconEl = document.getElementById('toastIcon');
-            if (!toast || !messageEl) return;
-
-            messageEl.innerText = msg;
-            if (type === 'success') {
-                iconEl.className = "fa-solid fa-circle-check text-emerald-400 text-base";
-            } else if (type === 'warning') {
-                iconEl.className = "fa-solid fa-triangle-exclamation text-amber-400 text-base";
-            } else {
-                iconEl.className = "fa-solid fa-circle-info text-blue-400 text-base";
+        window.speechUnlocked = false;
+        function unlockAudioSpeech() {
+            if (!window.speechUnlocked && 'speechSynthesis' in window) {
+                window.speechSynthesis.resume();
+                const silentUtterance = new SpeechSynthesisUtterance('');
+                silentUtterance.volume = 0;
+                window.speechSynthesis.speak(silentUtterance);
+                window.speechUnlocked = true;
             }
-
-            toast.classList.remove('opacity-0', 'translate-y-5', 'pointer-events-none');
-            setTimeout(() => {
-                toast.classList.add('opacity-0', 'translate-y-5', 'pointer-events-none');
-            }, 3000);
+            if ("Notification" in window && Notification.permission === "default") {
+                Notification.requestPermission();
+            }
         }
 
-        function openModal(id) {
-            const modal = document.getElementById(id);
-            if (modal) modal.classList.remove('hidden');
+        function sendDesktopNotification(title, body) {
+            if ("Notification" in window && Notification.permission === "granted") {
+                try {
+                    new Notification(title, { body: body, icon: "https://placehold.co/100x100/bb0a30/ffffff?text=AUDI" });
+                } catch(e) {}
+            }
         }
 
-        function closeModal(id) {
-            const modal = document.getElementById(id);
-            if (modal) modal.classList.add('hidden');
+        function testVoiceAlert() {
+            unlockAudioSpeech();
+            speakAlert("Prueba del sistema de alertas de voz de control de vuelos. Sistema activado y funcionando.");
+            showToast('Prueba de voz y notificaciones activadas correctamente', 'success');
         }
+
+        document.addEventListener('click', unlockAudioSpeech, { once: true });
+        document.addEventListener('touchstart', unlockAudioSpeech, { once: true });
 
         function openFirebaseConfigModal() {
             const saved = localStorage.getItem('audi_custom_firebase_config') || '';
@@ -1216,10 +1234,6 @@
                 }
 
                 const isShiftB = item.type === 'B';
-                
-                // REGLA SOLICITADA:
-                // Permitir habilitar los vuelos pasados y el vuelo activo actual,
-                // pero deshabilitar los vuelos futuros que aún no han llegado a su ventana de vuelo.
                 const isPastOrActive = (startSec <= currentSecNorm) || (idx <= (window.activeTargetIdx ?? 0));
 
                 html += `
@@ -1383,7 +1397,6 @@
         }
 
         window.addEventListener('DOMContentLoaded', () => {
-            // Reiniciar estado de vuelos de hoy a limpia (PENDIENTE)
             window.dailyFlightStatuses = {};
             localStorage.setItem('audi_flight_statuses', JSON.stringify(window.dailyFlightStatuses));
             if (window.cloudSyncFlightStatus) {
