@@ -778,10 +778,20 @@
 
             if (targetTimeEl) targetTimeEl.innerText = `${targetTimeStr} hrs`;
             if (targetBadgeEl) {
-                targetBadgeEl.innerText = `TIPO ${currentTarget.type} - ${currentTarget.name}`;
+                const isForced = currentTarget.type === 'B';
+                targetBadgeEl.innerText = isForced 
+                    ? `TIPO B (FORZOSO / HORA EXACTA) - ${currentTarget.name}`
+                    : `TIPO ${currentTarget.type} - ${currentTarget.name}`;
+                targetBadgeEl.className = isForced 
+                    ? "px-2.5 py-1 rounded-md text-[11px] font-extrabold bg-amber-600 text-slate-950 uppercase" 
+                    : "px-2.5 py-1 rounded-md text-[11px] font-extrabold bg-audi-red text-white";
             }
             if (targetWindowEl) {
-                targetWindowEl.innerText = `${formatMinStr(winStartSec)} - ${formatMinStr(winEndSec)} hrs`;
+                if (currentTarget.type === 'B') {
+                    targetWindowEl.innerText = `Exacto: ${targetTimeStr} hrs (Avisos 15m y 5m antes)`;
+                } else {
+                    targetWindowEl.innerText = `${formatMinStr(winStartSec)} - ${formatMinStr(winEndSec)} hrs`;
+                }
             }
 
             if (targetCountdownEl) {
@@ -835,6 +845,44 @@
             if (statusObj.status !== 'PENDIENTE') return;
 
             const todayKey = window.lastDateString || new Date().toISOString().split('T')[0];
+
+            // LOGICA PARA VUELOS FORZOSOS (TIPO B - CAMBIO DE TURNO)
+            if (currentTarget.type === 'B') {
+                const [th, tm] = targetTimeStr.split(':').map(Number);
+                let targetSec = th * 3600 + tm * 60;
+                let diffSec = targetSec - currentSecNorm;
+                if (targetSec === 0 && currentSecNorm >= 86400 - 1800) {
+                    diffSec += 86400;
+                }
+                const diffMins = Math.floor(diffSec / 60);
+
+                let alertCode = null;
+                let textToSpeak = "";
+                let toastType = "warning";
+
+                if (diffMins === 15) {
+                    alertCode = "FORCED_15M";
+                    textToSpeak = `Atención piloto. Faltan 15 minutos para el vuelo forzoso de cambio de turno de las ${targetTimeStr} horas.`;
+                    toastType = "warning";
+                } else if (diffMins === 5) {
+                    alertCode = "FORCED_5M";
+                    textToSpeak = `Alerta importante. Faltan solo 5 minutos para el vuelo forzoso de las ${targetTimeStr} horas. Preparar despegue inmediato.`;
+                    toastType = "warning";
+                }
+
+                if (alertCode && textToSpeak) {
+                    const key = `${todayKey}_idx${targetIdx}_${alertCode}`;
+                    if (!window.spokenFlightAlerts[key]) {
+                        window.spokenFlightAlerts[key] = true;
+                        speakAlert(textToSpeak);
+                        showToast(textToSpeak, toastType);
+                        sendDesktopNotification("Vuelo Forzoso Audi", textToSpeak);
+                    }
+                }
+                return;
+            }
+
+            // LOGICA PARA VUELOS REGULARES (TIPO A, C, D)
             const elapsedSec = currentSecNorm - winStartSec;
             const remainingSec = winEndSec - currentSecNorm;
 
@@ -1198,14 +1246,14 @@
         function sendDesktopNotification(title, body) {
             if ("Notification" in window && Notification.permission === "granted") {
                 try {
-                    new Notification(title, { body: body, icon: "https://placehold.co/100x100/bb0a30/ffffff?text=AUDI" });
+                    new Notification(title, { body: body, icon: "https://placehold.co/100x100/bb0a30/ffffff?text=DRONE" });
                 } catch(e) {}
             }
         }
 
         function testVoiceAlert() {
             unlockAudioSpeech();
-            speakAlert("Atención. Sistema de alertas de voz de Audi México activado correctamente.");
+            speakAlert("Atención. Sistema de alertas de voz activado correctamente.");
             showToast('Sonido de alerta y voz probados correctamente', 'success');
         }
 
