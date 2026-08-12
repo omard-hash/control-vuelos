@@ -932,6 +932,11 @@
         }
 
         function openTakeoffModalForIdx(idx) {
+            const statusObj = window.dailyFlightStatuses[idx] || { status: 'PENDIENTE' };
+            if (statusObj.status !== 'PENDIENTE') {
+                showToast(`Este vuelo ya se encuentra en estado ${statusObj.status}`, 'warning');
+                return;
+            }
             window.activeModalIndex = idx;
             const plan = OFFICIAL_PLANS[window.currentWeeklyPlan] || OFFICIAL_PLANS["1"];
             const item = plan[idx];
@@ -954,7 +959,7 @@
             const statusObj = window.dailyFlightStatuses[idx] || { status: 'PENDIENTE' };
 
             if (statusObj.status !== 'PENDIENTE') {
-                showToast('Este vuelo ya ha sido registrado hoy', 'warning');
+                showToast(`Este vuelo ya ha sido registrado hoy (${statusObj.status})`, 'warning');
                 return;
             }
             if (window.isTargetWindowOpen === false) {
@@ -1069,6 +1074,7 @@
             closeModal('modalSuspension');
             renderFlightsTable();
             renderBitacoraTable();
+            updateTargetFlightBanner(new Date());
             showToast('Suspensión de vuelo registrada con evidencia', 'warning');
             
             speakAlert(`Vuelo de las ${timeStr} horas suspendido por ${reason}. Favor de tomar la evidencia fotográfica correspondiente.`);
@@ -1513,10 +1519,11 @@
         }
 
         window.addEventListener('DOMContentLoaded', () => {
-            window.dailyFlightStatuses = {};
-            localStorage.setItem('audi_flight_statuses', JSON.stringify(window.dailyFlightStatuses));
-            if (window.cloudSyncFlightStatus) {
-                window.cloudSyncFlightStatus(window.dailyFlightStatuses);
+            const savedStatuses = localStorage.getItem('audi_flight_statuses');
+            if (savedStatuses) {
+                try { window.dailyFlightStatuses = JSON.parse(savedStatuses); } catch(e) { window.dailyFlightStatuses = {}; }
+            } else {
+                window.dailyFlightStatuses = {};
             }
 
             const savedBitacora = localStorage.getItem('audi_bitacora_logs');
