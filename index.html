@@ -172,7 +172,6 @@
 
     <main class="flex-1 max-w-7xl w-full mx-auto px-2 sm:px-4 py-3 space-y-3">
 
-        <section id="nextFlightCard" class="bg-gradient-to-r from-slate-900 via-blue-950/60 to-slate-900 p-3.5 rounded-2xl border border-blue-500/40 shadow-2xl relative overflow-hidden">
         <section id="nextFlightCard" class="bg-gradient-to-r from-slate-900 via-blue-950/60 to-slate-900 p-4 rounded-2xl border border-blue-500/40 shadow-2xl relative overflow-hidden">
             <div class="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
                 
@@ -201,7 +200,7 @@
                     </p>
                 </div>
 
-                <!-- CONTROLES PRINCIPALES (DESPEGUE Y SUSPENDER) -->
+                <!-- CONTROLES PRINCIPALES (DESPEGUE, SUSPENDER, QUITAR SUSPENSIÓN) -->
                 <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 bg-slate-950/90 p-3 rounded-xl border border-slate-800/90 shadow-lg">
                     <div class="text-center sm:text-right px-2.5 py-1 bg-slate-900/80 rounded-lg border border-slate-800">
                         <div class="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Estado Ventana / Cronómetro</div>
@@ -255,7 +254,6 @@
             </div>
         </section>
 
-        <!-- Tabla de Vuelos -->
         <section class="bg-slate-900 p-3 rounded-2xl border border-slate-800 shadow-xl space-y-2">
             <div class="flex items-center justify-between border-b border-slate-800 pb-2">
                 <h3 class="text-xs font-bold text-white flex items-center gap-1.5">
@@ -791,7 +789,7 @@
             }
             if (targetWindowEl) {
                 if (currentTarget.type === 'B') {
-                    targetWindowEl.innerText = `Exacto: ${targetTimeStr} hrs (Avisos 15m y 5m antes)`;
+                    targetWindowEl.innerText = `Exacto: ${targetTimeStr} hrs (Avisos 15m, 5m y 0m)`;
                 } else {
                     targetWindowEl.innerText = `${formatMinStr(winStartSec)} - ${formatMinStr(winEndSec)} hrs`;
                 }
@@ -830,10 +828,35 @@
             const isWindowOpen = (secToWinStart <= 0 && secToTargetEnd >= 0);
             window.isTargetWindowOpen = isWindowOpen;
 
+            // Smart detection of ANY suspended flight in the day
+            const firstSuspendedIdx = plan.findIndex((_, idx) => window.dailyFlightStatuses[idx]?.status === 'SUSPENDIDO');
+
             if (statusObj.status === 'SUSPENDIDO') {
                 if (btnFly) btnFly.classList.add('hidden');
                 if (btnSuspend) btnSuspend.classList.add('hidden');
-                if (btnReactivate) btnReactivate.classList.remove('hidden');
+                if (btnReactivate) {
+                    btnReactivate.classList.remove('hidden');
+                    btnReactivate.disabled = false;
+                    btnReactivate.innerHTML = `<i class="fa-solid fa-rotate-left text-lg"></i> QUITAR SUSPENSIÓN (${currentTarget.timeOp2} hrs)`;
+                    btnReactivate.onclick = () => reactivateFlight(targetIdx);
+                }
+            } else if (firstSuspendedIdx !== -1) {
+                // Target flight is not suspended, but another flight IS suspended! Allow 24/7 reactivation from top banner
+                const suspItem = plan[firstSuspendedIdx];
+                if (btnReactivate) {
+                    btnReactivate.classList.remove('hidden');
+                    btnReactivate.disabled = false;
+                    btnReactivate.innerHTML = `<i class="fa-solid fa-rotate-left text-lg"></i> QUITAR SUSPENSIÓN (${suspItem.timeOp2} hrs)`;
+                    btnReactivate.onclick = () => reactivateFlight(firstSuspendedIdx);
+                }
+                if (btnFly) {
+                    btnFly.classList.remove('hidden');
+                    btnFly.disabled = !isWindowOpen;
+                }
+                if (btnSuspend) {
+                    btnSuspend.classList.remove('hidden');
+                    btnSuspend.disabled = false; // Always allow suspending due to weather or emergencies
+                }
             } else {
                 if (btnFly) btnFly.classList.remove('hidden');
                 if (btnSuspend) btnSuspend.classList.remove('hidden');
@@ -842,12 +865,9 @@
                 if (statusObj.status !== 'PENDIENTE') {
                     if (btnFly) btnFly.disabled = true;
                     if (btnSuspend) btnSuspend.disabled = true;
-                } else if (isWindowOpen) {
-                    if (btnFly) btnFly.disabled = false;
-                    if (btnSuspend) btnSuspend.disabled = false;
                 } else {
-                    if (btnFly) btnFly.disabled = true;
-                    if (btnSuspend) btnSuspend.disabled = true;
+                    if (btnFly) btnFly.disabled = !isWindowOpen;
+                    if (btnSuspend) btnSuspend.disabled = false; // Always enable suspension for pending flights
                 }
             }
 
@@ -940,7 +960,7 @@
                     window.spokenFlightAlerts[key] = true;
                     speakAlert(textToSpeak);
                     showToast(textToSpeak, toastType);
-                    sendDesktopNotification("Alerta de Vuelo Drone Audi", textToSpeak);
+                    sendDesktopNotification("Alerta de Vuelo Drone", textToSpeak);
                 }
             }
         }
@@ -1003,7 +1023,15 @@
         }
 
         function reactivateFlightForCurrent() {
-            reactivateFlight(window.activeTargetIdx || 0);
+            let targetIdx = window.activeTargetIdx ?? 0;
+            if (window.dailyFlightStatuses[targetIdx]?.status !== 'SUSPENDIDO') {
+                const plan = OFFICIAL_PLANS[window.currentWeeklyPlan] || OFFICIAL_PLANS["1"];
+                const foundIdx = plan.findIndex((_, idx) => window.dailyFlightStatuses[idx]?.status === 'SUSPENDIDO');
+                if (foundIdx !== -1) {
+                    targetIdx = foundIdx;
+                }
+            }
+            reactivateFlight(targetIdx);
         }
 
         function reactivateFlight(idx) {
@@ -1081,6 +1109,7 @@
             closeModal('modalTakeoff');
             renderFlightsTable();
             renderBitacoraTable();
+            updateTargetFlightBanner(new Date());
             showToast('Despegue de vuelo registrado con éxito', 'success');
             speakAlert(`Despegue de vuelo ${timeStr} horas registrado`);
         }
@@ -1434,16 +1463,16 @@
                         <td class="px-2 py-1.5 text-right">
                             ${statusObj.status === 'PENDIENTE' ? `
                                 <div class="flex items-center justify-end gap-1">
-                                    <button onclick="openTakeoffModalForIdx(${idx})" ${isPastOrActive ? '' : 'disabled'} class="px-1.5 py-0.5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-30 disabled:cursor-not-allowed text-white text-[9.5px] font-bold rounded-md border border-emerald-500/30 transition" title="${isPastOrActive ? 'Registrar despegue' : 'Vuelo futuro - Aún no disponible'}">
+                                    <button onclick="openTakeoffModalForIdx(${idx})" ${isPastOrActive ? '' : 'disabled'} class="px-1.5 py-0.5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-30 disabled:cursor-not-allowed text-white text-[9.5px] font-bold rounded-md border border-emerald-500/30 transition" title="${isPastOrActive ? 'Registrar despegue' : 'Vuelo futuro - Esperando ventana'}">
                                         <i class="fa-solid fa-plane-departure me-0.5"></i>Despegue
                                     </button>
-                                    <button onclick="openSuspensionModalForIdx(${idx})" ${isPastOrActive ? '' : 'disabled'} class="px-1.5 py-0.5 bg-amber-600 hover:bg-amber-500 disabled:opacity-30 disabled:cursor-not-allowed text-white text-[9.5px] font-bold rounded-md border border-amber-500/30 transition" title="${isPastOrActive ? 'Registrar suspensión' : 'Vuelo futuro - Aún no disponible'}">
+                                    <button onclick="openSuspensionModalForIdx(${idx})" class="px-1.5 py-0.5 bg-amber-600 hover:bg-amber-500 text-white text-[9.5px] font-bold rounded-md border border-amber-500/30 transition cursor-pointer" title="Registrar suspensión (Clima / Emergencia)">
                                         <i class="fa-solid fa-pause me-0.5"></i>Suspender
                                     </button>
                                 </div>
                             ` : statusObj.status === 'SUSPENDIDO' ? `
                                 <div class="flex items-center justify-end gap-1">
-                                    <button onclick="reactivateFlight(${idx})" class="px-2 py-0.5 bg-blue-600 hover:bg-blue-500 text-white text-[9.5px] font-bold rounded-md border border-blue-400/30 transition" title="Quitar suspensión y reactivar vuelo">
+                                    <button onclick="reactivateFlight(${idx})" class="px-2 py-0.5 bg-blue-600 hover:bg-blue-500 text-white text-[9.5px] font-bold rounded-md border border-blue-400/30 transition shadow cursor-pointer" title="Quitar suspensión y reactivar vuelo a estado pendiente">
                                         <i class="fa-solid fa-rotate-left me-0.5"></i>Quitar Suspensión
                                     </button>
                                 </div>
@@ -1665,6 +1694,7 @@
                             window.dailyFlightStatuses = data.flightStatuses;
                             localStorage.setItem('audi_flight_statuses', JSON.stringify(data.flightStatuses));
                             if (typeof window.renderFlightsTable === 'function') window.renderFlightsTable();
+                            if (typeof window.updateTargetFlightBanner === 'function') window.updateTargetFlightBanner(new Date());
                         }
                     }
                 });
