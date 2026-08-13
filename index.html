@@ -36,7 +36,8 @@
             background-color: #090d16;
             color: #f1f5f9;
             font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-            overflow-x: hidden;
+            overflow: hidden;
+            height: 100vh;
         }
         ::-webkit-scrollbar { width: 5px; height: 5px; }
         ::-webkit-scrollbar-track { background: #0f172a; }
@@ -48,14 +49,15 @@
             * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
             header, main, .no-print, .modal-backdrop { display: none !important; }
             #bitacoraPrintSection { display: block !important; }
-            body { background: #ffffff !important; color: #000000 !important; padding: 0 !important; font-size: 10px !important; }
+            body { background: #ffffff !important; color: #000000 !important; padding: 0 !important; overflow: auto !important; height: auto !important; font-size: 10px !important; }
         }
         #bitacoraPrintSection { display: none; }
     </style>
 </head>
-<body class="min-h-screen flex flex-col bg-slate-950 text-slate-100 antialiased selection:bg-red-600 selection:text-white">
+<body class="h-screen flex flex-col bg-slate-950 text-slate-100 antialiased selection:bg-red-600 selection:text-white overflow-hidden">
 
-    <header class="bg-slate-900 border-b border-slate-800 sticky top-0 z-40 shadow-xl py-2 px-2 sm:px-3">
+    <!-- HEADER / BARRA SUPERIOR FIJA -->
+    <header class="bg-slate-900 border-b border-slate-800 sticky top-0 z-40 shadow-xl py-2 px-2 sm:px-3 shrink-0">
         <div class="max-w-7xl mx-auto flex flex-col xs:flex-row justify-between items-center gap-2">
             
             <!-- Logo Audi e Indicadores -->
@@ -63,9 +65,14 @@
                 <div class="p-1.5 bg-audi-red text-white rounded-lg shadow flex items-center justify-center shrink-0">
                     <i class="fa-solid fa-plane-departure text-sm"></i>
                 </div>
-                <div class="flex items-center gap-1">
+                <div class="flex items-center gap-1 flex-wrap">
                     <span class="text-[9px] font-extrabold tracking-wider uppercase bg-slate-800 text-red-400 px-1.5 py-0.5 rounded border border-red-900/40 shrink-0">Audi México</span>
                     <span id="shiftBadge" class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-950/80 text-emerald-400 border border-emerald-800/40 shrink-0">Turno --</span>
+                    
+                    <!-- INDICADOR DE CONEXIÓN NUBE EN LÍNEA -->
+                    <span id="cloudStatusBadge" class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-blue-950/80 text-blue-400 border border-blue-800/40 shrink-0 flex items-center gap-1">
+                        <i id="cloudStatusIcon" class="fa-solid fa-wifi text-blue-400 animate-pulse"></i> <span id="cloudStatusText">Conectando Nube...</span>
+                    </span>
                 </div>
             </div>
 
@@ -96,10 +103,11 @@
         </div>
     </header>
 
-    <main class="flex-1 max-w-7xl w-full mx-auto px-2 sm:px-4 py-2.5 space-y-2.5">
+    <!-- CONTENIDO PRINCIPAL FIJO CON TABLA CON SCROLL INDEPENDIENTE -->
+    <main class="flex-1 max-w-7xl w-full mx-auto px-2 sm:px-4 py-2.5 flex flex-col gap-2.5 overflow-hidden">
 
-        <!-- TARJETA PRINCIPAL DEL VUELO ACTIVO Y CRONÓMETRO GIGANTE -->
-        <section id="nextFlightCard" class="bg-gradient-to-r from-slate-900 via-blue-950/60 to-slate-900 p-3 sm:p-4 rounded-2xl border border-blue-500/40 shadow-2xl relative overflow-hidden">
+        <!-- TARJETA PRINCIPAL DEL VUELO ACTIVO Y CRONÓMETRO GIGANTE (FIJA) -->
+        <section id="nextFlightCard" class="bg-gradient-to-r from-slate-900 via-blue-950/60 to-slate-900 p-3 sm:p-4 rounded-2xl border border-blue-500/40 shadow-2xl relative overflow-hidden shrink-0">
             <div class="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3">
                 
                 <div class="space-y-1.5">
@@ -143,8 +151,8 @@
             </div>
         </section>
 
-        <!-- TARJETAS DE CONTEO -->
-        <section class="bg-slate-900/90 p-2 rounded-xl border border-slate-800 shadow-lg grid grid-cols-3 gap-1.5 text-xs">
+        <!-- TARJETAS DE CONTEO (FIJAS) -->
+        <section class="bg-slate-900/90 p-2 rounded-xl border border-slate-800 shadow-lg grid grid-cols-3 gap-1.5 text-xs shrink-0">
             <div class="bg-slate-950/80 p-1.5 rounded-lg border border-slate-800/80 text-center flex flex-col justify-center">
                 <span class="text-[8.5px] uppercase font-bold text-slate-400">Jornada 24h</span>
                 <span id="cntTotal" class="text-sm sm:text-base font-black text-white">16 Vuelos</span>
@@ -164,9 +172,9 @@
             </div>
         </section>
 
-        <!-- CRONOGRAMA DIARIO DE VUELOS -->
-        <section class="bg-slate-900 p-2.5 rounded-2xl border border-slate-800 shadow-xl space-y-2">
-            <div class="flex items-center justify-between border-b border-slate-800 pb-1.5">
+        <!-- CRONOGRAMA DIARIO DE VUELOS (SECCIÓN FLEXIBLE CON SCROLL INTERNO) -->
+        <section class="bg-slate-900 p-2.5 rounded-2xl border border-slate-800 shadow-xl space-y-2 flex-1 flex flex-col overflow-hidden min-h-0">
+            <div class="flex items-center justify-between border-b border-slate-800 pb-1.5 shrink-0">
                 <h3 class="text-xs font-bold text-white flex items-center gap-1.5">
                     <i class="fa-solid fa-list-check text-audi-red"></i>
                     Cronograma Diario
@@ -174,7 +182,7 @@
                 <span class="text-[9.5px] text-slate-400 font-mono">Ventana: &plusmn;30 min</span>
             </div>
 
-            <div class="max-h-64 overflow-y-auto overflow-x-auto pr-1">
+            <div class="flex-1 overflow-y-auto overflow-x-auto pr-1">
                 <table class="w-full text-left text-xs min-w-[550px]">
                     <thead class="bg-slate-950 text-slate-400 uppercase font-bold tracking-wider border-b border-slate-800 text-[9px] sticky top-0 z-10 shadow">
                         <tr>
@@ -488,6 +496,150 @@
         </div>
     </section>
 
+    <!-- FIREBASE INITIALIZATION MODULE -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, setDoc, deleteDoc, onSnapshot, collection } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'audi-mexico-drones';
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+
+        let db = null;
+        let auth = null;
+        let currentUser = null;
+
+        function updateCloudUI(isOnline, message) {
+            const icon = document.getElementById('cloudStatusIcon');
+            const text = document.getElementById('cloudStatusText');
+            const badge = document.getElementById('cloudStatusBadge');
+            
+            if (isOnline) {
+                if (text) text.innerText = message || "Nube en Línea";
+                if (icon) icon.className = "fa-solid fa-cloud-bolt text-emerald-400 animate-pulse";
+                if (badge) badge.className = "text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-950/80 text-emerald-400 border border-emerald-800/40 shrink-0 flex items-center gap-1";
+            } else {
+                if (text) text.innerText = message || "Modo Local";
+                if (icon) icon.className = "fa-solid fa-hard-drive text-amber-400";
+                if (badge) badge.className = "text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-950/80 text-amber-400 border border-amber-800/40 shrink-0 flex items-center gap-1";
+            }
+        }
+
+        async function initCloudPersistence() {
+            if (!firebaseConfig) {
+                console.warn("Sin configuración Firebase. Operando en almacenamiento local.");
+                updateCloudUI(false, "Modo Local");
+                return;
+            }
+
+            try {
+                const app = initializeApp(firebaseConfig);
+                auth = getAuth(app);
+                db = getFirestore(app);
+
+                if (initialAuthToken) {
+                    try {
+                        const userCred = await signInWithCustomToken(auth, initialAuthToken);
+                        currentUser = userCred.user;
+                    } catch (e) {
+                        const userCred = await signInAnonymously(auth);
+                        currentUser = userCred.user;
+                    }
+                } else {
+                    const userCred = await signInAnonymously(auth);
+                    currentUser = userCred.user;
+                }
+
+                updateCloudUI(true, "Nube Live Sincronizada");
+                setupRealtimeListeners();
+            } catch (err) {
+                console.error("Error al inicializar Firebase Firestore:", err);
+                updateCloudUI(false, "Modo Local");
+            }
+        }
+
+        function setupRealtimeListeners() {
+            if (!db || !currentUser) return;
+
+            const todayKey = window.getTodayKey();
+
+            // ESCUCHADOR EN VIVO DEL ESTADO DE VUELOS DEL DÍA
+            const statusDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'daily_status', todayKey);
+            onSnapshot(statusDocRef, (docSnap) => {
+                if (docSnap.exists()) {
+                    const data = docSnap.data();
+                    if (data.statuses) {
+                        window.dailyFlightStatuses = data.statuses;
+                        window.safeStorageSet('audi_flight_statuses', JSON.stringify(data.statuses));
+                    }
+                    if (data.weatherSuspended !== undefined) {
+                        window.systemWeatherSuspended = data.weatherSuspended;
+                        window.safeStorageSet('audi_weather_suspended', data.weatherSuspended ? 'true' : 'false');
+                        window.updateMainWeatherButtonUI();
+                    }
+                    window.renderFlightsTable();
+                    window.updateTargetFlightBanner(new Date());
+                }
+            }, (err) => console.warn("Error snapshot daily_status:", err));
+
+            // ESCUCHADOR EN VIVO DE LA BITÁCORA AUDITABLE
+            const bitacoraColRef = collection(db, 'artifacts', appId, 'public', 'data', 'bitacora_logs');
+            onSnapshot(bitacoraColRef, (querySnap) => {
+                const logs = [];
+                querySnap.forEach((docSnap) => {
+                    logs.push(docSnap.data());
+                });
+                
+                // Ordenar en memoria por ID desc (más recientes primero)
+                logs.sort((a, b) => b.id - a.id);
+                
+                window.bitacoraList = logs;
+                window.safeStorageSet('audi_bitacora_logs', JSON.stringify(logs));
+                
+                if (typeof window.renderBitacoraModalTable === 'function') {
+                    window.renderBitacoraModalTable();
+                }
+                window.renderFlightsTable();
+            }, (err) => console.warn("Error snapshot bitacora_logs:", err));
+        }
+
+        // EXPOSITOR DE FUNCIONES DE ESCRITURA FIRESTORE A WINDOW
+        window.saveDailyStatusToCloud = async function() {
+            if (!db || !currentUser) return;
+            const todayKey = window.getTodayKey();
+            try {
+                const statusDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'daily_status', todayKey);
+                await setDoc(statusDocRef, {
+                    date: todayKey,
+                    statuses: window.dailyFlightStatuses,
+                    weatherSuspended: window.systemWeatherSuspended,
+                    updatedAt: new Date().toISOString()
+                }, { merge: true });
+            } catch (e) { console.error("Error guardando en nube daily_status:", e); }
+        };
+
+        window.saveBitacoraLogToCloud = async function(logEntry) {
+            if (!db || !currentUser) return;
+            try {
+                const logDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'bitacora_logs', logEntry.id.toString());
+                await setDoc(logDocRef, logEntry);
+            } catch (e) { console.error("Error guardando en nube log bitácora:", e); }
+        };
+
+        window.deleteBitacoraLogFromCloud = async function(logId) {
+            if (!db || !currentUser) return;
+            try {
+                const logDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'bitacora_logs', logId.toString());
+                await deleteDoc(logDocRef);
+            } catch (e) { console.error("Error eliminando de nube log bitácora:", e); }
+        };
+
+        // Iniciar conexión al cargar el script
+        initCloudPersistence();
+    </script>
+
+    <!-- MAIN APPLICATION SCRIPT -->
     <script>
         const memoryStorageFallback = {};
         function safeStorageGet(key) {
@@ -501,6 +653,7 @@
             const now = new Date();
             return `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
         }
+        window.getTodayKey = getTodayKey;
 
         const OFFICIAL_PLANS = {
             "2": [
@@ -550,6 +703,7 @@
                 text.innerText = "SUSPENDER";
             }
         }
+        window.updateMainWeatherButtonUI = updateMainWeatherButtonUI;
 
         function toggleMainWeatherSuspension() {
             if (window.systemWeatherSuspended) {
@@ -564,6 +718,10 @@
             safeStorageSet('audi_weather_suspended', 'false');
             updateMainWeatherButtonUI();
             
+            if (typeof window.saveDailyStatusToCloud === 'function') {
+                window.saveDailyStatusToCloud();
+            }
+
             showToast("Clima despejado. Suspensión general finalizada y vuelos reanudados.", "success");
             triggerVoiceAlert("Atención. Clima despejado. Suspensión reanudada. Vuelos siguientes activos.");
             updateTargetFlightBanner(new Date());
@@ -702,16 +860,15 @@
                 if (ctx.state === 'suspended') ctx.resume();
 
                 const now = ctx.currentTime;
-                // Ráfaga de 4 pitidos agudos de alta penetración a volumen máximo (1.0)
                 const beepFreqs = [1200, 1600, 1200, 1600];
                 beepFreqs.forEach((freq, idx) => {
                     const startTime = now + idx * 0.14;
                     const osc = ctx.createOscillator();
                     const gain = ctx.createGain();
-                    osc.type = 'square'; // Onda cuadrada para un pitido de alarma potente y claro
+                    osc.type = 'square';
                     osc.frequency.setValueAtTime(freq, startTime);
                     
-                    gain.gain.setValueAtTime(1.0, startTime); // Ganancia máxima sin atenuación
+                    gain.gain.setValueAtTime(1.0, startTime);
                     gain.gain.exponentialRampToValueAtTime(0.001, startTime + 0.1);
                     
                     osc.connect(gain);
@@ -727,7 +884,6 @@
         function triggerVoiceAlert(text, isUrgent = false) {
             showToast(text, isUrgent ? 'warning' : 'info');
             
-            // Si la alerta es urgente (p. ej. a los 5 minutos de finalizar), reproduce el pitido primero
             if (isUrgent) {
                 playWarningBeep();
             }
@@ -740,29 +896,17 @@
 
                     const now = ctx.currentTime;
                     
-                    // Tono sintético de apoyo a volumen máximo (1.0)
                     const osc1 = ctx.createOscillator();
                     const gain1 = ctx.createGain();
-                    osc1.type = 'sawtooth'; // Mayor cuerpo auditivo
+                    osc1.type = 'sawtooth';
                     osc1.frequency.setValueAtTime(950, now);
                     osc1.frequency.setValueAtTime(1250, now + 0.12);
-                    gain1.gain.setValueAtTime(1.0, now); // Volumen máximo
+                    gain1.gain.setValueAtTime(1.0, now);
                     gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.28);
                     osc1.connect(gain1);
                     gain1.connect(ctx.destination);
                     osc1.start(now);
                     osc1.stop(now + 0.3);
-
-                    const osc2 = ctx.createOscillator();
-                    const gain2 = ctx.createGain();
-                    osc2.type = 'sine';
-                    osc2.frequency.setValueAtTime(1400, now + 0.3);
-                    gain2.gain.setValueAtTime(1.0, now + 0.3);
-                    gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.58);
-                    osc2.connect(gain2);
-                    gain2.connect(ctx.destination);
-                    osc2.start(now + 0.3);
-                    osc2.stop(now + 0.6);
                 }
             } catch (e) {}
 
@@ -770,16 +914,14 @@
                 try {
                     window.speechSynthesis.cancel();
                     
-                    // Pausa para permitir que concluya el pitido inicial antes de hablar
                     const delayMs = isUrgent ? 750 : 500;
                     setTimeout(() => {
                         const utterance = new SpeechSynthesisUtterance(text);
                         utterance.lang = 'es-MX';
-                        utterance.rate = 0.92; // Modulación óptima para dicción clara y potente
-                        utterance.pitch = 1.15; // Tono ligeramente más agudo para sobresalir en ambientes con ruido
-                        utterance.volume = 1.0; // VOLUMEN MÁXIMO ABSOLUTO (1.0)
+                        utterance.rate = 0.92;
+                        utterance.pitch = 1.15;
+                        utterance.volume = 1.0;
 
-                        // Selecciona la voz en español disponible con mejor proyección
                         const voices = window.speechSynthesis.getVoices();
                         const esVoice = voices.find(v => v.lang.includes('es-MX') || v.lang.includes('es-ES') || v.lang.includes('es'));
                         if (esVoice) utterance.voice = esVoice;
@@ -898,7 +1040,7 @@
                     triggerVoiceAlert(`Atención. Se ha abierto la ventana del vuelo de las ${targetItem.timeOp2} horas.`);
                 }
 
-                // RECORDATORIO PERIÓDICO CADA 15 MINUTOS MIENTRAS LA VENTANA ESTÁ ACTIVA (a los 45m, 30m y 15m restantes)
+                // RECORDATORIO PERIÓDICO CADA 15 MINUTOS MIENTRAS LA VENTANA ESTÁ ACTIVA
                 if (s === 0 && (m % 15 === 0) && m > 5 && m < 60) {
                     const periodicAlertKey = `win_periodic_${m}_${targetIdx}_${getTodayKey()}`;
                     if (!window.triggeredAlertsToday.has(periodicAlertKey)) {
@@ -984,6 +1126,8 @@
             if (cntFlownEl) cntFlownEl.innerText = voladosCount;
             if (cntSuspendedEl) cntSuspendedEl.innerText = suspendidosCount;
         }
+        window.renderFlightsTable = renderFlightsTable;
+        window.updateTargetFlightBanner = updateTargetFlightBanner;
 
         function openTakeoffModalForIdx(idx) {
             window.activeModalIndex = idx;
@@ -1033,7 +1177,7 @@
             safeStorageSet('audi_flight_statuses', JSON.stringify(window.dailyFlightStatuses));
 
             const now = new Date();
-            window.bitacoraList.unshift({
+            const logEntry = {
                 id: Date.now(),
                 timestampFormatted: now.toLocaleString('es-MX'),
                 scheduledTime: item.timeOp2,
@@ -1043,8 +1187,14 @@
                 pilot: pilot,
                 notes: notes,
                 imageData: ""
-            });
+            };
+
+            window.bitacoraList.unshift(logEntry);
             safeStorageSet('audi_bitacora_logs', JSON.stringify(window.bitacoraList));
+
+            // Sincronización Nube Firestore
+            if (typeof window.saveDailyStatusToCloud === 'function') window.saveDailyStatusToCloud();
+            if (typeof window.saveBitacoraLogToCloud === 'function') window.saveBitacoraLogToCloud(logEntry);
 
             closeModal('modalTakeoff');
             renderFlightsTable();
@@ -1071,7 +1221,7 @@
             safeStorageSet('audi_flight_statuses', JSON.stringify(window.dailyFlightStatuses));
 
             const now = new Date();
-            window.bitacoraList.unshift({
+            const logEntry = {
                 id: Date.now(),
                 timestampFormatted: now.toLocaleString('es-MX'),
                 scheduledTime: item.timeOp2,
@@ -1081,8 +1231,14 @@
                 pilot: pilot,
                 notes: `${reason}: ${notes}`,
                 imageData: imageData
-            });
+            };
+
+            window.bitacoraList.unshift(logEntry);
             safeStorageSet('audi_bitacora_logs', JSON.stringify(window.bitacoraList));
+
+            // Sincronización Nube Firestore
+            if (typeof window.saveDailyStatusToCloud === 'function') window.saveDailyStatusToCloud();
+            if (typeof window.saveBitacoraLogToCloud === 'function') window.saveBitacoraLogToCloud(logEntry);
 
             closeModal('modalSuspension');
             renderFlightsTable();
@@ -1167,6 +1323,7 @@
 
             tbody.innerHTML = html;
         }
+        window.renderBitacoraModalTable = renderBitacoraModalTable;
 
         function openEditBitacoraEntry(id) {
             const entry = window.bitacoraList.find(b => b.id === id);
@@ -1204,7 +1361,7 @@
             const notes = document.getElementById('editBitacoraNotes').value;
             const imageData = window.tempCompressedImage || "";
 
-            window.bitacoraList[entryIdx] = {
+            const updatedEntry = {
                 ...window.bitacoraList[entryIdx],
                 status,
                 scheduledTime: schedTime,
@@ -1213,6 +1370,8 @@
                 notes,
                 imageData
             };
+
+            window.bitacoraList[entryIdx] = updatedEntry;
             safeStorageSet('audi_bitacora_logs', JSON.stringify(window.bitacoraList));
 
             const planIdx = OFFICIAL_PLANS["2"].findIndex(p => p.timeOp2 === schedTime);
@@ -1220,6 +1379,9 @@
                 window.dailyFlightStatuses[planIdx] = { status, realTime, note: notes };
                 safeStorageSet('audi_flight_statuses', JSON.stringify(window.dailyFlightStatuses));
             }
+
+            if (typeof window.saveDailyStatusToCloud === 'function') window.saveDailyStatusToCloud();
+            if (typeof window.saveBitacoraLogToCloud === 'function') window.saveBitacoraLogToCloud(updatedEntry);
 
             closeModal('modalEditBitacoraEntry');
             renderBitacoraModalTable();
@@ -1244,6 +1406,9 @@
 
                     window.bitacoraList = window.bitacoraList.filter(b => b.id !== id);
                     safeStorageSet('audi_bitacora_logs', JSON.stringify(window.bitacoraList));
+
+                    if (typeof window.saveDailyStatusToCloud === 'function') window.saveDailyStatusToCloud();
+                    if (typeof window.deleteBitacoraLogFromCloud === 'function') window.deleteBitacoraLogFromCloud(id);
 
                     renderBitacoraModalTable();
                     renderFlightsTable();
@@ -1309,10 +1474,16 @@
                 "Vaciar Bitácora Completa",
                 "¿Deseas VACIAR completamente la Bitácora del día? Todos los vuelos volverán a PENDIENTE.",
                 function() {
+                    const logsToDelete = [...window.bitacoraList];
                     window.bitacoraList = [];
                     window.dailyFlightStatuses = {};
                     safeStorageSet('audi_bitacora_logs', JSON.stringify([]));
                     safeStorageSet('audi_flight_statuses', JSON.stringify({}));
+
+                    if (typeof window.saveDailyStatusToCloud === 'function') window.saveDailyStatusToCloud();
+                    if (typeof window.deleteBitacoraLogFromCloud === 'function') {
+                        logsToDelete.forEach(l => window.deleteBitacoraLogFromCloud(l.id));
+                    }
 
                     renderBitacoraModalTable();
                     renderFlightsTable();
