@@ -27,7 +27,7 @@
         body { font-family: 'Inter', sans-serif; }
         .font-mono { font-family: 'JetBrains+Mono', monospace; }
         
-        /* Scrollbar compacto para la tabla */
+        /* Scrollbar compacto personalizado */
         ::-webkit-scrollbar { width: 6px; height: 6px; }
         ::-webkit-scrollbar-track { background: #0f172a; }
         ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
@@ -36,26 +36,26 @@
 </head>
 <body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col antialiased selection:bg-red-600 selection:text-white">
 
-    <!-- BARRA SUPERIOR / ENCABEZADO -->
+    <!-- BARRA SUPERIOR ENCABEZADO -->
     <header class="bg-slate-900/90 border-b border-slate-800 backdrop-blur sticky top-0 z-40 px-4 py-2.5">
         <div class="max-w-7xl mx-auto flex items-center justify-between gap-4">
             
-            <!-- Logo e Identificadores -->
+            <!-- Logo e Identificadores de Turno -->
             <div class="flex items-center gap-3">
                 <div class="bg-red-600 text-white font-black px-2.5 py-1 rounded text-sm tracking-wider flex items-center gap-1.5 shadow-lg shadow-red-600/30">
                     <svg class="w-4 h-4 fill-current" viewBox="0 0 24 24"><path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L14 19v-5.5l8 2.5z"/></svg>
                     AUDI MÉXICO
                 </div>
                 <span id="shiftBadge" class="bg-slate-800 text-xs text-slate-300 px-2.5 py-1 rounded-full border border-slate-700 font-medium">
-                    Calculando turno...
+                    Cargando turno...
                 </span>
-                <span class="bg-emerald-950 text-emerald-400 text-xs px-2.5 py-1 rounded-full border border-emerald-800/50 items-center gap-1.5 font-medium hidden sm:flex">
+                <span class="bg-emerald-950 text-emerald-400 text-xs px-2.5 py-1 rounded-full border border-emerald-800/50 flex items-center gap-1.5 font-medium hidden sm:flex">
                     <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                    Nube Live
+                    Sincronizado
                 </span>
             </div>
 
-            <!-- RELOJ DIGITAL Y BOTÓN DE PRUEBA DE AUDIO -->
+            <!-- RELOJ PRINCIPAL Y PRUEBA DE SONIDO -->
             <div class="flex items-center gap-3">
                 <div class="text-right">
                     <div id="liveClock" class="font-mono text-2xl sm:text-3xl font-black text-yellow-400 tracking-wider leading-none drop-shadow-md">
@@ -66,7 +66,7 @@
                     </div>
                 </div>
 
-                <button id="btnSoundToggle" onclick="toggleAndTestAudio()" class="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 hover:text-white p-2 rounded-lg transition-all flex items-center gap-1.5 text-xs font-semibold" title="Probar Alertas de Voz">
+                <button id="btnSoundToggle" onclick="toggleAndTestAudio()" class="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 hover:text-white p-2 rounded-lg transition-all flex items-center gap-1.5 text-xs font-semibold" title="Probar Audio">
                     <span id="soundIcon" class="text-lg">🔊</span>
                     <span id="soundLabel" class="hidden sm:inline">Probar Sonido</span>
                 </button>
@@ -82,7 +82,7 @@
         <div class="bg-slate-900 border-2 border-slate-800 rounded-2xl p-4 shadow-2xl relative overflow-hidden">
             <div class="grid grid-cols-1 md:grid-cols-12 gap-4 items-center">
                 
-                <!-- Datos del Vuelo -->
+                <!-- Info de Hora Base y Tipo -->
                 <div class="md:col-span-7 space-y-2">
                     <div class="flex flex-wrap items-center gap-2">
                         <span class="bg-blue-600/30 text-blue-400 border border-blue-500/40 text-xs font-bold px-2.5 py-0.5 rounded-md tracking-wide uppercase">
@@ -108,7 +108,7 @@
                     </div>
                 </div>
 
-                <!-- Cronómetro Regresivo y Controles -->
+                <!-- Cronómetro y Botones Superiores -->
                 <div class="md:col-span-5 bg-slate-950 border border-slate-800 rounded-xl p-3 text-center flex flex-col justify-between gap-3">
                     <div>
                         <div class="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">
@@ -132,7 +132,7 @@
             </div>
         </div>
 
-        <!-- TARJETAS DE MÉTRICAS -->
+        <!-- TARJETAS DE MÉTRICAS / CONTADORES -->
         <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
             <div class="bg-slate-900 border border-slate-800 rounded-xl p-3 text-center">
                 <div class="text-xs text-slate-400 font-bold uppercase">Jornada 24H</div>
@@ -151,7 +151,7 @@
             </div>
         </div>
 
-        <!-- CRONOGRAMA DIARIO CON COLUMNA DE ACCIONES -->
+        <!-- TABLA COMPACTA DE CRONOGRAMA CON COLUMNA DE ACCIONES -->
         <div class="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-xl">
             <div class="p-3 bg-slate-900/80 border-b border-slate-800 flex justify-between items-center">
                 <h3 class="font-bold text-sm text-slate-200 flex items-center gap-2">
@@ -173,7 +173,7 @@
                         </tr>
                     </thead>
                     <tbody id="scheduleTableBody" class="divide-y divide-slate-800/60 font-mono">
-                        <!-- Filas de vuelos -->
+                        <!-- Filas dinámicas -->
                     </tbody>
                 </table>
             </div>
@@ -181,7 +181,7 @@
 
     </main>
 
-    <!-- MODAL REGISTRO DE SUSPENSIÓN -->
+    <!-- MODAL DE REGISTRO DE SUSPENSIÓN CON EVIDENCIA -->
     <div id="suspensionModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
         <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-5 space-y-4 shadow-2xl">
             <div class="flex justify-between items-center border-b border-slate-800 pb-3">
@@ -191,11 +191,11 @@
                 <button onclick="closeSuspensionModal()" class="text-slate-400 hover:text-white text-lg">✕</button>
             </div>
 
-            <p id="modalFlightTitle" class="text-xs text-slate-300 font-semibold">Cargando vuelo...</p>
+            <p id="modalFlightTitle" class="text-xs text-slate-300 font-semibold">Vuelo seleccionando...</p>
 
             <div class="space-y-3">
                 <div>
-                    <label class="block text-xs font-bold text-slate-400 mb-1">Motivo de Suspensión:</label>
+                    <label class="block text-xs font-bold text-slate-400 mb-1">Motivo de la Suspensión:</label>
                     <select id="suspensionReason" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-xs text-white focus:ring-1 focus:ring-amber-500 outline-none">
                         <option value="Lluvia / Tormenta">Lluvia / Tormenta</option>
                         <option value="Viento Fuerte (>35 km/h)">Viento Fuerte (>35 km/h)</option>
@@ -207,7 +207,7 @@
 
                 <div>
                     <label class="block text-xs font-bold text-slate-400 mb-1">Observaciones / Notas:</label>
-                    <textarea id="suspensionNotes" rows="2" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-xs text-white focus:ring-1 focus:ring-amber-500 outline-none" placeholder="Detalles climáticos o del incidente..."></textarea>
+                    <textarea id="suspensionNotes" rows="2" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-xs text-white focus:ring-1 focus:ring-amber-500 outline-none" placeholder="Detalles de las condiciones climáticas o del incidente..."></textarea>
                 </div>
             </div>
 
@@ -227,13 +227,13 @@
         <span id="toastIcon" class="text-2xl">🔔</span>
         <div>
             <div id="toastTitle" class="font-bold text-xs text-amber-400">Notificación</div>
-            <div id="toastMessage" class="text-xs text-slate-200 mt-0.5">Mensaje...</div>
+            <div id="toastMessage" class="text-xs text-slate-200 mt-0.5">Mensaje del sistema...</div>
         </div>
     </div>
 
-    <!-- JAVASCRIPT PRINCIPAL -->
+    <!-- JAVASCRIPT PRINCIPAL RESTAURADO -->
     <script>
-        // CRONOGRAMA DE 16 VUELOS (INICIO 00:30 HRS)
+        // PROGRAMA COMPLETO DE 16 VUELOS
         const SCHEDULE = [
             { id: 1, base: "00:30", window: "00:00-01:00", type: "TIPO A", name: "Recorrido perimetral", forced: false },
             { id: 2, base: "02:00", window: "01:30-02:30", type: "TIPO D", name: "Zonas lejanas", forced: false },
@@ -255,7 +255,9 @@
 
         let flightStatuses = {};
         let selectedFlightForSuspension = null;
+        let audioUnlocked = false;
 
+        // MANEJO DE MEMORIA LOCAL Y FECHAS
         function getTodayKey() {
             return new Date().toISOString().split('T')[0];
         }
@@ -266,6 +268,7 @@
                 const savedDate = localStorage.getItem('audi_flight_date');
                 
                 if (savedDate !== today) {
+                    // Si cambió el día, inicia nuevo ciclo pero conserva el backup en consola
                     localStorage.setItem('audi_flight_date', today);
                     flightStatuses = {};
                     localStorage.setItem('audi_flight_statuses', JSON.stringify(flightStatuses));
@@ -274,6 +277,7 @@
                     flightStatuses = saved ? JSON.parse(saved) : {};
                 }
             } catch (e) {
+                console.warn("Error cargando datos:", e);
                 flightStatuses = {};
             }
         }
@@ -282,7 +286,9 @@
             try {
                 localStorage.setItem('audi_flight_date', getTodayKey());
                 localStorage.setItem('audi_flight_statuses', JSON.stringify(flightStatuses));
-            } catch (e) {}
+            } catch (e) {
+                console.error("Error guardando datos:", e);
+            }
         }
 
         function parseTimeToMinutes(tStr) {
@@ -290,12 +296,12 @@
             return h * 60 + m;
         }
 
-        // BUCLE DEL RELOJ Y CRONÓMETRO
+        // RELOJ Y CRONÓMETRO
         function updateClockLoop() {
             try {
                 const now = new Date();
                 
-                // Reloj
+                // Reloj digital
                 const h = String(now.getHours()).padStart(2, '0');
                 const m = String(now.getMinutes()).padStart(2, '0');
                 const s = String(now.getSeconds()).padStart(2, '0');
@@ -312,7 +318,7 @@
                 else if (currentMins >= 840 && currentMins < 1290) shift = "Turno 2 (Tarde)";
                 document.getElementById('shiftBadge').textContent = shift;
 
-                // Vuelo Activo
+                // Vuelo Objetivo (El primer vuelo PENDIENTE)
                 let targetIdx = SCHEDULE.findIndex(f => (flightStatuses[f.id] || 'PENDIENTE') === 'PENDIENTE');
                 if (targetIdx === -1) targetIdx = SCHEDULE.length - 1;
 
@@ -350,11 +356,11 @@
 
                 updateCounters();
             } catch (err) {
-                console.error("Error en reloj:", err);
+                console.error("Error loop reloj:", err);
             }
         }
 
-        // RENDERIZADO DE TABLA DE CRONOGRAMA
+        // RENDERIZADO DE LA TABLA Y COLUMNA DE ACCIONES
         function renderScheduleTable() {
             const tbody = document.getElementById('scheduleTableBody');
             if (!tbody) return;
@@ -371,6 +377,7 @@
                 if (st === 'VOLADO') badgeClass = "bg-emerald-950 text-emerald-400 border-emerald-800";
                 if (st === 'SUSPENDIDO') badgeClass = "bg-amber-950 text-amber-400 border-amber-800";
 
+                // Despegue habilitado si es hora pasable o activa
                 const canTakeoff = (st === 'PENDIENTE') && (currentMins >= startMins);
 
                 return `
@@ -392,7 +399,7 @@
                         <td class="p-2 text-center">
                             ${st === 'PENDIENTE' ? `
                                 <div class="flex items-center justify-center gap-1">
-                                    <button onclick="takeoffFlight(${f.id})" ${!canTakeoff ? 'disabled' : ''} class="bg-emerald-600 hover:bg-emerald-500 disabled:opacity-30 text-white text-[10px] font-bold px-2 py-1 rounded transition">
+                                    <button onclick="takeoffFlight(${f.id})" ${!canTakeoff ? 'disabled' : ''} class="bg-emerald-600 hover:bg-emerald-500 disabled:opacity-30 disabled:hover:bg-emerald-600 text-white text-[10px] font-bold px-2 py-1 rounded transition">
                                         ✈️ Despegue
                                     </button>
                                     <button onclick="openSuspensionModal(${f.id})" class="bg-amber-600 hover:bg-amber-500 text-white text-[10px] font-bold px-2 py-1 rounded transition">
@@ -421,7 +428,7 @@
             document.getElementById('counterSuspendidos').textContent = suspendidos;
         }
 
-        // ACCIONES
+        // OPERACIONES DE VUELO
         function quickTakeoff() {
             let targetIdx = SCHEDULE.findIndex(f => (flightStatuses[f.id] || 'PENDIENTE') === 'PENDIENTE');
             if (targetIdx !== -1) takeoffFlight(SCHEDULE[targetIdx].id);
@@ -469,7 +476,7 @@
             showToast("Vuelo Suspendido", `Suspensión registrada para el vuelo de las ${flight.base} hrs.`);
         }
 
-        // SONIDO Y ALERTAS
+        // AUDIO Y NOTIFICACIONES
         function triggerAudioAlert(text) {
             if (!('speechSynthesis' in window)) return;
             try {
@@ -482,6 +489,7 @@
         }
 
         function toggleAndTestAudio() {
+            audioUnlocked = true;
             document.getElementById('soundIcon').textContent = '🔊';
             document.getElementById('soundLabel').textContent = 'Audio Activo';
             triggerAudioAlert("Atención. Sistema de alertas de voz activado correctamente.");
@@ -498,13 +506,13 @@
             }, 4000);
         }
 
-        // ARRANQUE DIRECTO
+        // ARRANQUE AUTOMÁTICO
         function initApp() {
             loadSavedData();
             renderScheduleTable();
             updateClockLoop();
             setInterval(updateClockLoop, 1000);
-            setInterval(renderScheduleTable, 15000);
+            setInterval(renderScheduleTable, 30000); // Re-evalúa despegues habilitados cada 30s
         }
 
         if (document.readyState === 'loading') {
