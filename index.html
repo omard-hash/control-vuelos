@@ -78,18 +78,21 @@
                 </div>
             </div>
 
-            <!-- RELOJ E INDICADORES DE AUDIO Y BITÁCORA -->
+            <!-- RELOJ DESTACADO (GRANDE), FECHA Y ESTADO DE AUDIO JUSTO DEBAJO -->
             <div class="flex items-center justify-between xs:justify-end gap-2 w-full xs:w-auto bg-slate-950/90 px-2.5 py-1.5 rounded-xl border border-slate-800 shadow-inner">
                 <div class="text-left xs:text-right flex flex-col items-start xs:items-end me-1">
-                    <div id="liveClock" class="text-2xl sm:text-4xl font-mono font-black text-amber-300 tracking-wider leading-none">00:00:00</div>
+                    <!-- Reloj con tipografía grande e impactante -->
+                    <div id="liveClock" class="text-2xl sm:text-4xl font-mono font-black text-amber-300 tracking-wider leading-none drop-shadow-md">00:00:00</div>
                     <div id="liveDate" class="text-[9.5px] text-slate-400 font-semibold mt-0.5 truncate max-w-[130px] sm:max-w-none">Cargando fecha...</div>
+                    
+                    <!-- Botón e indicador de estado de Audio desplegado JUSTO DEBAJO del reloj -->
                     <div id="audioStatusBadge" class="mt-1 text-[8.5px] font-bold px-1.5 py-0.5 rounded bg-slate-800 text-amber-300 border border-amber-700/60 flex items-center gap-1 shrink-0 cursor-pointer" onclick="unlockAudioSystem()">
                         <i id="audioStatusIcon" class="fa-solid fa-volume-xmark text-amber-400"></i> <span id="audioStatusText">Audio Inactivo</span>
                     </div>
                 </div>
                 
                 <div class="flex items-center gap-1 shrink-0">
-                    <!-- BOTÓN BITÁCORA -->
+                    <!-- BOTÓN BITÁCORA ENCABEZADO -->
                     <button onclick="openBitacoraModal()" id="btnOpenBitacora" class="px-2 py-1.5 rounded-lg text-xs font-black bg-blue-600 hover:bg-blue-500 text-white border border-blue-400/40 shadow-md transition flex items-center gap-1 cursor-pointer shrink-0">
                         <i class="fa-solid fa-book-bookmark text-amber-300"></i>
                         <span class="text-[10px]">Bitácora</span>
@@ -108,7 +111,7 @@
     <!-- CONTENIDO PRINCIPAL -->
     <main class="flex-1 max-w-7xl w-full mx-auto px-2 sm:px-4 py-2.5 space-y-2.5">
 
-        <!-- TARJETA PRINCIPAL DEL VUELO ACTIVO -->
+        <!-- TARJETA PRINCIPAL DEL VUELO ACTIVO Y CRONÓMETRO GIGANTE -->
         <section id="nextFlightCard" class="bg-gradient-to-r from-slate-900 via-blue-950/60 to-slate-900 p-3 sm:p-4 rounded-2xl border border-blue-500/40 shadow-2xl relative overflow-hidden">
             <div class="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3">
                 
@@ -133,19 +136,23 @@
                     </p>
                 </div>
 
-                <!-- CONTROLES Y CRONÓMETRO -->
+                <!-- CONTROLES Y CRONÓMETRO DESTACADO -->
                 <div class="flex flex-col xs:flex-row items-stretch xs:items-center gap-3 bg-slate-950/90 p-3 rounded-xl border border-slate-800/90 shadow-lg">
                     <div class="text-center xs:text-right px-3 py-1.5 bg-slate-900/80 rounded-lg border border-slate-800 flex-1 xs:flex-none">
                         <div class="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Estado / Cronómetro</div>
                         <div id="targetCountdown" class="text-2xl sm:text-4xl lg:text-5xl font-mono font-black text-emerald-400 mt-1">Calculando...</div>
                     </div>
 
-                    <div class="flex items-center gap-1.5 flex-1 xs:flex-none">
+                    <div class="flex items-center gap-1.5 flex-1 xs:flex-none flex-wrap sm:flex-nowrap">
                         <button id="btnQuickFly" onclick="quickRegisterTakeoff()" class="flex-1 px-3 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs sm:text-sm rounded-xl shadow-md transition flex items-center justify-center gap-1.5 border border-emerald-400/30 cursor-pointer">
                             <i class="fa-solid fa-plane-departure"></i> DESPEGUE
                         </button>
                         <button id="btnQuickSuspend" onclick="openSuspensionModalForCurrent()" class="flex-1 px-3 py-2 bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs sm:text-sm rounded-xl shadow-md border border-amber-400/30 transition flex items-center justify-center gap-1 cursor-pointer">
                             <i class="fa-solid fa-pause"></i> SUSPENDER
+                        </button>
+                        <!-- BOTÓN REANUDAR CLIMA DESPEJADO -->
+                        <button id="btnQuickResume" onclick="quickReactivateCurrent()" title="Limpiar suspensión y volver a PENDIENTE" class="px-2.5 py-2 bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs sm:text-sm rounded-xl shadow-md border border-blue-400/30 transition flex items-center justify-center gap-1 cursor-pointer">
+                            <i class="fa-solid fa-sun text-amber-300"></i> REANUDAR
                         </button>
                     </div>
                 </div>
@@ -222,7 +229,7 @@
                 </button>
             </div>
 
-            <!-- BOTONES DE EXPORTACIÓN Y GESTIÓN -->
+            <!-- BOTONES DE EXPORTACIÓN, GESTIÓN Y ORDENAMIENTO DE BITÁCORA -->
             <div class="flex items-center justify-between gap-2 flex-wrap bg-slate-950/80 p-2 rounded-xl border border-slate-800 text-xs">
                 <div class="text-[11px] text-slate-300 font-semibold flex items-center gap-2">
                     <span>Total Registros: <strong id="bitacoraRecordCount" class="text-emerald-400">0</strong></span>
@@ -427,7 +434,7 @@
         </div>
     </div>
 
-    <!-- TOAST NOTIFICACIÓN -->
+    <!-- TOAST NOTIFICACIÓN EN PANTALLA -->
     <div id="toastNotification" class="fixed bottom-3 right-3 bg-slate-900 border border-slate-700 text-white px-3 py-2 rounded-xl shadow-2xl z-50 flex items-center gap-2 transition-all duration-300 opacity-0 translate-y-5 pointer-events-none max-w-xs text-xs">
         <i id="toastIcon" class="fa-solid fa-circle-info text-blue-400 text-sm"></i>
         <span id="toastMessage" class="font-semibold text-[11px]">Notificación</span>
@@ -615,7 +622,7 @@
 
             if (badgeText) badgeText.innerText = "Audio Activo";
             if (badgeIcon) badgeIcon.className = "fa-solid fa-volume-high text-emerald-400 animate-pulse";
-            if (badgeContainer) badgeContainer.className = "mt-1 text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-950/80 text-emerald-400 border border-emerald-800/60 flex items-center gap-1 shrink-0 cursor-pointer";
+            if (badgeContainer) badgeContainer.className = "mt-1 text-[8.5px] font-bold px-1.5 py-0.5 rounded bg-emerald-950/80 text-emerald-400 border border-emerald-800/60 flex items-center gap-1 shrink-0 cursor-pointer";
 
             try {
                 const AudioCtx = window.AudioContext || window.webkitAudioContext;
@@ -630,7 +637,7 @@
             }
         }
 
-        // MOTOR DE VOZ Y TIMBRE DE AUDIO
+        // MOTOR DE VOZ Y TIMBRE DE AUDIO CON MÁXIMA POTENCIA DE VOLUMEN
         function triggerVoiceAlert(text) {
             showToast(text, 'info');
             
@@ -642,24 +649,24 @@
 
                     const now = ctx.currentTime;
                     
-                    // Pitido 1 (Alta frecuencia disuasiva)
+                    // Pitido 1 (Alta frecuencia disuasiva 880Hz)
                     const osc1 = ctx.createOscillator();
                     const gain1 = ctx.createGain();
                     osc1.type = 'sine';
-                    osc1.frequency.setValueAtTime(880, now); // La5 (880 Hz)
-                    osc1.frequency.setValueAtTime(1046.5, now + 0.1); // Do6
-                    gain1.gain.setValueAtTime(0.85, now);
+                    osc1.frequency.setValueAtTime(880, now);
+                    osc1.frequency.setValueAtTime(1046.5, now + 0.1);
+                    gain1.gain.setValueAtTime(0.90, now);
                     gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
                     osc1.connect(gain1);
                     gain1.connect(ctx.destination);
                     osc1.start(now);
                     osc1.stop(now + 0.28);
 
-                    // Pitido 2 (Alerta aguda de atención)
+                    // Pitido 2 (Alerta aguda de atención 1318.5Hz)
                     const osc2 = ctx.createOscillator();
                     const gain2 = ctx.createGain();
                     osc2.type = 'triangle';
-                    osc2.frequency.setValueAtTime(1318.5, now + 0.3); // Mi6
+                    osc2.frequency.setValueAtTime(1318.5, now + 0.3);
                     gain2.gain.setValueAtTime(0.90, now + 0.3);
                     gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.55);
                     osc2.connect(gain2);
@@ -686,8 +693,6 @@
 
         function toggleAudioAndTest() {
             unlockAudioSystem();
-            document.getElementById('btnTestVoiceText').innerText = "Audio";
-            document.getElementById('btnTestVoiceIcon').className = "fa-solid fa-volume-high text-emerald-400";
             triggerVoiceAlert("Atención. Sistema de alertas de voz verificado y activo al máximo volumen.");
         }
 
@@ -749,13 +754,13 @@
 
                 if (diffStart > 0) {
                     countdownEl.innerText = `Abre en ${Math.floor(diffStart/60)}m ${String(diffStart%60).padStart(2,'0')}s`;
-                    countdownEl.className = "text-xl sm:text-3xl lg:text-4xl font-mono font-black text-amber-400";
+                    countdownEl.className = "text-2xl sm:text-4xl lg:text-5xl font-mono font-black text-amber-400";
                 } else if (diffEnd >= 0) {
                     countdownEl.innerText = `ABIERTA (${Math.floor(diffEnd/60)}m ${String(diffEnd%60).padStart(2,'0')}s)`;
-                    countdownEl.className = "text-xl sm:text-3xl lg:text-4xl font-mono font-black text-emerald-400 pulse-green";
+                    countdownEl.className = "text-2xl sm:text-4xl lg:text-5xl font-mono font-black text-emerald-400 pulse-green";
                 } else {
                     countdownEl.innerText = "Ventana Pasada";
-                    countdownEl.className = "text-lg sm:text-2xl font-mono font-black text-slate-400";
+                    countdownEl.className = "text-xl sm:text-3xl font-mono font-black text-slate-400";
                 }
             }
 
@@ -764,7 +769,7 @@
             window.activeTargetIdx = targetIdx;
         }
 
-        // EVALUACIÓN ROBUSTA DE ALERTAS DE VOZ POR HITOS
+        // EVALUACIÓN ROBUSTA DE ALERTAS DE VOZ POR HITOS (SIN REPETICIONES MOLESTAS)
         function checkVoiceAlerts(flight, flightIdx, currentMins, targetBaseMins) {
             const today = getTodayKey();
             const diffMins = targetBaseMins - currentMins;
@@ -817,24 +822,32 @@
                     }
                 }
             }
+        }
 
-            // 3. RECORDATORIO RECURRENTE DE EVIDENCIA ANTE SUSPENSIONES ACTIVAS (CADA HORA)
-            let hasSuspendedToday = false;
-            for (let k in window.dailyFlightStatuses) {
-                if (window.dailyFlightStatuses[k]?.status === 'SUSPENDIDO') {
-                    hasSuspendedToday = true;
-                    break;
-                }
-            }
+        // FUNCIONALIDAD DE REACTIVACIÓN DE VUELOS (CLIMA DESPEJADO / REANUDACIÓN)
+        function reactivateFlight(idx) {
+            const plan = OFFICIAL_PLANS["2"];
+            const flightItem = plan[idx];
+            if (!flightItem) return;
 
-            if (hasSuspendedToday) {
-                const currentHour = new Date().getHours();
-                const alertKey = `suspend_reminder_h${currentHour}_${today}`;
-                if (!window.triggeredAlertsToday.has(alertKey)) {
-                    window.triggeredAlertsToday.add(alertKey);
-                    triggerVoiceAlert(`Recordatorio de seguridad. Se solicita verificar y registrar evidencia fotográfica de las condiciones de suspensión del vuelo.`);
-                }
-            }
+            // Eliminar estado del cronograma
+            delete window.dailyFlightStatuses[idx];
+            safeStorageSet('audi_flight_statuses', JSON.stringify(window.dailyFlightStatuses));
+
+            // Eliminar también del registro de la bitácora para sincronía total
+            window.bitacoraList = window.bitacoraList.filter(b => b.scheduledTime !== flightItem.timeOp2);
+            safeStorageSet('audi_bitacora_logs', JSON.stringify(window.bitacoraList));
+
+            renderBitacoraModalTable();
+            renderFlightsTable();
+            updateTargetFlightBanner(new Date());
+
+            showToast(`Vuelo de las ${flightItem.timeOp2} hrs reactivado a PENDIENTE (Clima Despejado)`, "success");
+            triggerVoiceAlert(`Atención. Vuelo de las ${flightItem.timeOp2} horas reactivado. Sistema en estado operativo normal.`);
+        }
+
+        function quickReactivateCurrent() {
+            reactivateFlight(window.activeTargetIdx || 0);
         }
 
         function renderFlightsTable() {
@@ -876,7 +889,14 @@
                                     <button onclick="openTakeoffModalForIdx(${idx})" class="px-1.5 py-0.5 bg-emerald-600 hover:bg-emerald-500 text-white text-[9px] font-bold rounded cursor-pointer">Despegue</button>
                                     <button onclick="openSuspensionModalForIdx(${idx})" class="px-1.5 py-0.5 bg-amber-600 hover:bg-amber-500 text-white text-[9px] font-bold rounded cursor-pointer">Suspender</button>
                                 </div>
-                            ` : `<span class="text-[9px] text-slate-500 font-semibold"><i class="fa-solid fa-circle-check text-emerald-400 me-0.5"></i>Registrado</span>`}
+                            ` : `
+                                <div class="flex items-center justify-end gap-1">
+                                    <span class="text-[9px] text-slate-500 font-semibold me-1"><i class="fa-solid fa-circle-check text-emerald-400 me-0.5"></i>Registrado</span>
+                                    <button onclick="reactivateFlight(${idx})" class="px-1.5 py-0.5 bg-blue-600 hover:bg-blue-500 text-white text-[9px] font-bold rounded cursor-pointer" title="Reactivar vuelo a PENDIENTE (Clima Despejado)">
+                                        <i class="fa-solid fa-rotate-left me-0.5"></i>Reactivar
+                                    </button>
+                                </div>
+                            `}
                         </td>
                     </tr>
                 `;
@@ -887,7 +907,7 @@
             document.getElementById('cntSuspended').innerText = totalSuspended;
         }
 
-        // BITÁCORA MODAL Y GESTIÓN COMPLETA
+        // BITÁCORA MODAL Y GESTIÓN COMPLETA DE REGISTROS
         function openBitacoraModal() {
             renderBitacoraModalTable();
             openModal('modalBitacoraView');
