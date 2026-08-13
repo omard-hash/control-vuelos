@@ -70,8 +70,8 @@
                     <span id="shiftBadge" class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-950/80 text-emerald-400 border border-emerald-800/40 shrink-0">Turno --</span>
                     
                     <!-- INDICADOR DE CONEXIÓN NUBE EN LÍNEA -->
-                    <span id="cloudStatusBadge" class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-blue-950/80 text-blue-400 border border-blue-800/40 shrink-0 flex items-center gap-1">
-                        <i id="cloudStatusIcon" class="fa-solid fa-wifi text-blue-400 animate-pulse"></i> <span id="cloudStatusText">Conectando Nube...</span>
+                    <span id="cloudStatusBadge" onclick="openCloudSettingsModal()" title="Haz clic para consultar o ajustar Nube Firebase" class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-950/80 text-amber-400 border border-amber-800/40 shrink-0 flex items-center gap-1 cursor-pointer hover:opacity-90">
+                        <i id="cloudStatusIcon" class="fa-solid fa-hard-drive text-amber-400"></i> <span id="cloudStatusText">Conectando Nube...</span>
                     </span>
                 </div>
             </div>
@@ -269,7 +269,7 @@
         </div>
     </div>
 
-    <!-- MODAL CONFIRMACIÓN GENÉRICO (REEMPLAZA confirm()) -->
+    <!-- MODAL CONFIRMACIÓN GENÉRICO -->
     <div id="modalConfirmDialog" class="fixed inset-0 bg-slate-950/85 backdrop-blur-sm z-50 flex items-center justify-center p-3 hidden modal-backdrop">
         <div class="bg-slate-900 border border-red-500/40 rounded-2xl max-w-sm w-full p-4 shadow-2xl space-y-3">
             <div class="flex items-center gap-2 text-red-400 font-bold text-sm">
@@ -280,6 +280,32 @@
             <div class="flex justify-end gap-2 pt-2 border-t border-slate-800">
                 <button id="btnConfirmCancel" class="px-3 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-xs rounded-xl">Cancelar</button>
                 <button id="btnConfirmOk" class="px-3 py-1 bg-red-600 hover:bg-red-500 text-white font-bold text-xs rounded-xl shadow">Aceptar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL DE CONFIGURACIÓN DE NUBE FIREBASE -->
+    <div id="modalCloudSettings" class="fixed inset-0 bg-slate-950/85 backdrop-blur-sm z-50 flex items-center justify-center p-3 hidden modal-backdrop">
+        <div class="bg-slate-900 border border-blue-500/40 rounded-2xl max-w-md w-full p-4 shadow-2xl space-y-3">
+            <div class="flex justify-between items-center border-b border-slate-800 pb-2">
+                <h3 class="text-xs sm:text-sm font-bold text-blue-400 flex items-center gap-1.5">
+                    <i class="fa-solid fa-cloud-bolt"></i> Configuración Nube Live
+                </h3>
+                <button onclick="closeModal('modalCloudSettings')" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark text-base"></i></button>
+            </div>
+            <p class="text-xs text-slate-300 leading-relaxed">
+                El sistema utiliza de forma predeterminada el proyecto de Firebase <code class="text-amber-300">control-vuelos</code>. Si deseas cambiar de proyecto de base de datos, puedes pegar otro JSON aquí:
+            </p>
+            <div>
+                <label class="block text-slate-400 font-semibold text-[11px] mb-1">JSON de firebaseConfig:</label>
+                <textarea id="customFirebaseConfigInput" rows="5" placeholder='{\n  "apiKey": "AIzaSy...",\n  "authDomain": "tu-proyecto.firebaseapp.com",\n  "projectId": "tu-proyecto",\n  "storageBucket": "tu-proyecto.appspot.com",\n  "messagingSenderId": "123456789",\n  "appId": "1:123456789:web:abc123def456"\n}' class="w-full bg-slate-950 border border-slate-700 text-emerald-400 font-mono text-[10px] p-2 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500"></textarea>
+            </div>
+            <div class="flex items-center justify-between pt-2 border-t border-slate-800">
+                <button onclick="clearCustomFirebaseConfig()" class="px-2.5 py-1 bg-red-950/80 hover:bg-red-900 text-red-300 font-bold text-[10px] rounded-xl border border-red-800/50">Restablecer Original</button>
+                <div class="flex gap-1.5">
+                    <button onclick="closeModal('modalCloudSettings')" class="px-3 py-1 bg-slate-800 text-slate-300 font-semibold text-xs rounded-xl">Cancelar</button>
+                    <button onclick="saveCustomFirebaseConfig()" class="px-3 py-1 bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs rounded-xl shadow">Guardar y Conectar</button>
+                </div>
             </div>
         </div>
     </div>
@@ -502,12 +528,21 @@
         import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, doc, setDoc, deleteDoc, onSnapshot, collection } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // Detección segura de variables de entorno globales
         let appId = 'audi-mexico-drones';
         try {
             if (typeof __app_id !== 'undefined' && __app_id) appId = __app_id;
             else if (typeof window.__app_id !== 'undefined' && window.__app_id) appId = window.__app_id;
         } catch(e) {}
+
+        // CREDANCIALES FIXTURES DEFAULT FIREBASE
+        const DEFAULT_FIREBASE_CONFIG = {
+            apiKey: "AIzaSyDXjwv133-dIKyprCktTUkjx_adAz1DhAY",
+            authDomain: "control-vuelos.firebaseapp.com",
+            projectId: "control-vuelos",
+            storageBucket: "control-vuelos.firebasestorage.app",
+            messagingSenderId: "756032981781",
+            appId: "1:756032981781:web:451641e72abe3692c0771c"
+        };
 
         let firebaseConfig = null;
         try {
@@ -548,9 +583,19 @@
 
         async function initCloudPersistence() {
             if (!firebaseConfig) {
-                console.warn("Sin configuración de Nube Firebase. Operando en almacenamiento local.");
-                updateCloudUI(false, "Modo Local");
-                return;
+                const customConfigStr = safeStorageGet('audi_custom_firebase_config');
+                if (customConfigStr) {
+                    try {
+                        firebaseConfig = JSON.parse(customConfigStr);
+                    } catch(e) {
+                        console.error("Error al parsear custom config de Nube:", e);
+                    }
+                }
+            }
+
+            // Si no hay configuración externa, utilizar por defecto las credenciales integradas de control-vuelos
+            if (!firebaseConfig) {
+                firebaseConfig = DEFAULT_FIREBASE_CONFIG;
             }
 
             try {
@@ -558,7 +603,6 @@
                 auth = getAuth(app);
                 db = getFirestore(app);
 
-                // Regla 3: Autenticación estricta antes de realizar consultas
                 if (initialAuthToken) {
                     try {
                         const userCred = await signInWithCustomToken(auth, initialAuthToken);
@@ -582,7 +626,7 @@
                 setupRealtimeListeners();
             } catch (err) {
                 console.error("Error al inicializar la persistencia en nube Firebase:", err);
-                updateCloudUI(false, "Modo Local");
+                updateCloudUI(false, "Error Nube");
             }
         }
 
@@ -591,7 +635,7 @@
 
             const todayKey = window.getTodayKey();
 
-            // ESCUCHADOR EN VIVO DEL ESTADO DE VUELOS DEL DÍA (Ruta estricta Regla 1)
+            // ESCUCHADOR EN VIVO DEL ESTADO DE VUELOS DEL DÍA
             const statusDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'daily_status', todayKey);
             onSnapshot(statusDocRef, (docSnap) => {
                 if (docSnap.exists()) {
@@ -613,7 +657,7 @@
                 updateCloudUI(false, "Error Nube");
             });
 
-            // ESCUCHADOR EN VIVO DE LA BITÁCORA AUDITABLE (Ruta estricta Regla 1 y consulta simple Regla 2)
+            // ESCUCHADOR EN VIVO DE LA BITÁCORA AUDITABLE
             const bitacoraColRef = collection(db, 'artifacts', appId, 'public', 'data', 'bitacora_logs');
             onSnapshot(bitacoraColRef, (querySnap) => {
                 const logs = [];
@@ -621,7 +665,6 @@
                     logs.push(docSnap.data());
                 });
                 
-                // Ordenar en memoria por ID desc (Regla 2: Sin consultas complejas en Firestore)
                 logs.sort((a, b) => b.id - a.id);
                 
                 window.bitacoraList = logs;
@@ -668,7 +711,39 @@
             } catch (e) { console.error("Error eliminando de nube log bitácora:", e); }
         };
 
-        // Iniciar conexión al cargar el script
+        window.openCloudSettingsModal = function() {
+            const savedConfig = window.safeStorageGet('audi_custom_firebase_config');
+            const input = document.getElementById('customFirebaseConfigInput');
+            if (input && savedConfig) {
+                input.value = savedConfig;
+            }
+            window.openModal('modalCloudSettings');
+        };
+
+        window.saveCustomFirebaseConfig = function() {
+            const input = document.getElementById('customFirebaseConfigInput');
+            if (!input) return;
+            const val = input.value.trim();
+            if (!val) {
+                alert("Por favor ingresa un objeto JSON válido de firebaseConfig.");
+                return;
+            }
+            try {
+                JSON.parse(val);
+                window.safeStorageSet('audi_custom_firebase_config', val);
+                window.closeModal('modalCloudSettings');
+                window.location.reload();
+            } catch(e) {
+                alert("El texto ingresado no es un JSON válido. Verifica que tenga la sintaxis de Firebase.");
+            }
+        };
+
+        window.clearCustomFirebaseConfig = function() {
+            window.safeStorageSet('audi_custom_firebase_config', '');
+            window.closeModal('modalCloudSettings');
+            window.location.reload();
+        };
+
         initCloudPersistence();
     </script>
 
@@ -1225,7 +1300,6 @@
             window.bitacoraList.unshift(logEntry);
             safeStorageSet('audi_bitacora_logs', JSON.stringify(window.bitacoraList));
 
-            // Sincronización Nube Firestore
             if (typeof window.saveDailyStatusToCloud === 'function') window.saveDailyStatusToCloud();
             if (typeof window.saveBitacoraLogToCloud === 'function') window.saveBitacoraLogToCloud(logEntry);
 
@@ -1269,7 +1343,6 @@
             window.bitacoraList.unshift(logEntry);
             safeStorageSet('audi_bitacora_logs', JSON.stringify(window.bitacoraList));
 
-            // Sincronización Nube Firestore
             if (typeof window.saveDailyStatusToCloud === 'function') window.saveDailyStatusToCloud();
             if (typeof window.saveBitacoraLogToCloud === 'function') window.saveBitacoraLogToCloud(logEntry);
 
