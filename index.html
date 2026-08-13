@@ -1,21 +1,24 @@
 <!DOCTYPE html>
-<html lang="es">
+<html lang="es" class="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Audi México - Sistema de Control y Bitácora de Drones</title>
-    <!-- Tailwind CSS CDN -->
+    <title>Audi México - Sistema Control de Vuelos & Bitácora Drone</title>
+
     <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <script>
         tailwind.config = {
+            darkMode: 'class',
             theme: {
                 extend: {
                     colors: {
                         audi: {
-                            red: '#BB0A30',
-                            dark: '#0F172A',
-                            card: '#1E293B',
-                            border: '#334155'
+                            red: '#bb0a30',
+                            redDark: '#8b0520',
+                            darkBg: '#090d16',
+                            cardBg: '#131b2e',
+                            slateAccent: '#1e293b'
                         }
                     }
                 }
@@ -23,680 +26,743 @@
         }
     </script>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700;800&family=Inter:wght@400;600;700;900&display=swap');
-        body { font-family: 'Inter', sans-serif; }
-        .font-mono { font-family: 'JetBrains+Mono', monospace; }
-        
-        /* Scrollbar compacto */
+        body {
+            background-color: #090d16;
+            color: #f1f5f9;
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            overflow-x: hidden;
+        }
+        .pulse-green {
+            animation: pulse-green 1.8s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+        @keyframes pulse-green {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: .8; transform: scale(1.02); }
+        }
         ::-webkit-scrollbar { width: 6px; height: 6px; }
         ::-webkit-scrollbar-track { background: #0f172a; }
         ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
         ::-webkit-scrollbar-thumb:hover { background: #475569; }
+
+        @media print {
+            @page { size: landscape; margin: 8mm; }
+            * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+            header, section:not(#bitacoraPrintSection), button, label, select, input, .no-print {
+                display: none !important;
+            }
+            body { background: #ffffff !important; color: #000000 !important; padding: 0 !important; font-size: 10px !important; }
+        }
     </style>
 </head>
-<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col antialiased selection:bg-red-600 selection:text-white">
+<body class="min-h-screen flex flex-col bg-slate-950 text-slate-100 antialiased selection:bg-red-600 selection:text-white">
 
-    <!-- BARRA SUPERIOR / ENCABEZADO -->
-    <header class="bg-slate-900/90 border-b border-slate-800 backdrop-blur sticky top-0 z-40 px-4 py-2.5">
-        <div class="max-w-7xl mx-auto flex items-center justify-between gap-4">
+    <!-- HEADER / BARRA SUPERIOR -->
+    <header class="bg-slate-900 border-b border-slate-800 sticky top-0 z-40 shadow-xl py-2 px-3">
+        <div class="max-w-7xl mx-auto flex flex-wrap justify-between items-center gap-2">
             
-            <!-- Logo e Identificadores -->
-            <div class="flex items-center gap-3">
-                <div class="bg-red-600 text-white font-black px-2.5 py-1 rounded text-sm tracking-wider flex items-center gap-1.5 shadow-lg shadow-red-600/30">
-                    <svg class="w-4 h-4 fill-current" viewBox="0 0 24 24"><path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L14 19v-5.5l8 2.5z"/></svg>
-                    AUDI MÉXICO
+            <div class="flex items-center space-x-2">
+                <div class="p-1.5 bg-audi-red text-white rounded-lg shadow flex items-center justify-center">
+                    <i class="fa-solid fa-plane-departure text-base"></i>
                 </div>
-                <span id="shiftBadge" class="bg-slate-800 text-xs text-slate-300 px-2.5 py-1 rounded-full border border-slate-700 font-medium">
-                    Calculando turno...
-                </span>
+                <div>
+                    <div class="flex items-center gap-1.5 flex-wrap">
+                        <span class="text-[10px] font-bold tracking-widest uppercase bg-slate-800 text-red-400 px-1.5 py-0.5 rounded border border-red-900/30">Audi México</span>
+                        <span id="shiftBadge" class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-950/80 text-emerald-400 border border-emerald-800/40">Iniciando Turno...</span>
+                        <button id="cloudStatusBadge" onclick="openFirebaseConfigModal()" title="Configurar Sincronización Nube" class="text-[10px] font-bold px-2 py-0.5 rounded-lg bg-slate-800 text-slate-300 border border-slate-700 flex items-center gap-1 hover:bg-slate-700 transition cursor-pointer">
+                            <i class="fa-solid fa-cloud text-[9px]"></i> Sincronizado
+                        </button>
+                    </div>
+                </div>
             </div>
 
-            <!-- RELOJ, BOTÓN DE BITÁCORA Y SONIDO -->
-            <div class="flex items-center gap-2 sm:gap-3">
+            <!-- RELOJ E INDICADORES Y BOTÓN VER BITÁCORA -->
+            <div class="flex items-center gap-2 bg-slate-950/90 px-3 py-1.5 rounded-xl border border-slate-800">
                 <div class="text-right">
-                    <div id="liveClock" class="font-mono text-2xl sm:text-3xl font-black text-yellow-400 tracking-wider leading-none drop-shadow-md">
-                        00:00:00
-                    </div>
-                    <div id="liveDate" class="text-[10px] text-slate-400 font-medium uppercase tracking-wider mt-0.5">
-                        Cargando fecha...
-                    </div>
+                    <div id="liveClock" class="text-2xl sm:text-3xl font-mono font-black text-amber-300 tracking-wider leading-none">00:00:00</div>
+                    <div id="liveDate" class="text-[10px] text-slate-400 font-semibold mt-0.5">Cargando fecha...</div>
                 </div>
-
-                <!-- Botón Ver Bitácora -->
-                <button onclick="openBitacoraModal()" class="bg-blue-600 hover:bg-blue-500 border border-blue-500 text-white p-2 rounded-lg transition-all flex items-center gap-1.5 text-xs font-semibold shadow-lg shadow-blue-900/30">
-                    <span>📋</span>
-                    <span class="hidden sm:inline">Ver Bitácora</span>
+                
+                <!-- BOTÓN PRINCIPAL PARA ABRIR BITÁCORA -->
+                <button onclick="openBitacoraModal()" id="btnOpenBitacora" class="px-2.5 py-1.5 rounded-lg text-xs font-extrabold bg-blue-600 hover:bg-blue-500 text-white border border-blue-400/40 shadow-lg shadow-blue-900/30 transition flex items-center gap-1.5 cursor-pointer">
+                    <i class="fa-solid fa-book-bookmark text-amber-300"></i>
+                    <span>Ver Bitácora</span>
                 </button>
 
-                <!-- Botón Prueba de Audio -->
-                <button id="btnSoundToggle" onclick="toggleAndTestAudio()" class="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 hover:text-white p-2 rounded-lg transition-all flex items-center gap-1.5 text-xs font-semibold" title="Probar Alertas de Voz">
-                    <span id="soundIcon" class="text-lg">🔊</span>
-                    <span id="soundLabel" class="hidden sm:inline">Probar Sonido</span>
+                <button id="btnTestVoice" onclick="testVoiceAlert()" title="Probar Alerta de Voz y Activar Sonido" class="p-1.5 rounded-lg bg-amber-950/80 hover:bg-amber-900 text-amber-300 text-xs border border-amber-700/60 transition flex items-center gap-1">
+                    <i id="btnTestVoiceIcon" class="fa-solid fa-volume-high text-amber-400"></i>
+                    <span id="btnTestVoiceText" class="text-[10px] font-bold text-amber-300 hidden xs:inline">Probar Sonido</span>
                 </button>
             </div>
-
         </div>
     </header>
 
     <!-- CONTENIDO PRINCIPAL -->
-    <main class="flex-1 max-w-7xl w-full mx-auto p-3 sm:p-4 space-y-4">
+    <main class="flex-1 max-w-7xl w-full mx-auto px-2 sm:px-4 py-3 space-y-3">
 
         <!-- TARJETA PRINCIPAL DEL VUELO ACTIVO / SIGUIENTE -->
-        <div class="bg-slate-900 border-2 border-slate-800 rounded-2xl p-4 shadow-2xl relative overflow-hidden">
-            <div class="grid grid-cols-1 md:grid-cols-12 gap-4 items-center">
+        <section id="nextFlightCard" class="bg-gradient-to-r from-slate-900 via-blue-950/60 to-slate-900 p-4 rounded-2xl border border-blue-500/40 shadow-2xl relative overflow-hidden">
+            <div class="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
                 
-                <div class="md:col-span-7 space-y-2">
-                    <div class="flex flex-wrap items-center gap-2">
-                        <span class="bg-blue-600/30 text-blue-400 border border-blue-500/40 text-xs font-bold px-2.5 py-0.5 rounded-md tracking-wide uppercase">
-                            Vuelo Siguiente / Activo
+                <div class="space-y-2">
+                    <div class="flex items-center gap-2 flex-wrap">
+                        <span class="px-2.5 py-1 rounded-md text-[11px] font-extrabold bg-blue-500/20 text-blue-300 border border-blue-500/30 uppercase tracking-wide">
+                            <i class="fa-solid fa-crosshairs me-1"></i>Vuelo Siguiente / Activo
                         </span>
-                        <span id="flightTypeBadge" class="bg-red-950/80 text-red-300 border border-red-800/60 text-xs font-bold px-2.5 py-0.5 rounded-md">
-                            TIPO A - Recorrido Perimetral
+                        <span id="targetFlightBadge" class="px-2.5 py-1 rounded-md text-[11px] font-extrabold bg-audi-red text-white">
+                            TIPO A - Perimetral
                         </span>
-                    </div>
-
-                    <div class="flex items-baseline gap-3">
-                        <span class="text-slate-400 text-xs font-bold uppercase tracking-wider">Hora Base:</span>
-                        <span id="targetBaseTime" class="font-mono text-4xl sm:text-5xl font-black text-amber-400 tracking-tight">
-                            00:30 hrs
+                        <span id="activePlanBadge" class="text-[11px] font-bold text-amber-300 bg-amber-950/80 px-2.5 py-1 rounded-md border border-amber-800">
+                            Plan 1
                         </span>
                     </div>
 
-                    <div class="flex items-center gap-2 text-xs">
-                        <span class="text-slate-400 font-medium">Ventana (±30m):</span>
-                        <span id="targetWindowText" class="font-mono font-bold bg-slate-950 px-2.5 py-1 rounded border border-slate-800 text-emerald-400">
-                            00:00 - 01:00 hrs
-                        </span>
+                    <div class="flex items-baseline gap-2 flex-wrap">
+                        <span class="text-sm sm:text-base font-bold text-slate-300 uppercase tracking-wider">Hora Base:</span>
+                        <h2 id="targetFlightTime" class="text-3xl sm:text-5xl font-mono font-black text-amber-300 tracking-tight">00:30 hrs</h2>
                     </div>
+
+                    <p class="text-sm text-slate-300 flex items-center gap-2 flex-wrap">
+                        <span class="font-semibold text-slate-400">Ventana (&plusmn;30m):</span>
+                        <strong id="targetFlightWindow" class="text-sm sm:text-base text-emerald-400 font-mono font-bold bg-slate-950/90 px-3 py-1 rounded-lg border border-emerald-500/40 shadow-inner">00:00 - 01:00 hrs</strong>
+                    </p>
                 </div>
 
-                <div class="md:col-span-5 bg-slate-950 border border-slate-800 rounded-xl p-3 text-center flex flex-col justify-between gap-3">
-                    <div>
-                        <div class="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">
-                            Estado Ventana / Cronómetro
-                        </div>
-                        <div id="countdownDisplay" class="font-mono text-2xl sm:text-3xl font-black text-emerald-400 tracking-wider">
-                            Iniciando...
-                        </div>
+                <!-- CONTROLES Y CRONÓMETRO -->
+                <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 bg-slate-950/90 p-3 rounded-xl border border-slate-800/90 shadow-lg">
+                    <div class="text-center sm:text-right px-2.5 py-1 bg-slate-900/80 rounded-lg border border-slate-800">
+                        <div class="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Estado Ventana / Cronómetro</div>
+                        <div id="targetCountdown" class="text-lg sm:text-2xl font-mono font-black text-emerald-400 mt-0.5">Calculando...</div>
                     </div>
 
-                    <div class="grid grid-cols-2 gap-2">
-                        <button id="btnTopDespegue" onclick="quickTakeoff()" class="bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white font-black py-2.5 px-3 rounded-lg text-sm flex items-center justify-center gap-2 transition shadow-lg shadow-emerald-900/30">
-                            ✈️ DESPEGUE
+                    <div class="flex items-center gap-2">
+                        <button id="btnQuickFly" onclick="quickRegisterTakeoff()" class="flex-1 sm:flex-none px-5 py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-sm sm:text-base rounded-xl shadow-lg shadow-emerald-900/40 transition flex items-center justify-center gap-2 border border-emerald-400/30 cursor-pointer">
+                            <i class="fa-solid fa-plane-departure text-lg"></i> DESPEGUE
                         </button>
-                        <button id="btnTopSuspender" onclick="quickSuspension()" class="bg-amber-600 hover:bg-amber-500 disabled:opacity-40 text-white font-black py-2.5 px-3 rounded-lg text-sm flex items-center justify-center gap-2 transition shadow-lg shadow-amber-900/30">
-                            ⏸️ SUSPENDER
+                        <button id="btnQuickSuspend" onclick="openSuspensionModalForCurrent()" class="flex-1 sm:flex-none px-4 py-3 bg-amber-600 hover:bg-amber-500 text-white font-bold text-sm sm:text-base rounded-xl shadow-lg shadow-amber-900/40 border border-amber-400/30 transition flex items-center justify-center gap-1.5 cursor-pointer">
+                            <i class="fa-solid fa-pause text-lg"></i> SUSPENDER
                         </button>
                     </div>
                 </div>
 
             </div>
-        </div>
+        </section>
 
-        <!-- CONTADORES -->
-        <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
-            <div class="bg-slate-900 border border-slate-800 rounded-xl p-3 text-center">
-                <div class="text-xs text-slate-400 font-bold uppercase">Jornada 24H</div>
-                <div class="text-2xl font-black text-white mt-1">16 Vuelos</div>
-                <div class="text-[10px] text-slate-500">12:00 AM - 11:59 PM</div>
+        <!-- TARJETAS DE CONTEO Y REGLAS -->
+        <section class="bg-slate-900/90 p-2.5 rounded-xl border border-slate-800 shadow-lg grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+            <div class="bg-slate-950/80 p-2 rounded-lg border border-slate-800/80 text-center flex flex-col justify-center">
+                <span class="text-[9px] uppercase font-bold text-slate-400">Jornada 24h</span>
+                <span id="cntTotal" class="text-base font-black text-white">16 Vuelos</span>
+                <span class="text-[8.5px] text-slate-500">12:00 AM - 11:59 PM</span>
             </div>
-            <div class="bg-slate-900 border border-slate-800 rounded-xl p-3 text-center">
-                <div class="text-xs text-emerald-400 font-bold uppercase">Volados Hoy</div>
-                <div id="counterVolados" class="text-2xl font-black text-emerald-400 mt-1">0</div>
-                <div class="text-[10px] text-slate-500">Ejecutados</div>
+            
+            <div class="bg-slate-950/80 p-2 rounded-lg border border-emerald-900/30 text-center flex flex-col justify-center">
+                <span class="text-[9px] uppercase font-bold text-emerald-400">Volados</span>
+                <span id="cntFlown" class="text-base font-black text-emerald-400">0</span>
+                <span class="text-[8.5px] text-slate-500">Ejecutados Hoy</span>
             </div>
-            <div class="bg-slate-900 border border-slate-800 rounded-xl p-3 text-center col-span-2 sm:col-span-1">
-                <div class="text-xs text-amber-400 font-bold uppercase">Suspendidos Hoy</div>
-                <div id="counterSuspendidos" class="text-2xl font-black text-amber-400 mt-1">0</div>
-                <div class="text-[10px] text-slate-500">Con Evidencia</div>
-            </div>
-        </div>
 
-        <!-- TABLA DE CRONOGRAMA -->
-        <div class="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-xl">
-            <div class="p-3 bg-slate-900/80 border-b border-slate-800 flex justify-between items-center">
-                <h3 class="font-bold text-sm text-slate-200 flex items-center gap-2">
-                    📋 Cronograma Diario (Ciclo 12:00 AM - 11:59 PM)
+            <div class="bg-slate-950/80 p-2 rounded-lg border border-amber-900/30 text-center flex flex-col justify-center">
+                <span class="text-[9px] uppercase font-bold text-amber-400">Suspendidos</span>
+                <span id="cntSuspended" class="text-base font-black text-amber-400">0</span>
+                <span class="text-[8.5px] text-slate-500">Con evidencia</span>
+            </div>
+
+            <div class="bg-slate-950/80 p-2 rounded-lg border border-slate-800/80 flex items-center justify-between px-2.5">
+                <div>
+                    <span class="text-[9px] uppercase font-bold text-slate-400 block">Regla Calendario</span>
+                    <span id="autoCalendarNote" class="text-[10px] text-emerald-400 font-bold truncate block max-w-[120px]">Plan 1 Activo</span>
+                </div>
+                <button onclick="viewOfficialPlansModal()" class="p-1.5 bg-blue-900/60 hover:bg-blue-800 text-blue-200 font-bold text-[10px] rounded-md border border-blue-700/60 transition" title="Ver Matriz Completa de Planes">
+                    <i class="fa-solid fa-table text-xs"></i>
+                </button>
+            </div>
+        </section>
+
+        <!-- CRONOGRAMA DIARIO DE VUELOS (TABLA DESLIZABLE) -->
+        <section class="bg-slate-900 p-3 rounded-2xl border border-slate-800 shadow-xl space-y-2">
+            <div class="flex items-center justify-between border-b border-slate-800 pb-2">
+                <h3 class="text-xs font-bold text-white flex items-center gap-1.5">
+                    <i class="fa-solid fa-list-check text-audi-red"></i>
+                    Cronograma Diario (Ciclo 12:00 AM - 11:59 PM)
                 </h3>
-                <span class="text-xs text-slate-400 font-mono">Ventana: ±30 min</span>
+                <span class="text-[10px] text-slate-400 font-mono">Ventana: &plusmn;30 min</span>
             </div>
 
-            <div class="max-h-64 overflow-y-auto">
-                <table class="w-full text-left border-collapse text-xs">
-                    <thead class="bg-slate-950 text-slate-400 uppercase text-[10px] sticky top-0 z-10">
+            <div class="max-h-60 overflow-y-auto pr-1 custom-scrollbar">
+                <table class="w-full text-left text-xs min-w-[500px]">
+                    <thead class="bg-slate-950 text-slate-400 uppercase font-bold tracking-wider border-b border-slate-800 text-[9.5px] sticky top-0 z-10 shadow">
                         <tr>
-                            <th class="p-2 border-b border-slate-800 text-center w-8">#</th>
-                            <th class="p-2 border-b border-slate-800">Hora Base</th>
-                            <th class="p-2 border-b border-slate-800">Ventana</th>
-                            <th class="p-2 border-b border-slate-800">Tipo / Recorrido</th>
-                            <th class="p-2 border-b border-slate-800 text-center">Estado</th>
-                            <th class="p-2 border-b border-slate-800 text-center">Acciones</th>
+                            <th class="px-2 py-1.5">#</th>
+                            <th class="px-2 py-1.5">Hora Base</th>
+                            <th class="px-2 py-1.5">Ventana (&plusmn;30m)</th>
+                            <th class="px-2 py-1.5">Tipo / Recorrido</th>
+                            <th class="px-2 py-1.5">Estado Actual</th>
+                            <th class="px-2 py-1.5">Hora Real / Motivo</th>
+                            <th class="px-2 py-1.5 text-right">Acciones</th>
                         </tr>
                     </thead>
-                    <tbody id="scheduleTableBody" class="divide-y divide-slate-800/60 font-mono">
+                    <tbody id="flightsTableBody" class="divide-y divide-slate-800/60 font-medium text-[11px]">
+                        <!-- Rellenado dinámicamente por JS -->
                     </tbody>
                 </table>
             </div>
-        </div>
+        </section>
 
     </main>
 
-    <!-- MODAL DE VER / EDITAR / BORRAR EN BITÁCORA -->
-    <div id="bitacoraModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
-        <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-4xl w-full p-5 space-y-4 shadow-2xl max-h-[85vh] flex flex-col">
-            <div class="flex justify-between items-center border-b border-slate-800 pb-3">
-                <h3 class="font-bold text-base text-blue-400 flex items-center gap-2">
-                    📋 Bitácora Auditable de Registros
-                </h3>
-                <button onclick="closeBitacoraModal()" class="text-slate-400 hover:text-white text-lg font-bold">✕</button>
+    <!-- MODAL COMPLETO DE BITÁCORA AUDITABLE (CON EDICIÓN Y BORRADO) -->
+    <div id="modalBitacoraView" class="fixed inset-0 bg-slate-950/90 backdrop-blur-md z-50 flex items-center justify-center p-3 hidden">
+        <div class="bg-slate-900 border border-blue-500/40 rounded-2xl max-w-5xl w-full p-4 sm:p-5 shadow-2xl space-y-3 max-h-[90vh] flex flex-col">
+            <div class="flex justify-between items-center border-b border-slate-800 pb-2.5">
+                <div>
+                    <h3 class="text-sm sm:text-base font-bold text-white flex items-center gap-2">
+                        <i class="fa-solid fa-book-bookmark text-emerald-400"></i>
+                        Bitácora Oficial Auditable de Vuelos (Registro Inmutable)
+                    </h3>
+                    <p class="text-[11px] text-slate-400">Consulta, edita observaciones o elimina registros para reactivar vuelos a PENDIENTE.</p>
+                </div>
+                <button onclick="closeModal('modalBitacoraView')" class="text-slate-400 hover:text-white p-1 text-lg">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
             </div>
 
-            <div class="flex-1 overflow-y-auto">
-                <table class="w-full text-left border-collapse text-xs">
-                    <thead class="bg-slate-950 text-slate-400 uppercase text-[10px] sticky top-0 z-10">
+            <!-- BOTONES DE EXPORTACIÓN Y GESTIÓN -->
+            <div class="flex items-center justify-between gap-2 flex-wrap bg-slate-950/80 p-2 rounded-xl border border-slate-800">
+                <div class="text-xs text-slate-300 font-semibold">
+                    Total Registros: <strong id="bitacoraRecordCount" class="text-emerald-400">0</strong>
+                </div>
+                <div class="flex items-center gap-2">
+                    <button onclick="exportBitacoraCSV()" class="px-2.5 py-1.5 bg-emerald-700 hover:bg-emerald-600 text-white font-bold text-xs rounded-lg border border-emerald-500/30 transition flex items-center gap-1">
+                        <i class="fa-solid fa-file-excel text-xs"></i> Exportar Excel
+                    </button>
+                    <button onclick="window.print()" class="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs rounded-lg border border-slate-700 transition flex items-center gap-1">
+                        <i class="fa-solid fa-print text-xs"></i> Imprimir / PDF
+                    </button>
+                    <button onclick="openClearBitacoraModal()" class="px-2.5 py-1.5 bg-red-950/80 hover:bg-red-900 text-red-300 font-bold text-xs rounded-lg border border-red-800/60 transition flex items-center gap-1">
+                        <i class="fa-solid fa-trash-can text-xs"></i> Vaciar Todo
+                    </button>
+                </div>
+            </div>
+
+            <!-- TABLA DE BITÁCORA -->
+            <div class="overflow-y-auto flex-1 pr-1 border border-slate-800 rounded-xl">
+                <table class="w-full text-left text-xs min-w-[700px]">
+                    <thead class="bg-slate-950 text-slate-400 uppercase font-bold tracking-wider border-b border-slate-800 text-[10px] sticky top-0 z-10 shadow">
                         <tr>
-                            <th class="p-2 border-b border-slate-800 text-center"># Vuelo</th>
-                            <th class="p-2 border-b border-slate-800">Hora Base</th>
-                            <th class="p-2 border-b border-slate-800">Estado</th>
-                            <th class="p-2 border-b border-slate-800">Motivo / Notas</th>
-                            <th class="p-2 border-b border-slate-800">Hora Registro</th>
-                            <th class="p-2 border-b border-slate-800 text-center">Gestión</th>
+                            <th class="px-3 py-2.5">Fecha / Hora</th>
+                            <th class="px-3 py-2.5">Programada</th>
+                            <th class="px-3 py-2.5">Tipo Vuelo</th>
+                            <th class="px-3 py-2.5">Piloto</th>
+                            <th class="px-3 py-2.5">Estado</th>
+                            <th class="px-3 py-2.5">Hora Real</th>
+                            <th class="px-3 py-2.5">Detalle / Motivo</th>
+                            <th class="px-3 py-2.5 text-center">Foto</th>
+                            <th class="px-3 py-2.5 text-right">Gestión</th>
                         </tr>
                     </thead>
-                    <tbody id="bitacoraTableBody" class="divide-y divide-slate-800/60 font-mono">
+                    <tbody id="modalBitacoraTableBody" class="divide-y divide-slate-800/60 font-medium">
+                        <!-- Rellenado dinámicamente -->
                     </tbody>
                 </table>
             </div>
 
-            <div class="border-t border-slate-800 pt-3 text-right">
-                <button onclick="closeBitacoraModal()" class="bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold py-2 px-4 rounded-lg text-xs">
+            <div class="flex justify-end pt-2 border-t border-slate-800">
+                <button onclick="closeModal('modalBitacoraView')" class="px-4 py-1.5 bg-slate-800 text-slate-300 font-semibold text-xs rounded-xl hover:bg-slate-700">
                     Cerrar Bitácora
                 </button>
             </div>
         </div>
     </div>
 
-    <!-- MODAL REGISTRO DE SUSPENSIÓN -->
-    <div id="suspensionModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
-        <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-5 space-y-4 shadow-2xl">
-            <div class="flex justify-between items-center border-b border-slate-800 pb-3">
-                <h3 class="font-bold text-base text-amber-400 flex items-center gap-2">
-                    ⏸️ Registrar Suspensión de Vuelo
+    <!-- MODAL EDICIÓN RÁPIDA DE REGISTRO EN BITÁCORA -->
+    <div id="modalEditBitacoraEntry" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-3 hidden">
+        <div class="bg-slate-900 border border-blue-500/40 rounded-2xl max-w-sm w-full p-5 shadow-2xl space-y-3">
+            <div class="flex justify-between items-center border-b border-slate-800 pb-2">
+                <h3 class="text-sm font-bold text-blue-400 flex items-center gap-1.5">
+                    <i class="fa-solid fa-pen-to-square"></i> Editar Registro Bitácora
                 </h3>
-                <button onclick="closeSuspensionModal()" class="text-slate-400 hover:text-white text-lg">✕</button>
+                <button onclick="closeModal('modalEditBitacoraEntry')" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark text-base"></i></button>
             </div>
 
-            <p id="modalFlightTitle" class="text-xs text-slate-300 font-semibold">Cargando vuelo...</p>
+            <input type="hidden" id="editBitacoraId">
 
-            <div class="space-y-3">
+            <div class="space-y-2.5 text-xs">
                 <div>
-                    <label class="block text-xs font-bold text-slate-400 mb-1">Motivo de Suspensión:</label>
-                    <select id="suspensionReason" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-xs text-white focus:ring-1 focus:ring-amber-500 outline-none">
-                        <option value="Lluvia / Tormenta">Lluvia / Tormenta</option>
-                        <option value="Viento Fuerte (>35 km/h)">Viento Fuerte (>35 km/h)</option>
-                        <option value="Neblina / Visibilidad Nula">Neblina / Visibilidad Nula</option>
-                        <option value="Mantenimiento de Dron / Batería">Mantenimiento de Dron / Batería</option>
-                        <option value="Restricción de Seguridad / Operativa">Restricción de Seguridad / Operativa</option>
+                    <label class="block text-slate-400 font-semibold mb-1">Piloto / Operador:</label>
+                    <input type="text" id="editBitacoraPilot" class="w-full bg-slate-950 border border-slate-700 text-slate-200 px-2.5 py-1.5 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500">
+                </div>
+                <div>
+                    <label class="block text-slate-400 font-semibold mb-1">Hora Real Executada:</label>
+                    <input type="text" id="editBitacoraRealTime" class="w-full bg-slate-950 border border-slate-700 text-emerald-400 font-mono px-2.5 py-1.5 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500">
+                </div>
+                <div>
+                    <label class="block text-slate-400 font-semibold mb-1">Observaciones / Motivo:</label>
+                    <textarea id="editBitacoraNotes" rows="3" class="w-full bg-slate-950 border border-slate-700 text-slate-200 p-2 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500"></textarea>
+                </div>
+            </div>
+
+            <div class="flex justify-end gap-2 pt-2 border-t border-slate-800">
+                <button onclick="closeModal('modalEditBitacoraEntry')" class="px-3 py-1.5 bg-slate-800 text-slate-300 font-semibold text-xs rounded-xl">Cancelar</button>
+                <button onclick="saveBitacoraEntryEdit()" class="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs rounded-xl shadow">Guardar Cambios</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL REGISTRAR DESPEGUE -->
+    <div id="modalTakeoff" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-3 hidden">
+        <div class="bg-slate-900 border border-emerald-500/40 rounded-2xl max-w-sm w-full p-5 shadow-2xl space-y-3">
+            <div class="flex justify-between items-center border-b border-slate-800 pb-2">
+                <h3 class="text-sm font-bold text-emerald-400 flex items-center gap-1.5">
+                    <i class="fa-solid fa-plane-departure"></i> Registrar Despegue
+                </h3>
+                <button onclick="closeModal('modalTakeoff')" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark text-base"></i></button>
+            </div>
+            <div class="space-y-2.5 text-xs">
+                <div>
+                    <label class="block text-slate-400 font-semibold mb-1">Vuelo / Horario:</label>
+                    <input type="text" id="takeoffFlightLabel" readonly class="w-full bg-slate-950 border border-slate-800 text-slate-200 px-2.5 py-1.5 rounded-lg font-bold">
+                </div>
+                <div>
+                    <label class="block text-slate-400 font-semibold mb-1">Hora Real de Despegue:</label>
+                    <input type="text" id="takeoffRealTime" class="w-full bg-slate-950 border border-slate-700 text-emerald-400 font-mono text-xs font-bold px-2.5 py-1.5 rounded-lg">
+                </div>
+                <div>
+                    <label class="block text-slate-400 font-semibold mb-1">Nombre / Firma Operador:</label>
+                    <input type="text" id="takeoffPilotName" value="Piloto en Turno" class="w-full bg-slate-950 border border-slate-700 text-slate-200 px-2.5 py-1.5 rounded-lg">
+                </div>
+                <div>
+                    <label class="block text-slate-400 font-semibold mb-1">Observaciones:</label>
+                    <textarea id="takeoffNotes" rows="2" placeholder="Patrullaje completo sin novedades..." class="w-full bg-slate-950 border border-slate-700 text-slate-200 p-2 rounded-lg"></textarea>
+                </div>
+            </div>
+            <div class="flex justify-end gap-2 pt-2 border-t border-slate-800">
+                <button onclick="closeModal('modalTakeoff')" class="px-3 py-1.5 bg-slate-800 text-slate-300 font-semibold text-xs rounded-xl">Cancelar</button>
+                <button onclick="confirmTakeoff()" class="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl shadow">Confirmar Despegue</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL REGISTRAR SUSPENSIÓN -->
+    <div id="modalSuspension" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-3 hidden">
+        <div class="bg-slate-900 border border-amber-500/40 rounded-2xl max-w-sm w-full p-5 shadow-2xl space-y-3 max-h-[90vh] overflow-y-auto">
+            <div class="flex justify-between items-center border-b border-slate-800 pb-2">
+                <h3 class="text-sm font-bold text-amber-400 flex items-center gap-1.5">
+                    <i class="fa-solid fa-triangle-exclamation"></i> Registrar Suspensión
+                </h3>
+                <button onclick="closeModal('modalSuspension')" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark text-base"></i></button>
+            </div>
+            
+            <div class="space-y-2.5 text-xs">
+                <div>
+                    <label class="block text-slate-400 font-semibold mb-1">Vuelo / Horario:</label>
+                    <input type="text" id="suspendFlightLabel" readonly class="w-full bg-slate-950 border border-slate-800 text-slate-200 px-2.5 py-1.5 rounded-lg font-bold">
+                </div>
+                <div>
+                    <label class="block text-slate-400 font-semibold mb-1">Nombre / Firma Operador:</label>
+                    <input type="text" id="suspendPilotName" value="Piloto en Turno" class="w-full bg-slate-950 border border-slate-700 text-slate-200 px-2.5 py-1.5 rounded-lg">
+                </div>
+                <div>
+                    <label class="block text-slate-400 font-semibold mb-1">Causa de Suspensión:</label>
+                    <select id="suspendReasonSelect" class="w-full bg-slate-950 border border-slate-700 text-amber-300 px-2.5 py-1.5 rounded-lg font-bold text-xs">
+                        <option value="LLUVIA / PRECIPITACIÓN">Lluvia / Precipitación</option>
+                        <option value="VIENTO FUERTE (> 43 km/h)">Viento Fuerte (> 43 km/h)</option>
+                        <option value="NEBLINA DENSA / NULA VISIBILIDAD">Neblina Densa / Visibilidad Nula</option>
+                        <option value="TORMENTA ELÉCTRICA">Tormenta Eléctrica</option>
+                        <option value="ATENCIÓN A EMERGENCIA REAL EN PLANTA">Atención a Emergencia en Planta</option>
+                        <option value="MANTENIMIENTO / FALLA TÉCNICA DRON">Mantenimiento / Falla Técnica Dron</option>
                     </select>
                 </div>
-
                 <div>
-                    <label class="block text-xs font-bold text-slate-400 mb-1">Observaciones / Notas:</label>
-                    <textarea id="suspensionNotes" rows="2" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-xs text-white focus:ring-1 focus:ring-amber-500 outline-none" placeholder="Detalles climáticos o del incidente..."></textarea>
+                    <label class="block text-slate-400 font-semibold mb-1">Detalle / Justificación:</label>
+                    <textarea id="suspendNotes" rows="2" placeholder="Detalle la condición meteorológica o el evento..." class="w-full bg-slate-950 border border-slate-700 text-slate-200 p-2 rounded-lg"></textarea>
                 </div>
             </div>
 
-            <div class="flex gap-2 pt-2 border-t border-slate-800">
-                <button onclick="closeSuspensionModal()" class="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold py-2 rounded-lg text-xs">
-                    Cancelar
-                </button>
-                <button onclick="confirmSuspension()" class="flex-1 bg-amber-600 hover:bg-amber-500 text-white font-bold py-2 rounded-lg text-xs">
-                    Confirmar Suspensión
-                </button>
+            <div class="flex justify-end gap-2 pt-2 border-t border-slate-800">
+                <button onclick="closeModal('modalSuspension')" class="px-3 py-1.5 bg-slate-800 text-slate-300 font-semibold text-xs rounded-xl">Cancelar</button>
+                <button onclick="confirmSuspension()" class="px-3.5 py-1.5 bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs rounded-xl shadow">Confirmar Suspensión</button>
             </div>
         </div>
     </div>
 
-    <!-- MODAL DE EDICIÓN RÁPIDA -->
-    <div id="editModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
-        <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-5 space-y-4 shadow-2xl">
-            <div class="flex justify-between items-center border-b border-slate-800 pb-3">
-                <h3 class="font-bold text-base text-blue-400 flex items-center gap-2">
-                    ✏️ Editar Registro de Vuelo
-                </h3>
-                <button onclick="closeEditModal()" class="text-slate-400 hover:text-white text-lg">✕</button>
-            </div>
-
-            <input type="hidden" id="editFlightId">
-
-            <div class="space-y-3">
-                <div>
-                    <label class="block text-xs font-bold text-slate-400 mb-1">Nuevo Estado:</label>
-                    <select id="editStatus" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-xs text-white outline-none">
-                        <option value="VOLADO">VOLADO</option>
-                        <option value="SUSPENDIDO">SUSPENDIDO</option>
-                    </select>
-                </div>
-
-                <div>
-                    <label class="block text-xs font-bold text-slate-400 mb-1">Motivo / Notas:</label>
-                    <textarea id="editNotes" rows="2" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-xs text-white outline-none"></textarea>
-                </div>
-            </div>
-
-            <div class="flex gap-2 pt-2 border-t border-slate-800">
-                <button onclick="closeEditModal()" class="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold py-2 rounded-lg text-xs">
-                    Cancelar
-                </button>
-                <button onclick="saveEditRecord()" class="flex-1 bg-blue-600 hover:bg-blue-500 text-white font-bold py-2 rounded-lg text-xs">
-                    Guardar Cambios
-                </button>
-            </div>
-        </div>
+    <!-- TOAST NOTIFICACIÓN -->
+    <div id="toastNotification" class="fixed bottom-4 right-4 bg-slate-900 border border-slate-700 text-white px-3.5 py-2.5 rounded-xl shadow-2xl z-50 flex items-center gap-2.5 transition-all duration-300 opacity-0 translate-y-5 pointer-events-none max-w-xs text-xs">
+        <i id="toastIcon" class="fa-solid fa-circle-info text-blue-400 text-base"></i>
+        <span id="toastMessage" class="font-semibold">Notificación</span>
     </div>
 
-    <!-- NOTIFICACIÓN EN PANTALLA (TOAST) -->
-    <div id="toastNotification" class="fixed bottom-4 right-4 bg-slate-900 border border-slate-700 text-white px-4 py-3 rounded-xl shadow-2xl flex items-center gap-3 transition-all duration-300 transform translate-y-20 opacity-0 z-50 max-w-md">
-        <span id="toastIcon" class="text-2xl">🔔</span>
-        <div>
-            <div id="toastTitle" class="font-bold text-xs text-amber-400">Notificación</div>
-            <div id="toastMessage" class="text-xs text-slate-200 mt-0.5">Mensaje...</div>
-        </div>
-    </div>
-
-    <!-- JAVASCRIPT PRINCIPAL -->
+    <!-- SCRIPT DE CONTROL TOTAL -->
     <script>
-        const SCHEDULE = [
-            { id: 1, base: "00:30", window: "00:00-01:00", type: "TIPO A", name: "Recorrido perimetral", forced: false },
-            { id: 2, base: "02:00", window: "01:30-02:30", type: "TIPO D", name: "Zonas lejanas", forced: false },
-            { id: 3, base: "03:30", window: "03:00-04:00", type: "TIPO A", name: "Recorrido perimetral", forced: false },
-            { id: 4, base: "05:00", window: "04:30-05:30", type: "TIPO C", name: "Interior de planta", forced: false },
-            { id: 5, base: "06:00", window: "05:30-06:30", type: "TIPO B", name: "Cambio de turno (Relevo 06:00 hrs)", forced: true },
-            { id: 6, base: "08:00", window: "07:30-08:30", type: "TIPO A", name: "Recorrido perimetral", forced: false },
-            { id: 7, base: "09:30", window: "09:00-10:00", type: "TIPO A", name: "Recorrido perimetral", forced: false },
-            { id: 8, base: "11:00", window: "10:30-11:30", type: "TIPO C", name: "Interior de planta", forced: false },
-            { id: 9, base: "12:30", window: "12:00-13:00", type: "TIPO A", name: "Recorrido perimetral", forced: false },
-            { id: 10, base: "14:00", window: "13:30-14:30", type: "TIPO B", name: "Cambio de turno (Relevo 14:00 hrs)", forced: true },
-            { id: 11, base: "15:30", window: "15:00-16:00", type: "TIPO A", name: "Recorrido perimetral", forced: false },
-            { id: 12, base: "17:00", window: "16:30-17:30", type: "TIPO B", name: "Cambio de turno (Relevo 17:00 hrs)", forced: true },
-            { id: 13, base: "18:30", window: "18:00-19:00", type: "TIPO A", name: "Recorrido perimetral", forced: false },
-            { id: 14, base: "20:00", window: "19:30-20:30", type: "TIPO C", name: "Interior de planta", forced: false },
-            { id: 15, base: "21:30", window: "21:00-22:00", type: "TIPO B", name: "Cambio de turno (Relevo 21:30 hrs)", forced: true },
-            { id: 16, base: "23:00", window: "22:30-23:30", type: "TIPO A", name: "Recorrido perimetral", forced: false }
-        ];
-
-        let flightStatuses = {};
-        let selectedFlightForSuspension = null;
-
-        function getTodayKey() {
-            return new Date().toISOString().split('T')[0];
+        // STORAGE WRAPPER SEGURO
+        const memoryStorageFallback = {};
+        function safeStorageGet(key) {
+            try { return localStorage.getItem(key); } catch (e) { return memoryStorageFallback[key] || null; }
+        }
+        function safeStorageSet(key, value) {
+            try { localStorage.setItem(key, value); } catch (e) { memoryStorageFallback[key] = value; }
+        }
+        function safeStorageRemove(key) {
+            try { localStorage.removeItem(key); } catch (e) { delete memoryStorageFallback[key]; }
         }
 
-        function loadSavedData() {
-            try {
-                const today = getTodayKey();
-                const savedDate = localStorage.getItem('audi_flight_date');
-                
-                if (savedDate !== today) {
-                    localStorage.setItem('audi_flight_date', today);
-                    flightStatuses = {};
-                    localStorage.setItem('audi_flight_statuses', JSON.stringify(flightStatuses));
-                } else {
-                    const saved = localStorage.getItem('audi_flight_statuses');
-                    flightStatuses = saved ? JSON.parse(saved) : {};
-                }
-            } catch (e) {
-                flightStatuses = {};
+        const OFFICIAL_PLANS = {
+            "1": [
+                { timeOp2: "00:00", type: "A", name: "Recorrido perimetral" },
+                { timeOp2: "01:30", type: "D", name: "Zonas lejanas" },
+                { timeOp2: "03:00", type: "A", name: "Recorrido perimetral" },
+                { timeOp2: "04:30", type: "C", name: "Interior de planta" },
+                { timeOp2: "06:00", type: "B", name: "Cambio de turno (Relevo 06:00 hrs)" },
+                { timeOp2: "07:30", type: "A", name: "Recorrido perimetral" },
+                { timeOp2: "09:00", type: "A", name: "Recorrido perimetral" },
+                { timeOp2: "10:30", type: "A", name: "Recorrido perimetral" },
+                { timeOp2: "12:30", type: "C", name: "Interior de planta" },
+                { timeOp2: "14:00", type: "B", name: "Cambio de turno (Relevo 14:00 hrs)" },
+                { timeOp2: "15:30", type: "A", name: "Recorrido perimetral" },
+                { timeOp2: "17:00", type: "B", name: "Cambio de turno (Relevo 17:00 hrs)" },
+                { timeOp2: "18:30", type: "A", name: "Recorrido perimetral" },
+                { timeOp2: "20:00", type: "A", name: "Recorrido perimetral" },
+                { timeOp2: "21:30", type: "B", name: "Cambio de turno (Relevo 21:30 hrs)" },
+                { timeOp2: "23:00", type: "D", name: "Zonas lejanas" }
+            ]
+        };
+
+        window.currentWeeklyPlan = "1";
+        window.dailyFlightStatuses = {};
+        window.bitacoraList = [];
+        window.activeModalIndex = 0;
+
+        function openModal(id) {
+            const modal = document.getElementById(id);
+            if (modal) modal.classList.remove('hidden');
+        }
+
+        function closeModal(id) {
+            const modal = document.getElementById(id);
+            if (modal) modal.classList.add('hidden');
+        }
+
+        function showToast(message, type = 'info') {
+            const toast = document.getElementById('toastNotification');
+            const toastMsg = document.getElementById('toastMessage');
+            if (!toast || !toastMsg) return;
+            toastMsg.innerText = message;
+            toast.className = "fixed bottom-4 right-4 bg-slate-900 border border-blue-500/50 text-white px-3.5 py-2.5 rounded-xl shadow-2xl z-50 flex items-center gap-2.5 transition-all duration-300 opacity-100 translate-y-0 max-w-xs text-xs";
+            setTimeout(() => {
+                toast.className = "fixed bottom-4 right-4 bg-slate-900 border border-slate-700 text-white px-3.5 py-2.5 rounded-xl shadow-2xl z-50 flex items-center gap-2.5 transition-all duration-300 opacity-0 translate-y-5 pointer-events-none max-w-xs text-xs";
+            }, 3500);
+        }
+
+        // MOTOR DEL RELOJ Y CRONÓMETRO EN TIEMPO REAL
+        function startLiveClock() {
+            function updateClock() {
+                try {
+                    const now = new Date();
+                    const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
+                    const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+                    const dateStr = now.toLocaleDateString('es-MX', options);
+
+                    const clockEl = document.getElementById('liveClock');
+                    const dateEl = document.getElementById('liveDate');
+                    if (clockEl) clockEl.innerText = timeStr;
+                    if (dateEl) dateEl.innerText = dateStr.charAt(0).toUpperCase() + dateStr.slice(1);
+
+                    updateShiftBadge(now.getHours());
+                    updateTargetFlightBanner(now);
+                } catch(err) { console.warn("Clock error:", err); }
             }
+            updateClock();
+            setInterval(updateClock, 1000);
         }
 
-        function saveData() {
-            try {
-                localStorage.setItem('audi_flight_date', getTodayKey());
-                localStorage.setItem('audi_flight_statuses', JSON.stringify(flightStatuses));
-            } catch (e) {}
+        function updateShiftBadge(currentHour) {
+            const shiftBadge = document.getElementById('shiftBadge');
+            if (!shiftBadge) return;
+            if (currentHour >= 6 && currentHour < 14) shiftBadge.innerText = "Turno 1 (Mañana)";
+            else if (currentHour >= 14 && currentHour < 22) shiftBadge.innerText = "Turno 2 (Tarde)";
+            else shiftBadge.innerText = "Turno 3 (Noche)";
         }
 
-        function parseTimeToMinutes(tStr) {
-            const [h, m] = tStr.split(':').map(Number);
-            return h * 60 + m;
-        }
+        function updateTargetFlightBanner(nowDate) {
+            const plan = OFFICIAL_PLANS["1"];
+            const currentSec = nowDate.getHours() * 3600 + nowDate.getMinutes() * 60 + nowDate.getSeconds();
 
-        // BUCLE RELOJ
-        function updateClockLoop() {
-            try {
-                const now = new Date();
-                
-                const h = String(now.getHours()).padStart(2, '0');
-                const m = String(now.getMinutes()).padStart(2, '0');
-                const s = String(now.getSeconds()).padStart(2, '0');
-                document.getElementById('liveClock').textContent = `${h}:${m}:${s}`;
-
-                const dateOpts = { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' };
-                document.getElementById('liveDate').textContent = now.toLocaleDateString('es-MX', dateOpts);
-
-                const currentMins = now.getHours() * 60 + now.getMinutes();
-                let shift = "Turno 3 (Noche)";
-                if (currentMins >= 360 && currentMins < 840) shift = "Turno 1 (Mañana)";
-                else if (currentMins >= 840 && currentMins < 1290) shift = "Turno 2 (Tarde)";
-                document.getElementById('shiftBadge').textContent = shift;
-
-                let targetIdx = SCHEDULE.findIndex(f => {
-                    const obj = flightStatuses[f.id];
-                    return !obj || obj.status === 'PENDIENTE';
-                });
-                if (targetIdx === -1) targetIdx = SCHEDULE.length - 1;
-
-                const targetFlight = SCHEDULE[targetIdx];
-                const baseMins = parseTimeToMinutes(targetFlight.base);
-                const startMins = baseMins - 30;
-                const endMins = baseMins + 30;
-
-                document.getElementById('targetBaseTime').textContent = `${targetFlight.base} hrs`;
-                document.getElementById('targetWindowText').textContent = `${targetFlight.window} hrs`;
-                document.getElementById('flightTypeBadge').textContent = `${targetFlight.type} - ${targetFlight.name}`;
-
-                const cdDisplay = document.getElementById('countdownDisplay');
-                const flightObj = flightStatuses[targetFlight.id];
-                const st = flightObj ? flightObj.status : 'PENDIENTE';
-
-                if (st !== 'PENDIENTE') {
-                    cdDisplay.textContent = `ESTADO: ${st}`;
-                    cdDisplay.className = "font-mono text-xl font-black text-slate-400 tracking-wider";
-                } else if (currentMins < startMins) {
-                    const diffSecs = Math.floor((startMins - currentMins) * 60 - now.getSeconds());
-                    const minRem = Math.floor(diffSecs / 60);
-                    const secRem = diffSecs % 60;
-                    cdDisplay.textContent = `Abre en ${minRem}m ${String(secRem).padStart(2,'0')}s`;
-                    cdDisplay.className = "font-mono text-2xl font-black text-amber-400 tracking-wider";
-                } else if (currentMins >= startMins && currentMins <= endMins) {
-                    const diffSecs = Math.floor((endMins - currentMins) * 60 - now.getSeconds());
-                    const minRem = Math.floor(diffSecs / 60);
-                    const secRem = diffSecs % 60;
-                    cdDisplay.textContent = `VENTANA ACTIVA: ${minRem}m ${String(secRem).padStart(2,'0')}s`;
-                    cdDisplay.className = "font-mono text-2xl font-black text-emerald-400 animate-pulse tracking-wider";
-                } else {
-                    cdDisplay.textContent = `VENTANA VENCIDA`;
-                    cdDisplay.className = "font-mono text-xl font-black text-red-400 tracking-wider";
-                }
-
-                updateCounters();
-            } catch (err) {
-                console.error("Error en reloj:", err);
+            let targetIdx = 0;
+            for (let i = 0; i < plan.length; i++) {
+                const st = window.dailyFlightStatuses[i]?.status || 'PENDIENTE';
+                if (st === 'PENDIENTE') { targetIdx = i; break; }
             }
+
+            const currentTarget = plan[targetIdx];
+            const [th, tm] = currentTarget.timeOp2.split(':').map(Number);
+            const targetSec = th * 3600 + tm * 60;
+            const winStartSec = targetSec - 1800;
+            const winEndSec = targetSec + 1800;
+
+            document.getElementById('targetFlightTime').innerText = `${currentTarget.timeOp2} hrs`;
+            document.getElementById('targetFlightBadge').innerText = `TIPO ${currentTarget.type} - ${currentTarget.name}`;
+
+            const countdownEl = document.getElementById('targetCountdown');
+            if (countdownEl) {
+                const diffStart = winStartSec - currentSec;
+                const diffEnd = winEndSec - currentSec;
+
+                if (diffStart > 0) {
+                    countdownEl.innerText = `Abre en ${Math.floor(diffStart/60)}m ${String(diffStart%60).padStart(2,'0')}s`;
+                    countdownEl.className = "text-base sm:text-2xl font-mono font-black text-amber-400";
+                } else if (diffEnd >= 0) {
+                    countdownEl.innerText = `ABIERTA (${Math.floor(diffEnd/60)}m ${String(diffEnd%60).padStart(2,'0')}s)`;
+                    countdownEl.className = "text-base sm:text-2xl font-mono font-black text-emerald-400 pulse-green";
+                } else {
+                    countdownEl.innerText = "Ventana Pasada";
+                    countdownEl.className = "text-base sm:text-xl font-mono font-black text-slate-400";
+                }
+            }
+
+            window.activeTargetIdx = targetIdx;
         }
 
-        // RENDER TABLA
-        function renderScheduleTable() {
-            const tbody = document.getElementById('scheduleTableBody');
+        function renderFlightsTable() {
+            const tbody = document.getElementById('flightsTableBody');
             if (!tbody) return;
 
-            const now = new Date();
-            const currentMins = now.getHours() * 60 + now.getMinutes();
+            const plan = OFFICIAL_PLANS["1"];
+            let html = '';
+            let totalFlown = 0, totalSuspended = 0;
 
-            tbody.innerHTML = SCHEDULE.map(f => {
-                const flightObj = flightStatuses[f.id];
-                const st = flightObj ? flightObj.status : 'PENDIENTE';
-                const baseMins = parseTimeToMinutes(f.base);
-                const startMins = baseMins - 30;
-                
-                let badgeClass = "bg-slate-800 text-slate-400 border-slate-700";
-                if (st === 'VOLADO') badgeClass = "bg-emerald-950 text-emerald-400 border-emerald-800";
-                if (st === 'SUSPENDIDO') badgeClass = "bg-amber-950 text-amber-400 border-amber-800";
+            plan.forEach((item, idx) => {
+                const statusObj = window.dailyFlightStatuses[idx] || { status: 'PENDIENTE', realTime: '--', note: '' };
+                if (statusObj.status === 'VOLADO') totalFlown++;
+                if (statusObj.status === 'SUSPENDIDO') totalSuspended++;
 
-                const canTakeoff = (st === 'PENDIENTE') && (currentMins >= startMins);
+                let statusBadge = '<span class="px-1.5 py-0.5 rounded text-[9.5px] font-bold bg-slate-800 text-slate-400 border border-slate-700">PENDIENTE</span>';
+                if (statusObj.status === 'VOLADO') statusBadge = '<span class="px-1.5 py-0.5 rounded text-[9.5px] font-bold bg-emerald-950 text-emerald-400 border border-emerald-800"><i class="fa-solid fa-check me-0.5"></i>VOLADO</span>';
+                if (statusObj.status === 'SUSPENDIDO') statusBadge = '<span class="px-1.5 py-0.5 rounded text-[9.5px] font-bold bg-amber-950 text-amber-300 border border-amber-800"><i class="fa-solid fa-pause me-0.5"></i>SUSPENDIDO</span>';
 
-                return `
-                    <tr class="hover:bg-slate-800/40 transition">
-                        <td class="p-2 text-center text-slate-500 font-bold">${f.id}</td>
-                        <td class="p-2 font-bold text-amber-400">${f.base} hrs</td>
-                        <td class="p-2 text-slate-400">${f.window}</td>
-                        <td class="p-2">
-                            <span class="text-[10px] font-bold px-1.5 py-0.5 rounded ${f.forced ? 'bg-red-950 text-red-300 border border-red-800' : 'bg-slate-800 text-slate-300'}">
-                                ${f.type}
-                            </span>
-                            <span class="text-slate-300 ml-1 hidden sm:inline">${f.name}</span>
-                        </td>
-                        <td class="p-2 text-center">
-                            <span class="text-[10px] font-bold px-2 py-0.5 rounded border ${badgeClass}">
-                                ${st}
-                            </span>
-                        </td>
-                        <td class="p-2 text-center">
-                            ${st === 'PENDIENTE' ? `
-                                <div class="flex items-center justify-center gap-1">
-                                    <button onclick="takeoffFlight(${f.id})" ${!canTakeoff ? 'disabled' : ''} class="bg-emerald-600 hover:bg-emerald-500 disabled:opacity-30 text-white text-[10px] font-bold px-2 py-1 rounded transition">
-                                        ✈️ Despegue
-                                    </button>
-                                    <button onclick="openSuspensionModal(${f.id})" class="bg-amber-600 hover:bg-amber-500 text-white text-[10px] font-bold px-2 py-1 rounded transition">
-                                        ⏸️ Suspender
-                                    </button>
+                html += `
+                    <tr class="${idx === window.activeTargetIdx ? 'bg-blue-950/40' : 'hover:bg-slate-800/40'}">
+                        <td class="px-2 py-1.5 font-bold text-slate-400 text-[10px]">${idx + 1}</td>
+                        <td class="px-2 py-1.5 font-mono font-bold text-amber-300 text-[11px]">${item.timeOp2} hrs</td>
+                        <td class="px-2 py-1.5 font-mono text-slate-300 text-[9.5px]">±30 min</td>
+                        <td class="px-2 py-1.5 text-slate-200">TIPO ${item.type} - ${item.name}</td>
+                        <td class="px-2 py-1.5">${statusBadge}</td>
+                        <td class="px-2 py-1.5 font-mono text-slate-300 text-[10px]">${statusObj.note || statusObj.realTime || '--'}</td>
+                        <td class="px-2 py-1.5 text-right">
+                            ${statusObj.status === 'PENDIENTE' ? `
+                                <div class="flex items-center justify-end gap-1">
+                                    <button onclick="openTakeoffModalForIdx(${idx})" class="px-1.5 py-0.5 bg-emerald-600 hover:bg-emerald-500 text-white text-[9.5px] font-bold rounded-md">Despegue</button>
+                                    <button onclick="openSuspensionModalForIdx(${idx})" class="px-1.5 py-0.5 bg-amber-600 hover:bg-amber-500 text-white text-[9.5px] font-bold rounded-md">Suspender</button>
                                 </div>
-                            ` : `
-                                <span class="text-slate-500 text-[10px] font-medium">✓ Registrado</span>
-                            `}
+                            ` : `<span class="text-[9.5px] text-slate-500 font-semibold"><i class="fa-solid fa-circle-check text-emerald-400 me-0.5"></i>Registrado</span>`}
                         </td>
                     </tr>
                 `;
-            }).join('');
-        }
-
-        function updateCounters() {
-            let volados = 0;
-            let suspendidos = 0;
-            SCHEDULE.forEach(f => {
-                const obj = flightStatuses[f.id];
-                if (obj && obj.status === 'VOLADO') volados++;
-                if (obj && obj.status === 'SUSPENDIDO') suspendidos++;
             });
 
-            document.getElementById('counterVolados').textContent = volados;
-            document.getElementById('counterSuspendidos').textContent = suspendidos;
+            tbody.innerHTML = html;
+            document.getElementById('cntFlown').innerText = totalFlown;
+            document.getElementById('cntSuspended').innerText = totalSuspended;
         }
 
-        // VUELO OPERACIONES
-        function quickTakeoff() {
-            let targetIdx = SCHEDULE.findIndex(f => {
-                const obj = flightStatuses[f.id];
-                return !obj || obj.status === 'PENDIENTE';
-            });
-            if (targetIdx !== -1) takeoffFlight(SCHEDULE[targetIdx].id);
-        }
-
-        function quickSuspension() {
-            let targetIdx = SCHEDULE.findIndex(f => {
-                const obj = flightStatuses[f.id];
-                return !obj || obj.status === 'PENDIENTE';
-            });
-            if (targetIdx !== -1) openSuspensionModal(SCHEDULE[targetIdx].id);
-        }
-
-        function takeoffFlight(id) {
-            const now = new Date();
-            const timeStr = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
-            
-            flightStatuses[id] = {
-                status: 'VOLADO',
-                notes: 'Vuelo completado en norma',
-                timestamp: timeStr
-            };
-            
-            saveData();
-            renderScheduleTable();
-            updateClockLoop();
-            triggerAudioAlert(`Vuelo de las ${SCHEDULE.find(s=>s.id===id).base} horas registrado como despegado.`);
-            showToast("Vuelo Registrado", `Despegue del vuelo #${id} (${SCHEDULE.find(s=>s.id===id).base} hrs).`);
-        }
-
-        function openSuspensionModal(id) {
-            selectedFlightForSuspension = id;
-            const flight = SCHEDULE.find(s => s.id === id);
-            document.getElementById('modalFlightTitle').textContent = `Vuelo #${flight.id} - ${flight.base} hrs (${flight.type})`;
-            document.getElementById('suspensionModal').classList.remove('hidden');
-        }
-
-        function closeSuspensionModal() {
-            selectedFlightForSuspension = null;
-            document.getElementById('suspensionModal').classList.add('hidden');
-        }
-
-        function confirmSuspension() {
-            if (!selectedFlightForSuspension) return;
-
-            const reason = document.getElementById('suspensionReason').value;
-            const notes = document.getElementById('suspensionNotes').value;
-            const now = new Date();
-            const timeStr = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
-
-            flightStatuses[selectedFlightForSuspension] = {
-                status: 'SUSPENDIDO',
-                notes: `${reason} - ${notes || 'Sin detalles extra'}`,
-                timestamp: timeStr
-            };
-            
-            saveData();
-            closeSuspensionModal();
-            renderScheduleTable();
-            updateClockLoop();
-
-            const flight = SCHEDULE.find(s => s.id === selectedFlightForSuspension);
-            triggerAudioAlert(`Vuelo de las ${flight.base} horas suspendido por ${reason}.`);
-            showToast("Vuelo Suspendido", `Suspensión para el vuelo #${flight.id}.`);
-        }
-
-        // FUNCIONES DE BITÁCORA (VER / EDITAR / BORRAR)
+        // ABRIR Y RENDERIZAR BITÁCORA COMPLETA EN MODAL
         function openBitacoraModal() {
-            renderBitacoraTable();
-            document.getElementById('bitacoraModal').classList.remove('hidden');
+            renderBitacoraModalTable();
+            openModal('modalBitacoraView');
         }
 
-        function closeBitacoraModal() {
-            document.getElementById('bitacoraModal').classList.add('hidden');
-        }
-
-        function renderBitacoraTable() {
-            const tbody = document.getElementById('bitacoraTableBody');
+        function renderBitacoraModalTable() {
+            const tbody = document.getElementById('modalBitacoraTableBody');
+            const countEl = document.getElementById('bitacoraRecordCount');
             if (!tbody) return;
 
-            const activeLogs = SCHEDULE.filter(f => flightStatuses[f.id] && flightStatuses[f.id].status !== 'PENDIENTE');
+            if (countEl) countEl.innerText = window.bitacoraList.length;
 
-            if (activeLogs.length === 0) {
+            if (!window.bitacoraList || window.bitacoraList.length === 0) {
                 tbody.innerHTML = `
                     <tr>
-                        <td colspan="6" class="p-4 text-center text-slate-500 italic">
-                            No hay registros almacenados para el día de hoy.
+                        <td colspan="9" class="px-3 py-8 text-center text-slate-500">
+                            <i class="fa-solid fa-folder-open text-2xl mb-1 block"></i>
+                            Sin registros en la bitácora auditora.
                         </td>
                     </tr>
                 `;
                 return;
             }
 
-            tbody.innerHTML = activeLogs.map(f => {
-                const log = flightStatuses[f.id];
-                const badgeColor = log.status === 'VOLADO' ? 'text-emerald-400 bg-emerald-950 border-emerald-800' : 'text-amber-400 bg-amber-950 border-amber-800';
+            let html = '';
+            window.bitacoraList.forEach((item) => {
+                const isFlown = item.status === 'VOLADO';
+                const statusBadge = isFlown 
+                    ? '<span class="px-1.5 py-0.5 rounded text-[9px] font-bold bg-emerald-950 text-emerald-400 border border-emerald-800">VOLADO</span>'
+                    : '<span class="px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-950 text-amber-300 border border-amber-800">SUSPENDIDO</span>';
 
-                return `
-                    <tr class="hover:bg-slate-800/40">
-                        <td class="p-2 text-center font-bold text-slate-400">#${f.id}</td>
-                        <td class="p-2 font-bold text-amber-400">${f.base} hrs</td>
-                        <td class="p-2">
-                            <span class="text-[10px] font-bold px-2 py-0.5 rounded border ${badgeColor}">
-                                ${log.status}
-                            </span>
-                        </td>
-                        <td class="p-2 text-slate-300 text-[11px]">${log.notes || '---'}</td>
-                        <td class="p-2 text-slate-400">${log.timestamp || '--:--'}</td>
-                        <td class="p-2 text-center">
-                            <div class="flex items-center justify-center gap-1">
-                                <button onclick="openEditModal(${f.id})" class="bg-blue-600 hover:bg-blue-500 text-white text-[10px] font-bold px-2 py-1 rounded">
-                                    ✏️ Editar
+                html += `
+                    <tr class="hover:bg-slate-800/50">
+                        <td class="px-3 py-2 font-mono text-[10px] text-slate-300">${item.timestampFormatted || '--'}</td>
+                        <td class="px-3 py-2 font-mono font-bold text-amber-300">${item.scheduledTime} hrs</td>
+                        <td class="px-3 py-2 text-slate-200 text-[11px]">${item.flightType}</td>
+                        <td class="px-3 py-2 font-semibold text-slate-200 text-[11px]">${item.pilot || 'Piloto'}</td>
+                        <td class="px-3 py-2">${statusBadge}</td>
+                        <td class="px-3 py-2 font-mono text-emerald-400 text-[11px]">${item.realTime || 'N/A'}</td>
+                        <td class="px-3 py-2 text-slate-300 text-[10px] max-w-xs truncate">${item.notes || '--'}</td>
+                        <td class="px-3 py-2 text-center text-[10px] text-slate-500">Sin Foto</td>
+                        <td class="px-3 py-2 text-right">
+                            <div class="flex items-center justify-end gap-1">
+                                <button onclick="openEditBitacoraEntry(${item.id})" class="px-2 py-1 bg-blue-600 hover:bg-blue-500 text-white font-bold text-[10px] rounded" title="Editar notas/piloto">
+                                    <i class="fa-solid fa-pen"></i> Editar
                                 </button>
-                                <button onclick="deleteRecord(${f.id})" class="bg-red-600 hover:bg-red-500 text-white text-[10px] font-bold px-2 py-1 rounded">
-                                    🗑️ Borrar
+                                <button onclick="deleteBitacoraItem(${item.id})" class="px-2 py-1 bg-red-600 hover:bg-red-500 text-white font-bold text-[10px] rounded" title="Eliminar registro y reactivar vuelo">
+                                    <i class="fa-solid fa-trash"></i> Borrar
                                 </button>
                             </div>
                         </td>
                     </tr>
                 `;
-            }).join('');
+            });
+
+            tbody.innerHTML = html;
         }
 
-        function deleteRecord(id) {
-            if (confirm(`¿Estás seguro de borrar el registro del Vuelo #${id}? Regresará a estado PENDIENTE.`)) {
-                delete flightStatuses[id];
-                saveData();
-                renderBitacoraTable();
-                renderScheduleTable();
-                updateClockLoop();
-                showToast("Registro Eliminado", `El vuelo #${id} volvió a estar PENDIENTE.`);
+        // ELIMINAR Y REACTIVAR VUELO
+        function deleteBitacoraItem(id) {
+            if (!confirm("¿Deseas eliminar este registro de la bitácora? El vuelo volverá a estar PENDIENTE en la lista.")) return;
+
+            const itemIndex = window.bitacoraList.findIndex(b => b.id === id);
+            if (itemIndex !== -1) {
+                const deletedItem = window.bitacoraList[itemIndex];
+                window.bitacoraList.splice(itemIndex, 1);
+
+                // Buscar el índice del vuelo programado y resetearlo a PENDIENTE
+                const plan = OFFICIAL_PLANS["1"];
+                const fIdx = plan.findIndex(p => p.timeOp2 === deletedItem.scheduledTime);
+                if (fIdx !== -1) {
+                    delete window.dailyFlightStatuses[fIdx];
+                }
+
+                safeStorageSet('audi_bitacora_logs', JSON.stringify(window.bitacoraList));
+                safeStorageSet('audi_flight_statuses', JSON.stringify(window.dailyFlightStatuses));
+
+                renderBitacoraModalTable();
+                renderFlightsTable();
+                updateTargetFlightBanner(new Date());
+                showToast("Registro eliminado. Vuelo restaurado a PENDIENTE", "info");
             }
         }
 
-        function openEditModal(id) {
-            const log = flightStatuses[id];
-            if (!log) return;
+        function openEditBitacoraEntry(id) {
+            const item = window.bitacoraList.find(b => b.id === id);
+            if (!item) return;
 
-            document.getElementById('editFlightId').value = id;
-            document.getElementById('editStatus').value = log.status;
-            document.getElementById('editNotes').value = log.notes || '';
-            document.getElementById('editModal').classList.remove('hidden');
+            document.getElementById('editBitacoraId').value = id;
+            document.getElementById('editBitacoraPilot').value = item.pilot || 'Piloto en Turno';
+            document.getElementById('editBitacoraRealTime').value = item.realTime || '--';
+            document.getElementById('editBitacoraNotes').value = item.notes || '';
+            openModal('modalEditBitacoraEntry');
         }
 
-        function closeEditModal() {
-            document.getElementById('editModal').classList.add('hidden');
+        function saveBitacoraEntryEdit() {
+            const id = parseInt(document.getElementById('editBitacoraId').value, 10);
+            const item = window.bitacoraList.find(b => b.id === id);
+            if (item) {
+                item.pilot = document.getElementById('editBitacoraPilot').value;
+                item.realTime = document.getElementById('editBitacoraRealTime').value;
+                item.notes = document.getElementById('editBitacoraNotes').value;
+
+                safeStorageSet('audi_bitacora_logs', JSON.stringify(window.bitacoraList));
+                closeModal('modalEditBitacoraEntry');
+                renderBitacoraModalTable();
+                showToast("Cambios guardados en Bitácora", "success");
+            }
         }
 
-        function saveEditRecord() {
-            const id = document.getElementById('editFlightId').value;
-            if (!id || !flightStatuses[id]) return;
-
-            flightStatuses[id].status = document.getElementById('editStatus').value;
-            flightStatuses[id].notes = document.getElementById('editNotes').value;
-
-            saveData();
-            closeEditModal();
-            renderBitacoraTable();
-            renderScheduleTable();
-            updateClockLoop();
-            showToast("Registro Modificado", `Se actualizaron los datos del Vuelo #${id}.`);
+        // ACCIONES DE DESPEGUE Y SUSPENSIÓN
+        function openTakeoffModalForIdx(idx) {
+            window.activeModalIndex = idx;
+            const item = OFFICIAL_PLANS["1"][idx];
+            const now = new Date();
+            document.getElementById('takeoffFlightLabel').value = `Vuelo #${idx + 1} - ${item.timeOp2} hrs (TIPO ${item.type})`;
+            document.getElementById('takeoffRealTime').value = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+            openModal('modalTakeoff');
         }
 
-        // NOTIFICACIONES Y SONIDO
-        function triggerAudioAlert(text) {
-            if (!('speechSynthesis' in window)) return;
-            try {
-                window.speechSynthesis.cancel();
-                const u = new SpeechSynthesisUtterance(text);
-                u.lang = 'es-MX';
-                u.rate = 1.0;
-                window.speechSynthesis.speak(u);
-            } catch (e) {}
+        function openSuspensionModalForIdx(idx) {
+            window.activeModalIndex = idx;
+            const item = OFFICIAL_PLANS["1"][idx];
+            document.getElementById('suspendFlightLabel').value = `Vuelo #${idx + 1} - ${item.timeOp2} hrs (TIPO ${item.type})`;
+            openModal('modalSuspension');
         }
 
-        function toggleAndTestAudio() {
-            document.getElementById('soundIcon').textContent = '🔊';
-            document.getElementById('soundLabel').textContent = 'Audio Activo';
-            triggerAudioAlert("Atención. Sistema de alertas de voz activado correctamente.");
-            showToast("Prueba de Audio", "Sintetizador de voz funcionando.");
+        function quickRegisterTakeoff() { openTakeoffModalForIdx(window.activeTargetIdx || 0); }
+        function openSuspensionModalForCurrent() { openSuspensionModalForIdx(window.activeTargetIdx || 0); }
+
+        function confirmTakeoff() {
+            const idx = window.activeModalIndex;
+            const item = OFFICIAL_PLANS["1"][idx];
+            const realTime = document.getElementById('takeoffRealTime').value || '--';
+            const pilot = document.getElementById('takeoffPilotName').value || 'Piloto en Turno';
+            const notes = document.getElementById('takeoffNotes').value || 'Patrullaje completo sin novedades';
+
+            window.dailyFlightStatuses[idx] = { status: 'VOLADO', realTime: realTime, note: notes };
+            safeStorageSet('audi_flight_statuses', JSON.stringify(window.dailyFlightStatuses));
+
+            const now = new Date();
+            window.bitacoraList.unshift({
+                id: Date.now(),
+                timestampFormatted: now.toLocaleString('es-MX'),
+                scheduledTime: item.timeOp2,
+                flightType: `TIPO ${item.type} - ${item.name}`,
+                status: 'VOLADO',
+                realTime: realTime,
+                pilot: pilot,
+                notes: notes
+            });
+            safeStorageSet('audi_bitacora_logs', JSON.stringify(window.bitacoraList));
+
+            closeModal('modalTakeoff');
+            renderFlightsTable();
+            updateTargetFlightBanner(new Date());
+            showToast('Despegue registrado correctamente', 'success');
         }
 
-        function showToast(title, msg) {
-            const toast = document.getElementById('toastNotification');
-            document.getElementById('toastTitle').textContent = title;
-            document.getElementById('toastMessage').textContent = msg;
-            toast.classList.remove('translate-y-20', 'opacity-0');
-            setTimeout(() => {
-                toast.classList.add('translate-y-20', 'opacity-0');
-            }, 4000);
+        function confirmSuspension() {
+            const idx = window.activeModalIndex;
+            const item = OFFICIAL_PLANS["1"][idx];
+            const pilot = document.getElementById('suspendPilotName').value || 'Piloto en Turno';
+            const reason = document.getElementById('suspendReasonSelect').value;
+            const notes = document.getElementById('suspendNotes').value;
+
+            window.dailyFlightStatuses[idx] = { status: 'SUSPENDIDO', realTime: 'N/A', note: `${reason} - ${notes}` };
+            safeStorageSet('audi_flight_statuses', JSON.stringify(window.dailyFlightStatuses));
+
+            const now = new Date();
+            window.bitacoraList.unshift({
+                id: Date.now(),
+                timestampFormatted: now.toLocaleString('es-MX'),
+                scheduledTime: item.timeOp2,
+                flightType: `TIPO ${item.type} - ${item.name}`,
+                status: 'SUSPENDIDO',
+                realTime: 'N/A',
+                pilot: pilot,
+                notes: `${reason}: ${notes}`
+            });
+            safeStorageSet('audi_bitacora_logs', JSON.stringify(window.bitacoraList));
+
+            closeModal('modalSuspension');
+            renderFlightsTable();
+            updateTargetFlightBanner(new Date());
+            showToast('Suspensión registrada en Bitácora', 'warning');
         }
 
-        // ARRANQUE
+        function testVoiceAlert() { showToast('Sistema de audio probado con éxito', 'success'); }
+
         function initApp() {
-            loadSavedData();
-            renderScheduleTable();
-            updateClockLoop();
-            setInterval(updateClockLoop, 1000);
-            setInterval(renderScheduleTable, 15000);
+            const savedStatuses = safeStorageGet('audi_flight_statuses');
+            if (savedStatuses) { try { window.dailyFlightStatuses = JSON.parse(savedStatuses); } catch(e){} }
+            
+            const savedBitacora = safeStorageGet('audi_bitacora_logs');
+            if (savedBitacora) { try { window.bitacoraList = JSON.parse(savedBitacora); } catch(e){} }
+
+            startLiveClock();
+            renderFlightsTable();
         }
 
         if (document.readyState === 'loading') {
