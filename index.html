@@ -7,6 +7,7 @@
 
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    
     <script>
         tailwind.config = {
             darkMode: 'class',
@@ -25,6 +26,7 @@
             }
         }
     </script>
+    
     <style>
         body {
             background-color: #090d16;
@@ -44,14 +46,15 @@
         ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
         ::-webkit-scrollbar-thumb:hover { background: #475569; }
 
+        /* REGLAS DE IMPRESIÓN Y GENERACIÓN DE PDF COMPLETO CON IMÁGENES */
         @media print {
             @page { size: landscape; margin: 8mm; }
             * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
-            header, section:not(#bitacoraPrintSection), button, label, select, input, .no-print {
-                display: none !important;
-            }
+            header, main, .no-print, .modal-backdrop { display: none !important; }
+            #bitacoraPrintSection { display: block !important; }
             body { background: #ffffff !important; color: #000000 !important; padding: 0 !important; font-size: 10px !important; }
         }
+        #bitacoraPrintSection { display: none; }
     </style>
 </head>
 <body class="min-h-screen flex flex-col bg-slate-950 text-slate-100 antialiased selection:bg-red-600 selection:text-white">
@@ -68,27 +71,27 @@
                     <div class="flex items-center gap-1.5 flex-wrap">
                         <span class="text-[10px] font-bold tracking-widest uppercase bg-slate-800 text-red-400 px-1.5 py-0.5 rounded border border-red-900/30">Audi México</span>
                         <span id="shiftBadge" class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-950/80 text-emerald-400 border border-emerald-800/40">Iniciando Turno...</span>
-                        <button id="cloudStatusBadge" onclick="openFirebaseConfigModal()" title="Configurar Sincronización Nube" class="text-[10px] font-bold px-2 py-0.5 rounded-lg bg-slate-800 text-slate-300 border border-slate-700 flex items-center gap-1 hover:bg-slate-700 transition cursor-pointer">
-                            <i class="fa-solid fa-cloud text-[9px]"></i> Sincronizado
-                        </button>
+                        <span id="cloudStatusBadge" class="text-[10px] font-bold px-2 py-0.5 rounded-lg bg-slate-800 text-slate-300 border border-slate-700 flex items-center gap-1">
+                            <i class="fa-solid fa-cloud text-[9px] text-emerald-400"></i> Sincronizado
+                        </span>
                     </div>
                 </div>
             </div>
 
-            <!-- RELOJ E INDICADORES Y BOTÓN VER BITÁCORA -->
+            <!-- RELOJ E INDICADORES Y BOTÓN PRINCIPAL BITÁCORA -->
             <div class="flex items-center gap-2 bg-slate-950/90 px-3 py-1.5 rounded-xl border border-slate-800">
-                <div class="text-right">
+                <div class="text-right me-1">
                     <div id="liveClock" class="text-2xl sm:text-3xl font-mono font-black text-amber-300 tracking-wider leading-none">00:00:00</div>
                     <div id="liveDate" class="text-[10px] text-slate-400 font-semibold mt-0.5">Cargando fecha...</div>
                 </div>
                 
-                <!-- BOTÓN PRINCIPAL PARA ABRIR BITÁCORA -->
-                <button onclick="openBitacoraModal()" id="btnOpenBitacora" class="px-2.5 py-1.5 rounded-lg text-xs font-extrabold bg-blue-600 hover:bg-blue-500 text-white border border-blue-400/40 shadow-lg shadow-blue-900/30 transition flex items-center gap-1.5 cursor-pointer">
+                <!-- BOTÓN PRINCIPAL VER BITÁCORA -->
+                <button onclick="openBitacoraModal()" id="btnOpenBitacora" class="px-3 py-1.5 rounded-lg text-xs font-black bg-blue-600 hover:bg-blue-500 text-white border border-blue-400/40 shadow-lg shadow-blue-900/30 transition flex items-center gap-1.5 cursor-pointer">
                     <i class="fa-solid fa-book-bookmark text-amber-300"></i>
                     <span>Ver Bitácora</span>
                 </button>
 
-                <button id="btnTestVoice" onclick="testVoiceAlert()" title="Probar Alerta de Voz y Activar Sonido" class="p-1.5 rounded-lg bg-amber-950/80 hover:bg-amber-900 text-amber-300 text-xs border border-amber-700/60 transition flex items-center gap-1">
+                <button id="btnTestVoice" onclick="toggleAudioAndTest()" title="Probar Alerta de Voz y Activar Sonido" class="p-1.5 rounded-lg bg-amber-950/80 hover:bg-amber-900 text-amber-300 text-xs border border-amber-700/60 transition flex items-center gap-1">
                     <i id="btnTestVoiceIcon" class="fa-solid fa-volume-high text-amber-400"></i>
                     <span id="btnTestVoiceText" class="text-[10px] font-bold text-amber-300 hidden xs:inline">Probar Sonido</span>
                 </button>
@@ -112,7 +115,7 @@
                             TIPO A - Perimetral
                         </span>
                         <span id="activePlanBadge" class="text-[11px] font-bold text-amber-300 bg-amber-950/80 px-2.5 py-1 rounded-md border border-amber-800">
-                            Plan 1
+                            Opción 2 (00:30 hrs)
                         </span>
                     </div>
 
@@ -147,8 +150,8 @@
             </div>
         </section>
 
-        <!-- TARJETAS DE CONTEO Y REGLAS -->
-        <section class="bg-slate-900/90 p-2.5 rounded-xl border border-slate-800 shadow-lg grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+        <!-- TARJETAS DE CONTEO -->
+        <section class="bg-slate-900/90 p-2.5 rounded-xl border border-slate-800 shadow-lg grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs">
             <div class="bg-slate-950/80 p-2 rounded-lg border border-slate-800/80 text-center flex flex-col justify-center">
                 <span class="text-[9px] uppercase font-bold text-slate-400">Jornada 24h</span>
                 <span id="cntTotal" class="text-base font-black text-white">16 Vuelos</span>
@@ -156,29 +159,19 @@
             </div>
             
             <div class="bg-slate-950/80 p-2 rounded-lg border border-emerald-900/30 text-center flex flex-col justify-center">
-                <span class="text-[9px] uppercase font-bold text-emerald-400">Volados</span>
+                <span class="text-[9px] uppercase font-bold text-emerald-400">Volados Hoy</span>
                 <span id="cntFlown" class="text-base font-black text-emerald-400">0</span>
-                <span class="text-[8.5px] text-slate-500">Ejecutados Hoy</span>
+                <span class="text-[8.5px] text-slate-500">Ejecutados</span>
             </div>
 
-            <div class="bg-slate-950/80 p-2 rounded-lg border border-amber-900/30 text-center flex flex-col justify-center">
-                <span class="text-[9px] uppercase font-bold text-amber-400">Suspendidos</span>
+            <div class="bg-slate-950/80 p-2 rounded-lg border border-amber-900/30 text-center flex flex-col justify-center col-span-2 sm:col-span-1">
+                <span class="text-[9px] uppercase font-bold text-amber-400">Suspendidos Hoy</span>
                 <span id="cntSuspended" class="text-base font-black text-amber-400">0</span>
                 <span class="text-[8.5px] text-slate-500">Con evidencia</span>
             </div>
-
-            <div class="bg-slate-950/80 p-2 rounded-lg border border-slate-800/80 flex items-center justify-between px-2.5">
-                <div>
-                    <span class="text-[9px] uppercase font-bold text-slate-400 block">Regla Calendario</span>
-                    <span id="autoCalendarNote" class="text-[10px] text-emerald-400 font-bold truncate block max-w-[120px]">Plan 1 Activo</span>
-                </div>
-                <button onclick="viewOfficialPlansModal()" class="p-1.5 bg-blue-900/60 hover:bg-blue-800 text-blue-200 font-bold text-[10px] rounded-md border border-blue-700/60 transition" title="Ver Matriz Completa de Planes">
-                    <i class="fa-solid fa-table text-xs"></i>
-                </button>
-            </div>
         </section>
 
-        <!-- CRONOGRAMA DIARIO DE VUELOS (TABLA DESLIZABLE) -->
+        <!-- CRONOGRAMA DIARIO DE VUELOS -->
         <section class="bg-slate-900 p-3 rounded-2xl border border-slate-800 shadow-xl space-y-2">
             <div class="flex items-center justify-between border-b border-slate-800 pb-2">
                 <h3 class="text-xs font-bold text-white flex items-center gap-1.5">
@@ -188,7 +181,7 @@
                 <span class="text-[10px] text-slate-400 font-mono">Ventana: &plusmn;30 min</span>
             </div>
 
-            <div class="max-h-60 overflow-y-auto pr-1 custom-scrollbar">
+            <div class="max-h-64 overflow-y-auto pr-1 custom-scrollbar">
                 <table class="w-full text-left text-xs min-w-[500px]">
                     <thead class="bg-slate-950 text-slate-400 uppercase font-bold tracking-wider border-b border-slate-800 text-[9.5px] sticky top-0 z-10 shadow">
                         <tr>
@@ -210,8 +203,8 @@
 
     </main>
 
-    <!-- MODAL COMPLETO DE BITÁCORA AUDITABLE (CON EDICIÓN Y BORRADO) -->
-    <div id="modalBitacoraView" class="fixed inset-0 bg-slate-950/90 backdrop-blur-md z-50 flex items-center justify-center p-3 hidden">
+    <!-- MODAL COMPLETO DE BITÁCORA AUDITABLE (CON EDICIÓN, IMÁGENES Y BORRADO) -->
+    <div id="modalBitacoraView" class="fixed inset-0 bg-slate-950/90 backdrop-blur-md z-50 flex items-center justify-center p-3 hidden modal-backdrop">
         <div class="bg-slate-900 border border-blue-500/40 rounded-2xl max-w-5xl w-full p-4 sm:p-5 shadow-2xl space-y-3 max-h-[90vh] flex flex-col">
             <div class="flex justify-between items-center border-b border-slate-800 pb-2.5">
                 <div>
@@ -219,7 +212,7 @@
                         <i class="fa-solid fa-book-bookmark text-emerald-400"></i>
                         Bitácora Oficial Auditable de Vuelos (Registro Inmutable)
                     </h3>
-                    <p class="text-[11px] text-slate-400">Consulta, edita observaciones o elimina registros para reactivar vuelos a PENDIENTE.</p>
+                    <p class="text-[11px] text-slate-400">Consulta, edita horas, estado, motivos e imágenes de evidencia o elimina registros para reactivar vuelos a PENDIENTE.</p>
                 </div>
                 <button onclick="closeModal('modalBitacoraView')" class="text-slate-400 hover:text-white p-1 text-lg">
                     <i class="fa-solid fa-xmark"></i>
@@ -232,21 +225,21 @@
                     Total Registros: <strong id="bitacoraRecordCount" class="text-emerald-400">0</strong>
                 </div>
                 <div class="flex items-center gap-2">
-                    <button onclick="exportBitacoraCSV()" class="px-2.5 py-1.5 bg-emerald-700 hover:bg-emerald-600 text-white font-bold text-xs rounded-lg border border-emerald-500/30 transition flex items-center gap-1">
-                        <i class="fa-solid fa-file-excel text-xs"></i> Exportar Excel
+                    <button onclick="exportBitacoraCSV()" class="px-2.5 py-1.5 bg-emerald-700 hover:bg-emerald-600 text-white font-bold text-xs rounded-lg border border-emerald-500/30 transition flex items-center gap-1 cursor-pointer">
+                        <i class="fa-solid fa-file-excel text-xs"></i> Exportar Excel (CSV)
                     </button>
-                    <button onclick="window.print()" class="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs rounded-lg border border-slate-700 transition flex items-center gap-1">
-                        <i class="fa-solid fa-print text-xs"></i> Imprimir / PDF
+                    <button onclick="printAuditBitacora()" class="px-2.5 py-1.5 bg-blue-700 hover:bg-blue-600 text-white font-bold text-xs rounded-lg border border-blue-500/30 transition flex items-center gap-1 cursor-pointer">
+                        <i class="fa-solid fa-print text-xs"></i> Imprimir / Exportar PDF
                     </button>
-                    <button onclick="openClearBitacoraModal()" class="px-2.5 py-1.5 bg-red-950/80 hover:bg-red-900 text-red-300 font-bold text-xs rounded-lg border border-red-800/60 transition flex items-center gap-1">
-                        <i class="fa-solid fa-trash-can text-xs"></i> Vaciar Todo
+                    <button onclick="clearAllBitacora()" class="px-2.5 py-1.5 bg-red-950/80 hover:bg-red-900 text-red-300 font-bold text-xs rounded-lg border border-red-800/60 transition flex items-center gap-1 cursor-pointer">
+                        <i class="fa-solid fa-trash-can text-xs"></i> Vaciar Bitácora
                     </button>
                 </div>
             </div>
 
             <!-- TABLA DE BITÁCORA -->
             <div class="overflow-y-auto flex-1 pr-1 border border-slate-800 rounded-xl">
-                <table class="w-full text-left text-xs min-w-[700px]">
+                <table class="w-full text-left text-xs min-w-[750px]">
                     <thead class="bg-slate-950 text-slate-400 uppercase font-bold tracking-wider border-b border-slate-800 text-[10px] sticky top-0 z-10 shadow">
                         <tr>
                             <th class="px-3 py-2.5">Fecha / Hora</th>
@@ -256,7 +249,7 @@
                             <th class="px-3 py-2.5">Estado</th>
                             <th class="px-3 py-2.5">Hora Real</th>
                             <th class="px-3 py-2.5">Detalle / Motivo</th>
-                            <th class="px-3 py-2.5 text-center">Foto</th>
+                            <th class="px-3 py-2.5 text-center">Foto Evidencia</th>
                             <th class="px-3 py-2.5 text-right">Gestión</th>
                         </tr>
                     </thead>
@@ -274,12 +267,12 @@
         </div>
     </div>
 
-    <!-- MODAL EDICIÓN RÁPIDA DE REGISTRO EN BITÁCORA -->
-    <div id="modalEditBitacoraEntry" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-3 hidden">
-        <div class="bg-slate-900 border border-blue-500/40 rounded-2xl max-w-sm w-full p-5 shadow-2xl space-y-3">
+    <!-- MODAL EDICIÓN COMPLETA DE REGISTRO EN BITÁCORA (INCLUYE IMAGEN Y HORAS) -->
+    <div id="modalEditBitacoraEntry" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-3 hidden modal-backdrop">
+        <div class="bg-slate-900 border border-blue-500/40 rounded-2xl max-w-md w-full p-5 shadow-2xl space-y-3 max-h-[90vh] overflow-y-auto">
             <div class="flex justify-between items-center border-b border-slate-800 pb-2">
                 <h3 class="text-sm font-bold text-blue-400 flex items-center gap-1.5">
-                    <i class="fa-solid fa-pen-to-square"></i> Editar Registro Bitácora
+                    <i class="fa-solid fa-pen-to-square"></i> Editar Registro de Bitácora
                 </h3>
                 <button onclick="closeModal('modalEditBitacoraEntry')" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark text-base"></i></button>
             </div>
@@ -288,16 +281,35 @@
 
             <div class="space-y-2.5 text-xs">
                 <div>
+                    <label class="block text-slate-400 font-semibold mb-1">Estado del Vuelo:</label>
+                    <select id="editBitacoraStatus" class="w-full bg-slate-950 border border-slate-700 text-slate-200 px-2.5 py-1.5 rounded-lg font-bold focus:ring-1 focus:ring-blue-500">
+                        <option value="VOLADO">VOLADO</option>
+                        <option value="SUSPENDIDO">SUSPENDIDO</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-slate-400 font-semibold mb-1">Hora Programada Base:</label>
+                    <input type="text" id="editBitacoraSchedTime" class="w-full bg-slate-950 border border-slate-700 text-amber-300 font-mono px-2.5 py-1.5 rounded-lg focus:ring-1 focus:ring-blue-500">
+                </div>
+                <div>
+                    <label class="block text-slate-400 font-semibold mb-1">Hora Real Executada / Anotada:</label>
+                    <input type="text" id="editBitacoraRealTime" class="w-full bg-slate-950 border border-slate-700 text-emerald-400 font-mono px-2.5 py-1.5 rounded-lg focus:ring-1 focus:ring-blue-500">
+                </div>
+                <div>
                     <label class="block text-slate-400 font-semibold mb-1">Piloto / Operador:</label>
-                    <input type="text" id="editBitacoraPilot" class="w-full bg-slate-950 border border-slate-700 text-slate-200 px-2.5 py-1.5 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500">
+                    <input type="text" id="editBitacoraPilot" class="w-full bg-slate-950 border border-slate-700 text-slate-200 px-2.5 py-1.5 rounded-lg focus:ring-1 focus:ring-blue-500">
                 </div>
                 <div>
-                    <label class="block text-slate-400 font-semibold mb-1">Hora Real Executada:</label>
-                    <input type="text" id="editBitacoraRealTime" class="w-full bg-slate-950 border border-slate-700 text-emerald-400 font-mono px-2.5 py-1.5 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500">
+                    <label class="block text-slate-400 font-semibold mb-1">Observaciones / Motivo de Suspensión:</label>
+                    <textarea id="editBitacoraNotes" rows="2" class="w-full bg-slate-950 border border-slate-700 text-slate-200 p-2 rounded-lg focus:ring-1 focus:ring-blue-500"></textarea>
                 </div>
                 <div>
-                    <label class="block text-slate-400 font-semibold mb-1">Observaciones / Motivo:</label>
-                    <textarea id="editBitacoraNotes" rows="3" class="w-full bg-slate-950 border border-slate-700 text-slate-200 p-2 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500"></textarea>
+                    <label class="block text-slate-400 font-semibold mb-1">Foto de Evidencia (Clima / Radar / Evento):</label>
+                    <input type="file" id="editBitacoraImageInput" accept="image/*" onchange="handleImageCompress(this, 'editBitacoraImgPreview')" class="w-full bg-slate-950 border border-slate-700 text-slate-400 text-xs py-1 px-2 rounded-lg cursor-pointer">
+                    <div id="editBitacoraImgPreviewContainer" class="mt-2 text-center hidden">
+                        <img id="editBitacoraImgPreview" src="" alt="Vista previa evidencia" class="max-h-28 mx-auto rounded border border-slate-700 object-cover shadow">
+                        <button type="button" onclick="removeImageFromEdit()" class="text-[10px] text-red-400 hover:text-red-300 mt-1 underline">Eliminar Foto</button>
+                    </div>
                 </div>
             </div>
 
@@ -309,7 +321,7 @@
     </div>
 
     <!-- MODAL REGISTRAR DESPEGUE -->
-    <div id="modalTakeoff" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-3 hidden">
+    <div id="modalTakeoff" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-3 hidden modal-backdrop">
         <div class="bg-slate-900 border border-emerald-500/40 rounded-2xl max-w-sm w-full p-5 shadow-2xl space-y-3">
             <div class="flex justify-between items-center border-b border-slate-800 pb-2">
                 <h3 class="text-sm font-bold text-emerald-400 flex items-center gap-1.5">
@@ -342,8 +354,8 @@
         </div>
     </div>
 
-    <!-- MODAL REGISTRAR SUSPENSIÓN -->
-    <div id="modalSuspension" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-3 hidden">
+    <!-- MODAL REGISTRAR SUSPENSIÓN CON FOTO EVIDENCIA -->
+    <div id="modalSuspension" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-3 hidden modal-backdrop">
         <div class="bg-slate-900 border border-amber-500/40 rounded-2xl max-w-sm w-full p-5 shadow-2xl space-y-3 max-h-[90vh] overflow-y-auto">
             <div class="flex justify-between items-center border-b border-slate-800 pb-2">
                 <h3 class="text-sm font-bold text-amber-400 flex items-center gap-1.5">
@@ -376,6 +388,13 @@
                     <label class="block text-slate-400 font-semibold mb-1">Detalle / Justificación:</label>
                     <textarea id="suspendNotes" rows="2" placeholder="Detalle la condición meteorológica o el evento..." class="w-full bg-slate-950 border border-slate-700 text-slate-200 p-2 rounded-lg"></textarea>
                 </div>
+                <div>
+                    <label class="block text-slate-400 font-semibold mb-1">Foto Evidencia (Clima/Radar):</label>
+                    <input type="file" id="suspendImageInput" accept="image/*" onchange="handleImageCompress(this, 'suspendImgPreview')" class="w-full bg-slate-950 border border-slate-700 text-slate-400 text-xs py-1 px-2 rounded-lg cursor-pointer">
+                    <div id="suspendImgPreviewContainer" class="mt-2 text-center hidden">
+                        <img id="suspendImgPreview" src="" alt="Evidencia clima" class="max-h-28 mx-auto rounded border border-slate-700 object-cover shadow">
+                    </div>
+                </div>
             </div>
 
             <div class="flex justify-end gap-2 pt-2 border-t border-slate-800">
@@ -385,11 +404,70 @@
         </div>
     </div>
 
+    <!-- MODAL DE VISUALIZACIÓN DE FOTO COMPLETA -->
+    <div id="modalImagePreview" class="fixed inset-0 bg-slate-950/90 backdrop-blur-md z-50 flex items-center justify-center p-3 hidden modal-backdrop">
+        <div class="bg-slate-900 border border-slate-700 rounded-2xl max-w-2xl w-full p-4 space-y-3 text-center">
+            <div class="flex justify-between items-center border-b border-slate-800 pb-2">
+                <h3 class="text-sm font-bold text-slate-200"><i class="fa-solid fa-camera me-1"></i> Evidencia Fotográfica de Vuelo</h3>
+                <button onclick="closeModal('modalImagePreview')" class="text-slate-400 hover:text-white text-lg"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="max-h-[70vh] overflow-hidden flex justify-center items-center bg-black/60 rounded-xl p-2">
+                <img id="modalFullImageSrc" src="" alt="Evidencia completa" class="max-h-[65vh] w-auto object-contain rounded">
+            </div>
+            <div class="flex justify-end pt-1">
+                <button onclick="closeModal('modalImagePreview')" class="px-4 py-1.5 bg-slate-800 hover:bg-slate-700 text-white text-xs font-semibold rounded-lg">Cerrar</button>
+            </div>
+        </div>
+    </div>
+
     <!-- TOAST NOTIFICACIÓN -->
     <div id="toastNotification" class="fixed bottom-4 right-4 bg-slate-900 border border-slate-700 text-white px-3.5 py-2.5 rounded-xl shadow-2xl z-50 flex items-center gap-2.5 transition-all duration-300 opacity-0 translate-y-5 pointer-events-none max-w-xs text-xs">
         <i id="toastIcon" class="fa-solid fa-circle-info text-blue-400 text-base"></i>
         <span id="toastMessage" class="font-semibold">Notificación</span>
     </div>
+
+    <!-- SECCIÓN OCULTA PARA IMPRESIÓN Y PDF DE LA BITÁCORA -->
+    <section id="bitacoraPrintSection" class="p-4 bg-white text-black">
+        <div class="border-b-2 border-black pb-3 mb-4 flex justify-between items-center">
+            <div>
+                <h1 class="text-xl font-bold uppercase tracking-wider">AUDI MÉXICO - PLANTA SAN JOSÉ CHIAPA</h1>
+                <h2 class="text-sm font-semibold">Bitácora Oficial Auditable de Vuelos con Drone (24/7)</h2>
+            </div>
+            <div class="text-right text-xs">
+                <div>Fecha de Reporte: <strong id="printReportDate">--</strong></div>
+                <div>Generado: <strong id="printReportTime">--</strong></div>
+            </div>
+        </div>
+
+        <table class="w-full text-left border-collapse border border-black text-[10px] mb-6">
+            <thead>
+                <tr class="bg-gray-200 border-b border-black font-bold">
+                    <th class="p-1 border-r border-black">Fecha/Hora Reg</th>
+                    <th class="p-1 border-r border-black">Prog.</th>
+                    <th class="p-1 border-r border-black">Tipo Vuelo</th>
+                    <th class="p-1 border-r border-black">Piloto</th>
+                    <th class="p-1 border-r border-black">Estado</th>
+                    <th class="p-1 border-r border-black">Hora Real</th>
+                    <th class="p-1 border-r border-black">Detalle / Motivo</th>
+                    <th class="p-1 text-center">Foto Evidencia</th>
+                </tr>
+            </thead>
+            <tbody id="printBitacoraTableBody">
+                <!-- Rellenado por JS -->
+            </tbody>
+        </table>
+
+        <div class="grid grid-cols-2 gap-8 pt-12 text-center text-xs">
+            <div class="border-t border-black pt-1">
+                <strong>Piloto en Turno Responsable</strong><br>
+                Firma y Nombre del Operador
+            </div>
+            <div class="border-t border-black pt-1">
+                <strong>Supervisión de Seguridad Audi México</strong><br>
+                Validación y Sello de Auditoría
+            </div>
+        </div>
+    </section>
 
     <!-- SCRIPT DE CONTROL TOTAL -->
     <script>
@@ -401,35 +479,39 @@
         function safeStorageSet(key, value) {
             try { localStorage.setItem(key, value); } catch (e) { memoryStorageFallback[key] = value; }
         }
-        function safeStorageRemove(key) {
-            try { localStorage.removeItem(key); } catch (e) { delete memoryStorageFallback[key]; }
+
+        function getTodayKey() {
+            const now = new Date();
+            return `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
         }
 
         const OFFICIAL_PLANS = {
-            "1": [
-                { timeOp2: "00:00", type: "A", name: "Recorrido perimetral" },
-                { timeOp2: "01:30", type: "D", name: "Zonas lejanas" },
-                { timeOp2: "03:00", type: "A", name: "Recorrido perimetral" },
-                { timeOp2: "04:30", type: "C", name: "Interior de planta" },
-                { timeOp2: "06:00", type: "B", name: "Cambio de turno (Relevo 06:00 hrs)" },
-                { timeOp2: "07:30", type: "A", name: "Recorrido perimetral" },
-                { timeOp2: "09:00", type: "A", name: "Recorrido perimetral" },
-                { timeOp2: "10:30", type: "A", name: "Recorrido perimetral" },
-                { timeOp2: "12:30", type: "C", name: "Interior de planta" },
-                { timeOp2: "14:00", type: "B", name: "Cambio de turno (Relevo 14:00 hrs)" },
-                { timeOp2: "15:30", type: "A", name: "Recorrido perimetral" },
-                { timeOp2: "17:00", type: "B", name: "Cambio de turno (Relevo 17:00 hrs)" },
-                { timeOp2: "18:30", type: "A", name: "Recorrido perimetral" },
-                { timeOp2: "20:00", type: "A", name: "Recorrido perimetral" },
-                { timeOp2: "21:30", type: "B", name: "Cambio de turno (Relevo 21:30 hrs)" },
-                { timeOp2: "23:00", type: "D", name: "Zonas lejanas" }
+            "2": [
+                { timeOp2: "00:30", type: "A", name: "Recorrido perimetral", forced: false },
+                { timeOp2: "02:00", type: "D", name: "Zonas lejanas", forced: false },
+                { timeOp2: "03:30", type: "A", name: "Recorrido perimetral", forced: false },
+                { timeOp2: "05:00", type: "C", name: "Interior de planta", forced: false },
+                { timeOp2: "06:00", type: "B", name: "Cambio de turno (Relevo 06:00 hrs)", forced: true },
+                { timeOp2: "08:00", type: "A", name: "Recorrido perimetral", forced: false },
+                { timeOp2: "09:30", type: "A", name: "Recorrido perimetral", forced: false },
+                { timeOp2: "11:00", type: "C", name: "Interior de planta", forced: false },
+                { timeOp2: "12:30", type: "A", name: "Recorrido perimetral", forced: false },
+                { timeOp2: "14:00", type: "B", name: "Cambio de turno (Relevo 14:00 hrs)", forced: true },
+                { timeOp2: "15:30", type: "A", name: "Recorrido perimetral", forced: false },
+                { timeOp2: "17:00", type: "B", name: "Cambio de turno (Relevo 17:00 hrs)", forced: true },
+                { timeOp2: "18:30", type: "A", name: "Recorrido perimetral", forced: false },
+                { timeOp2: "20:00", type: "C", name: "Interior de planta", forced: false },
+                { timeOp2: "21:30", type: "B", name: "Cambio de turno (Relevo 21:30 hrs)", forced: true },
+                { timeOp2: "23:00", type: "A", name: "Recorrido perimetral", forced: false }
             ]
         };
 
-        window.currentWeeklyPlan = "1";
         window.dailyFlightStatuses = {};
         window.bitacoraList = [];
         window.activeModalIndex = 0;
+        window.tempCompressedImage = "";
+        window.audioUnlocked = false;
+        window.lastTriggeredAlertKey = "";
 
         function openModal(id) {
             const modal = document.getElementById(id);
@@ -452,7 +534,108 @@
             }, 3500);
         }
 
-        // MOTOR DEL RELOJ Y CRONÓMETRO EN TIEMPO REAL
+        // COMPRESIÓN FOTOGRÁFICA CANVAS (~30KB)
+        function handleImageCompress(inputEl, previewImgId) {
+            const file = inputEl.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const img = new Image();
+                img.onload = function() {
+                    const canvas = document.createElement('canvas');
+                    const maxDim = 800;
+                    let width = img.width;
+                    let height = img.height;
+
+                    if (width > height && width > maxDim) {
+                        height = Math.round((height * maxDim) / width);
+                        width = maxDim;
+                    } else if (height > maxDim) {
+                        width = Math.round((width * maxDim) / height);
+                        height = maxDim;
+                    }
+
+                    canvas.width = width;
+                    canvas.height = height;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, width, height);
+
+                    const compressedBase64 = canvas.toDataURL('image/jpeg', 0.65);
+                    window.tempCompressedImage = compressedBase64;
+
+                    const previewImg = document.getElementById(previewImgId);
+                    if (previewImg) {
+                        previewImg.src = compressedBase64;
+                        previewImg.parentElement.classList.remove('hidden');
+                    }
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function removeImageFromEdit() {
+            window.tempCompressedImage = "";
+            const previewImg = document.getElementById('editBitacoraImgPreview');
+            if (previewImg) {
+                previewImg.src = "";
+                previewImg.parentElement.classList.add('hidden');
+            }
+            document.getElementById('editBitacoraImageInput').value = "";
+        }
+
+        function openFullImagePreview(src) {
+            document.getElementById('modalFullImageSrc').src = src;
+            openModal('modalImagePreview');
+        }
+
+        // MOTOR DE VOZ Y TIMBRE DE AUDIO
+        function triggerVoiceAlert(text) {
+            showToast(text, 'info');
+            
+            // Chime Acústico
+            try {
+                const AudioCtx = window.AudioContext || window.webkitAudioContext;
+                if (AudioCtx) {
+                    const ctx = new AudioCtx();
+                    const osc = ctx.createOscillator();
+                    const gain = ctx.createGain();
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(659.25, ctx.currentTime);
+                    osc.frequency.setValueAtTime(880, ctx.currentTime + 0.12);
+                    gain.gain.setValueAtTime(0.3, ctx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.35);
+                    osc.connect(gain);
+                    gain.connect(ctx.destination);
+                    osc.start();
+                    osc.stop(ctx.currentTime + 0.4);
+                }
+            } catch (e) {}
+
+            // Sintetizador TTS
+            if ('speechSynthesis' in window) {
+                try {
+                    window.speechSynthesis.cancel();
+                    setTimeout(() => {
+                        const utterance = new SpeechSynthesisUtterance(text);
+                        utterance.lang = 'es-MX';
+                        utterance.rate = 1.0;
+                        utterance.pitch = 1.0;
+                        window.speechSynthesis.speak(utterance);
+                    }, 60);
+                } catch (e) {}
+            }
+        }
+
+        function toggleAudioAndTest() {
+            window.audioUnlocked = true;
+            document.getElementById('btnTestVoiceText').innerText = "Audio Activo";
+            document.getElementById('btnTestVoiceIcon').className = "fa-solid fa-volume-high text-emerald-400";
+            triggerVoiceAlert("Atención. Sistema de alertas de voz y audio verificado correctamente.");
+        }
+
+        // MOTOR DEL RELOJ Y EVALUACIÓN DE CRONOGRAMA
         function startLiveClock() {
             function updateClock() {
                 try {
@@ -483,8 +666,9 @@
         }
 
         function updateTargetFlightBanner(nowDate) {
-            const plan = OFFICIAL_PLANS["1"];
+            const plan = OFFICIAL_PLANS["2"];
             const currentSec = nowDate.getHours() * 3600 + nowDate.getMinutes() * 60 + nowDate.getSeconds();
+            const currentMins = nowDate.getHours() * 60 + nowDate.getMinutes();
 
             let targetIdx = 0;
             for (let i = 0; i < plan.length; i++) {
@@ -495,6 +679,7 @@
             const currentTarget = plan[targetIdx];
             const [th, tm] = currentTarget.timeOp2.split(':').map(Number);
             const targetSec = th * 3600 + tm * 60;
+            const targetBaseMins = th * 60 + tm;
             const winStartSec = targetSec - 1800;
             const winEndSec = targetSec + 1800;
 
@@ -518,14 +703,56 @@
                 }
             }
 
+            // EVALUACIÓN DE ALERTAS DE VOZ (CAMBIOS DE TURNO Y VENTANAS)
+            checkVoiceAlerts(currentTarget, targetIdx, currentMins, targetBaseMins, nowDate.getSeconds());
+
             window.activeTargetIdx = targetIdx;
+        }
+
+        // CONTROL DE ALERTAS DE VOZ
+        function checkVoiceAlerts(flight, flightIdx, currentMins, targetBaseMins, currentSecs) {
+            const diff = targetBaseMins - currentMins;
+
+            // 1. ALERTAS PARA VUELOS FORZOSOS (TIPO B - CAMBIO DE TURNO: 06:00, 14:00, 17:00, 21:30)
+            if (flight.forced) {
+                if (diff === 15 && currentSecs === 0) {
+                    const alertKey = `b_15_${flight.timeOp2}`;
+                    if (window.lastTriggeredAlertKey !== alertKey) {
+                        window.lastTriggeredAlertKey = alertKey;
+                        triggerVoiceAlert(`Atención piloto. Faltan 15 minutos para el vuelo forzoso de cambio de turno de las ${flight.timeOp2} horas.`);
+                    }
+                }
+                if (diff === 5 && currentSecs === 0) {
+                    const alertKey = `b_5_${flight.timeOp2}`;
+                    if (window.lastTriggeredAlertKey !== alertKey) {
+                        window.lastTriggeredAlertKey = alertKey;
+                        triggerVoiceAlert(`Alerta importante. Faltan solo 5 minutos para el vuelo forzoso de las ${flight.timeOp2} horas. Preparar despegue inmediato.`);
+                    }
+                }
+                if (diff === 0 && currentSecs === 0) {
+                    const alertKey = `b_0_${flight.timeOp2}`;
+                    if (window.lastTriggeredAlertKey !== alertKey) {
+                        window.lastTriggeredAlertKey = alertKey;
+                        triggerVoiceAlert(`Alerta. Hora exacta del vuelo forzoso de cambio de turno de las ${flight.timeOp2} horas. Iniciar despegue inmediatamente.`);
+                    }
+                }
+            }
+
+            // 2. ALERTA AL ABRIR LA VENTANA (-30 MIN)
+            if (diff === 30 && currentSecs === 0) {
+                const alertKey = `win_open_${flight.timeOp2}`;
+                if (window.lastTriggeredAlertKey !== alertKey) {
+                    window.lastTriggeredAlertKey = alertKey;
+                    triggerVoiceAlert(`Atención. Se ha abierto la ventana del vuelo de las ${flight.timeOp2} horas.`);
+                }
+            }
         }
 
         function renderFlightsTable() {
             const tbody = document.getElementById('flightsTableBody');
             if (!tbody) return;
 
-            const plan = OFFICIAL_PLANS["1"];
+            const plan = OFFICIAL_PLANS["2"];
             let html = '';
             let totalFlown = 0, totalSuspended = 0;
 
@@ -543,14 +770,14 @@
                         <td class="px-2 py-1.5 font-bold text-slate-400 text-[10px]">${idx + 1}</td>
                         <td class="px-2 py-1.5 font-mono font-bold text-amber-300 text-[11px]">${item.timeOp2} hrs</td>
                         <td class="px-2 py-1.5 font-mono text-slate-300 text-[9.5px]">±30 min</td>
-                        <td class="px-2 py-1.5 text-slate-200">TIPO ${item.type} - ${item.name}</td>
+                        <td class="px-2 py-1.5 text-slate-200">${item.forced ? '<span class="text-red-400 font-bold me-1">[RELEVO]</span>' : ''}TIPO ${item.type} - ${item.name}</td>
                         <td class="px-2 py-1.5">${statusBadge}</td>
-                        <td class="px-2 py-1.5 font-mono text-slate-300 text-[10px]">${statusObj.note || statusObj.realTime || '--'}</td>
+                        <td class="px-2 py-1.5 font-mono text-slate-300 text-[10px] truncate max-w-[150px]">${statusObj.note || statusObj.realTime || '--'}</td>
                         <td class="px-2 py-1.5 text-right">
                             ${statusObj.status === 'PENDIENTE' ? `
                                 <div class="flex items-center justify-end gap-1">
-                                    <button onclick="openTakeoffModalForIdx(${idx})" class="px-1.5 py-0.5 bg-emerald-600 hover:bg-emerald-500 text-white text-[9.5px] font-bold rounded-md">Despegue</button>
-                                    <button onclick="openSuspensionModalForIdx(${idx})" class="px-1.5 py-0.5 bg-amber-600 hover:bg-amber-500 text-white text-[9.5px] font-bold rounded-md">Suspender</button>
+                                    <button onclick="openTakeoffModalForIdx(${idx})" class="px-1.5 py-0.5 bg-emerald-600 hover:bg-emerald-500 text-white text-[9.5px] font-bold rounded-md cursor-pointer">Despegue</button>
+                                    <button onclick="openSuspensionModalForIdx(${idx})" class="px-1.5 py-0.5 bg-amber-600 hover:bg-amber-500 text-white text-[9.5px] font-bold rounded-md cursor-pointer">Suspender</button>
                                 </div>
                             ` : `<span class="text-[9.5px] text-slate-500 font-semibold"><i class="fa-solid fa-circle-check text-emerald-400 me-0.5"></i>Registrado</span>`}
                         </td>
@@ -563,7 +790,7 @@
             document.getElementById('cntSuspended').innerText = totalSuspended;
         }
 
-        // ABRIR Y RENDERIZAR BITÁCORA COMPLETA EN MODAL
+        // ABRIR Y RENDERIZAR BITÁCORA COMPLETA
         function openBitacoraModal() {
             renderBitacoraModalTable();
             openModal('modalBitacoraView');
@@ -595,6 +822,10 @@
                     ? '<span class="px-1.5 py-0.5 rounded text-[9px] font-bold bg-emerald-950 text-emerald-400 border border-emerald-800">VOLADO</span>'
                     : '<span class="px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-950 text-amber-300 border border-amber-800">SUSPENDIDO</span>';
 
+                const photoThumb = item.imageData 
+                    ? `<img src="${item.imageData}" onclick="openFullImagePreview('${item.imageData}')" class="w-8 h-8 object-cover rounded border border-slate-700 mx-auto cursor-pointer hover:scale-110 transition" title="Ver foto de evidencia">`
+                    : '<span class="text-[10px] text-slate-500">Sin Foto</span>';
+
                 html += `
                     <tr class="hover:bg-slate-800/50">
                         <td class="px-3 py-2 font-mono text-[10px] text-slate-300">${item.timestampFormatted || '--'}</td>
@@ -604,13 +835,13 @@
                         <td class="px-3 py-2">${statusBadge}</td>
                         <td class="px-3 py-2 font-mono text-emerald-400 text-[11px]">${item.realTime || 'N/A'}</td>
                         <td class="px-3 py-2 text-slate-300 text-[10px] max-w-xs truncate">${item.notes || '--'}</td>
-                        <td class="px-3 py-2 text-center text-[10px] text-slate-500">Sin Foto</td>
+                        <td class="px-3 py-2 text-center">${photoThumb}</td>
                         <td class="px-3 py-2 text-right">
                             <div class="flex items-center justify-end gap-1">
-                                <button onclick="openEditBitacoraEntry(${item.id})" class="px-2 py-1 bg-blue-600 hover:bg-blue-500 text-white font-bold text-[10px] rounded" title="Editar notas/piloto">
+                                <button onclick="openEditBitacoraEntry(${item.id})" class="px-2 py-1 bg-blue-600 hover:bg-blue-500 text-white font-bold text-[10px] rounded cursor-pointer" title="Editar hora, estado, notas o foto">
                                     <i class="fa-solid fa-pen"></i> Editar
                                 </button>
-                                <button onclick="deleteBitacoraItem(${item.id})" class="px-2 py-1 bg-red-600 hover:bg-red-500 text-white font-bold text-[10px] rounded" title="Eliminar registro y reactivar vuelo">
+                                <button onclick="deleteBitacoraItem(${item.id})" class="px-2 py-1 bg-red-600 hover:bg-red-500 text-white font-bold text-[10px] rounded cursor-pointer" title="Eliminar registro y reactivar vuelo">
                                     <i class="fa-solid fa-trash"></i> Borrar
                                 </button>
                             </div>
@@ -622,9 +853,9 @@
             tbody.innerHTML = html;
         }
 
-        // ELIMINAR Y REACTIVAR VUELO
+        // ELIMINAR REGISTRO Y RESTAURAR VUELO A PENDIENTE
         function deleteBitacoraItem(id) {
-            if (!confirm("¿Deseas eliminar este registro de la bitácora? El vuelo volverá a estar PENDIENTE en la lista.")) return;
+            if (!confirm("¿Deseas eliminar este registro de la bitácora? El vuelo volverá a estar PENDIENTE en el cronograma.")) return;
 
             const itemIndex = window.bitacoraList.findIndex(b => b.id === id);
             if (itemIndex !== -1) {
@@ -632,7 +863,7 @@
                 window.bitacoraList.splice(itemIndex, 1);
 
                 // Buscar el índice del vuelo programado y resetearlo a PENDIENTE
-                const plan = OFFICIAL_PLANS["1"];
+                const plan = OFFICIAL_PLANS["2"];
                 const fIdx = plan.findIndex(p => p.timeOp2 === deletedItem.scheduledTime);
                 if (fIdx !== -1) {
                     delete window.dailyFlightStatuses[fIdx];
@@ -648,14 +879,28 @@
             }
         }
 
+        // ABRIR Y GUARDAR EDICIÓN DE BITÁCORA
         function openEditBitacoraEntry(id) {
             const item = window.bitacoraList.find(b => b.id === id);
             if (!item) return;
 
             document.getElementById('editBitacoraId').value = id;
-            document.getElementById('editBitacoraPilot').value = item.pilot || 'Piloto en Turno';
+            document.getElementById('editBitacoraStatus').value = item.status || 'VOLADO';
+            document.getElementById('editBitacoraSchedTime').value = item.scheduledTime || '00:30';
             document.getElementById('editBitacoraRealTime').value = item.realTime || '--';
+            document.getElementById('editBitacoraPilot').value = item.pilot || 'Piloto en Turno';
             document.getElementById('editBitacoraNotes').value = item.notes || '';
+
+            const previewImg = document.getElementById('editBitacoraImgPreview');
+            window.tempCompressedImage = item.imageData || "";
+            if (item.imageData) {
+                previewImg.src = item.imageData;
+                previewImg.parentElement.classList.remove('hidden');
+            } else {
+                previewImg.src = "";
+                previewImg.parentElement.classList.add('hidden');
+            }
+
             openModal('modalEditBitacoraEntry');
         }
 
@@ -663,21 +908,40 @@
             const id = parseInt(document.getElementById('editBitacoraId').value, 10);
             const item = window.bitacoraList.find(b => b.id === id);
             if (item) {
-                item.pilot = document.getElementById('editBitacoraPilot').value;
+                const oldSchedTime = item.scheduledTime;
+                
+                item.status = document.getElementById('editBitacoraStatus').value;
+                item.scheduledTime = document.getElementById('editBitacoraSchedTime').value;
                 item.realTime = document.getElementById('editBitacoraRealTime').value;
+                item.pilot = document.getElementById('editBitacoraPilot').value;
                 item.notes = document.getElementById('editBitacoraNotes').value;
+                item.imageData = window.tempCompressedImage || "";
+
+                // Actualizar dailyFlightStatuses si cambió el horario o estado
+                const plan = OFFICIAL_PLANS["2"];
+                const fIdx = plan.findIndex(p => p.timeOp2 === item.scheduledTime || p.timeOp2 === oldSchedTime);
+                if (fIdx !== -1) {
+                    window.dailyFlightStatuses[fIdx] = {
+                        status: item.status,
+                        realTime: item.realTime,
+                        note: item.notes
+                    };
+                }
 
                 safeStorageSet('audi_bitacora_logs', JSON.stringify(window.bitacoraList));
+                safeStorageSet('audi_flight_statuses', JSON.stringify(window.dailyFlightStatuses));
+                
                 closeModal('modalEditBitacoraEntry');
                 renderBitacoraModalTable();
-                showToast("Cambios guardados en Bitácora", "success");
+                renderFlightsTable();
+                updateTargetFlightBanner(new Date());
+                showToast("Registro actualizado en Bitácora", "success");
             }
         }
 
-        // ACCIONES DE DESPEGUE Y SUSPENSIÓN
         function openTakeoffModalForIdx(idx) {
             window.activeModalIndex = idx;
-            const item = OFFICIAL_PLANS["1"][idx];
+            const item = OFFICIAL_PLANS["2"][idx];
             const now = new Date();
             document.getElementById('takeoffFlightLabel').value = `Vuelo #${idx + 1} - ${item.timeOp2} hrs (TIPO ${item.type})`;
             document.getElementById('takeoffRealTime').value = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
@@ -686,8 +950,11 @@
 
         function openSuspensionModalForIdx(idx) {
             window.activeModalIndex = idx;
-            const item = OFFICIAL_PLANS["1"][idx];
+            window.tempCompressedImage = "";
+            const item = OFFICIAL_PLANS["2"][idx];
             document.getElementById('suspendFlightLabel').value = `Vuelo #${idx + 1} - ${item.timeOp2} hrs (TIPO ${item.type})`;
+            document.getElementById('suspendImgPreview').src = "";
+            document.getElementById('suspendImgPreviewContainer').classList.add('hidden');
             openModal('modalSuspension');
         }
 
@@ -696,7 +963,7 @@
 
         function confirmTakeoff() {
             const idx = window.activeModalIndex;
-            const item = OFFICIAL_PLANS["1"][idx];
+            const item = OFFICIAL_PLANS["2"][idx];
             const realTime = document.getElementById('takeoffRealTime').value || '--';
             const pilot = document.getElementById('takeoffPilotName').value || 'Piloto en Turno';
             const notes = document.getElementById('takeoffNotes').value || 'Patrullaje completo sin novedades';
@@ -713,7 +980,8 @@
                 status: 'VOLADO',
                 realTime: realTime,
                 pilot: pilot,
-                notes: notes
+                notes: notes,
+                imageData: ""
             });
             safeStorageSet('audi_bitacora_logs', JSON.stringify(window.bitacoraList));
 
@@ -725,10 +993,11 @@
 
         function confirmSuspension() {
             const idx = window.activeModalIndex;
-            const item = OFFICIAL_PLANS["1"][idx];
+            const item = OFFICIAL_PLANS["2"][idx];
             const pilot = document.getElementById('suspendPilotName').value || 'Piloto en Turno';
             const reason = document.getElementById('suspendReasonSelect').value;
             const notes = document.getElementById('suspendNotes').value;
+            const imageData = window.tempCompressedImage || "";
 
             window.dailyFlightStatuses[idx] = { status: 'SUSPENDIDO', realTime: 'N/A', note: `${reason} - ${notes}` };
             safeStorageSet('audi_flight_statuses', JSON.stringify(window.dailyFlightStatuses));
@@ -742,24 +1011,101 @@
                 status: 'SUSPENDIDO',
                 realTime: 'N/A',
                 pilot: pilot,
-                notes: `${reason}: ${notes}`
+                notes: `${reason}: ${notes}`,
+                imageData: imageData
             });
             safeStorageSet('audi_bitacora_logs', JSON.stringify(window.bitacoraList));
 
             closeModal('modalSuspension');
             renderFlightsTable();
             updateTargetFlightBanner(new Date());
-            showToast('Suspensión registrada en Bitácora', 'warning');
+            showToast('Suspensión registrada en Bitácora con evidencia', 'warning');
         }
 
-        function testVoiceAlert() { showToast('Sistema de audio probado con éxito', 'success'); }
+        // IMPRESIÓN Y EXPORTACIÓN DE BITÁCORA CON FOTOS
+        function printAuditBitacora() {
+            const printBody = document.getElementById('printBitacoraTableBody');
+            const now = new Date();
+            document.getElementById('printReportDate').innerText = now.toLocaleDateString('es-MX');
+            document.getElementById('printReportTime').innerText = now.toLocaleTimeString('es-MX');
 
+            if (!window.bitacoraList || window.bitacoraList.length === 0) {
+                printBody.innerHTML = `<tr><td colspan="8" class="p-3 text-center">Sin registros en la bitácora.</td></tr>`;
+            } else {
+                let html = '';
+                window.bitacoraList.forEach(item => {
+                    const imgHtml = item.imageData ? `<img src="${item.imageData}" style="max-height: 45px; margin: auto;">` : 'Sin foto';
+                    html += `
+                        <tr class="border-b border-black">
+                            <td class="p-1 border-r border-black font-mono">${item.timestampFormatted}</td>
+                            <td class="p-1 border-r border-black font-mono font-bold">${item.scheduledTime} hrs</td>
+                            <td class="p-1 border-r border-black">${item.flightType}</td>
+                            <td class="p-1 border-r border-black">${item.pilot}</td>
+                            <td class="p-1 border-r border-black font-bold">${item.status}</td>
+                            <td class="p-1 border-r border-black font-mono">${item.realTime}</td>
+                            <td class="p-1 border-r border-black">${item.notes}</td>
+                            <td class="p-1 text-center">${imgHtml}</td>
+                        </tr>
+                    `;
+                });
+                printBody.innerHTML = html;
+            }
+
+            window.print();
+        }
+
+        function exportBitacoraCSV() {
+            if (!window.bitacoraList || window.bitacoraList.length === 0) {
+                showToast("No hay registros para exportar", "warning");
+                return;
+            }
+
+            let csvContent = "data:text/csv;charset=utf-8,Fecha Registro,Hora Programada,Tipo Vuelo,Piloto,Estado,Hora Real,Notas / Motivo\n";
+            window.bitacoraList.forEach(item => {
+                csvContent += `"${item.timestampFormatted}","${item.scheduledTime}","${item.flightType}","${item.pilot}","${item.status}","${item.realTime}","${item.notes.replace(/"/g, '""')}"\n`;
+            });
+
+            const encodedUri = encodeURI(csvContent);
+            const link = document.createElement("a");
+            link.setAttribute("href", encodedUri);
+            link.setAttribute("download", `bitacora_drones_audi_${getTodayKey()}.csv`);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        function clearAllBitacora() {
+            if (!confirm("¿Deseas VACIAR completamente la Bitácora del día? Esto restablecerá todos los vuelos a PENDIENTE.")) return;
+
+            window.bitacoraList = [];
+            window.dailyFlightStatuses = {};
+            safeStorageSet('audi_bitacora_logs', JSON.stringify([]));
+            safeStorageSet('audi_flight_statuses', JSON.stringify({}));
+
+            renderBitacoraModalTable();
+            renderFlightsTable();
+            updateTargetFlightBanner(new Date());
+            showToast("Bitácora vaciada. Vuelos reiniciados a PENDIENTE", "info");
+        }
+
+        // INICIALIZADOR DE LA APLICACIÓN
         function initApp() {
-            const savedStatuses = safeStorageGet('audi_flight_statuses');
-            if (savedStatuses) { try { window.dailyFlightStatuses = JSON.parse(savedStatuses); } catch(e){} }
-            
-            const savedBitacora = safeStorageGet('audi_bitacora_logs');
-            if (savedBitacora) { try { window.bitacoraList = JSON.parse(savedBitacora); } catch(e){} }
+            const today = getTodayKey();
+            const savedDate = safeStorageGet('audi_flight_date');
+
+            if (savedDate !== today) {
+                safeStorageSet('audi_flight_date', today);
+                window.dailyFlightStatuses = {};
+                window.bitacoraList = [];
+                safeStorageSet('audi_flight_statuses', JSON.stringify({}));
+                safeStorageSet('audi_bitacora_logs', JSON.stringify([]));
+            } else {
+                const savedStatuses = safeStorageGet('audi_flight_statuses');
+                if (savedStatuses) { try { window.dailyFlightStatuses = JSON.parse(savedStatuses); } catch(e){} }
+                
+                const savedBitacora = safeStorageGet('audi_bitacora_logs');
+                if (savedBitacora) { try { window.bitacoraList = JSON.parse(savedBitacora); } catch(e){} }
+            }
 
             startLiveClock();
             renderFlightsTable();
