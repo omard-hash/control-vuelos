@@ -68,40 +68,36 @@
         <div class="max-w-7xl mx-auto flex flex-col xs:flex-row justify-between items-center gap-2">
             
             <!-- Logo Audi e Indicadores -->
-            <div class="flex items-center gap-2 w-full xs:w-auto justify-between xs:justify-start">
-                <div class="flex items-center gap-2">
-                    <div class="p-1.5 bg-audi-red text-white rounded-lg shadow flex items-center justify-center shrink-0">
-                        <i class="fa-solid fa-plane-departure text-sm"></i>
-                    </div>
-                    <div class="flex items-center gap-1 flex-wrap">
-                        <span class="text-[9px] font-extrabold tracking-wider uppercase bg-slate-800 text-red-400 px-1.5 py-0.5 rounded border border-red-900/40">Audi México</span>
-                        <span id="shiftBadge" class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-950/80 text-emerald-400 border border-emerald-800/40">Turno --</span>
-                    </div>
+            <div class="flex items-center gap-2 shrink-0">
+                <div class="p-1.5 bg-audi-red text-white rounded-lg shadow flex items-center justify-center shrink-0">
+                    <i class="fa-solid fa-plane-departure text-sm"></i>
                 </div>
-
-                <span id="audioStatusBadge" class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-800 text-amber-300 border border-amber-700/60 flex items-center gap-1 shrink-0 cursor-pointer" onclick="unlockAudioSystem()">
-                    <i id="audioStatusIcon" class="fa-solid fa-volume-xmark text-amber-400"></i> <span id="audioStatusText">Audio Inactivo</span>
-                </span>
+                <div class="flex items-center gap-1">
+                    <span class="text-[9px] font-extrabold tracking-wider uppercase bg-slate-800 text-red-400 px-1.5 py-0.5 rounded border border-red-900/40 shrink-0">Audi México</span>
+                    <span id="shiftBadge" class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-950/80 text-emerald-400 border border-emerald-800/40 shrink-0">Turno --</span>
+                </div>
             </div>
 
             <!-- RELOJ E INDICADORES DE AUDIO Y BITÁCORA -->
-            <div class="flex items-center justify-between xs:justify-end gap-2 w-full xs:w-auto bg-slate-950/90 px-3 py-1.5 rounded-xl border border-slate-800 shadow-inner">
-                <div class="text-left xs:text-right me-1">
-                    <div id="liveClock" class="text-3xl sm:text-5xl font-mono font-black text-amber-300 tracking-wider leading-none">00:00:00</div>
-                    <div id="liveDate" class="text-[10px] text-slate-400 font-semibold mt-1 truncate max-w-[140px] sm:max-w-none">Cargando fecha...</div>
+            <div class="flex items-center justify-between xs:justify-end gap-2 w-full xs:w-auto bg-slate-950/90 px-2.5 py-1.5 rounded-xl border border-slate-800 shadow-inner">
+                <div class="text-left xs:text-right flex flex-col items-start xs:items-end me-1">
+                    <div id="liveClock" class="text-2xl sm:text-4xl font-mono font-black text-amber-300 tracking-wider leading-none">00:00:00</div>
+                    <div id="liveDate" class="text-[9.5px] text-slate-400 font-semibold mt-0.5 truncate max-w-[130px] sm:max-w-none">Cargando fecha...</div>
+                    <div id="audioStatusBadge" class="mt-1 text-[8.5px] font-bold px-1.5 py-0.5 rounded bg-slate-800 text-amber-300 border border-amber-700/60 flex items-center gap-1 shrink-0 cursor-pointer" onclick="unlockAudioSystem()">
+                        <i id="audioStatusIcon" class="fa-solid fa-volume-xmark text-amber-400"></i> <span id="audioStatusText">Audio Inactivo</span>
+                    </div>
                 </div>
                 
-                <div class="flex items-center gap-1.5">
+                <div class="flex items-center gap-1 shrink-0">
                     <!-- BOTÓN BITÁCORA -->
-                    <button onclick="openBitacoraModal()" id="btnOpenBitacora" class="px-2.5 py-1.5 rounded-lg text-xs font-black bg-blue-600 hover:bg-blue-500 text-white border border-blue-400/40 shadow-md transition flex items-center gap-1 cursor-pointer shrink-0">
+                    <button onclick="openBitacoraModal()" id="btnOpenBitacora" class="px-2 py-1.5 rounded-lg text-xs font-black bg-blue-600 hover:bg-blue-500 text-white border border-blue-400/40 shadow-md transition flex items-center gap-1 cursor-pointer shrink-0">
                         <i class="fa-solid fa-book-bookmark text-amber-300"></i>
-                        <span class="text-[11px]">Bitácora</span>
+                        <span class="text-[10px]">Bitácora</span>
                     </button>
 
                     <!-- BOTÓN PRUEBA DE SONIDO -->
                     <button id="btnTestVoice" onclick="toggleAudioAndTest()" title="Probar Alerta de Voz" class="p-1.5 rounded-lg bg-amber-950/80 hover:bg-amber-900 text-amber-300 text-xs border border-amber-700/60 transition flex items-center gap-1 shrink-0">
                         <i id="btnTestVoiceIcon" class="fa-solid fa-volume-high text-amber-400"></i>
-                        <span id="btnTestVoiceText" class="text-[9px] font-bold text-amber-300 hidden md:inline">Audio</span>
                     </button>
                 </div>
             </div>
@@ -619,7 +615,7 @@
 
             if (badgeText) badgeText.innerText = "Audio Activo";
             if (badgeIcon) badgeIcon.className = "fa-solid fa-volume-high text-emerald-400 animate-pulse";
-            if (badgeContainer) badgeContainer.className = "text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-950/80 text-emerald-400 border border-emerald-800/60 flex items-center gap-1 shrink-0 cursor-pointer";
+            if (badgeContainer) badgeContainer.className = "mt-1 text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-950/80 text-emerald-400 border border-emerald-800/60 flex items-center gap-1 shrink-0 cursor-pointer";
 
             try {
                 const AudioCtx = window.AudioContext || window.webkitAudioContext;
