@@ -221,7 +221,6 @@
             </div>
         </section>
 
-        <!-- Resumen de Contadores -->
         <section class="bg-slate-900/90 p-2.5 rounded-xl border border-slate-800 shadow-lg grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
             <div class="bg-slate-950/80 p-2 rounded-lg border border-slate-800/80 text-center flex flex-col justify-center">
                 <span class="text-[9px] uppercase font-bold text-slate-400">Jornada 24h</span>
@@ -261,7 +260,6 @@
                 <span class="text-[10px] text-slate-400 font-mono">Ventana: &plusmn;30 min</span>
             </div>
 
-            <!-- Tabla de Vuelos Reducida y Deslizable -->
             <div class="max-h-52 sm:max-h-60 overflow-y-auto pr-1 custom-scrollbar">
                 <table class="w-full text-left text-xs min-w-[420px]">
                     <thead class="bg-slate-950 text-slate-400 uppercase font-bold tracking-wider border-b border-slate-800 text-[9.5px] sticky top-0 z-10 shadow">
@@ -282,7 +280,6 @@
             </div>
         </section>
 
-        <!-- Bitácora Auditora Section -->
         <section id="bitacoraSection" class="bg-slate-900 p-4 rounded-2xl border border-slate-800 shadow-xl space-y-3 hidden">
             <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800 pb-3">
                 <div>
@@ -731,50 +728,64 @@
 
         function updateTargetFlightBanner(nowDate) {
             const plan = OFFICIAL_PLANS[window.currentWeeklyPlan] || OFFICIAL_PLANS["1"];
-            const currentSec = nowDate.getHours() * 3600 + nowDate.getMinutes() * 60 + nowDate.getSeconds();
+            
+            const year = nowDate.getFullYear();
+            const month = nowDate.getMonth();
+            const date = nowDate.getDate();
+            
+            let targetIdx = -1;
+            let targetFlightDate = null;
+            let targetWinStart = null;
+            let targetWinEnd = null;
 
-            let targetIdx = 0;
-            let minDiffSec = Infinity;
+            // Recorrer los vuelos programados para hoy
+            for (let i = 0; i < plan.length; i++) {
+                const item = plan[i];
+                const [h, m] = item.timeOp2.split(':').map(Number);
+                const fDate = new Date(year, month, date, h, m, 0);
+                const wStart = new Date(fDate.getTime() - 30 * 60 * 1000);
+                const wEnd = new Date(fDate.getTime() + 30 * 60 * 1000);
 
-            plan.forEach((item, idx) => {
-                const timeStr = item.timeOp2;
-                const [h, m] = timeStr.split(':').map(Number);
-                let flightSec = h * 3600 + m * 60;
-
-                let diffSec = flightSec - currentSec;
-                if (diffSec < -2700) diffSec += 86400;
-
-                if (diffSec < minDiffSec && diffSec >= -2700) {
-                    minDiffSec = diffSec;
-                    targetIdx = idx;
+                // Prioridad 1: Ventana de vuelo actualmente abierta
+                if (nowDate >= wStart && nowDate <= wEnd) {
+                    targetIdx = i;
+                    targetFlightDate = fDate;
+                    targetWinStart = wStart;
+                    targetWinEnd = wEnd;
+                    break;
+                } else if (nowDate < wStart) {
+                    // Prioridad 2: Primer vuelo futuro del día
+                    targetIdx = i;
+                    targetFlightDate = fDate;
+                    targetWinStart = wStart;
+                    targetWinEnd = wEnd;
+                    break;
                 }
-            });
+            }
+
+            // Si todos los vuelos de hoy ya pasaron su ventana (después de las 23:30), apuntar al vuelo 1 de mañana (00:30 hrs)
+            if (targetIdx === -1) {
+                targetIdx = 0;
+                const item = plan[0];
+                const [h, m] = item.timeOp2.split(':').map(Number);
+                targetFlightDate = new Date(year, month, date + 1, h, m, 0);
+                targetWinStart = new Date(targetFlightDate.getTime() - 30 * 60 * 1000);
+                targetWinEnd = new Date(targetFlightDate.getTime() + 30 * 60 * 1000);
+            }
 
             const currentTarget = plan[targetIdx];
             const targetTimeStr = currentTarget.timeOp2;
-            const [th, tm] = targetTimeStr.split(':').map(Number);
-            let targetSec = th * 3600 + tm * 60;
-            let winStartSec = targetSec - 30 * 60;
-            let winEndSec = targetSec + 30 * 60;
-
-            let currentSecNorm = currentSec;
-            if (targetSec === 0 && currentSecNorm >= 86400 - 1800) {
-                targetSec += 86400;
-                winStartSec = targetSec - 1800;
-                winEndSec = targetSec + 1800;
-            }
-
-            const formatMinStr = (sec) => {
-                let norm = (sec + 86400) % 86400;
-                let hh = String(Math.floor(norm / 3600)).padStart(2, '0');
-                let mm = String(Math.floor((norm % 3600) / 60)).padStart(2, '0');
-                return `${hh}:${mm}`;
-            };
 
             const targetTimeEl = document.getElementById('targetFlightTime');
             const targetBadgeEl = document.getElementById('targetFlightBadge');
             const targetWindowEl = document.getElementById('targetFlightWindow');
             const targetCountdownEl = document.getElementById('targetCountdown');
+
+            const formatTimeStr = (d) => {
+                const hh = String(d.getHours()).padStart(2, '0');
+                const mm = String(d.getMinutes()).padStart(2, '0');
+                return `${hh}:${mm}`;
+            };
 
             if (targetTimeEl) targetTimeEl.innerText = `${targetTimeStr} hrs`;
             if (targetBadgeEl) {
@@ -786,31 +797,38 @@
                     ? "px-2.5 py-1 rounded-md text-[11px] font-extrabold bg-amber-600 text-slate-950 uppercase" 
                     : "px-2.5 py-1 rounded-md text-[11px] font-extrabold bg-audi-red text-white";
             }
+
             if (targetWindowEl) {
                 if (currentTarget.type === 'B') {
                     targetWindowEl.innerText = `Exacto: ${targetTimeStr} hrs (Avisos 15m, 5m y 0m)`;
                 } else {
-                    targetWindowEl.innerText = `${formatMinStr(winStartSec)} - ${formatMinStr(winEndSec)} hrs`;
+                    targetWindowEl.innerText = `${formatTimeStr(targetWinStart)} - ${formatTimeStr(targetWinEnd)} hrs`;
                 }
             }
 
-            if (targetCountdownEl) {
-                const secToWinStart = winStartSec - currentSecNorm;
-                const secToTargetEnd = winEndSec - currentSecNorm;
+            // Cálculo del estado del cronómetro y tiempo restante
+            const diffToStartMs = targetWinStart.getTime() - nowDate.getTime();
+            const diffToEndMs = targetWinEnd.getTime() - nowDate.getTime();
 
-                if (secToWinStart > 0) {
-                    const mins = Math.floor(secToWinStart / 60);
-                    const secs = secToWinStart % 60;
+            const isWindowOpen = (diffToStartMs <= 0 && diffToEndMs >= 0);
+            window.isTargetWindowOpen = isWindowOpen;
+
+            if (targetCountdownEl) {
+                if (diffToStartMs > 0) {
+                    const totalSec = Math.floor(diffToStartMs / 1000);
+                    const mins = Math.floor(totalSec / 60);
+                    const secs = totalSec % 60;
                     targetCountdownEl.innerText = `Abre en ${mins}m ${String(secs).padStart(2, '0')}s`;
-                    targetCountdownEl.className = "text-base sm:text-2xl font-mono font-black text-amber-400";
-                } else if (secToTargetEnd >= 0) {
-                    const mins = Math.floor(secToTargetEnd / 60);
-                    const secs = secToTargetEnd % 60;
+                    targetCountdownEl.className = "text-lg sm:text-2xl font-mono font-black text-amber-400";
+                } else if (diffToEndMs >= 0) {
+                    const totalSec = Math.floor(diffToEndMs / 1000);
+                    const mins = Math.floor(totalSec / 60);
+                    const secs = totalSec % 60;
                     targetCountdownEl.innerText = `ABIERTA (${mins}m ${String(secs).padStart(2, '0')}s)`;
-                    targetCountdownEl.className = "text-base sm:text-2xl font-mono font-black text-emerald-400 pulse-green";
+                    targetCountdownEl.className = "text-lg sm:text-2xl font-mono font-black text-emerald-400 pulse-green";
                 } else {
-                    targetCountdownEl.innerText = "Programado";
-                    targetCountdownEl.className = "text-base sm:text-xl font-mono font-black text-slate-400";
+                    targetCountdownEl.innerText = "Ventana Cerrada";
+                    targetCountdownEl.className = "text-lg sm:text-2xl font-mono font-black text-slate-400";
                 }
             }
 
@@ -820,12 +838,6 @@
             const btnFly = document.getElementById('btnQuickFly');
             const btnSuspend = document.getElementById('btnQuickSuspend');
 
-            const secToWinStart = winStartSec - currentSecNorm;
-            const secToTargetEnd = winEndSec - currentSecNorm;
-
-            const isWindowOpen = (secToWinStart <= 0 && secToTargetEnd >= 0);
-            window.isTargetWindowOpen = isWindowOpen;
-
             if (statusObj.status !== 'PENDIENTE') {
                 if (btnFly) btnFly.disabled = true;
                 if (btnSuspend) btnSuspend.disabled = true;
@@ -834,23 +846,19 @@
                 if (btnSuspend) btnSuspend.disabled = false;
             }
 
-            checkVoiceAlertsForTarget(currentTarget, targetIdx, targetTimeStr, winStartSec, winEndSec, currentSecNorm);
+            checkVoiceAlertsForTarget(currentTarget, targetIdx, targetTimeStr, targetWinStart, targetWinEnd, nowDate);
         }
 
-        function checkVoiceAlertsForTarget(currentTarget, targetIdx, targetTimeStr, winStartSec, winEndSec, currentSecNorm) {
+        function checkVoiceAlertsForTarget(currentTarget, targetIdx, targetTimeStr, targetWinStart, targetWinEnd, nowDate) {
             const statusObj = window.dailyFlightStatuses[targetIdx] || { status: 'PENDIENTE' };
             if (statusObj.status !== 'PENDIENTE') return;
 
             const todayKey = window.lastDateString || new Date().toISOString().split('T')[0];
 
             if (currentTarget.type === 'B') {
-                const [th, tm] = targetTimeStr.split(':').map(Number);
-                let targetSec = th * 3600 + tm * 60;
-                let diffSec = targetSec - currentSecNorm;
-                if (targetSec === 0 && currentSecNorm >= 86400 - 1800) {
-                    diffSec += 86400;
-                }
-                const diffMins = Math.floor(diffSec / 60);
+                const flightTargetTime = new Date(targetWinStart.getTime() + 30 * 60 * 1000);
+                const diffMs = flightTargetTime.getTime() - nowDate.getTime();
+                const diffMins = Math.floor(diffMs / 60000);
 
                 let alertCode = null;
                 let textToSpeak = "";
@@ -882,10 +890,10 @@
                 return;
             }
 
-            const elapsedSec = currentSecNorm - winStartSec;
-            const remainingSec = winEndSec - currentSecNorm;
+            const elapsedMs = nowDate.getTime() - targetWinStart.getTime();
+            const remainingMs = targetWinEnd.getTime() - nowDate.getTime();
 
-            if (elapsedSec < 0 || remainingSec < 0) return;
+            if (elapsedMs < 0 || remainingMs < 0) return;
 
             const openKey = `${todayKey}_idx${targetIdx}_OPEN_WINDOW`;
             if (!window.spokenFlightAlerts[openKey]) {
@@ -897,7 +905,7 @@
                 return;
             }
 
-            const elapsedMins = Math.floor(elapsedSec / 60);
+            const elapsedMins = Math.floor(elapsedMs / 60000);
 
             let alertCode = null;
             let textToSpeak = "";
@@ -1363,7 +1371,9 @@
             let totalSuspended = 0;
 
             const now = new Date();
-            const currentSecNorm = now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds();
+            const year = now.getFullYear();
+            const month = now.getMonth();
+            const date = now.getDate();
 
             plan.forEach((item, idx) => {
                 const statusObj = window.dailyFlightStatuses[idx] || { status: 'PENDIENTE', realTime: '--', note: '' };
@@ -1373,18 +1383,17 @@
                 if (statusObj.status === 'SUSPENDIDO') totalSuspended++;
 
                 const [h, m] = timeStr.split(':').map(Number);
-                let flightSec = h * 3600 + m * 60;
-                let startSec = flightSec - 1800;
-                let endSec = flightSec + 1800;
+                const flightDate = new Date(year, month, date, h, m, 0);
+                const winStart = new Date(flightDate.getTime() - 30 * 60 * 1000);
+                const winEnd = new Date(flightDate.getTime() + 30 * 60 * 1000);
 
-                const formatTime = (sec) => {
-                    let norm = (sec + 86400) % 86400;
-                    let hh = String(Math.floor(norm / 3600)).padStart(2, '0');
-                    let mm = String(Math.floor((norm % 3600) / 60)).padStart(2, '0');
+                const formatTime = (d) => {
+                    let hh = String(d.getHours()).padStart(2, '0');
+                    let mm = String(d.getMinutes()).padStart(2, '0');
                     return `${hh}:${mm}`;
                 };
 
-                const windowStr = `${formatTime(startSec)}-${formatTime(endSec)}`;
+                const windowStr = `${formatTime(winStart)}-${formatTime(winEnd)}`;
 
                 let statusBadge = '<span class="px-1.5 py-0.5 rounded text-[9.5px] font-bold bg-slate-800 text-slate-400 border border-slate-700">PENDIENTE</span>';
                 if (statusObj.status === 'VOLADO') {
@@ -1394,7 +1403,7 @@
                 }
 
                 const isShiftB = item.type === 'B';
-                const isPastOrActive = (startSec <= currentSecNorm) || (idx <= (window.activeTargetIdx ?? 0));
+                const isPastOrActive = (now >= winStart) || (idx <= (window.activeTargetIdx ?? 0));
 
                 html += `
                     <tr class="${idx === window.activeTargetIdx ? 'bg-blue-950/40' : 'hover:bg-slate-800/40'} transition">
