@@ -63,7 +63,7 @@
 </head>
 <body class="min-h-screen flex flex-col bg-slate-950 text-slate-100 antialiased selection:bg-red-600 selection:text-white">
 
-    <!-- HEADER / BARRA SUPERIOR (ADAPTADO A 1/4 DE PANTALLA) -->
+    <!-- HEADER / BARRA SUPERIOR (ADAPTADO A VISTA 1/4 DE PANTALLA) -->
     <header class="bg-slate-900 border-b border-slate-800 sticky top-0 z-40 shadow-xl py-2 px-2 sm:px-3">
         <div class="max-w-7xl mx-auto flex flex-col xs:flex-row justify-between items-center gap-2">
             
@@ -85,10 +85,10 @@
             </div>
 
             <!-- RELOJ E INDICADORES DE AUDIO Y BITÁCORA -->
-            <div class="flex items-center justify-between xs:justify-end gap-2 w-full xs:w-auto bg-slate-950/90 px-2 py-1 rounded-xl border border-slate-800">
+            <div class="flex items-center justify-between xs:justify-end gap-2 w-full xs:w-auto bg-slate-950/90 px-3 py-1.5 rounded-xl border border-slate-800 shadow-inner">
                 <div class="text-left xs:text-right me-1">
-                    <div id="liveClock" class="text-xl sm:text-2xl font-mono font-black text-amber-300 tracking-wider leading-none">00:00:00</div>
-                    <div id="liveDate" class="text-[9px] text-slate-400 font-semibold mt-0.5 truncate max-w-[120px] sm:max-w-none">Cargando fecha...</div>
+                    <div id="liveClock" class="text-3xl sm:text-5xl font-mono font-black text-amber-300 tracking-wider leading-none">00:00:00</div>
+                    <div id="liveDate" class="text-[10px] text-slate-400 font-semibold mt-1 truncate max-w-[140px] sm:max-w-none">Cargando fecha...</div>
                 </div>
                 
                 <div class="flex items-center gap-1.5">
@@ -138,10 +138,10 @@
                 </div>
 
                 <!-- CONTROLES Y CRONÓMETRO -->
-                <div class="flex flex-col xs:flex-row items-stretch xs:items-center gap-2 bg-slate-950/90 p-2.5 rounded-xl border border-slate-800/90 shadow-lg">
-                    <div class="text-center xs:text-right px-2 py-1 bg-slate-900/80 rounded-lg border border-slate-800 flex-1 xs:flex-none">
-                        <div class="text-[9px] uppercase font-bold text-slate-400 tracking-wider">Estado / Cronómetro</div>
-                        <div id="targetCountdown" class="text-base sm:text-xl font-mono font-black text-emerald-400 mt-0.5">Calculando...</div>
+                <div class="flex flex-col xs:flex-row items-stretch xs:items-center gap-3 bg-slate-950/90 p-3 rounded-xl border border-slate-800/90 shadow-lg">
+                    <div class="text-center xs:text-right px-3 py-1.5 bg-slate-900/80 rounded-lg border border-slate-800 flex-1 xs:flex-none">
+                        <div class="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Estado / Cronómetro</div>
+                        <div id="targetCountdown" class="text-2xl sm:text-4xl lg:text-5xl font-mono font-black text-emerald-400 mt-1">Calculando...</div>
                     </div>
 
                     <div class="flex items-center gap-1.5 flex-1 xs:flex-none">
@@ -621,7 +621,6 @@
             if (badgeIcon) badgeIcon.className = "fa-solid fa-volume-high text-emerald-400 animate-pulse";
             if (badgeContainer) badgeContainer.className = "text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-950/80 text-emerald-400 border border-emerald-800/60 flex items-center gap-1 shrink-0 cursor-pointer";
 
-            // Intentar desbloqueo de AudioContext
             try {
                 const AudioCtx = window.AudioContext || window.webkitAudioContext;
                 if (AudioCtx) {
@@ -643,17 +642,34 @@
                 const AudioCtx = window.AudioContext || window.webkitAudioContext;
                 if (AudioCtx) {
                     const ctx = new AudioCtx();
-                    const osc = ctx.createOscillator();
-                    const gain = ctx.createGain();
-                    osc.type = 'sine';
-                    osc.frequency.setValueAtTime(659.25, ctx.currentTime);
-                    osc.frequency.setValueAtTime(880, ctx.currentTime + 0.12);
-                    gain.gain.setValueAtTime(0.35, ctx.currentTime);
-                    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.38);
-                    osc.connect(gain);
-                    gain.connect(ctx.destination);
-                    osc.start();
-                    osc.stop(ctx.currentTime + 0.42);
+                    if (ctx.state === 'suspended') ctx.resume();
+
+                    const now = ctx.currentTime;
+                    
+                    // Pitido 1 (Alta frecuencia disuasiva)
+                    const osc1 = ctx.createOscillator();
+                    const gain1 = ctx.createGain();
+                    osc1.type = 'sine';
+                    osc1.frequency.setValueAtTime(880, now); // La5 (880 Hz)
+                    osc1.frequency.setValueAtTime(1046.5, now + 0.1); // Do6
+                    gain1.gain.setValueAtTime(0.85, now);
+                    gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
+                    osc1.connect(gain1);
+                    gain1.connect(ctx.destination);
+                    osc1.start(now);
+                    osc1.stop(now + 0.28);
+
+                    // Pitido 2 (Alerta aguda de atención)
+                    const osc2 = ctx.createOscillator();
+                    const gain2 = ctx.createGain();
+                    osc2.type = 'triangle';
+                    osc2.frequency.setValueAtTime(1318.5, now + 0.3); // Mi6
+                    gain2.gain.setValueAtTime(0.90, now + 0.3);
+                    gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.55);
+                    osc2.connect(gain2);
+                    gain2.connect(ctx.destination);
+                    osc2.start(now + 0.3);
+                    osc2.stop(now + 0.58);
                 }
             } catch (e) {}
 
@@ -663,10 +679,11 @@
                     setTimeout(() => {
                         const utterance = new SpeechSynthesisUtterance(text);
                         utterance.lang = 'es-MX';
-                        utterance.rate = 1.0;
-                        utterance.pitch = 1.0;
+                        utterance.rate = 0.95; // Cadencia clara
+                        utterance.pitch = 1.1;  // Tono proyectado
+                        utterance.volume = 1.0; // Volumen máximo
                         window.speechSynthesis.speak(utterance);
-                    }, 80);
+                    }, 600);
                 } catch (e) {}
             }
         }
@@ -675,7 +692,7 @@
             unlockAudioSystem();
             document.getElementById('btnTestVoiceText').innerText = "Audio";
             document.getElementById('btnTestVoiceIcon').className = "fa-solid fa-volume-high text-emerald-400";
-            triggerVoiceAlert("Atención. Sistema de alertas de voz verificado y activo.");
+            triggerVoiceAlert("Atención. Sistema de alertas de voz verificado y activo al máximo volumen.");
         }
 
         // RELOJ Y EVALUACIÓN DE CRONOGRAMA
@@ -736,13 +753,13 @@
 
                 if (diffStart > 0) {
                     countdownEl.innerText = `Abre en ${Math.floor(diffStart/60)}m ${String(diffStart%60).padStart(2,'0')}s`;
-                    countdownEl.className = "text-sm sm:text-lg font-mono font-black text-amber-400";
+                    countdownEl.className = "text-xl sm:text-3xl lg:text-4xl font-mono font-black text-amber-400";
                 } else if (diffEnd >= 0) {
                     countdownEl.innerText = `ABIERTA (${Math.floor(diffEnd/60)}m ${String(diffEnd%60).padStart(2,'0')}s)`;
-                    countdownEl.className = "text-sm sm:text-lg font-mono font-black text-emerald-400 pulse-green";
+                    countdownEl.className = "text-xl sm:text-3xl lg:text-4xl font-mono font-black text-emerald-400 pulse-green";
                 } else {
                     countdownEl.innerText = "Ventana Pasada";
-                    countdownEl.className = "text-sm sm:text-base font-mono font-black text-slate-400";
+                    countdownEl.className = "text-lg sm:text-2xl font-mono font-black text-slate-400";
                 }
             }
 
@@ -751,7 +768,7 @@
             window.activeTargetIdx = targetIdx;
         }
 
-        // EVALUACIÓN ROBUSTA DE ALERTAS DE VOZ POR HITOS (GARANTIZA EJECUCIÓN INCLUSO CON DESFASE)
+        // EVALUACIÓN ROBUSTA DE ALERTAS DE VOZ POR HITOS
         function checkVoiceAlerts(flight, flightIdx, currentMins, targetBaseMins) {
             const today = getTodayKey();
             const diffMins = targetBaseMins - currentMins;
@@ -765,6 +782,15 @@
                 if (!window.triggeredAlertsToday.has(alertKey)) {
                     window.triggeredAlertsToday.add(alertKey);
                     triggerVoiceAlert(`Atención. Se ha abierto la ventana del vuelo de las ${flight.timeOp2} horas.`);
+                }
+            }
+
+            // 1B. ALERTA Y PITIDO DE 5 MINUTOS ANTES DEL CIERRE DE VENTANA DE VUELO
+            if (diffMins <= -25 && diffMins >= -30) {
+                const alertKey = `win_close_5m_${flight.timeOp2}_${today}`;
+                if (!window.triggeredAlertsToday.has(alertKey)) {
+                    window.triggeredAlertsToday.add(alertKey);
+                    triggerVoiceAlert(`Alerta urgente. Quedan solo 5 minutos para que finalice la ventana del vuelo de las ${flight.timeOp2} horas.`);
                 }
             }
 
@@ -786,7 +812,7 @@
                         triggerVoiceAlert(`Alerta importante. Faltan solo 5 minutos para el vuelo forzoso de las ${flight.timeOp2} horas. Preparar despegue inmediato.`);
                     }
                 }
-                // Hora exacta (0 min o justo cumplida)
+                // Hora exacta
                 if (diffMins <= 0 && diffMins >= -5) {
                     const alertKey = `forced_exact_${flight.timeOp2}_${today}`;
                     if (!window.triggeredAlertsToday.has(alertKey)) {
@@ -1183,7 +1209,6 @@
                 if (savedBitacora) { try { window.bitacoraList = JSON.parse(savedBitacora); } catch(e){} }
             }
 
-            // Desbloquear audio automáticamente al interactuar
             document.addEventListener('click', unlockAudioSystem, { once: false });
             document.addEventListener('touchstart', unlockAudioSystem, { once: false });
 
