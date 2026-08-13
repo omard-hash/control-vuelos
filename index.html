@@ -200,7 +200,7 @@
                     </p>
                 </div>
 
-                <!-- CONTROLES PRINCIPALES (DESPEGUE, SUSPENDER, QUITAR SUSPENSIÓN) -->
+                <!-- CONTROLES PRINCIPALES (DESPEGUE Y SUSPENDER) -->
                 <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 bg-slate-950/90 p-3 rounded-xl border border-slate-800/90 shadow-lg">
                     <div class="text-center sm:text-right px-2.5 py-1 bg-slate-900/80 rounded-lg border border-slate-800">
                         <div class="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Estado Ventana / Cronómetro</div>
@@ -214,9 +214,6 @@
                         </button>
                         <button id="btnQuickSuspend" onclick="openSuspensionModalForCurrent()" class="flex-1 sm:flex-none px-4 py-3 bg-amber-600 hover:bg-amber-500 text-white font-bold text-sm sm:text-base rounded-xl shadow-lg shadow-amber-900/40 border border-amber-400/30 transition flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed disabled:bg-slate-800 disabled:border-slate-700 disabled:shadow-none">
                             <i class="fa-solid fa-pause text-lg"></i> SUSPENDER
-                        </button>
-                        <button id="btnQuickReactivate" onclick="reactivateFlightForCurrent()" class="hidden flex-1 sm:flex-none px-4 py-3 bg-blue-600 hover:bg-blue-500 text-white font-bold text-sm sm:text-base rounded-xl shadow-lg shadow-blue-900/40 border border-blue-400/30 transition flex items-center justify-center gap-1.5 cursor-pointer">
-                            <i class="fa-solid fa-rotate-left text-lg"></i> QUITAR SUSPENSIÓN
                         </button>
                     </div>
                 </div>
@@ -820,7 +817,6 @@
             const statusObj = window.dailyFlightStatuses[targetIdx] || { status: 'PENDIENTE' };
             const btnFly = document.getElementById('btnQuickFly');
             const btnSuspend = document.getElementById('btnQuickSuspend');
-            const btnReactivate = document.getElementById('btnQuickReactivate');
 
             const secToWinStart = winStartSec - currentSecNorm;
             const secToTargetEnd = winEndSec - currentSecNorm;
@@ -828,47 +824,12 @@
             const isWindowOpen = (secToWinStart <= 0 && secToTargetEnd >= 0);
             window.isTargetWindowOpen = isWindowOpen;
 
-            // Smart detection of ANY suspended flight in the day
-            const firstSuspendedIdx = plan.findIndex((_, idx) => window.dailyFlightStatuses[idx]?.status === 'SUSPENDIDO');
-
-            if (statusObj.status === 'SUSPENDIDO') {
-                if (btnFly) btnFly.classList.add('hidden');
-                if (btnSuspend) btnSuspend.classList.add('hidden');
-                if (btnReactivate) {
-                    btnReactivate.classList.remove('hidden');
-                    btnReactivate.disabled = false;
-                    btnReactivate.innerHTML = `<i class="fa-solid fa-rotate-left text-lg"></i> QUITAR SUSPENSIÓN (${currentTarget.timeOp2} hrs)`;
-                    btnReactivate.onclick = () => reactivateFlight(targetIdx);
-                }
-            } else if (firstSuspendedIdx !== -1) {
-                // Target flight is not suspended, but another flight IS suspended! Allow 24/7 reactivation from top banner
-                const suspItem = plan[firstSuspendedIdx];
-                if (btnReactivate) {
-                    btnReactivate.classList.remove('hidden');
-                    btnReactivate.disabled = false;
-                    btnReactivate.innerHTML = `<i class="fa-solid fa-rotate-left text-lg"></i> QUITAR SUSPENSIÓN (${suspItem.timeOp2} hrs)`;
-                    btnReactivate.onclick = () => reactivateFlight(firstSuspendedIdx);
-                }
-                if (btnFly) {
-                    btnFly.classList.remove('hidden');
-                    btnFly.disabled = !isWindowOpen;
-                }
-                if (btnSuspend) {
-                    btnSuspend.classList.remove('hidden');
-                    btnSuspend.disabled = false; // Always allow suspending due to weather or emergencies
-                }
+            if (statusObj.status !== 'PENDIENTE') {
+                if (btnFly) btnFly.disabled = true;
+                if (btnSuspend) btnSuspend.disabled = true;
             } else {
-                if (btnFly) btnFly.classList.remove('hidden');
-                if (btnSuspend) btnSuspend.classList.remove('hidden');
-                if (btnReactivate) btnReactivate.classList.add('hidden');
-
-                if (statusObj.status !== 'PENDIENTE') {
-                    if (btnFly) btnFly.disabled = true;
-                    if (btnSuspend) btnSuspend.disabled = true;
-                } else {
-                    if (btnFly) btnFly.disabled = !isWindowOpen;
-                    if (btnSuspend) btnSuspend.disabled = false; // Always enable suspension for pending flights
-                }
+                if (btnFly) btnFly.disabled = !isWindowOpen;
+                if (btnSuspend) btnSuspend.disabled = false; // Always allow suspending due to weather or emergencies
             }
 
             checkVoiceAlertsForTarget(currentTarget, targetIdx, targetTimeStr, winStartSec, winEndSec, currentSecNorm);
@@ -1022,54 +983,6 @@
             openSuspensionModalForIdx(window.activeTargetIdx || 0);
         }
 
-        function reactivateFlightForCurrent() {
-            let targetIdx = window.activeTargetIdx ?? 0;
-            if (window.dailyFlightStatuses[targetIdx]?.status !== 'SUSPENDIDO') {
-                const plan = OFFICIAL_PLANS[window.currentWeeklyPlan] || OFFICIAL_PLANS["1"];
-                const foundIdx = plan.findIndex((_, idx) => window.dailyFlightStatuses[idx]?.status === 'SUSPENDIDO');
-                if (foundIdx !== -1) {
-                    targetIdx = foundIdx;
-                }
-            }
-            reactivateFlight(targetIdx);
-        }
-
-        function reactivateFlight(idx) {
-            if (idx === undefined || idx === null) return;
-            const plan = OFFICIAL_PLANS[window.currentWeeklyPlan] || OFFICIAL_PLANS["1"];
-            const item = plan[idx];
-            if (!item) return;
-
-            window.dailyFlightStatuses[idx] = { status: 'PENDIENTE' };
-            localStorage.setItem('audi_flight_statuses', JSON.stringify(window.dailyFlightStatuses));
-
-            if (window.cloudSyncFlightStatus) window.cloudSyncFlightStatus(window.dailyFlightStatuses);
-
-            const now = new Date();
-            const bitacoraEntry = {
-                id: Date.now(),
-                timestampFormatted: now.toLocaleString('es-MX'),
-                scheduledTime: item.timeOp2,
-                flightType: `TIPO ${item.type} - ${item.name}`,
-                status: 'REACTIVADO',
-                realTime: '--',
-                pilot: 'Piloto en Turno',
-                notes: 'Suspensión levantada / Vuelo reactivado a estado pendiente',
-                evidenceImg: ''
-            };
-
-            window.bitacoraList.unshift(bitacoraEntry);
-            localStorage.setItem('audi_bitacora_logs', JSON.stringify(window.bitacoraList));
-            if (window.cloudAddBitacoraItem) window.cloudAddBitacoraItem(bitacoraEntry);
-
-            renderFlightsTable();
-            renderBitacoraTable();
-            updateTargetFlightBanner(new Date());
-
-            showToast(`Suspensión levantada. Vuelo de las ${item.timeOp2} hrs reactivado`, 'success');
-            speakAlert(`Suspensión levantada. Vuelo de las ${item.timeOp2} horas reactivado.`);
-        }
-
         function confirmTakeoff() {
             const idx = window.activeModalIndex;
             const plan = OFFICIAL_PLANS[window.currentWeeklyPlan] || OFFICIAL_PLANS["1"];
@@ -1164,6 +1077,9 @@
         }
 
         function checkSuspensionVoiceAlerts(nowDate) {
+            const hasSuspendedFlights = Object.values(window.dailyFlightStatuses).some(s => s?.status === 'SUSPENDIDO');
+            if (!hasSuspendedFlights) return;
+
             const lastSuspendStr = localStorage.getItem('audi_last_suspension_time');
             if (!lastSuspendStr) return;
 
@@ -1468,12 +1384,6 @@
                                     </button>
                                     <button onclick="openSuspensionModalForIdx(${idx})" class="px-1.5 py-0.5 bg-amber-600 hover:bg-amber-500 text-white text-[9.5px] font-bold rounded-md border border-amber-500/30 transition cursor-pointer" title="Registrar suspensión (Clima / Emergencia)">
                                         <i class="fa-solid fa-pause me-0.5"></i>Suspender
-                                    </button>
-                                </div>
-                            ` : statusObj.status === 'SUSPENDIDO' ? `
-                                <div class="flex items-center justify-end gap-1">
-                                    <button onclick="reactivateFlight(${idx})" class="px-2 py-0.5 bg-blue-600 hover:bg-blue-500 text-white text-[9.5px] font-bold rounded-md border border-blue-400/30 transition shadow cursor-pointer" title="Quitar suspensión y reactivar vuelo a estado pendiente">
-                                        <i class="fa-solid fa-rotate-left me-0.5"></i>Quitar Suspensión
                                     </button>
                                 </div>
                             ` : `<span class="text-[9.5px] text-slate-400 font-semibold"><i class="fa-solid fa-circle-check text-emerald-400 me-0.5"></i>Registrado</span>`}
