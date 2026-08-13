@@ -499,12 +499,32 @@
     <!-- FIREBASE INITIALIZATION MODULE -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, doc, setDoc, deleteDoc, onSnapshot, collection } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'audi-mexico-drones';
-        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
-        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+        // Detección segura de variables de entorno globales
+        let appId = 'audi-mexico-drones';
+        try {
+            if (typeof __app_id !== 'undefined' && __app_id) appId = __app_id;
+            else if (typeof window.__app_id !== 'undefined' && window.__app_id) appId = window.__app_id;
+        } catch(e) {}
+
+        let firebaseConfig = null;
+        try {
+            if (typeof __firebase_config !== 'undefined' && __firebase_config) {
+                firebaseConfig = typeof __firebase_config === 'string' ? JSON.parse(__firebase_config) : __firebase_config;
+            } else if (typeof window.__firebase_config !== 'undefined' && window.__firebase_config) {
+                firebaseConfig = typeof window.__firebase_config === 'string' ? JSON.parse(window.__firebase_config) : window.__firebase_config;
+            }
+        } catch(e) {
+            console.error("Error al parsear firebaseConfig:", e);
+        }
+
+        let initialAuthToken = null;
+        try {
+            if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) initialAuthToken = __initial_auth_token;
+            else if (typeof window.__initial_auth_token !== 'undefined' && window.__initial_auth_token) initialAuthToken = window.__initial_auth_token;
+        } catch(e) {}
 
         let db = null;
         let auth = null;
@@ -516,19 +536,19 @@
             const badge = document.getElementById('cloudStatusBadge');
             
             if (isOnline) {
-                if (text) text.innerText = message || "Nube en Línea";
+                if (text) text.innerText = message || "Nube Live Sincronizada";
                 if (icon) icon.className = "fa-solid fa-cloud-bolt text-emerald-400 animate-pulse";
-                if (badge) badge.className = "text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-950/80 text-emerald-400 border border-emerald-800/40 shrink-0 flex items-center gap-1";
+                if (badge) badge.className = "text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-950/80 text-emerald-400 border border-emerald-800/40 shrink-0 flex items-center gap-1 cursor-pointer";
             } else {
                 if (text) text.innerText = message || "Modo Local";
                 if (icon) icon.className = "fa-solid fa-hard-drive text-amber-400";
-                if (badge) badge.className = "text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-950/80 text-amber-400 border border-amber-800/40 shrink-0 flex items-center gap-1";
+                if (badge) badge.className = "text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-950/80 text-amber-400 border border-amber-800/40 shrink-0 flex items-center gap-1 cursor-pointer";
             }
         }
 
         async function initCloudPersistence() {
             if (!firebaseConfig) {
-                console.warn("Sin configuración Firebase. Operando en almacenamiento local.");
+                console.warn("Sin configuración de Nube Firebase. Operando en almacenamiento local.");
                 updateCloudUI(false, "Modo Local");
                 return;
             }
@@ -538,11 +558,13 @@
                 auth = getAuth(app);
                 db = getFirestore(app);
 
+                // Regla 3: Autenticación estricta antes de realizar consultas
                 if (initialAuthToken) {
                     try {
                         const userCred = await signInWithCustomToken(auth, initialAuthToken);
                         currentUser = userCred.user;
                     } catch (e) {
+                        console.warn("Custom token falló, reintentando de forma anónima:", e);
                         const userCred = await signInAnonymously(auth);
                         currentUser = userCred.user;
                     }
@@ -551,10 +573,15 @@
                     currentUser = userCred.user;
                 }
 
+                if (!currentUser) {
+                    updateCloudUI(false, "Modo Local");
+                    return;
+                }
+
                 updateCloudUI(true, "Nube Live Sincronizada");
                 setupRealtimeListeners();
             } catch (err) {
-                console.error("Error al inicializar Firebase Firestore:", err);
+                console.error("Error al inicializar la persistencia en nube Firebase:", err);
                 updateCloudUI(false, "Modo Local");
             }
         }
@@ -564,7 +591,7 @@
 
             const todayKey = window.getTodayKey();
 
-            // ESCUCHADOR EN VIVO DEL ESTADO DE VUELOS DEL DÍA
+            // ESCUCHADOR EN VIVO DEL ESTADO DE VUELOS DEL DÍA (Ruta estricta Regla 1)
             const statusDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'daily_status', todayKey);
             onSnapshot(statusDocRef, (docSnap) => {
                 if (docSnap.exists()) {
@@ -581,9 +608,12 @@
                     window.renderFlightsTable();
                     window.updateTargetFlightBanner(new Date());
                 }
-            }, (err) => console.warn("Error snapshot daily_status:", err));
+            }, (err) => {
+                console.warn("Error en el snapshot daily_status:", err);
+                updateCloudUI(false, "Error Nube");
+            });
 
-            // ESCUCHADOR EN VIVO DE LA BITÁCORA AUDITABLE
+            // ESCUCHADOR EN VIVO DE LA BITÁCORA AUDITABLE (Ruta estricta Regla 1 y consulta simple Regla 2)
             const bitacoraColRef = collection(db, 'artifacts', appId, 'public', 'data', 'bitacora_logs');
             onSnapshot(bitacoraColRef, (querySnap) => {
                 const logs = [];
@@ -591,7 +621,7 @@
                     logs.push(docSnap.data());
                 });
                 
-                // Ordenar en memoria por ID desc (más recientes primero)
+                // Ordenar en memoria por ID desc (Regla 2: Sin consultas complejas en Firestore)
                 logs.sort((a, b) => b.id - a.id);
                 
                 window.bitacoraList = logs;
@@ -601,7 +631,10 @@
                     window.renderBitacoraModalTable();
                 }
                 window.renderFlightsTable();
-            }, (err) => console.warn("Error snapshot bitacora_logs:", err));
+            }, (err) => {
+                console.warn("Error en el snapshot bitacora_logs:", err);
+                updateCloudUI(false, "Error Nube");
+            });
         }
 
         // EXPOSITOR DE FUNCIONES DE ESCRITURA FIRESTORE A WINDOW
