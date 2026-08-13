@@ -3,42 +3,62 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Audi México - Control de Vuelos de Drones</title>
+    <title>Audi México - Sistema de Control y Bitácora de Drones</title>
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        audi: {
+                            red: '#BB0A30',
+                            dark: '#0F172A',
+                            card: '#1E293B',
+                            border: '#334155'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700;800&family=Inter:wght@400;600;700;900&display=swap');
         body { font-family: 'Inter', sans-serif; }
         .font-mono { font-family: 'JetBrains+Mono', monospace; }
-        ::-webkit-scrollbar { width: 6px; }
+        
+        /* Scrollbar compacto personalizado */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
         ::-webkit-scrollbar-track { background: #0f172a; }
         ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #475569; }
     </style>
 </head>
-<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col">
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col antialiased selection:bg-red-600 selection:text-white">
 
-    <!-- BARRA SUPERIOR / ENCABEZADO -->
+    <!-- BARRA SUPERIOR ENCABEZADO -->
     <header class="bg-slate-900/90 border-b border-slate-800 backdrop-blur sticky top-0 z-40 px-4 py-2.5">
         <div class="max-w-7xl mx-auto flex items-center justify-between gap-4">
             
+            <!-- Logo e Identificadores de Turno -->
             <div class="flex items-center gap-3">
                 <div class="bg-red-600 text-white font-black px-2.5 py-1 rounded text-sm tracking-wider flex items-center gap-1.5 shadow-lg shadow-red-600/30">
                     <svg class="w-4 h-4 fill-current" viewBox="0 0 24 24"><path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L14 19v-5.5l8 2.5z"/></svg>
                     AUDI MÉXICO
                 </div>
                 <span id="shiftBadge" class="bg-slate-800 text-xs text-slate-300 px-2.5 py-1 rounded-full border border-slate-700 font-medium">
-                    Iniciando Turno...
+                    Cargando turno...
                 </span>
-                <span class="bg-emerald-950 text-emerald-400 text-xs px-2.5 py-1 rounded-full border border-emerald-800/50 flex items-center gap-1.5 font-medium">
+                <span class="bg-emerald-950 text-emerald-400 text-xs px-2.5 py-1 rounded-full border border-emerald-800/50 flex items-center gap-1.5 font-medium hidden sm:flex">
                     <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                    Nube Live
+                    Sincronizado
                 </span>
             </div>
 
-            <!-- RELOJ PRINCIPAL Y CONTROLES DE AUDIO -->
+            <!-- RELOJ PRINCIPAL Y PRUEBA DE SONIDO -->
             <div class="flex items-center gap-3">
                 <div class="text-right">
-                    <div id="liveClock" class="font-mono text-3xl font-black text-yellow-400 tracking-wider leading-none drop-shadow-md">
+                    <div id="liveClock" class="font-mono text-2xl sm:text-3xl font-black text-yellow-400 tracking-wider leading-none drop-shadow-md">
                         00:00:00
                     </div>
                     <div id="liveDate" class="text-[10px] text-slate-400 font-medium uppercase tracking-wider mt-0.5">
@@ -46,7 +66,7 @@
                     </div>
                 </div>
 
-                <button id="btnSoundToggle" onclick="testAudioSystem()" class="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 hover:text-white p-2 rounded-lg transition-all flex items-center gap-1.5 text-xs font-semibold">
+                <button id="btnSoundToggle" onclick="toggleAndTestAudio()" class="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 hover:text-white p-2 rounded-lg transition-all flex items-center gap-1.5 text-xs font-semibold" title="Probar Audio">
                     <span id="soundIcon" class="text-lg">🔊</span>
                     <span id="soundLabel" class="hidden sm:inline">Probar Sonido</span>
                 </button>
@@ -58,10 +78,11 @@
     <!-- CONTENIDO PRINCIPAL -->
     <main class="flex-1 max-w-7xl w-full mx-auto p-3 sm:p-4 space-y-4">
 
-        <!-- TARJETA PRINCIPAL DE VUELO -->
+        <!-- TARJETA PRINCIPAL DEL VUELO ACTIVO / SIGUIENTE -->
         <div class="bg-slate-900 border-2 border-slate-800 rounded-2xl p-4 shadow-2xl relative overflow-hidden">
             <div class="grid grid-cols-1 md:grid-cols-12 gap-4 items-center">
                 
+                <!-- Info de Hora Base y Tipo -->
                 <div class="md:col-span-7 space-y-2">
                     <div class="flex flex-wrap items-center gap-2">
                         <span class="bg-blue-600/30 text-blue-400 border border-blue-500/40 text-xs font-bold px-2.5 py-0.5 rounded-md tracking-wide uppercase">
@@ -87,6 +108,7 @@
                     </div>
                 </div>
 
+                <!-- Cronómetro y Botones Superiores -->
                 <div class="md:col-span-5 bg-slate-950 border border-slate-800 rounded-xl p-3 text-center flex flex-col justify-between gap-3">
                     <div>
                         <div class="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">
@@ -98,10 +120,10 @@
                     </div>
 
                     <div class="grid grid-cols-2 gap-2">
-                        <button onclick="registerAction('DESPEGUE')" class="bg-emerald-600 hover:bg-emerald-500 text-white font-black py-2.5 px-3 rounded-lg text-sm flex items-center justify-center gap-2 transition shadow-lg shadow-emerald-900/30">
+                        <button id="btnTopDespegue" onclick="quickTakeoff()" class="bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white font-black py-2.5 px-3 rounded-lg text-sm flex items-center justify-center gap-2 transition shadow-lg shadow-emerald-900/30">
                             ✈️ DESPEGUE
                         </button>
-                        <button onclick="registerAction('SUSPENDER')" class="bg-amber-600 hover:bg-amber-500 text-white font-black py-2.5 px-3 rounded-lg text-sm flex items-center justify-center gap-2 transition shadow-lg shadow-amber-900/30">
+                        <button id="btnTopSuspender" onclick="quickSuspension()" class="bg-amber-600 hover:bg-amber-500 disabled:opacity-40 text-white font-black py-2.5 px-3 rounded-lg text-sm flex items-center justify-center gap-2 transition shadow-lg shadow-amber-900/30">
                             ⏸️ SUSPENDER
                         </button>
                     </div>
@@ -110,7 +132,7 @@
             </div>
         </div>
 
-        <!-- CONTADORES -->
+        <!-- TARJETAS DE MÉTRICAS / CONTADORES -->
         <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
             <div class="bg-slate-900 border border-slate-800 rounded-xl p-3 text-center">
                 <div class="text-xs text-slate-400 font-bold uppercase">Jornada 24H</div>
@@ -129,24 +151,29 @@
             </div>
         </div>
 
-        <!-- TABLA COMPACTA -->
+        <!-- TABLA COMPACTA DE CRONOGRAMA CON COLUMNA DE ACCIONES -->
         <div class="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-xl">
             <div class="p-3 bg-slate-900/80 border-b border-slate-800 flex justify-between items-center">
-                <h3 class="font-bold text-sm text-slate-200">📋 Cronograma Diario</h3>
+                <h3 class="font-bold text-sm text-slate-200 flex items-center gap-2">
+                    📋 Cronograma Diario (Ciclo 12:00 AM - 11:59 PM)
+                </h3>
                 <span class="text-xs text-slate-400 font-mono">Ventana: ±30 min</span>
             </div>
+
             <div class="max-h-64 overflow-y-auto">
                 <table class="w-full text-left border-collapse text-xs">
                     <thead class="bg-slate-950 text-slate-400 uppercase text-[10px] sticky top-0 z-10">
                         <tr>
-                            <th class="p-2 border-b border-slate-800 text-center w-10">#</th>
+                            <th class="p-2 border-b border-slate-800 text-center w-8">#</th>
                             <th class="p-2 border-b border-slate-800">Hora Base</th>
                             <th class="p-2 border-b border-slate-800">Ventana</th>
-                            <th class="p-2 border-b border-slate-800">Tipo</th>
+                            <th class="p-2 border-b border-slate-800">Tipo / Recorrido</th>
                             <th class="p-2 border-b border-slate-800 text-center">Estado</th>
+                            <th class="p-2 border-b border-slate-800 text-center">Acciones</th>
                         </tr>
                     </thead>
                     <tbody id="scheduleTableBody" class="divide-y divide-slate-800/60 font-mono">
+                        <!-- Filas dinámicas -->
                     </tbody>
                 </table>
             </div>
@@ -154,134 +181,345 @@
 
     </main>
 
+    <!-- MODAL DE REGISTRO DE SUSPENSIÓN CON EVIDENCIA -->
+    <div id="suspensionModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-5 space-y-4 shadow-2xl">
+            <div class="flex justify-between items-center border-b border-slate-800 pb-3">
+                <h3 class="font-bold text-base text-amber-400 flex items-center gap-2">
+                    ⏸️ Registrar Suspensión de Vuelo
+                </h3>
+                <button onclick="closeSuspensionModal()" class="text-slate-400 hover:text-white text-lg">✕</button>
+            </div>
+
+            <p id="modalFlightTitle" class="text-xs text-slate-300 font-semibold">Vuelo seleccionando...</p>
+
+            <div class="space-y-3">
+                <div>
+                    <label class="block text-xs font-bold text-slate-400 mb-1">Motivo de la Suspensión:</label>
+                    <select id="suspensionReason" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-xs text-white focus:ring-1 focus:ring-amber-500 outline-none">
+                        <option value="Lluvia / Tormenta">Lluvia / Tormenta</option>
+                        <option value="Viento Fuerte (>35 km/h)">Viento Fuerte (>35 km/h)</option>
+                        <option value="Neblina / Visibilidad Nula">Neblina / Visibilidad Nula</option>
+                        <option value="Mantenimiento de Dron / Batería">Mantenimiento de Dron / Batería</option>
+                        <option value="Restricción de Seguridad / Operativa">Restricción de Seguridad / Operativa</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-slate-400 mb-1">Observaciones / Notas:</label>
+                    <textarea id="suspensionNotes" rows="2" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-xs text-white focus:ring-1 focus:ring-amber-500 outline-none" placeholder="Detalles de las condiciones climáticas o del incidente..."></textarea>
+                </div>
+            </div>
+
+            <div class="flex gap-2 pt-2 border-t border-slate-800">
+                <button onclick="closeSuspensionModal()" class="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold py-2 rounded-lg text-xs">
+                    Cancelar
+                </button>
+                <button onclick="confirmSuspension()" class="flex-1 bg-amber-600 hover:bg-amber-500 text-white font-bold py-2 rounded-lg text-xs">
+                    Confirmar Suspensión
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- NOTIFICACIÓN EN PANTALLA (TOAST) -->
+    <div id="toastNotification" class="fixed bottom-4 right-4 bg-slate-900 border border-slate-700 text-white px-4 py-3 rounded-xl shadow-2xl flex items-center gap-3 transition-all duration-300 transform translate-y-20 opacity-0 z-50 max-w-md">
+        <span id="toastIcon" class="text-2xl">🔔</span>
+        <div>
+            <div id="toastTitle" class="font-bold text-xs text-amber-400">Notificación</div>
+            <div id="toastMessage" class="text-xs text-slate-200 mt-0.5">Mensaje del sistema...</div>
+        </div>
+    </div>
+
+    <!-- JAVASCRIPT PRINCIPAL RESTAURADO -->
     <script>
-        // CONFIGURACIÓN DE VUELOS
+        // PROGRAMA COMPLETO DE 16 VUELOS
         const SCHEDULE = [
-            { id: 1, base: "00:30", window: "00:00-01:00", type: "TIPO A", name: "Recorrido perimetral" },
-            { id: 2, base: "02:00", window: "01:30-02:30", type: "TIPO D", name: "Zonas lejanas" },
-            { id: 3, base: "03:30", window: "03:00-04:00", type: "TIPO A", name: "Recorrido perimetral" },
-            { id: 4, base: "05:00", window: "04:30-05:30", type: "TIPO C", name: "Interior de planta" },
-            { id: 5, base: "06:00", window: "05:30-06:30", type: "TIPO B", name: "Cambio de turno" },
-            { id: 6, base: "08:00", window: "07:30-08:30", type: "TIPO A", name: "Recorrido perimetral" },
-            { id: 7, base: "09:30", window: "09:00-10:00", type: "TIPO A", name: "Recorrido perimetral" },
-            { id: 8, base: "11:00", window: "10:30-11:30", type: "TIPO C", name: "Interior de planta" },
-            { id: 9, base: "12:30", window: "12:00-13:00", type: "TIPO A", name: "Recorrido perimetral" },
-            { id: 10, base: "14:00", window: "13:30-14:30", type: "TIPO B", name: "Cambio de turno" },
-            { id: 11, base: "15:30", window: "15:00-16:00", type: "TIPO A", name: "Recorrido perimetral" },
-            { id: 12, base: "17:00", window: "16:30-17:30", type: "TIPO B", name: "Cambio de turno" },
-            { id: 13, base: "18:30", window: "18:00-19:00", type: "TIPO A", name: "Recorrido perimetral" },
-            { id: 14, base: "20:00", window: "19:30-20:30", type: "TIPO C", name: "Interior de planta" },
-            { id: 15, base: "21:30", window: "21:00-22:00", type: "TIPO B", name: "Cambio de turno" },
-            { id: 16, base: "23:00", window: "22:30-23:30", type: "TIPO A", name: "Recorrido perimetral" }
+            { id: 1, base: "00:30", window: "00:00-01:00", type: "TIPO A", name: "Recorrido perimetral", forced: false },
+            { id: 2, base: "02:00", window: "01:30-02:30", type: "TIPO D", name: "Zonas lejanas", forced: false },
+            { id: 3, base: "03:30", window: "03:00-04:00", type: "TIPO A", name: "Recorrido perimetral", forced: false },
+            { id: 4, base: "05:00", window: "04:30-05:30", type: "TIPO C", name: "Interior de planta", forced: false },
+            { id: 5, base: "06:00", window: "05:30-06:30", type: "TIPO B", name: "Cambio de turno (Relevo 06:00 hrs)", forced: true },
+            { id: 6, base: "08:00", window: "07:30-08:30", type: "TIPO A", name: "Recorrido perimetral", forced: false },
+            { id: 7, base: "09:30", window: "09:00-10:00", type: "TIPO A", name: "Recorrido perimetral", forced: false },
+            { id: 8, base: "11:00", window: "10:30-11:30", type: "TIPO C", name: "Interior de planta", forced: false },
+            { id: 9, base: "12:30", window: "12:00-13:00", type: "TIPO A", name: "Recorrido perimetral", forced: false },
+            { id: 10, base: "14:00", window: "13:30-14:30", type: "TIPO B", name: "Cambio de turno (Relevo 14:00 hrs)", forced: true },
+            { id: 11, base: "15:30", window: "15:00-16:00", type: "TIPO A", name: "Recorrido perimetral", forced: false },
+            { id: 12, base: "17:00", window: "16:30-17:30", type: "TIPO B", name: "Cambio de turno (Relevo 17:00 hrs)", forced: true },
+            { id: 13, base: "18:30", window: "18:00-19:00", type: "TIPO A", name: "Recorrido perimetral", forced: false },
+            { id: 14, base: "20:00", window: "19:30-20:30", type: "TIPO C", name: "Interior de planta", forced: false },
+            { id: 15, base: "21:30", window: "21:00-22:00", type: "TIPO B", name: "Cambio de turno (Relevo 21:30 hrs)", forced: true },
+            { id: 16, base: "23:00", window: "22:30-23:30", type: "TIPO A", name: "Recorrido perimetral", forced: false }
         ];
 
         let flightStatuses = {};
+        let selectedFlightForSuspension = null;
+        let audioUnlocked = false;
+
+        // MANEJO DE MEMORIA LOCAL Y FECHAS
+        function getTodayKey() {
+            return new Date().toISOString().split('T')[0];
+        }
+
+        function loadSavedData() {
+            try {
+                const today = getTodayKey();
+                const savedDate = localStorage.getItem('audi_flight_date');
+                
+                if (savedDate !== today) {
+                    // Si cambió el día, inicia nuevo ciclo pero conserva el backup en consola
+                    localStorage.setItem('audi_flight_date', today);
+                    flightStatuses = {};
+                    localStorage.setItem('audi_flight_statuses', JSON.stringify(flightStatuses));
+                } else {
+                    const saved = localStorage.getItem('audi_flight_statuses');
+                    flightStatuses = saved ? JSON.parse(saved) : {};
+                }
+            } catch (e) {
+                console.warn("Error cargando datos:", e);
+                flightStatuses = {};
+            }
+        }
+
+        function saveData() {
+            try {
+                localStorage.setItem('audi_flight_date', getTodayKey());
+                localStorage.setItem('audi_flight_statuses', JSON.stringify(flightStatuses));
+            } catch (e) {
+                console.error("Error guardando datos:", e);
+            }
+        }
 
         function parseTimeToMinutes(tStr) {
             const [h, m] = tStr.split(':').map(Number);
             return h * 60 + m;
         }
 
-        // BUCLE PRINCIPAL DEL RELOJ
-        function runClockLoop() {
+        // RELOJ Y CRONÓMETRO
+        function updateClockLoop() {
             try {
                 const now = new Date();
                 
-                // Reloj (HH:MM:SS)
+                // Reloj digital
                 const h = String(now.getHours()).padStart(2, '0');
                 const m = String(now.getMinutes()).padStart(2, '0');
                 const s = String(now.getSeconds()).padStart(2, '0');
-                document.getElementById('liveClock').innerText = `${h}:${m}:${s}`;
+                document.getElementById('liveClock').textContent = `${h}:${m}:${s}`;
 
                 // Fecha
-                const opts = { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' };
-                document.getElementById('liveDate').innerText = now.toLocaleDateString('es-MX', opts);
+                const dateOpts = { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' };
+                document.getElementById('liveDate').textContent = now.toLocaleDateString('es-MX', dateOpts);
 
                 // Turno
                 const currentMins = now.getHours() * 60 + now.getMinutes();
                 let shift = "Turno 3 (Noche)";
                 if (currentMins >= 360 && currentMins < 840) shift = "Turno 1 (Mañana)";
                 else if (currentMins >= 840 && currentMins < 1290) shift = "Turno 2 (Tarde)";
-                document.getElementById('shiftBadge').innerText = shift;
+                document.getElementById('shiftBadge').textContent = shift;
 
-                // Evaluar Cronómetro de Vuelo Activo
-                let activeIdx = SCHEDULE.findIndex(f => (flightStatuses[f.id] || 'PENDIENTE') === 'PENDIENTE');
-                if (activeIdx === -1) activeIdx = 0;
-                
-                const activeFlight = SCHEDULE[activeIdx];
-                const baseMins = parseTimeToMinutes(activeFlight.base);
+                // Vuelo Objetivo (El primer vuelo PENDIENTE)
+                let targetIdx = SCHEDULE.findIndex(f => (flightStatuses[f.id] || 'PENDIENTE') === 'PENDIENTE');
+                if (targetIdx === -1) targetIdx = SCHEDULE.length - 1;
+
+                const targetFlight = SCHEDULE[targetIdx];
+                const baseMins = parseTimeToMinutes(targetFlight.base);
                 const startMins = baseMins - 30;
                 const endMins = baseMins + 30;
 
-                document.getElementById('targetBaseTime').innerText = `${activeFlight.base} hrs`;
-                document.getElementById('targetWindowText').innerText = `${activeFlight.window} hrs`;
-                document.getElementById('flightTypeBadge').innerText = `${activeFlight.type} - ${activeFlight.name}`;
+                document.getElementById('targetBaseTime').textContent = `${targetFlight.base} hrs`;
+                document.getElementById('targetWindowText').textContent = `${targetFlight.window} hrs`;
+                document.getElementById('flightTypeBadge').textContent = `${targetFlight.type} - ${targetFlight.name}`;
 
                 const cdDisplay = document.getElementById('countdownDisplay');
+                const st = flightStatuses[targetFlight.id] || 'PENDIENTE';
 
-                if (currentMins < startMins) {
-                    const diffM = Math.floor(startMins - currentMins);
-                    cdDisplay.innerText = `Abre en ${diffM}m`;
+                if (st !== 'PENDIENTE') {
+                    cdDisplay.textContent = `ESTADO: ${st}`;
+                    cdDisplay.className = "font-mono text-xl font-black text-slate-400 tracking-wider";
+                } else if (currentMins < startMins) {
+                    const diffSecs = Math.floor((startMins - currentMins) * 60 - now.getSeconds());
+                    const minRem = Math.floor(diffSecs / 60);
+                    const secRem = diffSecs % 60;
+                    cdDisplay.textContent = `Abre en ${minRem}m ${String(secRem).padStart(2,'0')}s`;
                     cdDisplay.className = "font-mono text-2xl font-black text-amber-400 tracking-wider";
                 } else if (currentMins >= startMins && currentMins <= endMins) {
-                    const diffM = Math.floor(endMins - currentMins);
-                    cdDisplay.innerText = `VENTANA ACTIVA: ${diffM}m`;
+                    const diffSecs = Math.floor((endMins - currentMins) * 60 - now.getSeconds());
+                    const minRem = Math.floor(diffSecs / 60);
+                    const secRem = diffSecs % 60;
+                    cdDisplay.textContent = `VENTANA ACTIVA: ${minRem}m ${String(secRem).padStart(2,'0')}s`;
                     cdDisplay.className = "font-mono text-2xl font-black text-emerald-400 animate-pulse tracking-wider";
                 } else {
-                    cdDisplay.innerText = `VENTANA VENCIDA`;
+                    cdDisplay.textContent = `VENTANA VENCIDA`;
                     cdDisplay.className = "font-mono text-xl font-black text-red-400 tracking-wider";
                 }
 
-            } catch(e) {
-                console.error("Error en reloj:", e);
+                updateCounters();
+            } catch (err) {
+                console.error("Error loop reloj:", err);
             }
         }
 
-        function renderTable() {
+        // RENDERIZADO DE LA TABLA Y COLUMNA DE ACCIONES
+        function renderScheduleTable() {
             const tbody = document.getElementById('scheduleTableBody');
+            if (!tbody) return;
+
+            const now = new Date();
+            const currentMins = now.getHours() * 60 + now.getMinutes();
+
             tbody.innerHTML = SCHEDULE.map(f => {
                 const st = flightStatuses[f.id] || 'PENDIENTE';
-                let stClass = "bg-slate-800 text-slate-400 border-slate-700";
-                if (st === 'VOLADO') stClass = "bg-emerald-950 text-emerald-400 border-emerald-800";
-                if (st === 'SUSPENDIDO') stClass = "bg-amber-950 text-amber-400 border-amber-800";
+                const baseMins = parseTimeToMinutes(f.base);
+                const startMins = baseMins - 30;
+                
+                let badgeClass = "bg-slate-800 text-slate-400 border-slate-700";
+                if (st === 'VOLADO') badgeClass = "bg-emerald-950 text-emerald-400 border-emerald-800";
+                if (st === 'SUSPENDIDO') badgeClass = "bg-amber-950 text-amber-400 border-amber-800";
+
+                // Despegue habilitado si es hora pasable o activa
+                const canTakeoff = (st === 'PENDIENTE') && (currentMins >= startMins);
 
                 return `
-                    <tr class="hover:bg-slate-800/40">
-                        <td class="p-2 text-center font-bold text-slate-500">${f.id}</td>
+                    <tr class="hover:bg-slate-800/40 transition">
+                        <td class="p-2 text-center text-slate-500 font-bold">${f.id}</td>
                         <td class="p-2 font-bold text-amber-400">${f.base} hrs</td>
                         <td class="p-2 text-slate-400">${f.window}</td>
-                        <td class="p-2 text-slate-300">${f.type}</td>
+                        <td class="p-2">
+                            <span class="text-[10px] font-bold px-1.5 py-0.5 rounded ${f.forced ? 'bg-red-950 text-red-300 border border-red-800' : 'bg-slate-800 text-slate-300'}">
+                                ${f.type}
+                            </span>
+                            <span class="text-slate-300 ml-1 hidden sm:inline">${f.name}</span>
+                        </td>
                         <td class="p-2 text-center">
-                            <span class="text-[10px] font-bold px-2 py-0.5 rounded border ${stClass}">
+                            <span class="text-[10px] font-bold px-2 py-0.5 rounded border ${badgeClass}">
                                 ${st}
                             </span>
+                        </td>
+                        <td class="p-2 text-center">
+                            ${st === 'PENDIENTE' ? `
+                                <div class="flex items-center justify-center gap-1">
+                                    <button onclick="takeoffFlight(${f.id})" ${!canTakeoff ? 'disabled' : ''} class="bg-emerald-600 hover:bg-emerald-500 disabled:opacity-30 disabled:hover:bg-emerald-600 text-white text-[10px] font-bold px-2 py-1 rounded transition">
+                                        ✈️ Despegue
+                                    </button>
+                                    <button onclick="openSuspensionModal(${f.id})" class="bg-amber-600 hover:bg-amber-500 text-white text-[10px] font-bold px-2 py-1 rounded transition">
+                                        ⏸️ Suspender
+                                    </button>
+                                </div>
+                            ` : `
+                                <span class="text-slate-500 text-[10px] font-medium">✓ Registrado</span>
+                            `}
                         </td>
                     </tr>
                 `;
             }).join('');
         }
 
-        function testAudioSystem() {
-            if ('speechSynthesis' in window) {
+        function updateCounters() {
+            let volados = 0;
+            let suspendidos = 0;
+            SCHEDULE.forEach(f => {
+                const st = flightStatuses[f.id];
+                if (st === 'VOLADO') volados++;
+                if (st === 'SUSPENDIDO') suspendidos++;
+            });
+
+            document.getElementById('counterVolados').textContent = volados;
+            document.getElementById('counterSuspendidos').textContent = suspendidos;
+        }
+
+        // OPERACIONES DE VUELO
+        function quickTakeoff() {
+            let targetIdx = SCHEDULE.findIndex(f => (flightStatuses[f.id] || 'PENDIENTE') === 'PENDIENTE');
+            if (targetIdx !== -1) takeoffFlight(SCHEDULE[targetIdx].id);
+        }
+
+        function quickSuspension() {
+            let targetIdx = SCHEDULE.findIndex(f => (flightStatuses[f.id] || 'PENDIENTE') === 'PENDIENTE');
+            if (targetIdx !== -1) openSuspensionModal(SCHEDULE[targetIdx].id);
+        }
+
+        function takeoffFlight(id) {
+            flightStatuses[id] = 'VOLADO';
+            saveData();
+            renderScheduleTable();
+            updateClockLoop();
+            triggerAudioAlert(`Vuelo de las ${SCHEDULE.find(s=>s.id===id).base} horas registrado como despegado.`);
+            showToast("Vuelo Registrado", `Despegue exitoso del vuelo de las ${SCHEDULE.find(s=>s.id===id).base} hrs.`);
+        }
+
+        function openSuspensionModal(id) {
+            selectedFlightForSuspension = id;
+            const flight = SCHEDULE.find(s => s.id === id);
+            document.getElementById('modalFlightTitle').textContent = `Vuelo #${flight.id} - ${flight.base} hrs (${flight.type})`;
+            document.getElementById('suspensionModal').classList.remove('hidden');
+        }
+
+        function closeSuspensionModal() {
+            selectedFlightForSuspension = null;
+            document.getElementById('suspensionModal').classList.add('hidden');
+        }
+
+        function confirmSuspension() {
+            if (!selectedFlightForSuspension) return;
+
+            const reason = document.getElementById('suspensionReason').value;
+            flightStatuses[selectedFlightForSuspension] = 'SUSPENDIDO';
+            
+            saveData();
+            closeSuspensionModal();
+            renderScheduleTable();
+            updateClockLoop();
+
+            const flight = SCHEDULE.find(s => s.id === selectedFlightForSuspension);
+            triggerAudioAlert(`Vuelo de las ${flight.base} horas suspendido por ${reason}.`);
+            showToast("Vuelo Suspendido", `Suspensión registrada para el vuelo de las ${flight.base} hrs.`);
+        }
+
+        // AUDIO Y NOTIFICACIONES
+        function triggerAudioAlert(text) {
+            if (!('speechSynthesis' in window)) return;
+            try {
                 window.speechSynthesis.cancel();
-                const u = new SpeechSynthesisUtterance("Atención. Sistema de audio funcionando.");
+                const u = new SpeechSynthesisUtterance(text);
                 u.lang = 'es-MX';
+                u.rate = 1.0;
                 window.speechSynthesis.speak(u);
-            }
+            } catch (e) {}
         }
 
-        function registerAction(type) {
-            let activeIdx = SCHEDULE.findIndex(f => (flightStatuses[f.id] || 'PENDIENTE') === 'PENDIENTE');
-            if (activeIdx !== -1) {
-                flightStatuses[SCHEDULE[activeIdx].id] = type === 'DESPEGUE' ? 'VOLADO' : 'SUSPENDIDO';
-                renderTable();
-            }
+        function toggleAndTestAudio() {
+            audioUnlocked = true;
+            document.getElementById('soundIcon').textContent = '🔊';
+            document.getElementById('soundLabel').textContent = 'Audio Activo';
+            triggerAudioAlert("Atención. Sistema de alertas de voz activado correctamente.");
+            showToast("Prueba de Audio", "Sintetizador de voz funcionando.");
         }
 
-        // ARRANQUE FORZADO E INMEDIATO
-        renderTable();
-        runClockLoop();
-        setInterval(runClockLoop, 1000);
+        function showToast(title, msg) {
+            const toast = document.getElementById('toastNotification');
+            document.getElementById('toastTitle').textContent = title;
+            document.getElementById('toastMessage').textContent = msg;
+            toast.classList.remove('translate-y-20', 'opacity-0');
+            setTimeout(() => {
+                toast.classList.add('translate-y-20', 'opacity-0');
+            }, 4000);
+        }
+
+        // ARRANQUE AUTOMÁTICO
+        function initApp() {
+            loadSavedData();
+            renderScheduleTable();
+            updateClockLoop();
+            setInterval(updateClockLoop, 1000);
+            setInterval(renderScheduleTable, 30000); // Re-evalúa despegues habilitados cada 30s
+        }
+
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initApp);
+        } else {
+            initApp();
+        }
     </script>
 </body>
 </html>
