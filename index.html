@@ -162,9 +162,9 @@
                     <span id="btnToggleBitacoraText" class="hidden sm:inline">Bitácora</span>
                 </button>
 
-                <button id="btnTestVoice" onclick="testVoiceAlert()" title="Probar Alerta de Voz y Activar Sonido" class="p-1.5 rounded-lg bg-emerald-950/80 hover:bg-emerald-900 text-emerald-300 text-xs border border-emerald-700/60 transition flex items-center gap-1">
-                    <i class="fa-solid fa-bullhorn text-emerald-400"></i>
-                    <span class="text-[10px] font-bold text-emerald-300 hidden xs:inline">Probar Sonido</span>
+                <button id="btnTestVoice" onclick="testVoiceAlert()" title="Probar Alerta de Voz y Activar Sonido" class="p-1.5 rounded-lg bg-amber-950/80 hover:bg-amber-900 text-amber-300 text-xs border border-amber-700/60 transition flex items-center gap-1 animate-pulse">
+                    <i id="btnTestVoiceIcon" class="fa-solid fa-volume-xmark text-amber-400"></i>
+                    <span id="btnTestVoiceText" class="text-[10px] font-bold text-amber-300 hidden xs:inline">Activar Sonido</span>
                 </button>
             </div>
         </div>
@@ -887,17 +887,24 @@
 
             if (elapsedSec < 0 || remainingSec < 0) return;
 
+            // ALERTA DE APERTURA DE VENTANA: Se activa en cualquier momento que la ventana esté abierta
+            const openKey = `${todayKey}_idx${targetIdx}_OPEN_WINDOW`;
+            if (!window.spokenFlightAlerts[openKey]) {
+                window.spokenFlightAlerts[openKey] = true;
+                const openText = `Atención piloto. Se abre la ventana de vuelo para las ${targetTimeStr} horas. Recorrido ${currentTarget.name}.`;
+                speakAlert(openText);
+                showToast(openText, "info");
+                sendDesktopNotification("Ventana de Vuelo Abierta", openText);
+                return;
+            }
+
             const elapsedMins = Math.floor(elapsedSec / 60);
 
             let alertCode = null;
             let textToSpeak = "";
             let toastType = "info";
 
-            if (elapsedMins === 0) {
-                alertCode = "OPEN_0M";
-                textToSpeak = `Atención piloto. Se abre la ventana de vuelo para las ${targetTimeStr} horas. Recorrido ${currentTarget.name}.`;
-                toastType = "info";
-            } else if (elapsedMins === 15) {
+            if (elapsedMins === 15) {
                 alertCode = "ACTIVE_15M";
                 textToSpeak = `Recordatorio de vuelo. La ventana de las ${targetTimeStr} horas está activa. Restan 45 minutos de ventana.`;
                 toastType = "info";
@@ -1174,23 +1181,41 @@
             
             if ('speechSynthesis' in window) {
                 try {
-                    window.speechSynthesis.resume();
                     window.speechSynthesis.cancel();
 
-                    const utterance = new SpeechSynthesisUtterance(text);
-                    utterance.lang = 'es-MX';
-                    utterance.rate = 1.0;
-                    utterance.pitch = 1.0;
-
-                    const voices = window.speechSynthesis.getVoices();
-                    if (voices && voices.length > 0) {
-                        const spanishVoice = voices.find(v => v.lang.startsWith('es-MX') || v.lang.startsWith('es'));
-                        if (spanishVoice) utterance.voice = spanishVoice;
-                    }
-
                     setTimeout(() => {
+                        const utterance = new SpeechSynthesisUtterance(text);
+                        utterance.lang = 'es-MX';
+                        utterance.rate = 0.95;
+                        utterance.pitch = 1.0;
+                        utterance.volume = 1.0;
+
+                        const voices = window.speechSynthesis.getVoices();
+                        if (voices && voices.length > 0) {
+                            const spanishVoice = voices.find(v => 
+                                v.lang.includes('es-MX') || 
+                                v.lang.includes('es_MX') || 
+                                v.lang.startsWith('es')
+                            );
+                            if (spanishVoice) utterance.voice = spanishVoice;
+                        }
+
+                        if (window.speechSynthesis.paused) {
+                            window.speechSynthesis.resume();
+                        }
+
                         window.speechSynthesis.speak(utterance);
-                    }, 100);
+
+                        // Keep-alive timer for Chrome SpeechSynthesis bug
+                        const keepAlive = setInterval(() => {
+                            if (!window.speechSynthesis.speaking) {
+                                clearInterval(keepAlive);
+                            } else {
+                                window.speechSynthesis.resume();
+                            }
+                        }, 250);
+                    }, 60);
+
                 } catch(e) {
                     console.warn("Speech Synthesis Warning:", e);
                 }
@@ -1211,42 +1236,58 @@
 
                 const now = window.audioCtx.currentTime;
                 
+                // Tone 1 (E5 - 659.25Hz)
                 const osc1 = window.audioCtx.createOscillator();
                 const gain1 = window.audioCtx.createGain();
                 osc1.type = 'sine';
-                osc1.frequency.setValueAtTime(587.33, now); // D5
-                gain1.gain.setValueAtTime(0.15, now);
-                gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
+                osc1.frequency.setValueAtTime(659.25, now);
+                gain1.gain.setValueAtTime(0.35, now);
+                gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.22);
                 osc1.connect(gain1);
                 gain1.connect(window.audioCtx.destination);
                 osc1.start(now);
-                osc1.stop(now + 0.25);
+                osc1.stop(now + 0.22);
 
+                // Tone 2 (A5 - 880Hz)
                 const osc2 = window.audioCtx.createOscillator();
                 const gain2 = window.audioCtx.createGain();
                 osc2.type = 'sine';
-                osc2.frequency.setValueAtTime(880, now + 0.15); // A5
-                gain2.gain.setValueAtTime(0.2, now + 0.15);
-                gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.55);
+                osc2.frequency.setValueAtTime(880, now + 0.15);
+                gain2.gain.setValueAtTime(0.4, now + 0.15);
+                gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.5);
                 osc2.connect(gain2);
                 gain2.connect(window.audioCtx.destination);
                 osc2.start(now + 0.15);
-                osc2.stop(now + 0.55);
+                osc2.stop(now + 0.5);
 
             } catch (err) {
                 console.warn("Audio Chime Error:", err);
             }
         }
+        window.activeTargetIdx = targetIdx;
 
-        window.speechUnlocked = false;
-        function unlockAudioSpeech() {
-            if (!window.speechUnlocked) {
-                if (window.speechSynthesis) {
-                    window.speechSynthesis.resume();
-                }
-                playAudioChime();
-                window.speechUnlocked = true;
+        const statusObj = window.dailyFlightStatuses[targetIdx] || { status: 'PENDIENTE' };
+        const btnFly = document.getElementById('btnQuickFly');
+        const btnSuspend = document.getElementById('btnQuickSuspend');
+
+        if (btnFly) btnFly.disabled = (statusObj.status !== 'PENDIENTE');
+        if (btnSuspend) btnSuspend.disabled = (statusObj.status !== 'PENDIENTE');
+
+        checkVoiceAlertsForTarget(currentTarget, targetIdx, targetTimeStr, winStartSec, winEndSec, currentSecNorm);
+    }
+            playAudioChime();
+            window.speechUnlocked = true;
+
+            const btn = document.getElementById('btnTestVoice');
+            const icon = document.getElementById('btnTestVoiceIcon');
+            const text = document.getElementById('btnTestVoiceText');
+
+            if (btn && icon && text) {
+                btn.className = "p-1.5 rounded-lg bg-emerald-950/80 hover:bg-emerald-900 text-emerald-300 text-xs border border-emerald-700/60 transition flex items-center gap-1";
+                icon.className = "fa-solid fa-volume-high text-emerald-400";
+                text.innerText = "Audio Activo";
             }
+
             if ("Notification" in window && Notification.permission === "default") {
                 Notification.requestPermission();
             }
