@@ -1303,7 +1303,8 @@
         }
 
         function handleMidnightReset() {
-            window.dailyFlightStatuses = {};
+            const todayKey = new Date().toISOString().split('T')[0];
+            window.dailyFlightStatuses = { dateKey: todayKey };
             window.spokenFlightAlerts = {};
             localStorage.setItem('audi_flight_statuses', JSON.stringify(window.dailyFlightStatuses));
             if (window.cloudSyncFlightStatus) {
@@ -1313,9 +1314,19 @@
             showToast('Jornada reiniciada a las 12:00 AM', 'info');
         }
 
+        function validateAndCleanTodayStatuses() {
+            const todayKey = new Date().toISOString().split('T')[0];
+            if (!window.dailyFlightStatuses || window.dailyFlightStatuses.dateKey !== todayKey) {
+                window.dailyFlightStatuses = { dateKey: todayKey };
+                localStorage.setItem('audi_flight_statuses', JSON.stringify(window.dailyFlightStatuses));
+            }
+        }
+
         function renderFlightsTable() {
             const tbody = document.getElementById('flightsTableBody');
             if (!tbody) return;
+
+            validateAndCleanTodayStatuses();
 
             const plan = OFFICIAL_PLANS[window.currentWeeklyPlan] || OFFICIAL_PLANS["1"];
             let html = '';
@@ -1518,11 +1529,21 @@
         }
 
         window.addEventListener('DOMContentLoaded', () => {
+            const todayKey = new Date().toISOString().split('T')[0];
             const savedStatuses = localStorage.getItem('audi_flight_statuses');
             if (savedStatuses) {
-                try { window.dailyFlightStatuses = JSON.parse(savedStatuses); } catch(e) { window.dailyFlightStatuses = {}; }
+                try { 
+                    const parsed = JSON.parse(savedStatuses); 
+                    if (parsed && parsed.dateKey === todayKey) {
+                        window.dailyFlightStatuses = parsed;
+                    } else {
+                        window.dailyFlightStatuses = { dateKey: todayKey };
+                    }
+                } catch(e) { 
+                    window.dailyFlightStatuses = { dateKey: todayKey }; 
+                }
             } else {
-                window.dailyFlightStatuses = {};
+                window.dailyFlightStatuses = { dateKey: todayKey };
             }
 
             const savedBitacora = localStorage.getItem('audi_bitacora_logs');
@@ -1596,13 +1617,18 @@
             if (!db) return;
 
             try {
+                const todayKey = new Date().toISOString().split('T')[0];
                 const appDocRef = doc(db, 'audi_drones_apps', window.appId);
                 onSnapshot(appDocRef, (snapshot) => {
                     if (snapshot.exists()) {
                         const data = snapshot.data();
                         if (data.flightStatuses) {
-                            window.dailyFlightStatuses = data.flightStatuses;
-                            localStorage.setItem('audi_flight_statuses', JSON.stringify(data.flightStatuses));
+                            if (data.dateKey === todayKey) {
+                                window.dailyFlightStatuses = data.flightStatuses;
+                            } else {
+                                window.dailyFlightStatuses = { dateKey: todayKey };
+                            }
+                            localStorage.setItem('audi_flight_statuses', JSON.stringify(window.dailyFlightStatuses));
                             if (typeof window.renderFlightsTable === 'function') window.renderFlightsTable();
                             if (typeof window.updateTargetFlightBanner === 'function') window.updateTargetFlightBanner(new Date());
                         }
@@ -1630,9 +1656,11 @@
         window.cloudSyncFlightStatus = async function(statuses) {
             if (!db) return;
             try {
+                const todayKey = new Date().toISOString().split('T')[0];
                 const appDocRef = doc(db, 'audi_drones_apps', window.appId);
                 await setDoc(appDocRef, { 
                     flightStatuses: statuses,
+                    dateKey: todayKey,
                     currentWeeklyPlan: window.currentWeeklyPlan || '1',
                     currentOptionTime: 'op2',
                     lastUpdated: new Date().toISOString()
