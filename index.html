@@ -712,12 +712,13 @@
             const todayKey = window.getTodayKey();
             try {
                 const statusDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'daily_status', todayKey);
+                // NOTA: Se remueve { merge: true } para permitir la eliminación real de llaves borradas en Firestore
                 await setDoc(statusDocRef, {
                     date: todayKey,
                     statuses: window.dailyFlightStatuses,
                     weatherSuspended: window.systemWeatherSuspended,
                     updatedAt: new Date().toISOString()
-                }, { merge: true });
+                });
             } catch (e) { console.error("Error guardando en nube daily_status:", e); }
         };
 
@@ -868,17 +869,17 @@
             const now = new Date();
             const currentMins = now.getHours() * 60 + now.getMinutes();
 
-            // Restablecer a PENDIENTE los vuelos suspendidos cuyo horario/ventana sea activo o futuro
+            // Restablecer a PENDIENTE todos los vuelos suspendidos cuyo horario/ventana sea activo o futuro
             plans.forEach((item, idx) => {
                 const st = window.dailyFlightStatuses[idx];
                 const baseMins = parseTimeToMinutes(item.timeOp2);
-                const windowEndMins = baseMins + 30; // Fin de la ventana de vuelo (+30 min)
+                const windowEndMins = baseMins + 30; // Fin de la ventana (+30 min)
                 
-                // Si el vuelo está suspendido y es futuro/activo (o fue suspendido en cascada)
+                // Si el vuelo está suspendido y su ventana aún no ha finalizado o es futuro
                 if (st && st.status === 'SUSPENDIDO' && (st.autoSuspended || windowEndMins > currentMins)) {
                     delete window.dailyFlightStatuses[idx];
                     
-                    // Remover de la bitácora local y de la nube los registros automáticos sin foto de evidencia
+                    // Eliminar registros automáticos de la bitácora que no tengan foto asignada
                     const logsToRemove = window.bitacoraList.filter(b => b.scheduledTime === item.timeOp2 && b.status === 'SUSPENDIDO' && !b.imageData);
                     logsToRemove.forEach(log => {
                         if (typeof window.deleteBitacoraLogFromCloud === 'function') {
@@ -890,11 +891,11 @@
                 }
             });
 
-            // Guardar en almacenamiento local
+            // Guardar localmente
             safeStorageSet('audi_flight_statuses', JSON.stringify(window.dailyFlightStatuses));
             safeStorageSet('audi_bitacora_logs', JSON.stringify(window.bitacoraList));
 
-            // Sincronizar estado en la nube Firebase
+            // Sincronizar en Nube Firebase borrando las llaves
             if (typeof window.saveDailyStatusToCloud === 'function') {
                 window.saveDailyStatusToCloud();
             }
@@ -907,7 +908,7 @@
             }
             updateTargetFlightBanner(new Date());
 
-            showToast("Clima despejado. Suspensión general finalizada y vuelos próximos restablecidos a PENDIENTES.", "success");
+            showToast("Clima despejado. Suspensión reanudada y vuelos próximos restablecidos a PENDIENTES.", "success");
             triggerVoiceAlert("Atención. Clima despejado. Suspensión reanudada. Vuelos siguientes restablecidos a pendientes.");
         }
         window.quickResumeSystem = quickResumeSystem;
