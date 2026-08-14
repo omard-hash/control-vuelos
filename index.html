@@ -864,15 +864,25 @@
             window.systemWeatherSuspended = false;
             safeStorageSet('audi_weather_suspended', 'false');
             
-            // Restablecer a PENDIENTE todos los vuelos que fueron suspendidos automáticamente por clima
             const plans = OFFICIAL_PLANS["2"];
+            const currentMins = new Date().getHours() * 60 + new Date().getMinutes();
+
+            // Restablecer a PENDIENTE todos los vuelos suspendidos por clima cuyo horario/ventana sea activo o futuro
             plans.forEach((item, idx) => {
                 const st = window.dailyFlightStatuses[idx];
-                if (st && st.status === 'SUSPENDIDO' && st.autoSuspended) {
+                const baseMins = parseTimeToMinutes(item.timeOp2);
+                
+                // Si el vuelo fue suspendido automáticamente o su ventana aún no ha vencido (+30 min)
+                if (st && st.status === 'SUSPENDIDO' && (st.autoSuspended || (baseMins + 30) > currentMins)) {
                     delete window.dailyFlightStatuses[idx];
+                    
+                    // Remover de la bitácora los registros automáticos que no tengan foto de evidencia subida
+                    window.bitacoraList = window.bitacoraList.filter(b => !(b.scheduledTime === item.timeOp2 && b.status === 'SUSPENDIDO' && !b.imageData));
                 }
             });
+
             safeStorageSet('audi_flight_statuses', JSON.stringify(window.dailyFlightStatuses));
+            safeStorageSet('audi_bitacora_logs', JSON.stringify(window.bitacoraList));
 
             updateMainWeatherButtonUI();
             
@@ -881,9 +891,12 @@
             }
 
             renderFlightsTable();
+            if (typeof window.renderBitacoraModalTable === 'function') {
+                renderBitacoraModalTable();
+            }
             updateTargetFlightBanner(new Date());
 
-            showToast("Clima despejado. Suspensión general finalizada y vuelos siguientes restablecidos.", "success");
+            showToast("Clima despejado. Suspensión general finalizada y vuelos siguientes restablecidos a PENDIENTES.", "success");
             triggerVoiceAlert("Atención. Clima despejado. Suspensión reanudada. Vuelos siguientes restablecidos a pendientes.");
         }
         window.quickResumeSystem = quickResumeSystem;
@@ -1500,48 +1513,71 @@
         window.confirmTakeoff = confirmTakeoff;
 
         function confirmSuspension() {
-            const startIdx = window.activeModalIndex;
+            const idx = window.activeModalIndex;
             const pilot = document.getElementById('suspendPilotName').value || 'Piloto en Turno';
             const reason = document.getElementById('suspendReasonSelect').value;
             const notes = document.getElementById('suspendNotes').value;
             const imageData = window.tempCompressedImage || "";
 
-            window.systemWeatherSuspended = true;
-            safeStorageSet('audi_weather_suspended', 'true');
-            updateMainWeatherButtonUI();
+            if (window.isTopLevelSuspension) {
+                window.systemWeatherSuspended = true;
+                safeStorageSet('audi_weather_suspended', 'true');
+                updateMainWeatherButtonUI();
+            }
 
             const plans = OFFICIAL_PLANS["2"];
 
-            // SUSPENDER VUELO ACTUAL Y TODOS LOS SIGUIENTES PENDIENTES
-            for (let i = startIdx; i < plans.length; i++) {
-                const currentStatus = window.dailyFlightStatuses[i];
-                if (!currentStatus || currentStatus.status === 'PENDIENTE') {
-                    const item = plans[i];
-                    const isFirst = (i === startIdx);
-                    const photoForThisFlight = isFirst ? imageData : "";
+            // Si es suspensión general por clima, suspende el vuelo activo y los siguientes pendientes en cascada
+            if (window.isTopLevelSuspension) {
+                for (let i = idx; i < plans.length; i++) {
+                    const currentStatus = window.dailyFlightStatuses[i];
+                    if (!currentStatus || currentStatus.status === 'PENDIENTE') {
+                        const item = plans[i];
+                        const isFirst = (i === idx);
+                        const photoForThisFlight = isFirst ? imageData : "";
 
-                    window.dailyFlightStatuses[i] = {
-                        status: 'SUSPENDIDO',
-                        realTime: 'N/A',
-                        note: `${reason} - ${notes}`,
-                        autoSuspended: true
-                    };
+                        window.dailyFlightStatuses[i] = { 
+                            status: 'SUSPENDIDO', 
+                            realTime: 'N/A', 
+                            note: `${reason} - ${notes}`,
+                            autoSuspended: true
+                        };
 
-                    const logEntry = {
-                        id: Date.now() + i,
-                        timestampFormatted: new Date().toLocaleString('es-MX'),
-                        scheduledTime: item.timeOp2,
-                        flightType: `TIPO ${item.type} - ${item.name}`,
-                        status: 'SUSPENDIDO',
-                        realTime: 'N/A',
-                        pilot: pilot,
-                        notes: `${reason}: ${notes}${!photoForThisFlight ? ' (Pendiente subir evidencia)' : ''}`,
-                        imageData: photoForThisFlight
-                    };
+                        const logEntry = {
+                            id: Date.now() + i,
+                            timestampFormatted: new Date().toLocaleString('es-MX'),
+                            scheduledTime: item.timeOp2,
+                            flightType: `TIPO ${item.type} - ${item.name}`,
+                            status: 'SUSPENDIDO',
+                            realTime: 'N/A',
+                            pilot: pilot,
+                            notes: `${reason}: ${notes}${!photoForThisFlight ? ' (Pendiente subir evidencia)' : ''}`,
+                            imageData: photoForThisFlight,
+                            autoSuspended: true
+                        };
 
-                    window.bitacoraList.unshift(logEntry);
-                    if (typeof window.saveBitacoraLogToCloud === 'function') window.saveBitacoraLogToCloud(logEntry);
+                        window.bitacoraList.unshift(logEntry);
+                        if (typeof window.saveBitacoraLogToCloud === 'function') window.saveBitacoraLogToCloud(logEntry);
+                    }
                 }
+            } else {
+                const item = plans[idx];
+                window.dailyFlightStatuses[idx] = { status: 'SUSPENDIDO', realTime: 'N/A', note: `${reason} - ${notes}` };
+                
+                const logEntry = {
+                    id: Date.now(),
+                    timestampFormatted: new Date().toLocaleString('es-MX'),
+                    scheduledTime: item.timeOp2,
+                    flightType: `TIPO ${item.type} - ${item.name}`,
+                    status: 'SUSPENDIDO',
+                    realTime: 'N/A',
+                    pilot: pilot,
+                    notes: `${reason}: ${notes}`,
+                    imageData: imageData
+                };
+
+                window.bitacoraList.unshift(logEntry);
+                if (typeof window.saveBitacoraLogToCloud === 'function') window.saveBitacoraLogToCloud(logEntry);
             }
 
             safeStorageSet('audi_flight_statuses', JSON.stringify(window.dailyFlightStatuses));
@@ -1553,8 +1589,12 @@
             renderFlightsTable();
             updateTargetFlightBanner(new Date());
 
-            showToast(`Suspensión general activada. Los vuelos siguientes han pasado a suspendidos (Pendiente subida de evidencia).`, 'warning');
-            triggerVoiceAlert(`Atención. Suspensión general registrada por ${reason}. Vuelos siguientes suspendidos. Favor de subir evidencia fotográfica.`, true);
+            if (window.isTopLevelSuspension) {
+                showToast(`Suspensión general activada por clima. Vuelos siguientes pasaron a suspendidos.`, 'warning');
+                triggerVoiceAlert(`Atención. Suspensión general registrada por ${reason}. Vuelos siguientes suspendidos.`, true);
+            } else {
+                showToast(`Suspensión registrada para vuelo de ${plans[idx].timeOp2} hrs.`, 'warning');
+            }
         }
         window.confirmSuspension = confirmSuspension;
 
