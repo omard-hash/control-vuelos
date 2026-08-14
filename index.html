@@ -865,38 +865,49 @@
             safeStorageSet('audi_weather_suspended', 'false');
             
             const plans = OFFICIAL_PLANS["2"];
-            const currentMins = new Date().getHours() * 60 + new Date().getMinutes();
+            const now = new Date();
+            const currentMins = now.getHours() * 60 + now.getMinutes();
 
-            // Restablecer a PENDIENTE todos los vuelos suspendidos por clima cuyo horario/ventana sea activo o futuro
+            // Restablecer a PENDIENTE los vuelos suspendidos cuyo horario/ventana sea activo o futuro
             plans.forEach((item, idx) => {
                 const st = window.dailyFlightStatuses[idx];
                 const baseMins = parseTimeToMinutes(item.timeOp2);
+                const windowEndMins = baseMins + 30; // Fin de la ventana de vuelo (+30 min)
                 
-                // Si el vuelo fue suspendido automáticamente o su ventana aún no ha vencido (+30 min)
-                if (st && st.status === 'SUSPENDIDO' && (st.autoSuspended || (baseMins + 30) > currentMins)) {
+                // Si el vuelo está suspendido y es futuro/activo (o fue suspendido en cascada)
+                if (st && st.status === 'SUSPENDIDO' && (st.autoSuspended || windowEndMins > currentMins)) {
                     delete window.dailyFlightStatuses[idx];
                     
-                    // Remover de la bitácora los registros automáticos que no tengan foto de evidencia subida
+                    // Remover de la bitácora local y de la nube los registros automáticos sin foto de evidencia
+                    const logsToRemove = window.bitacoraList.filter(b => b.scheduledTime === item.timeOp2 && b.status === 'SUSPENDIDO' && !b.imageData);
+                    logsToRemove.forEach(log => {
+                        if (typeof window.deleteBitacoraLogFromCloud === 'function') {
+                            window.deleteBitacoraLogFromCloud(log.id);
+                        }
+                    });
+
                     window.bitacoraList = window.bitacoraList.filter(b => !(b.scheduledTime === item.timeOp2 && b.status === 'SUSPENDIDO' && !b.imageData));
                 }
             });
 
+            // Guardar en almacenamiento local
             safeStorageSet('audi_flight_statuses', JSON.stringify(window.dailyFlightStatuses));
             safeStorageSet('audi_bitacora_logs', JSON.stringify(window.bitacoraList));
 
-            updateMainWeatherButtonUI();
-            
+            // Sincronizar estado en la nube Firebase
             if (typeof window.saveDailyStatusToCloud === 'function') {
                 window.saveDailyStatusToCloud();
             }
 
+            // Actualizar interfaz visual
+            updateMainWeatherButtonUI();
             renderFlightsTable();
             if (typeof window.renderBitacoraModalTable === 'function') {
                 renderBitacoraModalTable();
             }
             updateTargetFlightBanner(new Date());
 
-            showToast("Clima despejado. Suspensión general finalizada y vuelos siguientes restablecidos a PENDIENTES.", "success");
+            showToast("Clima despejado. Suspensión general finalizada y vuelos próximos restablecidos a PENDIENTES.", "success");
             triggerVoiceAlert("Atención. Clima despejado. Suspensión reanudada. Vuelos siguientes restablecidos a pendientes.");
         }
         window.quickResumeSystem = quickResumeSystem;
