@@ -69,6 +69,12 @@
                     <span class="text-[9px] font-extrabold tracking-wider uppercase bg-slate-800 text-red-400 px-1.5 py-0.5 rounded border border-red-900/40 shrink-0">Audi México</span>
                     <span id="shiftBadge" class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-950/80 text-emerald-400 border border-emerald-800/40 shrink-0">Turno --</span>
                     
+                    <!-- INDICADOR DE ESTADO DE SUSPENSIÓN SISTEMA -->
+                    <span id="systemStatusBadge" class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-950/80 text-emerald-400 border border-emerald-800/40 shrink-0 flex items-center gap-1">
+                        <i id="systemStatusIcon" class="fa-solid fa-circle-check text-emerald-400"></i>
+                        <span id="systemStatusText">Operación Normal</span>
+                    </span>
+
                     <!-- INDICADOR DE CONEXIÓN NUBE EN LÍNEA -->
                     <span id="cloudStatusBadge" onclick="openCloudSettingsModal()" title="Haz clic para consultar o ajustar Nube Firebase" class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-950/80 text-amber-400 border border-amber-800/40 shrink-0 flex items-center gap-1 cursor-pointer hover:opacity-90">
                         <i id="cloudStatusIcon" class="fa-solid fa-hard-drive text-amber-400"></i> <span id="cloudStatusText">Conectando Nube...</span>
@@ -168,7 +174,7 @@
             <div class="bg-slate-950/80 p-1.5 rounded-lg border border-amber-900/30 text-center flex flex-col justify-center">
                 <span class="text-[8.5px] uppercase font-bold text-amber-400">Suspendidos</span>
                 <span id="cntSuspended" class="text-sm sm:text-base font-black text-amber-400">0</span>
-                <span class="text-[8px] text-slate-500 hidden sm:inline">Con evidencia</span>
+                <span class="text-[8px] text-slate-500 hidden sm:inline">Con/Sin evidencia</span>
             </div>
         </section>
 
@@ -202,6 +208,39 @@
         </section>
 
     </main>
+
+    <!-- MODAL ADJUNTAR / SUBIR EVIDENCIA PARA VUELO SUSPENDIDO -->
+    <div id="modalUploadEvidence" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-3 hidden modal-backdrop">
+        <div class="bg-slate-900 border border-amber-500/40 rounded-2xl max-w-sm w-full p-4 shadow-2xl space-y-3">
+            <div class="flex justify-between items-center border-b border-slate-800 pb-2">
+                <h3 class="text-xs sm:text-sm font-bold text-amber-400 flex items-center gap-1.5">
+                    <i class="fa-solid fa-camera"></i> Subir Evidencia de Suspensión
+                </h3>
+                <button onclick="closeModal('modalUploadEvidence')" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark text-base"></i></button>
+            </div>
+            
+            <input type="hidden" id="evidenceFlightIndex">
+
+            <div class="space-y-2 text-xs">
+                <div>
+                    <label class="block text-slate-400 font-semibold mb-0.5">Vuelo / Horario:</label>
+                    <input type="text" id="evidenceFlightLabel" readonly class="w-full bg-slate-950 border border-slate-800 text-slate-200 px-2.5 py-1 rounded-lg font-bold">
+                </div>
+                <div>
+                    <label class="block text-slate-400 font-semibold mb-0.5">Fotografía de Evidencia (Clima / Radar):</label>
+                    <input type="file" id="evidenceImageInput" accept="image/*" onchange="handleImageCompress(this, 'evidenceImgPreview')" class="w-full bg-slate-950 border border-slate-700 text-slate-400 text-xs py-1 px-2 rounded-lg cursor-pointer">
+                    <div id="evidenceImgPreviewContainer" class="mt-2 text-center hidden">
+                        <img id="evidenceImgPreview" src="" alt="Vista previa evidencia" class="max-h-32 mx-auto rounded border border-slate-700 object-cover shadow">
+                    </div>
+                </div>
+            </div>
+
+            <div class="flex justify-end gap-2 pt-2 border-t border-slate-800">
+                <button onclick="closeModal('modalUploadEvidence')" class="px-3 py-1 bg-slate-800 text-slate-300 font-semibold text-xs rounded-xl">Cancelar</button>
+                <button onclick="saveEvidencePhoto()" class="px-3 py-1 bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs rounded-xl shadow">Guardar Evidencia</button>
+            </div>
+        </div>
+    </div>
 
     <!-- MODAL COMPLETO DE BITÁCORA AUDITABLE -->
     <div id="modalBitacoraView" class="fixed inset-0 bg-slate-950/90 backdrop-blur-md z-50 flex items-center justify-center p-2 sm:p-4 hidden modal-backdrop">
@@ -431,16 +470,6 @@
                     <label class="block text-slate-400 font-semibold mb-0.5">Detalle / Justificación:</label>
                     <textarea id="suspendNotes" rows="2" placeholder="Detalle la condición meteorológica o el evento..." class="w-full bg-slate-950 border border-slate-700 text-slate-200 p-2 rounded-lg"></textarea>
                 </div>
-                
-                <div id="suspendKeepFutureActiveContainer" class="p-2 bg-blue-950/60 rounded-xl border border-blue-500/30 space-y-1">
-                    <label class="flex items-center gap-2 cursor-pointer text-slate-200 font-semibold text-[11px]">
-                        <input type="checkbox" id="suspendKeepFutureActive" checked class="rounded border-slate-700 bg-slate-950 text-emerald-500 focus:ring-emerald-500 w-4 h-4">
-                        <span>¿El clima ya es favorable para vuelos siguientes?</span>
-                    </label>
-                    <p class="text-[9.5px] text-slate-400 leading-tight ps-6">
-                        Si es un registro pasado o la situación concluyó, mantendrá los vuelos siguientes activos.
-                    </p>
-                </div>
 
                 <div>
                     <label class="block text-slate-400 font-semibold mb-0.5">Foto Evidencia (Clima/Radar):</label>
@@ -453,7 +482,7 @@
 
             <div class="flex justify-end gap-2 pt-2 border-t border-slate-800">
                 <button onclick="closeModal('modalSuspension')" class="px-3 py-1 bg-slate-800 text-slate-300 font-semibold text-xs rounded-xl">Cancelar</button>
-                <button onclick="confirmSuspension()" class="px-3 py-1 bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs rounded-xl shadow">Confirmar Suspensión</button>
+                <button onclick="confirmSuspension()" class="px-3 py-1 bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs rounded-xl shadow">Confirmar Suspensión General</button>
             </div>
         </div>
     </div>
@@ -798,16 +827,26 @@
             const btn = document.getElementById('btnMainWeatherToggle');
             const icon = document.getElementById('btnMainWeatherIcon');
             const text = document.getElementById('btnMainWeatherText');
-            if (!btn || !icon || !text) return;
+            const sysBadge = document.getElementById('systemStatusBadge');
+            const sysIcon = document.getElementById('systemStatusIcon');
+            const sysText = document.getElementById('systemStatusText');
 
             if (window.systemWeatherSuspended) {
-                btn.className = "flex-1 px-3 py-2 bg-blue-600 hover:bg-blue-500 text-white font-black text-xs sm:text-sm rounded-xl shadow-lg border border-blue-400/50 transition flex items-center justify-center gap-1 cursor-pointer animate-pulse";
-                icon.className = "fa-solid fa-sun text-amber-300";
-                text.innerText = "REANUDAR";
+                if (btn) btn.className = "flex-1 px-3 py-2 bg-blue-600 hover:bg-blue-500 text-white font-black text-xs sm:text-sm rounded-xl shadow-lg border border-blue-400/50 transition flex items-center justify-center gap-1 cursor-pointer animate-pulse";
+                if (icon) icon.className = "fa-solid fa-sun text-amber-300";
+                if (text) text.innerText = "REANUDAR";
+
+                if (sysBadge) sysBadge.className = "text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-950/80 text-amber-400 border border-amber-800/40 shrink-0 flex items-center gap-1 animate-pulse";
+                if (sysIcon) sysIcon.className = "fa-solid fa-triangle-exclamation text-amber-400";
+                if (sysText) sysText.innerText = "SUSPENSIÓN GENERAL CLIMA";
             } else {
-                btn.className = "flex-1 px-3 py-2 bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs sm:text-sm rounded-xl shadow-md border border-amber-400/30 transition flex items-center justify-center gap-1 cursor-pointer";
-                icon.className = "fa-solid fa-pause";
-                text.innerText = "SUSPENDER";
+                if (btn) btn.className = "flex-1 px-3 py-2 bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs sm:text-sm rounded-xl shadow-md border border-amber-400/30 transition flex items-center justify-center gap-1 cursor-pointer";
+                if (icon) icon.className = "fa-solid fa-pause";
+                if (text) text.innerText = "SUSPENDER";
+
+                if (sysBadge) sysBadge.className = "text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-950/80 text-emerald-400 border border-emerald-800/40 shrink-0 flex items-center gap-1";
+                if (sysIcon) sysIcon.className = "fa-solid fa-circle-check text-emerald-400";
+                if (sysText) sysText.innerText = "Operación Normal";
             }
         }
         window.updateMainWeatherButtonUI = updateMainWeatherButtonUI;
@@ -824,16 +863,30 @@
         function quickResumeSystem() {
             window.systemWeatherSuspended = false;
             safeStorageSet('audi_weather_suspended', 'false');
+            
+            // Restablecer a PENDIENTE todos los vuelos que fueron suspendidos automáticamente por clima
+            const plans = OFFICIAL_PLANS["2"];
+            plans.forEach((item, idx) => {
+                const st = window.dailyFlightStatuses[idx];
+                if (st && st.status === 'SUSPENDIDO' && st.autoSuspended) {
+                    delete window.dailyFlightStatuses[idx];
+                }
+            });
+            safeStorageSet('audi_flight_statuses', JSON.stringify(window.dailyFlightStatuses));
+
             updateMainWeatherButtonUI();
             
             if (typeof window.saveDailyStatusToCloud === 'function') {
                 window.saveDailyStatusToCloud();
             }
 
-            showToast("Clima despejado. Suspensión general finalizada y vuelos reanudados.", "success");
-            triggerVoiceAlert("Atención. Clima despejado. Suspensión reanudada. Vuelos siguientes activos.");
+            renderFlightsTable();
             updateTargetFlightBanner(new Date());
+
+            showToast("Clima despejado. Suspensión general finalizada y vuelos siguientes restablecidos.", "success");
+            triggerVoiceAlert("Atención. Clima despejado. Suspensión reanudada. Vuelos siguientes restablecidos a pendientes.");
         }
+        window.quickResumeSystem = quickResumeSystem;
 
         function openModal(id) {
             const modal = document.getElementById(id);
@@ -1070,11 +1123,12 @@
                     updateShiftBadge(now.getHours());
                     updateTargetFlightBanner(now);
 
+                    // ANUNCIO PERIÓDICO CADA 60 MINUTOS EN SUSPENSIÓN GENERAL
                     if (window.systemWeatherSuspended && now.getMinutes() === 0 && now.getSeconds() === 0) {
                         if (window.lastHourlyReminderHour !== now.getHours()) {
                             window.lastHourlyReminderHour = now.getHours();
-                            triggerVoiceAlert("Atención. Suspensión general por clima activa. Por favor tome evidencia fotográfica del estado del clima.");
-                            showToast("Recordatorio: Tome evidencia fotográfica del clima actual.", "warning");
+                            triggerVoiceAlert("Atención. Suspensión por clima activa. Vuelos siguientes suspendidos. Favor de subir evidencia fotográfica.");
+                            showToast("Recordatorio 60 min: Favor de subir la evidencia fotográfica por suspensión.", "warning");
                         }
                     }
                 } catch(err) { console.warn("Clock loop error:", err); }
@@ -1125,6 +1179,17 @@
 
             const statusObj = window.dailyFlightStatuses[targetIdx] || { status: 'PENDIENTE' };
             const isTypeB = targetItem.type === 'B';
+
+            // SILENCIAR OTRAS NOTIFICACIONES MIENTRAS ESTÉ SUSPENDIDO
+            if (window.systemWeatherSuspended) {
+                if (winEl) winEl.innerText = "Suspensión General por Clima Activa";
+                if (cdEl) {
+                    cdEl.innerText = "SUSPENDIDO";
+                    cdEl.className = "text-2xl sm:text-4xl lg:text-5xl font-mono font-black text-amber-400 mt-1 animate-pulse";
+                }
+                renderFlightsTable();
+                return;
+            }
 
             if (isTypeB) {
                 if (winEl) winEl.innerText = `Hora Exacta (${targetItem.timeOp2} hrs - Sin Ventana)`;
@@ -1273,6 +1338,10 @@
                     '<span class="text-amber-400 font-bold">Hora Exacta</span>' : 
                     '±30 min';
 
+                // Buscar si hay evidencia en bitácora para este vuelo
+                const bitacoraEntry = window.bitacoraList.find(b => b.scheduledTime === item.timeOp2 && b.status === 'SUSPENDIDO');
+                const hasEvidence = bitacoraEntry && bitacoraEntry.imageData;
+
                 html += `
                     <tr class="${idx === window.activeTargetIdx ? 'bg-blue-950/40' : 'hover:bg-slate-800/40'}">
                         <td class="px-2 py-1.5 font-bold text-slate-400 text-[10px]">${idx + 1}</td>
@@ -1286,6 +1355,12 @@
                                 <div class="flex items-center justify-end gap-1">
                                     <button onclick="openTakeoffModalForIdx(${idx})" class="px-1.5 py-0.5 bg-emerald-600 hover:bg-emerald-500 text-white text-[9px] font-bold rounded cursor-pointer">Despegue</button>
                                     <button onclick="openSuspensionModalForIdx(${idx}, false)" class="px-1.5 py-0.5 bg-amber-600 hover:bg-amber-500 text-white text-[9px] font-bold rounded cursor-pointer">Suspender</button>
+                                </div>
+                            ` : (statusObj.status === 'SUSPENDIDO' && !hasEvidence) ? `
+                                <div class="flex items-center justify-end gap-1">
+                                    <button onclick="openUploadEvidenceModal(${idx})" class="px-2 py-0.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-[9px] rounded shadow animate-pulse cursor-pointer">
+                                        <i class="fa-solid fa-camera me-1"></i>Subir Evidencia
+                                    </button>
                                 </div>
                             ` : `
                                 <div class="flex items-center justify-end gap-1">
@@ -1305,6 +1380,60 @@
             if (cntSuspendedEl) cntSuspendedEl.innerText = suspendidosCount;
         }
         window.renderFlightsTable = renderFlightsTable;
+
+        function openUploadEvidenceModal(idx) {
+            window.activeModalIndex = idx;
+            window.tempCompressedImage = "";
+            const item = OFFICIAL_PLANS["2"][idx];
+
+            document.getElementById('evidenceFlightIndex').value = idx;
+            document.getElementById('evidenceFlightLabel').value = `Vuelo #${idx + 1} - ${item.timeOp2} hrs (TIPO ${item.type})`;
+            document.getElementById('evidenceImgPreview').src = "";
+            document.getElementById('evidenceImgPreviewContainer').classList.add('hidden');
+            document.getElementById('evidenceImageInput').value = "";
+
+            openModal('modalUploadEvidence');
+        }
+        window.openUploadEvidenceModal = openUploadEvidenceModal;
+
+        function saveEvidencePhoto() {
+            const idx = parseInt(document.getElementById('evidenceFlightIndex').value, 10);
+            const item = OFFICIAL_PLANS["2"][idx];
+            const imageData = window.tempCompressedImage;
+
+            if (!imageData) {
+                alert("Por favor seleccione una fotografía de evidencia antes de guardar.");
+                return;
+            }
+
+            // Buscar si ya existe una entrada en la bitácora o crear una nueva
+            let logEntry = window.bitacoraList.find(b => b.scheduledTime === item.timeOp2 && b.status === 'SUSPENDIDO');
+            if (logEntry) {
+                logEntry.imageData = imageData;
+            } else {
+                logEntry = {
+                    id: Date.now(),
+                    timestampFormatted: new Date().toLocaleString('es-MX'),
+                    scheduledTime: item.timeOp2,
+                    flightType: `TIPO ${item.type} - ${item.name}`,
+                    status: 'SUSPENDIDO',
+                    realTime: 'N/A',
+                    pilot: 'Piloto en Turno',
+                    notes: 'Suspensión general - Evidencia adjuntada',
+                    imageData: imageData
+                };
+                window.bitacoraList.unshift(logEntry);
+            }
+
+            safeStorageSet('audi_bitacora_logs', JSON.stringify(window.bitacoraList));
+            if (typeof window.saveBitacoraLogToCloud === 'function') window.saveBitacoraLogToCloud(logEntry);
+
+            closeModal('modalUploadEvidence');
+            renderFlightsTable();
+            renderBitacoraModalTable();
+            showToast("Evidencia fotográfica adjuntada correctamente.", "success");
+        }
+        window.saveEvidencePhoto = saveEvidencePhoto;
 
         function openTakeoffModalForIdx(idx) {
             window.activeModalIndex = idx;
@@ -1327,17 +1456,6 @@
             document.getElementById('suspendFlightLabel').value = `Vuelo #${idx + 1} - ${item.timeOp2} hrs (TIPO ${item.type})`;
             document.getElementById('suspendImgPreview').src = "";
             document.getElementById('suspendImgPreviewContainer').classList.add('hidden');
-            
-            const keepFutureContainer = document.getElementById('suspendKeepFutureActiveContainer');
-            if (keepFutureContainer) {
-                if (isTopLevel) {
-                    keepFutureContainer.classList.add('hidden');
-                } else {
-                    keepFutureContainer.classList.remove('hidden');
-                    const keepCheck = document.getElementById('suspendKeepFutureActive');
-                    if (keepCheck) keepCheck.checked = true;
-                }
-            }
 
             openModal('modalSuspension');
         }
@@ -1382,53 +1500,61 @@
         window.confirmTakeoff = confirmTakeoff;
 
         function confirmSuspension() {
-            const idx = window.activeModalIndex;
-            const item = OFFICIAL_PLANS["2"][idx];
+            const startIdx = window.activeModalIndex;
             const pilot = document.getElementById('suspendPilotName').value || 'Piloto en Turno';
             const reason = document.getElementById('suspendReasonSelect').value;
             const notes = document.getElementById('suspendNotes').value;
             const imageData = window.tempCompressedImage || "";
-            const keepFutureActive = document.getElementById('suspendKeepFutureActive')?.checked ?? true;
 
-            if (window.isTopLevelSuspension) {
-                window.systemWeatherSuspended = true;
-                safeStorageSet('audi_weather_suspended', 'true');
-                updateMainWeatherButtonUI();
+            window.systemWeatherSuspended = true;
+            safeStorageSet('audi_weather_suspended', 'true');
+            updateMainWeatherButtonUI();
+
+            const plans = OFFICIAL_PLANS["2"];
+
+            // SUSPENDER VUELO ACTUAL Y TODOS LOS SIGUIENTES PENDIENTES
+            for (let i = startIdx; i < plans.length; i++) {
+                const currentStatus = window.dailyFlightStatuses[i];
+                if (!currentStatus || currentStatus.status === 'PENDIENTE') {
+                    const item = plans[i];
+                    const isFirst = (i === startIdx);
+                    const photoForThisFlight = isFirst ? imageData : "";
+
+                    window.dailyFlightStatuses[i] = {
+                        status: 'SUSPENDIDO',
+                        realTime: 'N/A',
+                        note: `${reason} - ${notes}`,
+                        autoSuspended: true
+                    };
+
+                    const logEntry = {
+                        id: Date.now() + i,
+                        timestampFormatted: new Date().toLocaleString('es-MX'),
+                        scheduledTime: item.timeOp2,
+                        flightType: `TIPO ${item.type} - ${item.name}`,
+                        status: 'SUSPENDIDO',
+                        realTime: 'N/A',
+                        pilot: pilot,
+                        notes: `${reason}: ${notes}${!photoForThisFlight ? ' (Pendiente subir evidencia)' : ''}`,
+                        imageData: photoForThisFlight
+                    };
+
+                    window.bitacoraList.unshift(logEntry);
+                    if (typeof window.saveBitacoraLogToCloud === 'function') window.saveBitacoraLogToCloud(logEntry);
+                }
             }
 
-            window.dailyFlightStatuses[idx] = { status: 'SUSPENDIDO', realTime: 'N/A', note: `${reason} - ${notes}` };
             safeStorageSet('audi_flight_statuses', JSON.stringify(window.dailyFlightStatuses));
-
-            const logEntry = {
-                id: Date.now(),
-                timestampFormatted: new Date().toLocaleString('es-MX'),
-                scheduledTime: item.timeOp2,
-                flightType: `TIPO ${item.type} - ${item.name}`,
-                status: 'SUSPENDIDO',
-                realTime: 'N/A',
-                pilot: pilot,
-                notes: `${reason}: ${notes}`,
-                imageData: imageData
-            };
-
-            window.bitacoraList.unshift(logEntry);
             safeStorageSet('audi_bitacora_logs', JSON.stringify(window.bitacoraList));
 
             if (typeof window.saveDailyStatusToCloud === 'function') window.saveDailyStatusToCloud();
-            if (typeof window.saveBitacoraLogToCloud === 'function') window.saveBitacoraLogToCloud(logEntry);
 
             closeModal('modalSuspension');
             renderFlightsTable();
             updateTargetFlightBanner(new Date());
 
-            if (window.isTopLevelSuspension) {
-                showToast(`Suspensión general activada por clima. Recordatorio de foto por hora activo.`, 'warning');
-                triggerVoiceAlert(`Suspensión general registrada por ${reason}. Tome evidencia fotográfica.`);
-            } else if (keepFutureActive) {
-                showToast(`Suspensión registrada para vuelo de ${item.timeOp2} hrs. Vuelos siguientes permanecen ACTIVOS.`, 'warning');
-            } else {
-                showToast(`Suspensión registrada para vuelo de ${item.timeOp2} hrs.`, 'warning');
-            }
+            showToast(`Suspensión general activada. Los vuelos siguientes han pasado a suspendidos (Pendiente subida de evidencia).`, 'warning');
+            triggerVoiceAlert(`Atención. Suspensión general registrada por ${reason}. Vuelos siguientes suspendidos. Favor de subir evidencia fotográfica.`, true);
         }
         window.confirmSuspension = confirmSuspension;
 
@@ -1479,7 +1605,7 @@
 
                 const imgThumbnail = item.imageData ? 
                     `<img src="${item.imageData}" onclick="openFullImagePreview('${item.imageData}')" class="h-8 w-12 object-cover mx-auto rounded border border-slate-700 cursor-pointer hover:opacity-80 transition">` : 
-                    '<span class="text-slate-600 text-[9px]">Sin foto</span>';
+                    '<span class="text-amber-400 text-[9px] font-semibold"><i class="fa-solid fa-clock me-1"></i>Pendiente foto</span>';
 
                 html += `
                     <tr class="hover:bg-slate-800/40">
@@ -1608,7 +1734,7 @@
             } else {
                 let html = '';
                 window.bitacoraList.forEach(item => {
-                    const imgHtml = item.imageData ? `<img src="${item.imageData}" style="max-height: 40px; margin: auto;">` : 'Sin foto';
+                    const imgHtml = item.imageData ? `<img src="${item.imageData}" style="max-height: 40px; margin: auto;">` : 'Pendiente foto';
                     html += `
                         <tr class="border-b border-black">
                             <td class="p-1 border-r border-black">${item.timestampFormatted}</td>
