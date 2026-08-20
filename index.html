@@ -82,13 +82,12 @@
                 </div>
             </div>
 
-            <!-- RELOJ DESTACADO, FECHA Y ESTADO DE AUDIO UBICADO DEBAJO DEL RELOJ -->
+            <!-- RELOJ DESTACADO, FECHA Y ESTADO DE AUDIO -->
             <div class="flex items-center justify-between xs:justify-end gap-2 w-full xs:w-auto bg-slate-950/90 px-2.5 py-1.5 rounded-xl border border-slate-800 shadow-inner">
                 <div class="text-left xs:text-right flex flex-col items-start xs:items-end me-1">
                     <div id="liveClock" class="text-2xl sm:text-4xl font-mono font-black text-amber-300 tracking-wider leading-none drop-shadow-md">00:00:00</div>
                     <div id="liveDate" class="text-[9.5px] text-slate-400 font-semibold mt-0.5 truncate max-w-[130px] sm:max-w-none">Cargando fecha...</div>
                     
-                    <!-- Indicador de estado de Audio ubicado DEBAJO del reloj -->
                     <div id="audioStatusBadge" class="mt-1 text-[8.5px] font-bold px-1.5 py-0.5 rounded bg-slate-800 text-amber-300 border border-amber-700/60 flex items-center gap-1 shrink-0 cursor-pointer" onclick="unlockAudioSystem()">
                         <i id="audioStatusIcon" class="fa-solid fa-volume-xmark text-amber-400"></i> <span id="audioStatusText">Audio Inactivo</span>
                     </div>
@@ -109,10 +108,10 @@
         </div>
     </header>
 
-    <!-- CONTENIDO PRINCIPAL FIJO CON TABLA CON SCROLL INDEPENDIENTE -->
+    <!-- CONTENIDO PRINCIPAL FIJO -->
     <main class="flex-1 max-w-7xl w-full mx-auto px-2 sm:px-4 py-2.5 flex flex-col gap-2.5 overflow-hidden">
 
-        <!-- TARJETA PRINCIPAL DEL VUELO ACTIVO Y CRONÓMETRO GIGANTE (FIJA) -->
+        <!-- TARJETA PRINCIPAL DEL VUELO ACTIVO Y CRONÓMETRO -->
         <section id="nextFlightCard" class="bg-gradient-to-r from-slate-900 via-blue-950/60 to-slate-900 p-3 sm:p-4 rounded-2xl border border-blue-500/40 shadow-2xl relative overflow-hidden shrink-0">
             <div class="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3">
                 
@@ -137,7 +136,7 @@
                     </p>
                 </div>
 
-                <!-- CONTROLES Y CRONÓMETRO DESTACADO -->
+                <!-- CONTROLES Y CRONÓMETRO -->
                 <div class="flex flex-col xs:flex-row items-stretch xs:items-center gap-3 bg-slate-950/90 p-3 rounded-xl border border-slate-800/90 shadow-lg">
                     <div class="text-center xs:text-right px-3 py-1.5 bg-slate-900/80 rounded-lg border border-slate-800 flex-1 xs:flex-none">
                         <div class="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Estado / Cronómetro</div>
@@ -157,7 +156,7 @@
             </div>
         </section>
 
-        <!-- TARJETAS DE CONTEO (FIJAS) -->
+        <!-- TARJETAS DE CONTEO -->
         <section class="bg-slate-900/90 p-2 rounded-xl border border-slate-800 shadow-lg grid grid-cols-3 gap-1.5 text-xs shrink-0">
             <div class="bg-slate-950/80 p-1.5 rounded-lg border border-slate-800/80 text-center flex flex-col justify-center">
                 <span class="text-[8.5px] uppercase font-bold text-slate-400">Jornada 24h</span>
@@ -183,7 +182,7 @@
             <div class="flex items-center justify-between border-b border-slate-800 pb-1.5 shrink-0">
                 <h3 class="text-xs font-bold text-white flex items-center gap-1.5">
                     <i class="fa-solid fa-list-check text-audi-red"></i>
-                    Cronograma Diario
+                    Cronograma Diario <span id="activePlanBadge" class="ml-1 px-1.5 py-0.5 bg-blue-900/40 text-blue-300 font-extrabold rounded border border-blue-500/40 text-[9px] tracking-widest uppercase">Plan --</span>
                 </h3>
                 <span class="text-[9.5px] text-slate-400 font-mono">Ventana: &plusmn;30 min</span>
             </div>
@@ -712,7 +711,6 @@
             const todayKey = window.getTodayKey();
             try {
                 const statusDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'daily_status', todayKey);
-                // NOTA: Se remueve { merge: true } para permitir la eliminación real de llaves borradas en Firestore
                 await setDoc(statusDocRef, {
                     date: todayKey,
                     statuses: window.dailyFlightStatuses,
@@ -792,7 +790,43 @@
         }
         window.getTodayKey = getTodayKey;
 
+        function getActivePlanKey() {
+            const today = new Date();
+            const year = today.getFullYear();
+            const month = today.getMonth() + 1; // 1 a 12
+            const date = today.getDate();
+
+            if (year === 2026 && month === 8) {
+                if (date >= 21 && date <= 25) return "3";
+                if (date >= 26 && date <= 31) return "4";
+            }
+            
+            return "2"; // Predeterminado - Plan 2 actual
+        }
+
+        function getActivePlan() {
+            return OFFICIAL_PLANS[getActivePlanKey()];
+        }
+
         const OFFICIAL_PLANS = {
+            "1": [
+                { timeOp2: "00:00", type: "A", name: "Recorrido perimetral", forced: false },
+                { timeOp2: "01:30", type: "D", name: "Zonas lejanas", forced: false },
+                { timeOp2: "03:00", type: "A", name: "Recorrido perimetral", forced: false },
+                { timeOp2: "04:30", type: "B", name: "Cambio de turno", forced: true },
+                { timeOp2: "06:00", type: "C", name: "Interior de planta", forced: false },
+                { timeOp2: "07:30", type: "A", name: "Recorrido perimetral", forced: false },
+                { timeOp2: "09:00", type: "A", name: "Recorrido perimetral", forced: false },
+                { timeOp2: "10:30", type: "A", name: "Recorrido perimetral", forced: false },
+                { timeOp2: "12:00", type: "C", name: "Interior de planta", forced: false },
+                { timeOp2: "13:30", type: "B", name: "Cambio de turno", forced: true },
+                { timeOp2: "15:00", type: "A", name: "Recorrido perimetral", forced: false },
+                { timeOp2: "16:30", type: "B", name: "Cambio de turno", forced: true },
+                { timeOp2: "18:00", type: "A", name: "Recorrido perimetral", forced: false },
+                { timeOp2: "19:30", type: "A", name: "Recorrido perimetral", forced: false },
+                { timeOp2: "21:00", type: "B", name: "Cambio de turno", forced: true },
+                { timeOp2: "22:30", type: "D", name: "Zonas lejanas", forced: false }
+            ],
             "2": [
                 { timeOp2: "00:30", type: "A", name: "Recorrido perimetral", forced: false },
                 { timeOp2: "02:00", type: "D", name: "Zonas lejanas", forced: false },
@@ -810,6 +844,42 @@
                 { timeOp2: "20:00", type: "C", name: "Interior de planta", forced: false },
                 { timeOp2: "21:30", type: "B", name: "Cambio de turno (Relevo 21:30 hrs)", forced: true },
                 { timeOp2: "23:00", type: "A", name: "Recorrido perimetral", forced: false }
+            ],
+            "3": [
+                { timeOp2: "00:00", type: "D", name: "Zonas lejanas", forced: false },
+                { timeOp2: "01:30", type: "A", name: "Recorrido perimetral", forced: false },
+                { timeOp2: "03:00", type: "A", name: "Recorrido perimetral", forced: false },
+                { timeOp2: "04:30", type: "B", name: "Cambio de turno", forced: true },
+                { timeOp2: "06:00", type: "C", name: "Interior de planta", forced: false },
+                { timeOp2: "07:30", type: "A", name: "Recorrido perimetral", forced: false },
+                { timeOp2: "09:00", type: "A", name: "Recorrido perimetral", forced: false },
+                { timeOp2: "10:30", type: "A", name: "Recorrido perimetral", forced: false },
+                { timeOp2: "12:00", type: "D", name: "Zonas lejanas", forced: false },
+                { timeOp2: "13:30", type: "B", name: "Cambio de turno", forced: true },
+                { timeOp2: "15:00", type: "C", name: "Interior de planta", forced: false },
+                { timeOp2: "16:30", type: "B", name: "Cambio de turno", forced: true },
+                { timeOp2: "18:00", type: "A", name: "Recorrido perimetral", forced: false },
+                { timeOp2: "19:30", type: "A", name: "Recorrido perimetral", forced: false },
+                { timeOp2: "21:00", type: "B", name: "Cambio de turno", forced: true },
+                { timeOp2: "22:30", type: "C", name: "Interior de planta", forced: false }
+            ],
+            "4": [
+                { timeOp2: "00:00", type: "A", name: "Recorrido perimetral", forced: false },
+                { timeOp2: "01:30", type: "A", name: "Recorrido perimetral", forced: false },
+                { timeOp2: "03:00", type: "C", name: "Interior de planta", forced: false },
+                { timeOp2: "04:30", type: "B", name: "Cambio de turno", forced: true },
+                { timeOp2: "06:00", type: "C", name: "Interior de planta", forced: false },
+                { timeOp2: "07:30", type: "C", name: "Interior de planta", forced: false },
+                { timeOp2: "09:00", type: "A", name: "Recorrido perimetral", forced: false },
+                { timeOp2: "10:30", type: "A", name: "Recorrido perimetral", forced: false },
+                { timeOp2: "12:00", type: "A", name: "Recorrido perimetral", forced: false },
+                { timeOp2: "13:30", type: "B", name: "Cambio de turno", forced: true },
+                { timeOp2: "15:00", type: "C", name: "Interior de planta", forced: false },
+                { timeOp2: "16:30", type: "B", name: "Cambio de turno", forced: true },
+                { timeOp2: "18:00", type: "A", name: "Recorrido perimetral", forced: false },
+                { timeOp2: "19:30", type: "A", name: "Recorrido perimetral", forced: false },
+                { timeOp2: "21:00", type: "B", name: "Cambio de turno", forced: true },
+                { timeOp2: "22:30", type: "D", name: "Zonas lejanas", forced: false }
             ]
         };
 
@@ -865,7 +935,7 @@
             window.systemWeatherSuspended = false;
             safeStorageSet('audi_weather_suspended', 'false');
             
-            const plans = OFFICIAL_PLANS["2"];
+            const plans = getActivePlan();
             const now = new Date();
             const currentMins = now.getHours() * 60 + now.getMinutes();
 
@@ -1180,7 +1250,10 @@
         }
 
         function updateTargetFlightBanner(now) {
-            const plans = OFFICIAL_PLANS["2"];
+            const plans = getActivePlan();
+            const activePlanBadge = document.getElementById('activePlanBadge');
+            if (activePlanBadge) activePlanBadge.innerText = `PLAN ${getActivePlanKey()}`;
+
             const currentMins = now.getHours() * 60 + now.getMinutes();
 
             let targetIdx = plans.findIndex((p, idx) => {
@@ -1203,7 +1276,7 @@
             if (badgeEl) badgeEl.innerText = `TIPO ${targetItem.type} - ${targetItem.name}`;
 
             const statusObj = window.dailyFlightStatuses[targetIdx] || { status: 'PENDIENTE' };
-            const isTypeB = targetItem.type === 'B';
+            const isTypeB = targetItem.forced; // Uso forced para verificar si es Cambio de turno
 
             // SILENCIAR OTRAS NOTIFICACIONES MIENTRAS ESTÉ SUSPENDIDO
             if (window.systemWeatherSuspended) {
@@ -1334,14 +1407,14 @@
             const tbody = document.getElementById('flightsTableBody');
             if (!tbody) return;
 
-            const plans = OFFICIAL_PLANS["2"];
+            const plans = getActivePlan();
             let voladosCount = 0;
             let suspendidosCount = 0;
 
             let html = '';
             plans.forEach((item, idx) => {
                 const statusObj = window.dailyFlightStatuses[idx] || { status: 'PENDIENTE', realTime: '--', note: '' };
-                const isTypeB = item.type === 'B';
+                const isTypeB = item.forced;
                 
                 let statusBadge = '<span class="px-2 py-0.5 rounded text-[9.5px] font-bold bg-slate-800 text-slate-400 border border-slate-700">PENDIENTE</span>';
                 if (statusObj.status === 'VOLADO') {
@@ -1409,7 +1482,7 @@
         function openUploadEvidenceModal(idx) {
             window.activeModalIndex = idx;
             window.tempCompressedImage = "";
-            const item = OFFICIAL_PLANS["2"][idx];
+            const item = getActivePlan()[idx];
 
             document.getElementById('evidenceFlightIndex').value = idx;
             document.getElementById('evidenceFlightLabel').value = `Vuelo #${idx + 1} - ${item.timeOp2} hrs (TIPO ${item.type})`;
@@ -1423,7 +1496,7 @@
 
         function saveEvidencePhoto() {
             const idx = parseInt(document.getElementById('evidenceFlightIndex').value, 10);
-            const item = OFFICIAL_PLANS["2"][idx];
+            const item = getActivePlan()[idx];
             const imageData = window.tempCompressedImage;
 
             if (!imageData) {
@@ -1462,7 +1535,7 @@
 
         function openTakeoffModalForIdx(idx) {
             window.activeModalIndex = idx;
-            const item = OFFICIAL_PLANS["2"][idx];
+            const item = getActivePlan()[idx];
             const now = new Date();
             const timeNow = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
 
@@ -1476,7 +1549,7 @@
             window.activeModalIndex = idx;
             window.isTopLevelSuspension = isTopLevel;
             window.tempCompressedImage = "";
-            const item = OFFICIAL_PLANS["2"][idx];
+            const item = getActivePlan()[idx];
 
             document.getElementById('suspendFlightLabel').value = `Vuelo #${idx + 1} - ${item.timeOp2} hrs (TIPO ${item.type})`;
             document.getElementById('suspendImgPreview').src = "";
@@ -1491,7 +1564,7 @@
 
         function confirmTakeoff() {
             const idx = window.activeModalIndex;
-            const item = OFFICIAL_PLANS["2"][idx];
+            const item = getActivePlan()[idx];
             const realTime = document.getElementById('takeoffRealTime').value || '--';
             const pilot = document.getElementById('takeoffPilotName').value || 'Piloto en Turno';
             const notes = document.getElementById('takeoffNotes').value || 'Patrullaje completo sin novedades';
@@ -1537,7 +1610,7 @@
                 updateMainWeatherButtonUI();
             }
 
-            const plans = OFFICIAL_PLANS["2"];
+            const plans = getActivePlan();
 
             // Si es suspensión general por clima, suspende el vuelo activo y los siguientes pendientes en cascada
             if (window.isTopLevelSuspension) {
@@ -1733,7 +1806,7 @@
             window.bitacoraList[entryIdx] = updatedEntry;
             safeStorageSet('audi_bitacora_logs', JSON.stringify(window.bitacoraList));
 
-            const planIdx = OFFICIAL_PLANS["2"].findIndex(p => p.timeOp2 === schedTime);
+            const planIdx = getActivePlan().findIndex(p => p.timeOp2 === schedTime);
             if (planIdx !== -1) {
                 window.dailyFlightStatuses[planIdx] = { status, realTime, note: notes };
                 safeStorageSet('audi_flight_statuses', JSON.stringify(window.dailyFlightStatuses));
@@ -1754,7 +1827,7 @@
             showConfirmDialog("Eliminar Registro", "¿Deseas ELIMINAR este registro de la Bitácora? El vuelo volverá a estar PENDIENTE en el cronograma.", () => {
                 const entry = window.bitacoraList.find(b => b.id === id);
                 if (entry) {
-                    const planIdx = OFFICIAL_PLANS["2"].findIndex(p => p.timeOp2 === entry.scheduledTime);
+                    const planIdx = getActivePlan().findIndex(p => p.timeOp2 === entry.scheduledTime);
                     if (planIdx !== -1) {
                         delete window.dailyFlightStatuses[planIdx];
                         safeStorageSet('audi_flight_statuses', JSON.stringify(window.dailyFlightStatuses));
@@ -1849,6 +1922,7 @@
             const today = getTodayKey();
             const savedDate = safeStorageGet('audi_flight_date');
 
+            // Si es un día diferente, se blanquean los vuelos para iniciar el nuevo día (con el nuevo plan si aplica)
             if (savedDate !== today) {
                 safeStorageSet('audi_flight_date', today);
                 window.dailyFlightStatuses = {};
