@@ -177,7 +177,7 @@
             </div>
         </section>
 
-        <!-- CRONOGRAMA DIARIO DE VUELOS (SECCIÓN FLEXIBLE CON SCROLL INTERNO) -->
+        <!-- CRONOGRAMA DIARIO DE VUELOS -->
         <section class="bg-slate-900 p-2.5 rounded-2xl border border-slate-800 shadow-xl space-y-2 flex-1 flex flex-col overflow-hidden min-h-0">
             <div class="flex items-center justify-between border-b border-slate-800 pb-1.5 shrink-0">
                 <h3 class="text-xs font-bold text-white flex items-center gap-1.5">
@@ -711,6 +711,7 @@
             const todayKey = window.getTodayKey();
             try {
                 const statusDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'daily_status', todayKey);
+                // NOTA: Se remueve { merge: true } para permitir la eliminación real de llaves borradas en Firestore
                 await setDoc(statusDocRef, {
                     date: todayKey,
                     statuses: window.dailyFlightStatuses,
@@ -796,6 +797,7 @@
             const month = today.getMonth() + 1; // 1 a 12
             const date = today.getDate();
 
+            // Reglas automáticas de fecha para los planes (Mismos horarios fijos, distinto recorrido)
             if (year === 2026 && month === 8) {
                 if (date >= 21 && date <= 25) return "3";
                 if (date >= 26 && date <= 31) return "4";
@@ -808,78 +810,81 @@
             return OFFICIAL_PLANS[getActivePlanKey()];
         }
 
+        // CONSTANTES DONDE TODOS COMPARTEN LAS MISMAS 16 HORAS BASE
+        // (00:30, 02:00, 03:30, 05:00, 06:00, 08:00, 09:30, 11:00, 12:30, 14:00, 15:30, 17:00, 18:30, 20:00, 21:30, 23:00)
+        // NOTA: Los Cambios de turno (Tipo B) SIEMPRE caen en sus horas oficiales (06:00, 14:00, 17:00, 21:30).
         const OFFICIAL_PLANS = {
             "1": [
-                { timeOp2: "00:00", type: "A", name: "Recorrido perimetral", forced: false },
-                { timeOp2: "01:30", type: "D", name: "Zonas lejanas", forced: false },
-                { timeOp2: "03:00", type: "A", name: "Recorrido perimetral", forced: false },
-                { timeOp2: "04:30", type: "B", name: "Cambio de turno", forced: true },
-                { timeOp2: "06:00", type: "C", name: "Interior de planta", forced: false },
-                { timeOp2: "07:30", type: "A", name: "Recorrido perimetral", forced: false },
-                { timeOp2: "09:00", type: "A", name: "Recorrido perimetral", forced: false },
-                { timeOp2: "10:30", type: "A", name: "Recorrido perimetral", forced: false },
-                { timeOp2: "12:00", type: "C", name: "Interior de planta", forced: false },
-                { timeOp2: "13:30", type: "B", name: "Cambio de turno", forced: true },
-                { timeOp2: "15:00", type: "A", name: "Recorrido perimetral", forced: false },
-                { timeOp2: "16:30", type: "B", name: "Cambio de turno", forced: true },
-                { timeOp2: "18:00", type: "A", name: "Recorrido perimetral", forced: false },
-                { timeOp2: "19:30", type: "A", name: "Recorrido perimetral", forced: false },
-                { timeOp2: "21:00", type: "B", name: "Cambio de turno", forced: true },
-                { timeOp2: "22:30", type: "D", name: "Zonas lejanas", forced: false }
+                { timeOp2: "00:30", type: "A", name: "Recorrido perimetral", forced: false },
+                { timeOp2: "02:00", type: "D", name: "Zonas lejanas", forced: false },
+                { timeOp2: "03:30", type: "A", name: "Recorrido perimetral", forced: false },
+                { timeOp2: "05:00", type: "C", name: "Interior de planta", forced: false },
+                { timeOp2: "06:00", type: "B", name: "Cambio de turno", forced: true },
+                { timeOp2: "08:00", type: "A", name: "Recorrido perimetral", forced: false },
+                { timeOp2: "09:30", type: "A", name: "Recorrido perimetral", forced: false },
+                { timeOp2: "11:00", type: "A", name: "Recorrido perimetral", forced: false },
+                { timeOp2: "12:30", type: "C", name: "Interior de planta", forced: false },
+                { timeOp2: "14:00", type: "B", name: "Cambio de turno", forced: true },
+                { timeOp2: "15:30", type: "A", name: "Recorrido perimetral", forced: false },
+                { timeOp2: "17:00", type: "B", name: "Cambio de turno", forced: true },
+                { timeOp2: "18:30", type: "A", name: "Recorrido perimetral", forced: false },
+                { timeOp2: "20:00", type: "A", name: "Recorrido perimetral", forced: false },
+                { timeOp2: "21:30", type: "B", name: "Cambio de turno", forced: true },
+                { timeOp2: "23:00", type: "D", name: "Zonas lejanas", forced: false }
             ],
             "2": [
                 { timeOp2: "00:30", type: "A", name: "Recorrido perimetral", forced: false },
                 { timeOp2: "02:00", type: "D", name: "Zonas lejanas", forced: false },
                 { timeOp2: "03:30", type: "A", name: "Recorrido perimetral", forced: false },
                 { timeOp2: "05:00", type: "C", name: "Interior de planta", forced: false },
-                { timeOp2: "06:00", type: "B", name: "Cambio de turno (Relevo 06:00 hrs)", forced: true },
+                { timeOp2: "06:00", type: "B", name: "Cambio de turno", forced: true },
                 { timeOp2: "08:00", type: "A", name: "Recorrido perimetral", forced: false },
                 { timeOp2: "09:30", type: "A", name: "Recorrido perimetral", forced: false },
                 { timeOp2: "11:00", type: "C", name: "Interior de planta", forced: false },
                 { timeOp2: "12:30", type: "A", name: "Recorrido perimetral", forced: false },
-                { timeOp2: "14:00", type: "B", name: "Cambio de turno (Relevo 14:00 hrs)", forced: true },
+                { timeOp2: "14:00", type: "B", name: "Cambio de turno", forced: true },
                 { timeOp2: "15:30", type: "A", name: "Recorrido perimetral", forced: false },
-                { timeOp2: "17:00", type: "B", name: "Cambio de turno (Relevo 17:00 hrs)", forced: true },
+                { timeOp2: "17:00", type: "B", name: "Cambio de turno", forced: true },
                 { timeOp2: "18:30", type: "A", name: "Recorrido perimetral", forced: false },
                 { timeOp2: "20:00", type: "C", name: "Interior de planta", forced: false },
-                { timeOp2: "21:30", type: "B", name: "Cambio de turno (Relevo 21:30 hrs)", forced: true },
+                { timeOp2: "21:30", type: "B", name: "Cambio de turno", forced: true },
                 { timeOp2: "23:00", type: "A", name: "Recorrido perimetral", forced: false }
             ],
             "3": [
-                { timeOp2: "00:00", type: "D", name: "Zonas lejanas", forced: false },
-                { timeOp2: "01:30", type: "A", name: "Recorrido perimetral", forced: false },
-                { timeOp2: "03:00", type: "A", name: "Recorrido perimetral", forced: false },
-                { timeOp2: "04:30", type: "B", name: "Cambio de turno", forced: true },
-                { timeOp2: "06:00", type: "C", name: "Interior de planta", forced: false },
-                { timeOp2: "07:30", type: "A", name: "Recorrido perimetral", forced: false },
-                { timeOp2: "09:00", type: "A", name: "Recorrido perimetral", forced: false },
-                { timeOp2: "10:30", type: "A", name: "Recorrido perimetral", forced: false },
-                { timeOp2: "12:00", type: "D", name: "Zonas lejanas", forced: false },
-                { timeOp2: "13:30", type: "B", name: "Cambio de turno", forced: true },
-                { timeOp2: "15:00", type: "C", name: "Interior de planta", forced: false },
-                { timeOp2: "16:30", type: "B", name: "Cambio de turno", forced: true },
-                { timeOp2: "18:00", type: "A", name: "Recorrido perimetral", forced: false },
-                { timeOp2: "19:30", type: "A", name: "Recorrido perimetral", forced: false },
-                { timeOp2: "21:00", type: "B", name: "Cambio de turno", forced: true },
-                { timeOp2: "22:30", type: "C", name: "Interior de planta", forced: false }
+                { timeOp2: "00:30", type: "D", name: "Zonas lejanas", forced: false },
+                { timeOp2: "02:00", type: "A", name: "Recorrido perimetral", forced: false },
+                { timeOp2: "03:30", type: "A", name: "Recorrido perimetral", forced: false },
+                { timeOp2: "05:00", type: "C", name: "Interior de planta", forced: false },
+                { timeOp2: "06:00", type: "B", name: "Cambio de turno", forced: true },
+                { timeOp2: "08:00", type: "A", name: "Recorrido perimetral", forced: false },
+                { timeOp2: "09:30", type: "A", name: "Recorrido perimetral", forced: false },
+                { timeOp2: "11:00", type: "A", name: "Recorrido perimetral", forced: false },
+                { timeOp2: "12:30", type: "D", name: "Zonas lejanas", forced: false },
+                { timeOp2: "14:00", type: "B", name: "Cambio de turno", forced: true },
+                { timeOp2: "15:30", type: "C", name: "Interior de planta", forced: false },
+                { timeOp2: "17:00", type: "B", name: "Cambio de turno", forced: true },
+                { timeOp2: "18:30", type: "A", name: "Recorrido perimetral", forced: false },
+                { timeOp2: "20:00", type: "A", name: "Recorrido perimetral", forced: false },
+                { timeOp2: "21:30", type: "B", name: "Cambio de turno", forced: true },
+                { timeOp2: "23:00", type: "C", name: "Interior de planta", forced: false }
             ],
             "4": [
-                { timeOp2: "00:00", type: "A", name: "Recorrido perimetral", forced: false },
-                { timeOp2: "01:30", type: "A", name: "Recorrido perimetral", forced: false },
-                { timeOp2: "03:00", type: "C", name: "Interior de planta", forced: false },
-                { timeOp2: "04:30", type: "B", name: "Cambio de turno", forced: true },
-                { timeOp2: "06:00", type: "C", name: "Interior de planta", forced: false },
-                { timeOp2: "07:30", type: "C", name: "Interior de planta", forced: false },
-                { timeOp2: "09:00", type: "A", name: "Recorrido perimetral", forced: false },
-                { timeOp2: "10:30", type: "A", name: "Recorrido perimetral", forced: false },
-                { timeOp2: "12:00", type: "A", name: "Recorrido perimetral", forced: false },
-                { timeOp2: "13:30", type: "B", name: "Cambio de turno", forced: true },
-                { timeOp2: "15:00", type: "C", name: "Interior de planta", forced: false },
-                { timeOp2: "16:30", type: "B", name: "Cambio de turno", forced: true },
-                { timeOp2: "18:00", type: "A", name: "Recorrido perimetral", forced: false },
-                { timeOp2: "19:30", type: "A", name: "Recorrido perimetral", forced: false },
-                { timeOp2: "21:00", type: "B", name: "Cambio de turno", forced: true },
-                { timeOp2: "22:30", type: "D", name: "Zonas lejanas", forced: false }
+                { timeOp2: "00:30", type: "A", name: "Recorrido perimetral", forced: false },
+                { timeOp2: "02:00", type: "A", name: "Recorrido perimetral", forced: false },
+                { timeOp2: "03:30", type: "C", name: "Interior de planta", forced: false },
+                { timeOp2: "05:00", type: "C", name: "Interior de planta", forced: false },
+                { timeOp2: "06:00", type: "B", name: "Cambio de turno", forced: true },
+                { timeOp2: "08:00", type: "C", name: "Interior de planta", forced: false },
+                { timeOp2: "09:30", type: "A", name: "Recorrido perimetral", forced: false },
+                { timeOp2: "11:00", type: "A", name: "Recorrido perimetral", forced: false },
+                { timeOp2: "12:30", type: "A", name: "Recorrido perimetral", forced: false },
+                { timeOp2: "14:00", type: "B", name: "Cambio de turno", forced: true },
+                { timeOp2: "15:30", type: "C", name: "Interior de planta", forced: false },
+                { timeOp2: "17:00", type: "B", name: "Cambio de turno", forced: true },
+                { timeOp2: "18:30", type: "A", name: "Recorrido perimetral", forced: false },
+                { timeOp2: "20:00", type: "A", name: "Recorrido perimetral", forced: false },
+                { timeOp2: "21:30", type: "B", name: "Cambio de turno", forced: true },
+                { timeOp2: "23:00", type: "D", name: "Zonas lejanas", forced: false }
             ]
         };
 
@@ -1251,6 +1256,8 @@
 
         function updateTargetFlightBanner(now) {
             const plans = getActivePlan();
+            
+            // Actualizar el Badge Visual del Plan Activo
             const activePlanBadge = document.getElementById('activePlanBadge');
             if (activePlanBadge) activePlanBadge.innerText = `PLAN ${getActivePlanKey()}`;
 
@@ -1276,7 +1283,7 @@
             if (badgeEl) badgeEl.innerText = `TIPO ${targetItem.type} - ${targetItem.name}`;
 
             const statusObj = window.dailyFlightStatuses[targetIdx] || { status: 'PENDIENTE' };
-            const isTypeB = targetItem.forced; // Uso forced para verificar si es Cambio de turno
+            const isTypeB = targetItem.forced; // Uso de 'forced' ya que es true para todos los Cambio de Turno
 
             // SILENCIAR OTRAS NOTIFICACIONES MIENTRAS ESTÉ SUSPENDIDO
             if (window.systemWeatherSuspended) {
@@ -1414,7 +1421,7 @@
             let html = '';
             plans.forEach((item, idx) => {
                 const statusObj = window.dailyFlightStatuses[idx] || { status: 'PENDIENTE', realTime: '--', note: '' };
-                const isTypeB = item.forced;
+                const isTypeB = item.forced; // Ahora usado consistentemente
                 
                 let statusBadge = '<span class="px-2 py-0.5 rounded text-[9.5px] font-bold bg-slate-800 text-slate-400 border border-slate-700">PENDIENTE</span>';
                 if (statusObj.status === 'VOLADO') {
@@ -1922,7 +1929,6 @@
             const today = getTodayKey();
             const savedDate = safeStorageGet('audi_flight_date');
 
-            // Si es un día diferente, se blanquean los vuelos para iniciar el nuevo día (con el nuevo plan si aplica)
             if (savedDate !== today) {
                 safeStorageSet('audi_flight_date', today);
                 window.dailyFlightStatuses = {};
