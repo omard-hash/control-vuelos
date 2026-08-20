@@ -88,6 +88,7 @@
                     <div id="liveClock" class="text-2xl sm:text-4xl font-mono font-black text-amber-300 tracking-wider leading-none drop-shadow-md">00:00:00</div>
                     <div id="liveDate" class="text-[9.5px] text-slate-400 font-semibold mt-0.5 truncate max-w-[130px] sm:max-w-none">Cargando fecha...</div>
                     
+                    <!-- Indicador de estado de Audio ubicado DEBAJO del reloj -->
                     <div id="audioStatusBadge" class="mt-1 text-[8.5px] font-bold px-1.5 py-0.5 rounded bg-slate-800 text-amber-300 border border-amber-700/60 flex items-center gap-1 shrink-0 cursor-pointer" onclick="unlockAudioSystem()">
                         <i id="audioStatusIcon" class="fa-solid fa-volume-xmark text-amber-400"></i> <span id="audioStatusText">Audio Inactivo</span>
                     </div>
@@ -111,7 +112,7 @@
     <!-- CONTENIDO PRINCIPAL FIJO -->
     <main class="flex-1 max-w-7xl w-full mx-auto px-2 sm:px-4 py-2.5 flex flex-col gap-2.5 overflow-hidden">
 
-        <!-- TARJETA PRINCIPAL DEL VUELO ACTIVO Y CRONÓMETRO -->
+        <!-- TARJETA PRINCIPAL DEL VUELO ACTIVO Y CRONÓMETRO GIGANTE -->
         <section id="nextFlightCard" class="bg-gradient-to-r from-slate-900 via-blue-950/60 to-slate-900 p-3 sm:p-4 rounded-2xl border border-blue-500/40 shadow-2xl relative overflow-hidden shrink-0">
             <div class="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3">
                 
@@ -136,7 +137,7 @@
                     </p>
                 </div>
 
-                <!-- CONTROLES Y CRONÓMETRO -->
+                <!-- CONTROLES Y CRONÓMETRO DESTACADO -->
                 <div class="flex flex-col xs:flex-row items-stretch xs:items-center gap-3 bg-slate-950/90 p-3 rounded-xl border border-slate-800/90 shadow-lg">
                     <div class="text-center xs:text-right px-3 py-1.5 bg-slate-900/80 rounded-lg border border-slate-800 flex-1 xs:flex-none">
                         <div class="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Estado / Cronómetro</div>
@@ -165,7 +166,7 @@
             </div>
             
             <div class="bg-slate-950/80 p-1.5 rounded-lg border border-emerald-900/30 text-center flex flex-col justify-center">
-                <span class="text-[8.5px] uppercase font-bold text-emerald-400">Volados</span>
+                <span class="text-[8.5px] uppercase font-bold text-emerald-400">Realizados</span>
                 <span id="cntFlown" class="text-sm sm:text-base font-black text-emerald-400">0</span>
                 <span class="text-[8px] text-slate-500 hidden sm:inline">Ejecutados</span>
             </div>
@@ -257,7 +258,6 @@
                 </button>
             </div>
 
-            <!-- BOTONES DE EXPORTACIÓN Y GESTIÓN DE BITÁCORA -->
             <div class="flex items-center justify-between gap-2 flex-wrap bg-slate-950/80 p-2 rounded-xl border border-slate-800 text-xs">
                 <div class="text-[11px] text-slate-300 font-semibold flex items-center gap-2">
                     <span>Total Registros: <strong id="bitacoraRecordCount" class="text-emerald-400">0</strong></span>
@@ -364,7 +364,7 @@
                 <div>
                     <label class="block text-slate-400 font-semibold mb-0.5">Estado del Vuelo:</label>
                     <select id="editBitacoraStatus" class="w-full bg-slate-950 border border-slate-700 text-slate-200 px-2.5 py-1 rounded-lg font-bold">
-                        <option value="VOLADO">VOLADO</option>
+                        <option value="REALIZADO">REALIZADO</option>
                         <option value="SUSPENDIDO">SUSPENDIDO</option>
                     </select>
                 </div>
@@ -797,13 +797,18 @@
             const month = today.getMonth() + 1; // 1 a 12
             const date = today.getDate();
 
-            // Reglas automáticas de fecha para los planes (Mismos horarios fijos, distinto recorrido)
-            if (year === 2026 && month === 8) {
-                if (date >= 21 && date <= 25) return "3";
-                if (date >= 26 && date <= 31) return "4";
+            // Antes del 21 de agosto de 2026, mantener SIEMPRE el Plan 2.
+            if (year < 2026 || (year === 2026 && month < 8) || (year === 2026 && month === 8 && date < 21)) {
+                return "2";
             }
+
+            // A partir del 21 de agosto de 2026: Plan Aleatorio Basado en la Fecha
+            // Garantiza el mismo plan TODO el día sin importar cuántas veces se recargue la página.
+            const seed = year * 10000 + month * 100 + date;
+            const pseudoRandom = (seed * 16807) % 2147483647;
+            const randomPlanNumber = (pseudoRandom % 4) + 1;
             
-            return "2"; // Predeterminado - Plan 2 actual
+            return randomPlanNumber.toString();
         }
 
         function getActivePlan() {
@@ -811,8 +816,7 @@
         }
 
         // CONSTANTES DONDE TODOS COMPARTEN LAS MISMAS 16 HORAS BASE
-        // (00:30, 02:00, 03:30, 05:00, 06:00, 08:00, 09:30, 11:00, 12:30, 14:00, 15:30, 17:00, 18:30, 20:00, 21:30, 23:00)
-        // NOTA: Los Cambios de turno (Tipo B) SIEMPRE caen en sus horas oficiales (06:00, 14:00, 17:00, 21:30).
+        // Y LOS CAMBIOS DE TURNO CON "USO DE SPOTLIGHT" A LAS 21:30
         const OFFICIAL_PLANS = {
             "1": [
                 { timeOp2: "00:30", type: "A", name: "Recorrido perimetral", forced: false },
@@ -829,7 +833,7 @@
                 { timeOp2: "17:00", type: "B", name: "Cambio de turno", forced: true },
                 { timeOp2: "18:30", type: "A", name: "Recorrido perimetral", forced: false },
                 { timeOp2: "20:00", type: "A", name: "Recorrido perimetral", forced: false },
-                { timeOp2: "21:30", type: "B", name: "Cambio de turno", forced: true },
+                { timeOp2: "21:30", type: "B", name: "Cambio de turno - Uso de Spotlight", forced: true },
                 { timeOp2: "23:00", type: "D", name: "Zonas lejanas", forced: false }
             ],
             "2": [
@@ -847,7 +851,7 @@
                 { timeOp2: "17:00", type: "B", name: "Cambio de turno", forced: true },
                 { timeOp2: "18:30", type: "A", name: "Recorrido perimetral", forced: false },
                 { timeOp2: "20:00", type: "C", name: "Interior de planta", forced: false },
-                { timeOp2: "21:30", type: "B", name: "Cambio de turno", forced: true },
+                { timeOp2: "21:30", type: "B", name: "Cambio de turno - Uso de Spotlight", forced: true },
                 { timeOp2: "23:00", type: "A", name: "Recorrido perimetral", forced: false }
             ],
             "3": [
@@ -865,7 +869,7 @@
                 { timeOp2: "17:00", type: "B", name: "Cambio de turno", forced: true },
                 { timeOp2: "18:30", type: "A", name: "Recorrido perimetral", forced: false },
                 { timeOp2: "20:00", type: "A", name: "Recorrido perimetral", forced: false },
-                { timeOp2: "21:30", type: "B", name: "Cambio de turno", forced: true },
+                { timeOp2: "21:30", type: "B", name: "Cambio de turno - Uso de Spotlight", forced: true },
                 { timeOp2: "23:00", type: "C", name: "Interior de planta", forced: false }
             ],
             "4": [
@@ -883,7 +887,7 @@
                 { timeOp2: "17:00", type: "B", name: "Cambio de turno", forced: true },
                 { timeOp2: "18:30", type: "A", name: "Recorrido perimetral", forced: false },
                 { timeOp2: "20:00", type: "A", name: "Recorrido perimetral", forced: false },
-                { timeOp2: "21:30", type: "B", name: "Cambio de turno", forced: true },
+                { timeOp2: "21:30", type: "B", name: "Cambio de turno - Uso de Spotlight", forced: true },
                 { timeOp2: "23:00", type: "D", name: "Zonas lejanas", forced: false }
             ]
         };
@@ -1424,16 +1428,16 @@
                 const isTypeB = item.forced; // Ahora usado consistentemente
                 
                 let statusBadge = '<span class="px-2 py-0.5 rounded text-[9.5px] font-bold bg-slate-800 text-slate-400 border border-slate-700">PENDIENTE</span>';
-                if (statusObj.status === 'VOLADO') {
+                if (statusObj.status === 'VOLADO' || statusObj.status === 'REALIZADO') {
                     voladosCount++;
-                    statusBadge = '<span class="px-2 py-0.5 rounded text-[9.5px] font-bold bg-emerald-950 text-emerald-400 border border-emerald-800">VOLADO</span>';
+                    statusBadge = '<span class="px-2 py-0.5 rounded text-[9.5px] font-bold bg-emerald-950 text-emerald-400 border border-emerald-800">REALIZADO</span>';
                 } else if (statusObj.status === 'SUSPENDIDO') {
                     suspendidosCount++;
                     statusBadge = '<span class="px-2 py-0.5 rounded text-[9.5px] font-bold bg-amber-950 text-amber-400 border border-amber-800">SUSPENDIDO</span>';
                 }
 
                 let displayRealOrReason = '--';
-                if (statusObj.status === 'VOLADO') {
+                if (statusObj.status === 'VOLADO' || statusObj.status === 'REALIZADO') {
                     displayRealOrReason = `${statusObj.realTime} hrs`;
                 } else if (statusObj.status === 'SUSPENDIDO') {
                     displayRealOrReason = statusObj.note || 'Suspendido';
@@ -1576,7 +1580,7 @@
             const pilot = document.getElementById('takeoffPilotName').value || 'Piloto en Turno';
             const notes = document.getElementById('takeoffNotes').value || 'Patrullaje completo sin novedades';
 
-            window.dailyFlightStatuses[idx] = { status: 'VOLADO', realTime: realTime, note: notes };
+            window.dailyFlightStatuses[idx] = { status: 'REALIZADO', realTime: realTime, note: notes };
             safeStorageSet('audi_flight_statuses', JSON.stringify(window.dailyFlightStatuses));
 
             const logEntry = {
@@ -1584,7 +1588,7 @@
                 timestampFormatted: new Date().toLocaleString('es-MX'),
                 scheduledTime: item.timeOp2,
                 flightType: `TIPO ${item.type} - ${item.name}`,
-                status: 'VOLADO',
+                status: 'REALIZADO',
                 realTime: realTime,
                 pilot: pilot,
                 notes: notes,
@@ -1731,8 +1735,9 @@
 
             let html = '';
             sortedList.forEach(item => {
-                const badge = item.status === 'VOLADO' ?
-                    '<span class="px-1.5 py-0.5 rounded text-[9px] font-bold bg-emerald-950 text-emerald-400 border border-emerald-800">VOLADO</span>' :
+                const isRealizado = (item.status === 'VOLADO' || item.status === 'REALIZADO');
+                const badge = isRealizado ?
+                    '<span class="px-1.5 py-0.5 rounded text-[9px] font-bold bg-emerald-950 text-emerald-400 border border-emerald-800">REALIZADO</span>' :
                     '<span class="px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-950 text-amber-400 border border-amber-800">SUSPENDIDO</span>';
 
                 const imgThumbnail = item.imageData ? 
@@ -1769,7 +1774,12 @@
 
             window.tempCompressedImage = entry.imageData || "";
             document.getElementById('editBitacoraId').value = entry.id;
-            document.getElementById('editBitacoraStatus').value = entry.status;
+            
+            // Adaptar para legado
+            let st = entry.status;
+            if (st === 'VOLADO') st = 'REALIZADO';
+            document.getElementById('editBitacoraStatus').value = st;
+            
             document.getElementById('editBitacoraSchedTime').value = entry.scheduledTime;
             document.getElementById('editBitacoraRealTime').value = entry.realTime;
             document.getElementById('editBitacoraPilot').value = entry.pilot;
@@ -1867,13 +1877,14 @@
                 let html = '';
                 window.bitacoraList.forEach(item => {
                     const imgHtml = item.imageData ? `<img src="${item.imageData}" style="max-height: 40px; margin: auto;">` : 'Pendiente foto';
+                    const printStatus = (item.status === 'VOLADO') ? 'REALIZADO' : item.status;
                     html += `
                         <tr class="border-b border-black">
                             <td class="p-1 border-r border-black">${item.timestampFormatted}</td>
                             <td class="p-1 border-r border-black font-bold">${item.scheduledTime} hrs</td>
                             <td class="p-1 border-r border-black">${item.flightType}</td>
                             <td class="p-1 border-r border-black">${item.pilot}</td>
-                            <td class="p-1 border-r border-black font-bold">${item.status}</td>
+                            <td class="p-1 border-r border-black font-bold">${printStatus}</td>
                             <td class="p-1 border-r border-black">${item.realTime}</td>
                             <td class="p-1 border-r border-black">${item.notes}</td>
                             <td class="p-1 text-center">${imgHtml}</td>
@@ -1895,7 +1906,8 @@
 
             let csvContent = "data:text/csv;charset=utf-8,Fecha Registro,Hora Programada,Tipo Vuelo,Piloto,Estado,Hora Real,Notas / Motivo\n";
             window.bitacoraList.forEach(item => {
-                csvContent += `"${item.timestampFormatted}","${item.scheduledTime}","${item.flightType}","${item.pilot}","${item.status}","${item.realTime}","${item.notes.replace(/"/g, '""')}"\n`;
+                const csvStatus = (item.status === 'VOLADO') ? 'REALIZADO' : item.status;
+                csvContent += `"${item.timestampFormatted}","${item.scheduledTime}","${item.flightType}","${item.pilot}","${csvStatus}","${item.realTime}","${item.notes.replace(/"/g, '""')}"\n`;
             });
 
             const encodedUri = encodeURI(csvContent);
