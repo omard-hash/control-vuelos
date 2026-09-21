@@ -246,31 +246,58 @@
         </div>
     </div>
 
-    <!-- MODAL COMPLETO DE BITÁCORA AUDITABLE (SIN BOTÓN RECUPERAR) -->
+    <!-- MODAL COMPLETO DE BITÁCORA AUDITABLE CON SELECTOR DE CALENDARIO -->
     <div id="modalBitacoraView" class="fixed inset-0 bg-slate-950/90 backdrop-blur-md z-50 flex items-center justify-center p-2 sm:p-4 hidden modal-backdrop">
-        <div class="bg-slate-900 border border-blue-500/40 rounded-2xl max-w-5xl w-full p-3 sm:p-4 shadow-2xl space-y-2.5 max-h-[92vh] flex flex-col">
+        <div class="bg-slate-900 border border-blue-500/40 rounded-2xl max-w-6xl w-full p-3 sm:p-4 shadow-2xl space-y-2.5 max-h-[94vh] flex flex-col">
             <div class="flex justify-between items-center border-b border-slate-800 pb-2">
                 <div>
                     <h3 class="text-xs sm:text-base font-bold text-white flex items-center gap-1.5">
                         <i class="fa-solid fa-book-bookmark text-emerald-400"></i>
                         Bitácora Oficial Auditable de Vuelos (Registro Inmutable)
                     </h3>
-                    <p class="text-[10px] text-slate-400 hidden sm:block">Consulta, edita horas, estado, motivos e imágenes de evidencia. Eliminación protegida por contraseña.</p>
+                    <p class="text-[10px] text-slate-400 hidden sm:block">Filtra por calendario, consulta el histórico completo, edita horas, estado y fotos de evidencia.</p>
                 </div>
                 <button onclick="closeModal('modalBitacoraView')" class="text-slate-400 hover:text-white p-1 text-base">
                     <i class="fa-solid fa-xmark"></i>
                 </button>
             </div>
 
-            <div class="flex items-center justify-between gap-2 flex-wrap bg-slate-950/80 p-2 rounded-xl border border-slate-800 text-xs">
-                <div class="text-[11px] text-slate-300 font-semibold flex items-center gap-2">
-                    <span>Total Registros: <strong id="bitacoraRecordCount" class="text-emerald-400">0</strong></span>
-                    <button onclick="toggleBitacoraSort()" class="px-2 py-0.5 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-[10px] rounded-lg border border-slate-700 transition flex items-center gap-1 cursor-pointer">
+            <!-- BARRA DE FILTRO Y CALENDARIO DE LA BITÁCORA -->
+            <div class="flex items-center justify-between gap-2 flex-wrap bg-slate-950/90 p-2.5 rounded-xl border border-slate-800 text-xs shadow-inner">
+                
+                <!-- Controles de Vista: Total, Calendario Picker y Modos -->
+                <div class="flex items-center gap-2 flex-wrap">
+                    <span class="text-[11px] text-slate-300 font-semibold">
+                        Registros: <strong id="bitacoraRecordCount" class="text-emerald-400 font-mono">0</strong>
+                    </span>
+
+                    <!-- Selector de Fecha / Calendario Interactivo -->
+                    <div class="flex items-center gap-1 bg-slate-900 px-2 py-1 rounded-lg border border-blue-500/40 shadow-sm">
+                        <i class="fa-solid fa-calendar-days text-amber-400 text-xs"></i>
+                        <label for="bitacoraDateInput" class="text-[10px] font-bold text-slate-300">Día:</label>
+                        <input type="date" id="bitacoraDateInput" onchange="filterBitacoraByCalendar(this.value)" class="bg-slate-950 text-white font-mono text-[11px] px-1.5 py-0.5 rounded border border-slate-700 focus:outline-none focus:border-blue-400 cursor-pointer">
+                    </div>
+
+                    <!-- Botones Rápidos de Histórico -->
+                    <button onclick="setBitacoraViewMode('ALL')" id="btnViewAll" class="px-2.5 py-1 bg-blue-600 text-white font-bold text-[10px] rounded-lg border border-blue-400/40 transition flex items-center gap-1 cursor-pointer">
+                        <i class="fa-solid fa-layer-group"></i> Ver Todo el Histórico
+                    </button>
+
+                    <button onclick="setBitacoraViewMode('TODAY')" id="btnViewToday" class="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-[10px] rounded-lg border border-slate-700 transition flex items-center gap-1 cursor-pointer">
+                        <i class="fa-solid fa-calendar-day text-emerald-400"></i> Solo Hoy
+                    </button>
+
+                    <button onclick="toggleBitacoraSort()" class="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-[10px] rounded-lg border border-slate-700 transition flex items-center gap-1 cursor-pointer">
                         <i id="bitacoraSortIcon" class="fa-solid fa-arrow-down-short-wide text-blue-400"></i>
                         <span id="bitacoraSortText">Recientes primero</span>
                     </button>
                 </div>
+
+                <!-- Botones de Acción: Escanear Histórico, Excel, PDF, Vaciar -->
                 <div class="flex items-center gap-1.5 flex-wrap">
+                    <button onclick="triggerDeepRecoveryScan()" title="Buscar y recuperar vuelos históricos de la nube" class="px-2 py-1 bg-indigo-900/80 hover:bg-indigo-800 text-indigo-200 font-bold text-[10px] rounded-lg border border-indigo-700/50 transition flex items-center gap-1 cursor-pointer">
+                        <i class="fa-solid fa-rotate text-amber-300"></i> Sincronizar Histórico
+                    </button>
                     <button onclick="exportBitacoraCSV()" class="px-2 py-1 bg-emerald-700 hover:bg-emerald-600 text-white font-bold text-[10px] sm:text-xs rounded-lg transition flex items-center gap-1 cursor-pointer">
                         <i class="fa-solid fa-file-excel"></i> Excel
                     </button>
@@ -283,8 +310,9 @@
                 </div>
             </div>
 
+            <!-- TABLA DE LA BITÁCORA -->
             <div class="overflow-y-auto overflow-x-auto flex-1 border border-slate-800 rounded-xl">
-                <table class="w-full text-left text-xs min-w-[700px]">
+                <table class="w-full text-left text-xs min-w-[750px]">
                     <thead class="bg-slate-950 text-slate-400 uppercase font-bold tracking-wider border-b border-slate-800 text-[9.5px] sticky top-0 z-10 shadow">
                         <tr>
                             <th class="px-2.5 py-2">Fecha / Hora</th>
@@ -303,7 +331,8 @@
                 </table>
             </div>
 
-            <div class="flex justify-end pt-1.5 border-t border-slate-800">
+            <div class="flex justify-between items-center pt-1.5 border-t border-slate-800">
+                <span id="bitacoraFooterFilterInfo" class="text-[10px] text-slate-400 font-mono">Mostrando: Histórico Completo</span>
                 <button onclick="closeModal('modalBitacoraView')" class="px-3 py-1 bg-slate-800 text-slate-300 font-semibold text-xs rounded-xl hover:bg-slate-700">
                     Cerrar Bitácora
                 </button>
@@ -443,7 +472,7 @@
                 </div>
                 <div>
                     <label class="block text-slate-400 font-semibold mb-0.5">Nombre / Firma Operador:</label>
-                    <input type="text" id="takeoffPilotName" value="Piloto en Turno" class="w-full bg-slate-950 border border-slate-700 text-slate-200 px-2.5 py-1 rounded-lg">
+                    <input type="text" id="takeoffPilotName" value="Jonathan Rodriguez Morales" class="w-full bg-slate-950 border border-slate-700 text-slate-200 px-2.5 py-1 rounded-lg">
                 </div>
                 <div>
                     <label class="block text-slate-400 font-semibold mb-0.5">Observaciones:</label>
@@ -474,14 +503,14 @@
                 </div>
                 <div>
                     <label class="block text-slate-400 font-semibold mb-0.5">Nombre / Firma Operador:</label>
-                    <input type="text" id="suspendPilotName" value="Piloto en Turno" class="w-full bg-slate-950 border border-slate-700 text-slate-200 px-2.5 py-1 rounded-lg">
+                    <input type="text" id="suspendPilotName" value="Jonathan Rodriguez Morales" class="w-full bg-slate-950 border border-slate-700 text-slate-200 px-2.5 py-1 rounded-lg">
                 </div>
                 <div>
                     <label class="block text-slate-400 font-semibold mb-0.5">Causa de Suspensión:</label>
                     <select id="suspendReasonSelect" class="w-full bg-slate-950 border border-slate-700 text-amber-300 px-2.5 py-1 rounded-lg font-bold text-xs">
+                        <option value="NEBLINA DENSA / NULA VISIBILIDAD">Neblina Densa / Visibilidad Nula</option>
                         <option value="LLUVIA / PRECIPITACIÓN">Lluvia / Precipitación</option>
                         <option value="VIENTO FUERTE (> 43 km/h)">Viento Fuerte (> 43 km/h)</option>
-                        <option value="NEBLINA DENSA / NULA VISIBILIDAD">Neblina Densa / Visibilidad Nula</option>
                         <option value="TORMENTA ELÉCTRICA">Tormenta Eléctrica</option>
                         <option value="ATENCIÓN A EMERGENCIA REAL EN PLANTA">Atención a Emergencia en Planta</option>
                         <option value="MANTENIMIENTO / FALLA TÉCNICA DRON">MANTENIMIENTO / Falla Técnica Dron</option>
@@ -604,6 +633,7 @@
 
         let db = null;
         let auth = null;
+        window.__firebase_db = null;
 
         function updateCloudUI(isOnline, message) {
             const icon = document.getElementById('cloudStatusIcon');
@@ -641,6 +671,7 @@
                 const app = initializeApp(firebaseConfig);
                 auth = getAuth(app);
                 db = getFirestore(app);
+                window.__firebase_db = db;
 
                 // Intento no bloqueante de autenticación
                 try {
@@ -651,6 +682,11 @@
 
                 updateCloudUI(true, "Nube Live Sincronizada");
                 setupRealtimeListeners();
+
+                // Escaneo profundo inicial para rescatar registros históricos de la base de datos
+                setTimeout(() => {
+                    if (window.triggerDeepRecoveryScan) window.triggerDeepRecoveryScan(true);
+                }, 1000);
             } catch (err) {
                 console.error("Error al inicializar la persistencia en nube Firebase:", err);
                 updateCloudUI(false, "Modo Local");
@@ -680,10 +716,10 @@
                     if (typeof window.updateTargetFlightBanner === 'function') window.updateTargetFlightBanner(new Date());
                 }
             }, (err) => {
-                console.warn("Nota: Verificando colección de estado alternativo:", err);
+                console.warn("Nota estado diario alternativo:", err);
             });
 
-            // 2. Escucha de Bitácora: Escuchar tanto la ruta de artefacto como la ruta raíz para máxima compatibilidad
+            // 2. Escucha de Bitácora
             const bitacoraColRef = collection(db, 'artifacts', appId, 'public', 'data', 'bitacora_logs');
             onSnapshot(bitacoraColRef, (querySnap) => {
                 const logs = [];
@@ -694,7 +730,6 @@
                 if (logs.length > 0) {
                     processIncomingCloudLogs(logs);
                 } else {
-                    // Si la ruta del artefacto está vacía, consultar la colección raíz por si se guardaron allí
                     fetchRootCollectionLogs();
                 }
             }, (err) => {
@@ -716,29 +751,42 @@
             } catch(e) {}
         }
 
-        function processIncomingCloudLogs(logs) {
-            logs.sort((a, b) => b.id - a.id);
+        function processIncomingCloudLogs(newLogs) {
+            if (!newLogs || newLogs.length === 0) return;
+
+            // Merge sin duplicados con los registros existentes
+            const currentMap = new Map();
+            (window.bitacoraList || []).forEach(item => {
+                if (item && item.id) currentMap.set(String(item.id), item);
+            });
+
+            newLogs.forEach(item => {
+                if (item && item.id) {
+                    currentMap.set(String(item.id), item);
+                }
+            });
+
+            const merged = Array.from(currentMap.values());
+            merged.sort((a, b) => b.id - a.id);
             
-            // Si la nube tiene registros, auto-respaldar automáticamente en segundo plano
-            if (logs.length > 0 && window.saveRecoveryBackup) {
-                window.saveRecoveryBackup(logs, 'Sincronización Nube Firestore');
-            }
-            
-            window.bitacoraList = logs;
-            if (window.safeStorageSet) window.safeStorageSet('audi_bitacora_logs', JSON.stringify(logs));
-            
-            // RECONSTRUCCIÓN INTELIGENTE: Si el cronograma de hoy está vacío en pantalla,
-            // verificar si hay vuelos de hoy registrados en la bitácora y rellenar automáticamente la tabla
+            window.bitacoraList = merged;
+            if (window.safeStorageSet) window.safeStorageSet('audi_bitacora_logs', JSON.stringify(merged));
+            if (window.saveRecoveryBackup) window.saveRecoveryBackup(merged, 'Sincronización Nube Firestore');
+
+            // Reconstrucción inteligente del cronograma de hoy
             if (typeof window.getActivePlan === 'function') {
                 const plans = window.getActivePlan();
                 let rebuiltAny = false;
+                const todayStr = new Date().toLocaleDateString('es-MX');
 
                 plans.forEach((item, idx) => {
-                    // Si este horario no está completado en dailyFlightStatuses
                     const currentSt = window.dailyFlightStatuses[idx];
                     if (!currentSt || currentSt.status === 'PENDIENTE') {
-                        // Buscar el registro más reciente en la bitácora para esta hora
-                        const match = logs.find(b => b.scheduledTime === item.timeOp2);
+                        // Buscar el registro de hoy para este horario
+                        const match = merged.find(b => 
+                            b.scheduledTime === item.timeOp2 && 
+                            (b.timestampFormatted && b.timestampFormatted.includes(todayStr))
+                        );
                         if (match) {
                             const st = (match.status === 'VOLADO') ? 'REALIZADO' : match.status;
                             window.dailyFlightStatuses[idx] = {
@@ -756,15 +804,9 @@
                 }
             }
 
-            if (typeof window.renderBitacoraModalTable === 'function') {
-                window.renderBitacoraModalTable();
-            }
-            if (typeof window.renderFlightsTable === 'function') {
-                window.renderFlightsTable();
-            }
-            if (typeof window.updateTargetFlightBanner === 'function') {
-                window.updateTargetFlightBanner(new Date());
-            }
+            if (typeof window.renderBitacoraModalTable === 'function') window.renderBitacoraModalTable();
+            if (typeof window.renderFlightsTable === 'function') window.renderFlightsTable();
+            if (typeof window.updateTargetFlightBanner === 'function') window.updateTargetFlightBanner(new Date());
         }
 
         window.saveDailyStatusToCloud = async function() {
@@ -778,7 +820,7 @@
                     weatherSuspended: window.systemWeatherSuspended,
                     updatedAt: new Date().toISOString()
                 });
-            } catch (e) { console.error("Error guardando en nube daily_status:", e); }
+            } catch (e) { console.error("Error guardando daily_status:", e); }
         };
 
         window.saveBitacoraLogToCloud = async function(logEntry) {
@@ -786,11 +828,9 @@
             try {
                 const logDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'bitacora_logs', logEntry.id.toString());
                 await setDoc(logDocRef, logEntry);
-                
-                // Guardar también en colección raíz de respaldo
                 const rootDocRef = doc(db, 'bitacora_logs', logEntry.id.toString());
                 await setDoc(rootDocRef, logEntry);
-            } catch (e) { console.error("Error guardando en nube log bitácora:", e); }
+            } catch (e) { console.error("Error guardando log:", e); }
         };
 
         window.deleteBitacoraLogFromCloud = async function(logId) {
@@ -800,7 +840,73 @@
                 await deleteDoc(logDocRef);
                 const rootDocRef = doc(db, 'bitacora_logs', logId.toString());
                 await deleteDoc(rootDocRef);
-            } catch (e) { console.error("Error eliminando de nube log bitácora:", e); }
+            } catch (e) { console.error("Error eliminando log:", e); }
+        };
+
+        // Escaneo exhaustivo en todas las colecciones posibles de Firestore
+        window.triggerDeepRecoveryScan = async function(isSilent = false) {
+            if (!db) {
+                if (!isSilent) window.showToast("Conectando con la base de datos...", "warning");
+                return;
+            }
+
+            if (!isSilent) window.showToast("Buscando historial completo en la nube...", "info");
+
+            const candidateCollections = [
+                collection(db, 'artifacts', appId, 'public', 'data', 'bitacora_logs'),
+                collection(db, 'bitacora_logs'),
+                collection(db, 'bitacora'),
+                collection(db, 'vuelos'),
+                collection(db, 'flights'),
+                collection(db, 'audi_bitacora')
+            ];
+
+            let recoveredLogs = [];
+
+            for (const colRef of candidateCollections) {
+                try {
+                    const snap = await getDocs(colRef);
+                    snap.forEach(d => {
+                        const data = d.data();
+                        if (data && (data.scheduledTime || data.flightType)) {
+                            recoveredLogs.push(data);
+                        }
+                    });
+                } catch(e) {}
+            }
+
+            // Rescatar también de los respaldos históricos locales
+            try {
+                const rawBackups = window.safeStorageGet('audi_bitacora_backups');
+                if (rawBackups) {
+                    const parsed = JSON.parse(rawBackups);
+                    parsed.forEach(bk => {
+                        if (bk.logs && Array.isArray(bk.logs)) {
+                            recoveredLogs.push(...bk.logs);
+                        }
+                    });
+                }
+            } catch(e) {}
+
+            // Revisar claves espejo locales
+            try {
+                for (let i = 0; i < localStorage.length; i++) {
+                    const key = localStorage.key(i);
+                    if (key && (key.startsWith('audi_mirror_backup_') || key.startsWith('audi_backup_'))) {
+                        try {
+                            const val = JSON.parse(localStorage.getItem(key));
+                            if (Array.isArray(val)) recoveredLogs.push(...val);
+                        } catch(e) {}
+                    }
+                }
+            } catch(e) {}
+
+            if (recoveredLogs.length > 0) {
+                processIncomingCloudLogs(recoveredLogs);
+                if (!isSilent) window.showToast(`¡Sincronización completa! Total registros: ${window.bitacoraList.length}`, "success");
+            } else {
+                if (!isSilent) window.showToast("No se encontraron registros adicionales en otras carpetas.", "info");
+            }
         };
 
         window.openCloudSettingsModal = function() {
@@ -874,12 +980,12 @@
                 };
 
                 backups.unshift(newBackup);
-                if (backups.length > 25) backups = backups.slice(0, 25);
+                if (backups.length > 30) backups = backups.slice(0, 30);
 
                 safeStorageSet('audi_bitacora_backups', JSON.stringify(backups));
                 safeStorageSet(`audi_mirror_backup_${getTodayKey()}`, JSON.stringify(logs));
             } catch (e) {
-                console.warn("Error guardando copia de seguridad automática:", e);
+                console.warn("Error guardando copia de seguridad:", e);
             }
         }
         window.saveRecoveryBackup = saveRecoveryBackup;
@@ -1047,6 +1153,8 @@
         window.audioUnlocked = false;
         window.triggeredAlertsToday = new Set();
         window.bitacoraSortAsc = false;
+        window.bitacoraFilterMode = 'ALL'; // 'ALL', 'TODAY', 'CALENDAR'
+        window.bitacoraSelectedDate = "";
         window.systemWeatherSuspended = false;
         window.isTopLevelSuspension = false;
         window.lastHourlyReminderHour = -1;
@@ -1626,7 +1734,7 @@
                     flightType: `TIPO ${item.type} - ${item.name}`,
                     status: 'SUSPENDIDO',
                     realTime: 'N/A',
-                    pilot: 'Piloto en Turno',
+                    pilot: 'Jonathan Rodriguez Morales',
                     notes: 'Suspensión general - Evidencia adjuntada',
                     imageData: imageData
                 };
@@ -1677,7 +1785,7 @@
             const idx = window.activeModalIndex;
             const item = getActivePlan()[idx];
             const realTime = document.getElementById('takeoffRealTime').value || '--';
-            const pilot = document.getElementById('takeoffPilotName').value || 'Piloto en Turno';
+            const pilot = document.getElementById('takeoffPilotName').value || 'Jonathan Rodriguez Morales';
             const notes = document.getElementById('takeoffNotes').value || 'Patrullaje completo sin novedades';
 
             window.dailyFlightStatuses[idx] = { status: 'REALIZADO', realTime: realTime, note: notes };
@@ -1711,7 +1819,7 @@
 
         function confirmSuspension() {
             const idx = window.activeModalIndex;
-            const pilot = document.getElementById('suspendPilotName').value || 'Piloto en Turno';
+            const pilot = document.getElementById('suspendPilotName').value || 'Jonathan Rodriguez Morales';
             const reason = document.getElementById('suspendReasonSelect').value;
             const notes = document.getElementById('suspendNotes').value;
             const imageData = window.tempCompressedImage || "";
@@ -1796,41 +1904,119 @@
         window.confirmSuspension = confirmSuspension;
 
         function openBitacoraModal() {
+            // Inicializar el input de fecha con la fecha de hoy
+            const dateInput = document.getElementById('bitacoraDateInput');
+            if (dateInput && !dateInput.value) {
+                dateInput.value = getTodayKey();
+            }
             renderBitacoraModalTable();
             openModal('modalBitacoraView');
         }
-        function filterBitacoraByDate() {
+        window.openBitacoraModal = openBitacoraModal;
+
+        function setBitacoraViewMode(mode) {
+            window.bitacoraFilterMode = mode;
+            const btnAll = document.getElementById('btnViewAll');
+            const btnToday = document.getElementById('btnViewToday');
+
+            if (mode === 'ALL') {
+                if (btnAll) {
+                    btnAll.className = "px-2.5 py-1 bg-blue-600 text-white font-bold text-[10px] rounded-lg border border-blue-400/40 transition flex items-center gap-1 cursor-pointer";
+                }
+                if (btnToday) {
+                    btnToday.className = "px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-[10px] rounded-lg border border-slate-700 transition flex items-center gap-1 cursor-pointer";
+                }
+            } else if (mode === 'TODAY') {
+                if (btnAll) {
+                    btnAll.className = "px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-[10px] rounded-lg border border-slate-700 transition flex items-center gap-1 cursor-pointer";
+                }
+                if (btnToday) {
+                    btnToday.className = "px-2.5 py-1 bg-emerald-600 text-white font-bold text-[10px] rounded-lg border border-emerald-400/40 transition flex items-center gap-1 cursor-pointer";
+                }
+            }
+
             renderBitacoraModalTable();
         }
-        window.filterBitacoraByDate = filterBitacoraByDate;
+        window.setBitacoraViewMode = setBitacoraViewMode;
+
+        function filterBitacoraByCalendar(selectedDateYMD) {
+            if (!selectedDateYMD) return;
+            window.bitacoraFilterMode = 'CALENDAR';
+            window.bitacoraSelectedDate = selectedDateYMD;
+
+            const btnAll = document.getElementById('btnViewAll');
+            const btnToday = document.getElementById('btnViewToday');
+            if (btnAll) btnAll.className = "px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-[10px] rounded-lg border border-slate-700 transition flex items-center gap-1 cursor-pointer";
+            if (btnToday) btnToday.className = "px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-[10px] rounded-lg border border-slate-700 transition flex items-center gap-1 cursor-pointer";
+
+            renderBitacoraModalTable();
+        }
+        window.filterBitacoraByCalendar = filterBitacoraByCalendar;
+
+        function toggleBitacoraSort() {
+            window.bitacoraSortAsc = !window.bitacoraSortAsc;
+            const icon = document.getElementById('bitacoraSortIcon');
+            const text = document.getElementById('bitacoraSortText');
+            if (icon && text) {
+                if (window.bitacoraSortAsc) {
+                    icon.className = "fa-solid fa-arrow-up-short-wide text-emerald-400";
+                    text.innerText = "Antiguos primero";
+                } else {
+                    icon.className = "fa-solid fa-arrow-down-short-wide text-blue-400";
+                    text.innerText = "Recientes primero";
+                }
+            }
+            renderBitacoraModalTable();
+        }
+        window.toggleBitacoraSort = toggleBitacoraSort;
 
         function renderBitacoraModalTable() {
             const tbody = document.getElementById('modalBitacoraTableBody');
             const cntEl = document.getElementById('bitacoraRecordCount');
-            const filterEl = document.getElementById('bitacoraDateFilter');
+            const footerInfoEl = document.getElementById('bitacoraFooterFilterInfo');
             if (!tbody) return;
 
-            const selectedFilter = filterEl ? filterEl.value : 'TODAY';
+            const mode = window.bitacoraFilterMode;
             const todayStr = new Date().toLocaleDateString('es-MX');
 
             let filteredList = [...window.bitacoraList];
-            if (selectedFilter === 'TODAY') {
+
+            if (mode === 'TODAY') {
                 filteredList = filteredList.filter(item => {
                     if (!item.timestampFormatted) return true;
                     return item.timestampFormatted.includes(todayStr) || (item.dateKey && item.dateKey === getTodayKey());
                 });
+                if (footerInfoEl) footerInfoEl.innerText = `Mostrando: Solo Jornada de Hoy (${todayStr})`;
+            } else if (mode === 'CALENDAR' && window.bitacoraSelectedDate) {
+                const parts = window.bitacoraSelectedDate.split('-');
+                const day = parseInt(parts[2], 10);
+                const month = parseInt(parts[1], 10);
+                const year = parts[0];
+                const dateFilterPattern = `${day}/${month}/${year}`;
+
+                filteredList = filteredList.filter(item => {
+                    if (!item.timestampFormatted) return false;
+                    return item.timestampFormatted.includes(dateFilterPattern) || item.timestampFormatted.includes(window.bitacoraSelectedDate);
+                });
+                if (footerInfoEl) footerInfoEl.innerText = `Filtrado por Calendario: ${dateFilterPattern}`;
+            } else {
+                if (footerInfoEl) footerInfoEl.innerText = `Mostrando: Histórico Completo (${filteredList.length} registros)`;
             }
 
-            if (cntEl) cntEl.innerText = `${filteredList.length} (de ${window.bitacoraList.length} total)`;
+            if (cntEl) {
+                cntEl.innerText = `${filteredList.length} (de ${window.bitacoraList.length} total)`;
+            }
 
             if (!filteredList || filteredList.length === 0) {
                 tbody.innerHTML = `
                     <tr>
                         <td colspan="9" class="p-6 text-center text-slate-400">
-                            <div class="flex flex-col items-center justify-center gap-1">
-                                <i class="fa-solid fa-folder-open text-2xl text-slate-500"></i>
-                                <p class="italic">No hay registros para la vista seleccionada (${selectedFilter === 'TODAY' ? 'Hoy' : 'Histórico'}).</p>
-                                ${selectedFilter === 'TODAY' && window.bitacoraList.length > 0 ? `<button onclick="document.getElementById('bitacoraDateFilter').value='ALL'; renderBitacoraModalTable();" class="text-xs text-blue-400 underline mt-1">Ver todos los registros históricos (${window.bitacoraList.length})</button>` : ''}
+                            <div class="flex flex-col items-center justify-center gap-1.5">
+                                <i class="fa-solid fa-folder-open text-3xl text-slate-600"></i>
+                                <p class="italic text-xs text-slate-300">No hay registros para la fecha o filtro seleccionado.</p>
+                                <button onclick="setBitacoraViewMode('ALL')" class="px-2.5 py-1 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-bold mt-1 shadow">
+                                    <i class="fa-solid fa-layer-group me-1"></i>Ver todos los ${window.bitacoraList.length} registros del histórico
+                                </button>
                             </div>
                         </td>
                     </tr>`;
@@ -1850,7 +2036,7 @@
                     '<span class="px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-950 text-amber-400 border border-amber-800">SUSPENDIDO</span>';
 
                 const imgThumbnail = item.imageData ? 
-                    `<img src="${item.imageData}" onclick="openFullImagePreview('${item.imageData}')" class="h-8 w-12 object-cover mx-auto rounded border border-slate-700 cursor-pointer hover:opacity-80 transition">` : 
+                    `<img src="${item.imageData}" onclick="openFullImagePreview('${item.imageData}')" class="h-8 w-12 object-cover mx-auto rounded border border-slate-700 cursor-pointer hover:opacity-80 transition shadow">` : 
                     '<span class="text-amber-400 text-[9px] font-semibold"><i class="fa-solid fa-clock me-1"></i>Pendiente foto</span>';
 
                 html += `
@@ -1983,7 +2169,7 @@
         function confirmClearAllBitacoraModal() {
             promptPasswordConfirmation(
                 "Autorizar Vaciado Total de Bitácora",
-                "ADVERTENCIA CRÍTICA: Se vaciarán todos los registros del día actual. Ingresa la contraseña de supervisor para autorizar:",
+                "ADVERTENCIA CRÍTICA: Se vaciarán los registros mostrados. Ingresa la contraseña de supervisor para autorizar:",
                 () => {
                     if (window.bitacoraList && window.bitacoraList.length > 0) {
                         saveRecoveryBackup(window.bitacoraList, 'Antes de Vaciar Bitácora');
@@ -2064,35 +2250,25 @@
             const today = getTodayKey();
             const savedDate = safeStorageGet('audi_flight_date');
 
-            if (savedDate !== today) {
-                const prevLogsRaw = safeStorageGet('audi_bitacora_logs');
-                if (prevLogsRaw) {
-                    try {
-                        const prevLogs = JSON.parse(prevLogsRaw);
-                        if (prevLogs && prevLogs.length > 0) {
-                            saveRecoveryBackup(prevLogs, `Cierre de Jornada (${savedDate || 'Ayer'})`);
-                        }
-                    } catch (e) {}
-                }
+            // Cargar bitácora histórica almacenada sin borrar días anteriores
+            const savedBitacora = safeStorageGet('audi_bitacora_logs');
+            if (savedBitacora) { 
+                try { 
+                    window.bitacoraList = JSON.parse(savedBitacora); 
+                    saveRecoveryBackup(window.bitacoraList, 'Auto-Respaldo en Carga');
+                } catch(e){} 
+            }
 
+            // Si es un nuevo día, solo reiniciamos el cronograma de hoy, pero conservamos la bitácora histórica
+            if (savedDate !== today) {
                 safeStorageSet('audi_flight_date', today);
                 window.dailyFlightStatuses = {};
-                window.bitacoraList = [];
                 window.systemWeatherSuspended = false;
                 safeStorageSet('audi_flight_statuses', JSON.stringify({}));
-                safeStorageSet('audi_bitacora_logs', JSON.stringify([]));
                 safeStorageSet('audi_weather_suspended', 'false');
             } else {
                 const savedStatuses = safeStorageGet('audi_flight_statuses');
                 if (savedStatuses) { try { window.dailyFlightStatuses = JSON.parse(savedStatuses); } catch(e){} }
-                
-                const savedBitacora = safeStorageGet('audi_bitacora_logs');
-                if (savedBitacora) { 
-                    try { 
-                        window.bitacoraList = JSON.parse(savedBitacora); 
-                        saveRecoveryBackup(window.bitacoraList, 'Auto-Respaldo en Recarga');
-                    } catch(e){} 
-                }
 
                 const savedWeatherSuspended = safeStorageGet('audi_weather_suspended');
                 window.systemWeatherSuspended = (savedWeatherSuspended === 'true');
