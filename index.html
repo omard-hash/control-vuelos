@@ -1799,45 +1799,45 @@
             renderBitacoraModalTable();
             openModal('modalBitacoraView');
         }
-        window.openBitacoraModal = openBitacoraModal;
-
-        function toggleBitacoraSort() {
-            window.bitacoraSortAsc = !window.bitacoraSortAsc;
-            const textEl = document.getElementById('bitacoraSortText');
-            const iconEl = document.getElementById('bitacoraSortIcon');
-
-            if (window.bitacoraSortAsc) {
-                if (textEl) textEl.innerText = "Antiguos primero";
-                if (iconEl) iconEl.className = "fa-solid fa-arrow-up-short-wide text-blue-400";
-            } else {
-                if (textEl) textEl.innerText = "Recientes primero";
-                if (iconEl) iconEl.className = "fa-solid fa-arrow-down-short-wide text-blue-400";
-            }
+        function filterBitacoraByDate() {
             renderBitacoraModalTable();
         }
-        window.toggleBitacoraSort = toggleBitacoraSort;
+        window.filterBitacoraByDate = filterBitacoraByDate;
 
         function renderBitacoraModalTable() {
             const tbody = document.getElementById('modalBitacoraTableBody');
             const cntEl = document.getElementById('bitacoraRecordCount');
+            const filterEl = document.getElementById('bitacoraDateFilter');
             if (!tbody) return;
 
-            if (cntEl) cntEl.innerText = window.bitacoraList.length;
+            const selectedFilter = filterEl ? filterEl.value : 'TODAY';
+            const todayStr = new Date().toLocaleDateString('es-MX');
 
-            if (!window.bitacoraList || window.bitacoraList.length === 0) {
+            let filteredList = [...window.bitacoraList];
+            if (selectedFilter === 'TODAY') {
+                filteredList = filteredList.filter(item => {
+                    if (!item.timestampFormatted) return true;
+                    return item.timestampFormatted.includes(todayStr) || (item.dateKey && item.dateKey === getTodayKey());
+                });
+            }
+
+            if (cntEl) cntEl.innerText = `${filteredList.length} (de ${window.bitacoraList.length} total)`;
+
+            if (!filteredList || filteredList.length === 0) {
                 tbody.innerHTML = `
                     <tr>
                         <td colspan="9" class="p-6 text-center text-slate-400">
                             <div class="flex flex-col items-center justify-center gap-1">
                                 <i class="fa-solid fa-folder-open text-2xl text-slate-500"></i>
-                                <p class="italic">No hay registros en la bitácora activa.</p>
+                                <p class="italic">No hay registros para la vista seleccionada (${selectedFilter === 'TODAY' ? 'Hoy' : 'Histórico'}).</p>
+                                ${selectedFilter === 'TODAY' && window.bitacoraList.length > 0 ? `<button onclick="document.getElementById('bitacoraDateFilter').value='ALL'; renderBitacoraModalTable();" class="text-xs text-blue-400 underline mt-1">Ver todos los registros históricos (${window.bitacoraList.length})</button>` : ''}
                             </div>
                         </td>
                     </tr>`;
                 return;
             }
 
-            let sortedList = [...window.bitacoraList];
+            let sortedList = [...filteredList];
             if (window.bitacoraSortAsc) {
                 sortedList.reverse();
             }
