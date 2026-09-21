@@ -95,6 +95,11 @@
                 </div>
                 
                 <div class="flex items-center gap-1 shrink-0">
+                    <button onclick="openRecoveryModal()" title="Centro de Recuperación y Respaldo" class="px-2 py-1.5 rounded-lg text-xs font-black bg-amber-600 hover:bg-amber-500 text-white border border-amber-400/50 shadow-md transition flex items-center gap-1 cursor-pointer shrink-0">
+                        <i class="fa-solid fa-clock-rotate-left text-white"></i>
+                        <span class="text-[10px] hidden sm:inline">Recuperar</span>
+                    </button>
+
                     <button onclick="openBitacoraModal()" id="btnOpenBitacora" class="px-2.5 py-1.5 rounded-lg text-xs font-black bg-blue-600 hover:bg-blue-500 text-white border border-blue-400/40 shadow-md transition flex items-center gap-1 cursor-pointer shrink-0">
                         <i class="fa-solid fa-book-bookmark text-amber-300"></i>
                         <span class="text-[10px]">Bitácora</span>
@@ -267,6 +272,9 @@
                     </button>
                 </div>
                 <div class="flex items-center gap-1.5 flex-wrap">
+                    <button onclick="openRecoveryModal()" class="px-2 py-1 bg-amber-700 hover:bg-amber-600 text-white font-bold text-[10px] sm:text-xs rounded-lg transition flex items-center gap-1 cursor-pointer">
+                        <i class="fa-solid fa-clock-rotate-left"></i> Recuperar Copias
+                    </button>
                     <button onclick="exportBitacoraCSV()" class="px-2 py-1 bg-emerald-700 hover:bg-emerald-600 text-white font-bold text-[10px] sm:text-xs rounded-lg transition flex items-center gap-1 cursor-pointer">
                         <i class="fa-solid fa-file-excel"></i> Excel
                     </button>
@@ -303,6 +311,48 @@
                 <button onclick="closeModal('modalBitacoraView')" class="px-3 py-1 bg-slate-800 text-slate-300 font-semibold text-xs rounded-xl hover:bg-slate-700">
                     Cerrar Bitácora
                 </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL DE RECUPERACIÓN Y RESPALDO (RECOVERY CENTER) -->
+    <div id="modalRecoveryCenter" class="fixed inset-0 bg-slate-950/90 backdrop-blur-md z-50 flex items-center justify-center p-3 hidden modal-backdrop">
+        <div class="bg-slate-900 border border-amber-500/50 rounded-2xl max-w-2xl w-full p-4 shadow-2xl space-y-3 max-h-[90vh] flex flex-col">
+            <div class="flex justify-between items-center border-b border-slate-800 pb-2">
+                <h3 class="text-sm sm:text-base font-bold text-amber-400 flex items-center gap-2">
+                    <i class="fa-solid fa-life-ring"></i> Centro de Rescate y Restauración de Bitácora
+                </h3>
+                <button onclick="closeModal('modalRecoveryCenter')" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark text-base"></i></button>
+            </div>
+
+            <p class="text-xs text-slate-300 leading-relaxed">
+                Si alguien borró la bitácora o se reinició por error, aquí puedes rastrear y restaurar copias de seguridad generadas automáticamente antes de cada vaciado o cambio de día:
+            </p>
+
+            <div class="bg-slate-950 p-2.5 rounded-xl border border-slate-800 space-y-2">
+                <div class="flex items-center justify-between flex-wrap gap-2">
+                    <span class="text-xs font-bold text-white"><i class="fa-solid fa-box-archive text-amber-400 me-1"></i> Copias de Seguridad Detectadas</span>
+                    <button onclick="scanForRecoverableData()" class="px-2 py-0.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-[10px] font-bold rounded transition">
+                        <i class="fa-solid fa-arrows-rotate me-1"></i> Explorar Memoria
+                    </button>
+                </div>
+                <div id="recoveryBackupsList" class="space-y-1.5 max-h-48 overflow-y-auto pr-1 text-xs">
+                    <!-- Se llena dinámicamente -->
+                </div>
+            </div>
+
+            <div class="bg-slate-950 p-2.5 rounded-xl border border-slate-800 space-y-2 text-xs">
+                <span class="font-bold text-slate-300 block"><i class="fa-solid fa-file-import text-blue-400 me-1"></i> Restaurar desde Archivo o JSON de Emergencia:</span>
+                <div class="flex gap-2">
+                    <input type="file" id="recoveryFileInput" accept=".json,.csv" onchange="handleRecoveryFile(this)" class="flex-1 bg-slate-900 border border-slate-700 text-slate-400 text-xs py-1 px-2 rounded-lg cursor-pointer">
+                    <button onclick="exportCurrentBackupJSON()" class="px-3 py-1 bg-blue-700 hover:bg-blue-600 text-white font-bold rounded-lg shrink-0">
+                        <i class="fa-solid fa-download me-1"></i> Descargar Respaldo Actual
+                    </button>
+                </div>
+            </div>
+
+            <div class="flex justify-end gap-2 pt-2 border-t border-slate-800">
+                <button onclick="closeModal('modalRecoveryCenter')" class="px-3 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-xs rounded-xl">Cerrar</button>
             </div>
         </div>
     </div>
@@ -554,7 +604,7 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, setDoc, deleteDoc, onSnapshot, collection } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, doc, setDoc, deleteDoc, onSnapshot, collection, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         let appId = 'audi-mexico-drones';
         try {
@@ -563,12 +613,12 @@
         } catch(e) {}
 
         const DEFAULT_FIREBASE_CONFIG = {
-            apiKey: "AIzaSyDXjwv133-dIKyprCktTUkjx_adAz1DhAY",
+            apiKey: "AIzaSyChAG45qQ2gLup1_HwRGhmJJ5cFyFBd70U",
             authDomain: "control-vuelos.firebaseapp.com",
             projectId: "control-vuelos",
             storageBucket: "control-vuelos.firebasestorage.app",
             messagingSenderId: "756032981781",
-            appId: "1:756032981781:web:451641e72abe3692c0771c"
+            appId: "1:756032981781:web:cc679a65b3995087c0771c"
         };
 
         let firebaseConfig = null;
@@ -629,25 +679,20 @@
                 auth = getAuth(app);
                 db = getFirestore(app);
 
-                if (initialAuthToken) {
-                    try {
+                // Intentar autenticación pero sin bloquear la carga si falla
+                try {
+                    if (initialAuthToken) {
                         const userCred = await signInWithCustomToken(auth, initialAuthToken);
                         currentUser = userCred.user;
-                    } catch (e) {
-                        console.warn("Custom token falló, reintentando de forma anónima:", e);
+                    } else {
                         const userCred = await signInAnonymously(auth);
                         currentUser = userCred.user;
                     }
-                } else {
-                    const userCred = await signInAnonymously(auth);
-                    currentUser = userCred.user;
+                } catch (authErr) {
+                    console.warn("Autenticación secundaria omitida, procediendo directamente con Firestore:", authErr);
                 }
 
-                if (!currentUser) {
-                    updateCloudUI(false, "Modo Local");
-                    return;
-                }
-
+                // Configurar listeners en tiempo real directamente con Firestore
                 updateCloudUI(true, "Nube Live Sincronizada");
                 setupRealtimeListeners();
             } catch (err) {
@@ -657,7 +702,7 @@
         }
 
         function setupRealtimeListeners() {
-            if (!db || !currentUser) return;
+            if (!db) return;
 
             const todayKey = window.getTodayKey();
 
@@ -679,7 +724,6 @@
                 }
             }, (err) => {
                 console.warn("Error en el snapshot daily_status:", err);
-                updateCloudUI(false, "Modo Local");
             });
 
             const bitacoraColRef = collection(db, 'artifacts', appId, 'public', 'data', 'bitacora_logs');
@@ -690,6 +734,11 @@
                 });
                 
                 logs.sort((a, b) => b.id - a.id);
+                
+                // Si la nube tiene registros, respaldar automáticamente
+                if (logs.length > 0) {
+                    window.saveRecoveryBackup(logs, 'Sincronización Nube Firestore');
+                }
                 
                 window.bitacoraList = logs;
                 if (window.safeStorageSet) window.safeStorageSet('audi_bitacora_logs', JSON.stringify(logs));
@@ -702,16 +751,28 @@
                 }
             }, (err) => {
                 console.warn("Error en el snapshot bitacora_logs:", err);
-                updateCloudUI(false, "Modo Local");
             });
         }
 
+        window.fetchCloudLogsOnce = async function() {
+            if (!db) return [];
+            try {
+                const bitacoraColRef = collection(db, 'artifacts', appId, 'public', 'data', 'bitacora_logs');
+                const snap = await getDocs(bitacoraColRef);
+                const results = [];
+                snap.forEach(d => results.push(d.data()));
+                return results;
+            } catch (e) {
+                console.error("Error fetching cloud logs:", e);
+                return [];
+            }
+        };
+
         window.saveDailyStatusToCloud = async function() {
-            if (!db || !currentUser) return;
+            if (!db) return;
             const todayKey = window.getTodayKey();
             try {
                 const statusDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'daily_status', todayKey);
-                // NOTA: Se remueve { merge: true } para permitir la eliminación real de llaves borradas en Firestore
                 await setDoc(statusDocRef, {
                     date: todayKey,
                     statuses: window.dailyFlightStatuses,
@@ -722,7 +783,7 @@
         };
 
         window.saveBitacoraLogToCloud = async function(logEntry) {
-            if (!db || !currentUser) return;
+            if (!db) return;
             try {
                 const logDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'bitacora_logs', logEntry.id.toString());
                 await setDoc(logDocRef, logEntry);
@@ -730,7 +791,7 @@
         };
 
         window.deleteBitacoraLogFromCloud = async function(logId) {
-            if (!db || !currentUser) return;
+            if (!db) return;
             try {
                 const logDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'bitacora_logs', logId.toString());
                 await deleteDoc(logDocRef);
@@ -790,6 +851,279 @@
             return `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
         }
         window.getTodayKey = getTodayKey;
+
+        // GUARDADO DE COPIAS PREVENTIVAS HISTÓRICAS
+        function saveRecoveryBackup(logs, reason = 'Automático') {
+            if (!logs || logs.length === 0) return;
+            try {
+                let backups = [];
+                const raw = safeStorageGet('audi_bitacora_backups');
+                if (raw) backups = JSON.parse(raw);
+
+                const newBackup = {
+                    id: Date.now(),
+                    date: new Date().toLocaleString('es-MX'),
+                    count: logs.length,
+                    reason: reason,
+                    logs: logs
+                };
+
+                // Conservar hasta los últimos 12 respaldos históricos
+                backups.unshift(newBackup);
+                if (backups.length > 12) backups = backups.slice(0, 12);
+
+                safeStorageSet('audi_bitacora_backups', JSON.stringify(backups));
+            } catch (e) {
+                console.warn("Error guardando copia de seguridad:", e);
+            }
+        }
+        window.saveRecoveryBackup = saveRecoveryBackup;
+
+        function openRecoveryModal() {
+            scanDeepRecoverableData();
+            openModal('modalRecoveryCenter');
+        }
+        window.openRecoveryModal = openRecoveryModal;
+
+        // ESCÁNER PROFUNDO DE REGISTROS BORRADOS (NUBE + LOCALSTORAGE)
+        async function scanDeepRecoverableData() {
+            const listEl = document.getElementById('recoveryBackupsList');
+            if (!listEl) return;
+
+            listEl.innerHTML = `
+                <div class="p-3 text-center text-amber-300 font-semibold bg-slate-900 rounded-lg animate-pulse">
+                    <i class="fa-solid fa-spinner fa-spin me-2"></i> Escaneando Nube Firestore y memoria del navegador en busca de registros...
+                </div>
+            `;
+
+            let candidates = [];
+
+            // 1. Escanear en la Nube Firestore directamente
+            if (typeof window.fetchCloudLogsOnce === 'function') {
+                try {
+                    const cloudLogs = await window.fetchCloudLogsOnce();
+                    if (cloudLogs && cloudLogs.length > 0) {
+                        candidates.push({
+                            source: 'Nube Firestore (Base de Datos)',
+                            date: 'En Línea',
+                            count: cloudLogs.length,
+                            logs: cloudLogs,
+                            badgeColor: 'bg-emerald-950 text-emerald-300 border-emerald-700'
+                        });
+                    }
+                } catch(e) {}
+            }
+
+            // 2. Escanear el respaldo preventivo del último "Vaciar"
+            const lastCleared = safeStorageGet('audi_last_cleared_bitacora');
+            if (lastCleared) {
+                try {
+                    const parsed = JSON.parse(lastCleared);
+                    if (parsed && parsed.length > 0) {
+                        candidates.push({
+                            source: 'Memoria Local (Justo antes del último Vaciar)',
+                            date: 'Reciente',
+                            count: parsed.length,
+                            logs: parsed,
+                            badgeColor: 'bg-blue-950 text-blue-300 border-blue-700'
+                        });
+                    }
+                } catch (e) {}
+            }
+
+            // 3. Escanear el historial de copias preventivas
+            const rawBackups = safeStorageGet('audi_bitacora_backups');
+            if (rawBackups) {
+                try {
+                    const backups = JSON.parse(rawBackups);
+                    backups.forEach(b => {
+                        if (b.logs && b.logs.length > 0) {
+                            candidates.push({
+                                source: `Copia de Seguridad: ${b.reason}`,
+                                date: b.date,
+                                count: b.logs.length,
+                                logs: b.logs,
+                                badgeColor: 'bg-amber-950 text-amber-300 border-amber-700'
+                            });
+                        }
+                    });
+                } catch(e) {}
+            }
+
+            // 4. Escanear si hay logs guardados en 'audi_bitacora_logs' que no se hayan pintado
+            const currentRaw = safeStorageGet('audi_bitacora_logs');
+            if (currentRaw && (!window.bitacoraList || window.bitacoraList.length === 0)) {
+                try {
+                    const parsed = JSON.parse(currentRaw);
+                    if (parsed && parsed.length > 0) {
+                        candidates.push({
+                            source: 'Caché de Bitácora Local',
+                            date: 'Sesión anterior',
+                            count: parsed.length,
+                            logs: parsed,
+                            badgeColor: 'bg-purple-950 text-purple-300 border-purple-700'
+                        });
+                    }
+                } catch(e) {}
+            }
+
+            if (candidates.length === 0) {
+                listEl.innerHTML = `
+                    <div class="p-3 text-center text-slate-400 bg-slate-900 rounded-lg space-y-1">
+                        <div class="font-bold text-amber-400"><i class="fa-solid fa-triangle-exclamation me-1"></i> No se encontraron registros automáticos.</div>
+                        <p class="text-[11px] text-slate-400">Si tú o un compañero descargaron un Excel o un archivo previo, puedes subir el archivo .CSV o .JSON abajo para restaurarlo de inmediato.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            window._currentRecoveryCandidates = candidates;
+
+            let html = '';
+            candidates.forEach((cand, idx) => {
+                html += `
+                    <div class="flex items-center justify-between p-2.5 bg-slate-900 rounded-xl border border-slate-800 hover:border-amber-500/50 transition gap-2">
+                        <div class="flex-1 min-w-0">
+                            <div class="flex items-center gap-1.5 flex-wrap">
+                                <span class="font-bold text-slate-100 text-xs">${cand.source}</span>
+                                <span class="text-[9px] px-1.5 py-0.2 rounded border ${cand.badgeColor} font-bold">${cand.count} vuelos</span>
+                            </div>
+                            <div class="text-[10px] text-slate-400 font-mono mt-0.5">Fecha/Hora: ${cand.date}</div>
+                        </div>
+                        <button onclick="restoreCandidateByIndex(${idx})" class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-lg transition flex items-center gap-1 shadow cursor-pointer shrink-0">
+                            <i class="fa-solid fa-rotate-left"></i> Restaurar
+                        </button>
+                    </div>
+                `;
+            });
+
+            listEl.innerHTML = html;
+        }
+        window.scanDeepRecoverableData = scanDeepRecoverableData;
+
+        function restoreCandidateByIndex(idx) {
+            if (!window._currentRecoveryCandidates || !window._currentRecoveryCandidates[idx]) return;
+            const target = window._currentRecoveryCandidates[idx];
+
+            showConfirmDialog(
+                "Confirmar Restauración",
+                `¿Deseas restaurar ${target.count} registros encontrados en "${target.source}"? La bitácora y el cronograma de vuelos volverán a quedar completos.`,
+                () => {
+                    applyRestoredLogs(target.logs);
+                    closeModal('modalRecoveryCenter');
+                    showToast(`¡Recuperados exitosamente ${target.count} registros!`, "success");
+                    triggerVoiceAlert("Atención. Bitácora y vuelos restaurados correctamente.");
+                }
+            );
+        }
+        window.restoreCandidateByIndex = restoreCandidateByIndex;
+
+        function applyRestoredLogs(logs) {
+            if (!logs || logs.length === 0) return;
+
+            window.bitacoraList = logs;
+            safeStorageSet('audi_bitacora_logs', JSON.stringify(logs));
+
+            // Reconstruir el cronograma diario en base a los registros restaurados
+            const plans = getActivePlan();
+            window.dailyFlightStatuses = {};
+
+            logs.forEach(log => {
+                const planIdx = plans.findIndex(p => p.timeOp2 === log.scheduledTime);
+                if (planIdx !== -1) {
+                    const st = (log.status === 'VOLADO') ? 'REALIZADO' : log.status;
+                    window.dailyFlightStatuses[planIdx] = {
+                        status: st,
+                        realTime: log.realTime || '--',
+                        note: log.notes || ''
+                    };
+                }
+                // Sincronizar de nuevo a Firestore en la nube
+                if (typeof window.saveBitacoraLogToCloud === 'function') {
+                    window.saveBitacoraLogToCloud(log);
+                }
+            });
+
+            safeStorageSet('audi_flight_statuses', JSON.stringify(window.dailyFlightStatuses));
+            if (typeof window.saveDailyStatusToCloud === 'function') {
+                window.saveDailyStatusToCloud();
+            }
+
+            renderFlightsTable();
+            renderBitacoraModalTable();
+            updateTargetFlightBanner(new Date());
+        }
+        window.applyRestoredLogs = applyRestoredLogs;
+
+        function exportCurrentBackupJSON() {
+            if (!window.bitacoraList || window.bitacoraList.length === 0) {
+                showToast("No hay registros en la bitácora actual para guardar", "warning");
+                return;
+            }
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(window.bitacoraList, null, 2));
+            const dlAnchor = document.createElement('a');
+            dlAnchor.setAttribute("href", dataStr);
+            dlAnchor.setAttribute("download", `respaldo_bitacora_${getTodayKey()}.json`);
+            document.body.appendChild(dlAnchor);
+            dlAnchor.click();
+            dlAnchor.remove();
+        }
+        window.exportCurrentBackupJSON = exportCurrentBackupJSON;
+
+        function handleRecoveryFile(input) {
+            const file = input.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const content = e.target.result;
+                    if (file.name.endsWith('.json')) {
+                        const parsed = JSON.parse(content);
+                        if (Array.isArray(parsed)) {
+                            applyRestoredLogs(parsed);
+                            closeModal('modalRecoveryCenter');
+                            showToast(`Restaurados ${parsed.length} registros desde archivo JSON`, "success");
+                        } else {
+                            alert("El archivo JSON no contiene un formato de bitácora válido.");
+                        }
+                    } else if (file.name.endsWith('.csv')) {
+                        const lines = content.split('\n');
+                        const restored = [];
+                        for (let i = 1; i < lines.length; i++) {
+                            const line = lines[i].trim();
+                            if (!line) continue;
+                            const cols = line.match(/(".*?"|[^",\s]+)(?=\s*,|\s*$)/g) || [];
+                            const clean = cols.map(c => c.replace(/^"|"$/g, '').trim());
+                            if (clean.length >= 5) {
+                                restored.push({
+                                    id: Date.now() + i,
+                                    timestampFormatted: clean[0] || new Date().toLocaleString('es-MX'),
+                                    scheduledTime: clean[1] || '00:00',
+                                    flightType: clean[2] || 'TIPO A - Perimetral',
+                                    pilot: clean[3] || 'Piloto en Turno',
+                                    status: clean[4] || 'REALIZADO',
+                                    realTime: clean[5] || '--',
+                                    notes: clean[6] || '',
+                                    imageData: ''
+                                });
+                            }
+                        }
+                        if (restored.length > 0) {
+                            applyRestoredLogs(restored);
+                            closeModal('modalRecoveryCenter');
+                            showToast(`Restaurados ${restored.length} registros desde archivo CSV`, "success");
+                        } else {
+                            alert("No se pudieron extraer registros válidos del archivo CSV.");
+                        }
+                    }
+                } catch (err) {
+                    alert("Error al leer el archivo de respaldo: " + err.message);
+                }
+            };
+            reader.readAsText(file);
+        }
+        window.handleRecoveryFile = handleRecoveryFile;
 
         function getActivePlanKey() {
             const today = new Date();
@@ -970,9 +1304,10 @@
                 }
             });
 
-            // Guardar localmente
+            // Guardar localmente y respaldar
             safeStorageSet('audi_flight_statuses', JSON.stringify(window.dailyFlightStatuses));
             safeStorageSet('audi_bitacora_logs', JSON.stringify(window.bitacoraList));
+            saveRecoveryBackup(window.bitacoraList, 'Reanudación tras Suspensión');
 
             // Sincronizar en Nube Firebase borrando las llaves
             if (typeof window.saveDailyStatusToCloud === 'function') {
@@ -1287,7 +1622,7 @@
             if (badgeEl) badgeEl.innerText = `TIPO ${targetItem.type} - ${targetItem.name}`;
 
             const statusObj = window.dailyFlightStatuses[targetIdx] || { status: 'PENDIENTE' };
-            const isTypeB = targetItem.forced; // Uso de 'forced' ya que es true para todos los Cambio de Turno
+            const isTypeB = targetItem.forced;
 
             // SILENCIAR OTRAS NOTIFICACIONES MIENTRAS ESTÉ SUSPENDIDO
             if (window.systemWeatherSuspended) {
@@ -1425,7 +1760,7 @@
             let html = '';
             plans.forEach((item, idx) => {
                 const statusObj = window.dailyFlightStatuses[idx] || { status: 'PENDIENTE', realTime: '--', note: '' };
-                const isTypeB = item.forced; // Ahora usado consistentemente
+                const isTypeB = item.forced;
                 
                 let statusBadge = '<span class="px-2 py-0.5 rounded text-[9.5px] font-bold bg-slate-800 text-slate-400 border border-slate-700">PENDIENTE</span>';
                 if (statusObj.status === 'VOLADO' || statusObj.status === 'REALIZADO') {
@@ -1515,7 +1850,6 @@
                 return;
             }
 
-            // Buscar si ya existe una entrada en la bitácora o crear una nueva
             let logEntry = window.bitacoraList.find(b => b.scheduledTime === item.timeOp2 && b.status === 'SUSPENDIDO');
             if (logEntry) {
                 logEntry.imageData = imageData;
@@ -1535,6 +1869,7 @@
             }
 
             safeStorageSet('audi_bitacora_logs', JSON.stringify(window.bitacoraList));
+            saveRecoveryBackup(window.bitacoraList, 'Actualización Evidencia');
             if (typeof window.saveBitacoraLogToCloud === 'function') window.saveBitacoraLogToCloud(logEntry);
 
             closeModal('modalUploadEvidence');
@@ -1597,6 +1932,7 @@
 
             window.bitacoraList.unshift(logEntry);
             safeStorageSet('audi_bitacora_logs', JSON.stringify(window.bitacoraList));
+            saveRecoveryBackup(window.bitacoraList, `Despegue ${item.timeOp2}`);
 
             if (typeof window.saveDailyStatusToCloud === 'function') window.saveDailyStatusToCloud();
             if (typeof window.saveBitacoraLogToCloud === 'function') window.saveBitacoraLogToCloud(logEntry);
@@ -1623,7 +1959,6 @@
 
             const plans = getActivePlan();
 
-            // Si es suspensión general por clima, suspende el vuelo activo y los siguientes pendientes en cascada
             if (window.isTopLevelSuspension) {
                 for (let i = idx; i < plans.length; i++) {
                     const currentStatus = window.dailyFlightStatuses[i];
@@ -1678,6 +2013,7 @@
 
             safeStorageSet('audi_flight_statuses', JSON.stringify(window.dailyFlightStatuses));
             safeStorageSet('audi_bitacora_logs', JSON.stringify(window.bitacoraList));
+            saveRecoveryBackup(window.bitacoraList, `Suspensión ${plans[idx].timeOp2}`);
 
             if (typeof window.saveDailyStatusToCloud === 'function') window.saveDailyStatusToCloud();
 
@@ -1724,7 +2060,18 @@
             if (cntEl) cntEl.innerText = window.bitacoraList.length;
 
             if (!window.bitacoraList || window.bitacoraList.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="9" class="p-4 text-center text-slate-500 italic">No hay registros almacenados en la bitácora del día.</td></tr>`;
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="9" class="p-6 text-center text-slate-400">
+                            <div class="flex flex-col items-center justify-center gap-2">
+                                <i class="fa-solid fa-folder-open text-2xl text-slate-500"></i>
+                                <p class="italic">No hay registros almacenados en la bitácora activa.</p>
+                                <button onclick="openRecoveryModal()" class="px-3 py-1 bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs rounded-lg transition shadow flex items-center gap-1.5">
+                                    <i class="fa-solid fa-clock-rotate-left"></i> Abrir Recuperador de Registros
+                                </button>
+                            </div>
+                        </td>
+                    </tr>`;
                 return;
             }
 
@@ -1775,7 +2122,6 @@
             window.tempCompressedImage = entry.imageData || "";
             document.getElementById('editBitacoraId').value = entry.id;
             
-            // Adaptar para legado
             let st = entry.status;
             if (st === 'VOLADO') st = 'REALIZADO';
             document.getElementById('editBitacoraStatus').value = st;
@@ -1822,6 +2168,7 @@
 
             window.bitacoraList[entryIdx] = updatedEntry;
             safeStorageSet('audi_bitacora_logs', JSON.stringify(window.bitacoraList));
+            saveRecoveryBackup(window.bitacoraList, `Edición ${schedTime}`);
 
             const planIdx = getActivePlan().findIndex(p => p.timeOp2 === schedTime);
             if (planIdx !== -1) {
@@ -1842,6 +2189,9 @@
 
         function deleteBitacoraEntry(id) {
             showConfirmDialog("Eliminar Registro", "¿Deseas ELIMINAR este registro de la Bitácora? El vuelo volverá a estar PENDIENTE en el cronograma.", () => {
+                // Guardar respaldo preventivo antes de eliminar
+                saveRecoveryBackup(window.bitacoraList, 'Antes de Eliminar Registro');
+
                 const entry = window.bitacoraList.find(b => b.id === id);
                 if (entry) {
                     const planIdx = getActivePlan().findIndex(p => p.timeOp2 === entry.scheduledTime);
@@ -1921,7 +2271,12 @@
         window.exportBitacoraCSV = exportBitacoraCSV;
 
         function confirmClearAllBitacoraModal() {
-            showConfirmDialog("Vaciar Bitácora", "¿Deseas VACIAR completamente la Bitácora del día? Todos los vuelos volverán a estar PENDIENTES.", () => {
+            showConfirmDialog("Vaciar Bitácora", "¿Deseas VACIAR completamente la Bitácora del día? Se creará una copia de seguridad recuperable antes de limpiar.", () => {
+                if (window.bitacoraList && window.bitacoraList.length > 0) {
+                    safeStorageSet('audi_last_cleared_bitacora', JSON.stringify(window.bitacoraList));
+                    saveRecoveryBackup(window.bitacoraList, 'Antes de Vaciar Bitácora');
+                }
+
                 window.bitacoraList = [];
                 window.dailyFlightStatuses = {};
                 safeStorageSet('audi_bitacora_logs', JSON.stringify([]));
@@ -1932,7 +2287,7 @@
                 renderBitacoraModalTable();
                 renderFlightsTable();
                 updateTargetFlightBanner(new Date());
-                showToast("Bitácora vaciada. Vuelos reiniciados a PENDIENTE", "info");
+                showToast("Bitácora vaciada. Puedes recuperarla pulsando 'Recuperar'", "info");
             });
         }
         window.confirmClearAllBitacoraModal = confirmClearAllBitacoraModal;
@@ -1942,6 +2297,17 @@
             const savedDate = safeStorageGet('audi_flight_date');
 
             if (savedDate !== today) {
+                // Guardar copia del día anterior antes de reiniciar el día
+                const prevLogsRaw = safeStorageGet('audi_bitacora_logs');
+                if (prevLogsRaw) {
+                    try {
+                        const prevLogs = JSON.parse(prevLogsRaw);
+                        if (prevLogs && prevLogs.length > 0) {
+                            saveRecoveryBackup(prevLogs, `Cierre de Jornada (${savedDate || 'Ayer'})`);
+                        }
+                    } catch (e) {}
+                }
+
                 safeStorageSet('audi_flight_date', today);
                 window.dailyFlightStatuses = {};
                 window.bitacoraList = [];
@@ -1958,6 +2324,17 @@
 
                 const savedWeatherSuspended = safeStorageGet('audi_weather_suspended');
                 window.systemWeatherSuspended = (savedWeatherSuspended === 'true');
+            }
+
+            // Si la bitácora local está vacía, revisar si existe una copia de seguridad o vaciado reciente para sugerir rescate
+            if (!window.bitacoraList || window.bitacoraList.length === 0) {
+                const lastCleared = safeStorageGet('audi_last_cleared_bitacora');
+                const backupsRaw = safeStorageGet('audi_bitacora_backups');
+                if (lastCleared || backupsRaw) {
+                    setTimeout(() => {
+                        showToast("Se detectaron respaldos anteriores en memoria. Haz clic en 'Recuperar'", "warning");
+                    }, 1200);
+                }
             }
 
             updateMainWeatherButtonUI();
