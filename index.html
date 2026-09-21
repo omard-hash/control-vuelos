@@ -76,13 +76,13 @@
                     </span>
 
                     <!-- INDICADOR DE CONEXIÓN NUBE EN LÍNEA -->
-                    <span id="cloudStatusBadge" onclick="openCloudSettingsModal()" title="Haz clic para consultar o ajustar Nube Firebase" class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-950/80 text-amber-400 border border-amber-800/40 shrink-0 flex items-center gap-1 cursor-pointer hover:opacity-90">
+                    <span id="cloudStatusBadge" onclick="openCloudSettingsModal()" title="Configuración de Firebase" class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-950/80 text-amber-400 border border-amber-800/40 shrink-0 flex items-center gap-1 cursor-pointer hover:opacity-90">
                         <i id="cloudStatusIcon" class="fa-solid fa-hard-drive text-amber-400"></i> <span id="cloudStatusText">Conectando Nube...</span>
                     </span>
                 </div>
             </div>
 
-            <!-- RELOJ DESTACADO, FECHA Y ESTADO DE AUDIO -->
+            <!-- RELOJ DESTACADO, FECHA Y CONTROLES -->
             <div class="flex items-center justify-between xs:justify-end gap-2 w-full xs:w-auto bg-slate-950/90 px-2.5 py-1.5 rounded-xl border border-slate-800 shadow-inner">
                 <div class="text-left xs:text-right flex flex-col items-start xs:items-end me-1">
                     <div id="liveClock" class="text-2xl sm:text-4xl font-mono font-black text-amber-300 tracking-wider leading-none drop-shadow-md">00:00:00</div>
@@ -94,12 +94,7 @@
                     </div>
                 </div>
                 
-                <div class="flex items-center gap-1 shrink-0">
-                    <button onclick="openRecoveryModal()" title="Centro de Recuperación y Respaldo" class="px-2 py-1.5 rounded-lg text-xs font-black bg-amber-600 hover:bg-amber-500 text-white border border-amber-400/50 shadow-md transition flex items-center gap-1 cursor-pointer shrink-0">
-                        <i class="fa-solid fa-clock-rotate-left text-white"></i>
-                        <span class="text-[10px] hidden sm:inline">Recuperar</span>
-                    </button>
-
+                <div class="flex items-center gap-1.5 shrink-0">
                     <button onclick="openBitacoraModal()" id="btnOpenBitacora" class="px-2.5 py-1.5 rounded-lg text-xs font-black bg-blue-600 hover:bg-blue-500 text-white border border-blue-400/40 shadow-md transition flex items-center gap-1 cursor-pointer shrink-0">
                         <i class="fa-solid fa-book-bookmark text-amber-300"></i>
                         <span class="text-[10px]">Bitácora</span>
@@ -115,13 +110,13 @@
     </header>
 
     <!-- CONTENIDO PRINCIPAL FIJO -->
-    <main class="flex-1 max-w-7xl w-full mx-auto px-2 sm:px-4 py-2.5 flex flex-col gap-2.5 overflow-hidden">
+    <main class="flex-1 max-w-7xl w-full mx-auto px-2 sm:px-4 py-2 flex flex-col gap-2 overflow-hidden">
 
         <!-- TARJETA PRINCIPAL DEL VUELO ACTIVO Y CRONÓMETRO GIGANTE -->
-        <section id="nextFlightCard" class="bg-gradient-to-r from-slate-900 via-blue-950/60 to-slate-900 p-3 sm:p-4 rounded-2xl border border-blue-500/40 shadow-2xl relative overflow-hidden shrink-0">
-            <div class="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3">
+        <section id="nextFlightCard" class="bg-gradient-to-r from-slate-900 via-blue-950/60 to-slate-900 p-2.5 sm:p-3.5 rounded-2xl border border-blue-500/40 shadow-2xl relative overflow-hidden shrink-0">
+            <div class="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-2.5">
                 
-                <div class="space-y-1.5">
+                <div class="space-y-1">
                     <div class="flex items-center gap-1.5 flex-wrap">
                         <span class="px-2 py-0.5 rounded text-[10px] font-extrabold bg-blue-500/20 text-blue-300 border border-blue-500/30 uppercase tracking-wide">
                             <i class="fa-solid fa-crosshairs me-1"></i>Vuelo Siguiente / Activo
@@ -143,10 +138,10 @@
                 </div>
 
                 <!-- CONTROLES Y CRONÓMETRO DESTACADO -->
-                <div class="flex flex-col xs:flex-row items-stretch xs:items-center gap-3 bg-slate-950/90 p-3 rounded-xl border border-slate-800/90 shadow-lg">
-                    <div class="text-center xs:text-right px-3 py-1.5 bg-slate-900/80 rounded-lg border border-slate-800 flex-1 xs:flex-none">
-                        <div class="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Estado / Cronómetro</div>
-                        <div id="targetCountdown" class="text-2xl sm:text-4xl lg:text-5xl font-mono font-black text-emerald-400 mt-1">Calculando...</div>
+                <div class="flex flex-col xs:flex-row items-stretch xs:items-center gap-2.5 bg-slate-950/90 p-2.5 rounded-xl border border-slate-800/90 shadow-lg">
+                    <div class="text-center xs:text-right px-3 py-1 bg-slate-900/80 rounded-lg border border-slate-800 flex-1 xs:flex-none">
+                        <div class="text-[9.5px] uppercase font-bold text-slate-400 tracking-wider">Estado / Cronómetro</div>
+                        <div id="targetCountdown" class="text-2xl sm:text-4xl lg:text-5xl font-mono font-black text-emerald-400 mt-0.5">Calculando...</div>
                     </div>
 
                     <div class="flex items-center gap-1.5 flex-1 xs:flex-none flex-wrap sm:flex-nowrap">
@@ -163,28 +158,28 @@
         </section>
 
         <!-- TARJETAS DE CONTEO -->
-        <section class="bg-slate-900/90 p-2 sm:p-3 rounded-xl border border-slate-800 shadow-lg grid grid-cols-3 gap-2 shrink-0">
-            <div class="bg-slate-950/80 p-2 sm:p-2.5 rounded-xl border border-slate-800/80 text-center flex flex-col justify-center shadow-inner">
-                <span class="text-[10px] sm:text-xs uppercase font-bold text-slate-400 tracking-wider">Jornada 24h</span>
-                <span id="cntTotal" class="text-lg sm:text-2xl font-black text-white my-0.5">16 Vuelos</span>
-                <span class="text-[9px] sm:text-[10px] text-slate-500 hidden sm:inline">12:00 AM - 11:59 PM</span>
+        <section class="bg-slate-900/90 p-2 sm:p-2.5 rounded-xl border border-slate-800 shadow-lg grid grid-cols-3 gap-2 shrink-0">
+            <div class="bg-slate-950/80 p-1.5 sm:p-2 rounded-xl border border-slate-800/80 text-center flex flex-col justify-center shadow-inner">
+                <span class="text-[9.5px] sm:text-xs uppercase font-bold text-slate-400 tracking-wider">Jornada 24h</span>
+                <span id="cntTotal" class="text-base sm:text-xl font-black text-white my-0.5">16 Vuelos</span>
+                <span class="text-[8.5px] sm:text-[9.5px] text-slate-500 hidden sm:inline">12:00 AM - 11:59 PM</span>
             </div>
             
-            <div class="bg-slate-950/80 p-2 sm:p-2.5 rounded-xl border border-emerald-900/40 text-center flex flex-col justify-center shadow-inner">
-                <span class="text-[10px] sm:text-xs uppercase font-bold text-emerald-400 tracking-wider">Realizados</span>
-                <span id="cntFlown" class="text-xl sm:text-3xl font-black text-emerald-400 my-0.5 drop-shadow-md">0</span>
-                <span class="text-[9px] sm:text-[10px] text-slate-500 hidden sm:inline">Ejecutados</span>
+            <div class="bg-slate-950/80 p-1.5 sm:p-2 rounded-xl border border-emerald-900/40 text-center flex flex-col justify-center shadow-inner">
+                <span class="text-[9.5px] sm:text-xs uppercase font-bold text-emerald-400 tracking-wider">Realizados</span>
+                <span id="cntFlown" class="text-lg sm:text-2xl font-black text-emerald-400 my-0.5 drop-shadow-md">0</span>
+                <span class="text-[8.5px] sm:text-[9.5px] text-slate-500 hidden sm:inline">Ejecutados</span>
             </div>
 
-            <div class="bg-slate-950/80 p-2 sm:p-2.5 rounded-xl border border-amber-900/40 text-center flex flex-col justify-center shadow-inner">
-                <span class="text-[10px] sm:text-xs uppercase font-bold text-amber-400 tracking-wider">Suspendidos</span>
-                <span id="cntSuspended" class="text-xl sm:text-3xl font-black text-amber-400 my-0.5 drop-shadow-md">0</span>
-                <span class="text-[9px] sm:text-[10px] text-slate-500 hidden sm:inline">Con/Sin evidencia</span>
+            <div class="bg-slate-950/80 p-1.5 sm:p-2 rounded-xl border border-amber-900/40 text-center flex flex-col justify-center shadow-inner">
+                <span class="text-[9.5px] sm:text-xs uppercase font-bold text-amber-400 tracking-wider">Suspendidos</span>
+                <span id="cntSuspended" class="text-lg sm:text-2xl font-black text-amber-400 my-0.5 drop-shadow-md">0</span>
+                <span class="text-[8.5px] sm:text-[9.5px] text-slate-500 hidden sm:inline">Con/Sin evidencia</span>
             </div>
         </section>
 
         <!-- CRONOGRAMA DIARIO DE VUELOS -->
-        <section class="bg-slate-900 p-2.5 rounded-2xl border border-slate-800 shadow-xl space-y-2 flex-1 flex flex-col overflow-hidden min-h-0">
+        <section class="bg-slate-900 p-2 sm:p-2.5 rounded-2xl border border-slate-800 shadow-xl space-y-1.5 flex-1 flex flex-col overflow-hidden min-h-0">
             <div class="flex items-center justify-between border-b border-slate-800 pb-1.5 shrink-0">
                 <h3 class="text-xs font-bold text-white flex items-center gap-1.5">
                     <i class="fa-solid fa-list-check text-audi-red"></i>
@@ -214,49 +209,53 @@
 
     </main>
 
-    <!-- MODAL ADJUNTAR / SUBIR EVIDENCIA PARA VUELO SUSPENDIDO -->
-    <div id="modalUploadEvidence" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-3 hidden modal-backdrop">
-        <div class="bg-slate-900 border border-amber-500/40 rounded-2xl max-w-sm w-full p-4 shadow-2xl space-y-3">
-            <div class="flex justify-between items-center border-b border-slate-800 pb-2">
-                <h3 class="text-xs sm:text-sm font-bold text-amber-400 flex items-center gap-1.5">
-                    <i class="fa-solid fa-camera"></i> Subir Evidencia de Suspensión
-                </h3>
-                <button onclick="closeModal('modalUploadEvidence')" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark text-base"></i></button>
+    <!-- MODAL CONFIRMACIÓN CON CONTRASEÑA DE SUPERVISIÓN -->
+    <div id="modalPasswordConfirmDialog" class="fixed inset-0 bg-slate-950/85 backdrop-blur-sm z-50 flex items-center justify-center p-3 hidden modal-backdrop">
+        <div class="bg-slate-900 border border-red-500/50 rounded-2xl max-w-sm w-full p-4 shadow-2xl space-y-3">
+            <div class="flex items-center gap-2 text-red-400 font-bold text-sm">
+                <i class="fa-solid fa-shield-halved text-base"></i>
+                <span id="pwdDialogTitle">Autorización de Seguridad Requerida</span>
             </div>
-            
-            <input type="hidden" id="evidenceFlightIndex">
-
-            <div class="space-y-2 text-xs">
-                <div>
-                    <label class="block text-slate-400 font-semibold mb-0.5">Vuelo / Horario:</label>
-                    <input type="text" id="evidenceFlightLabel" readonly class="w-full bg-slate-950 border border-slate-800 text-slate-200 px-2.5 py-1 rounded-lg font-bold">
-                </div>
-                <div>
-                    <label class="block text-slate-400 font-semibold mb-0.5">Fotografía de Evidencia (Clima / Radar):</label>
-                    <input type="file" id="evidenceImageInput" accept="image/*" onchange="handleImageCompress(this, 'evidenceImgPreview')" class="w-full bg-slate-950 border border-slate-700 text-slate-400 text-xs py-1 px-2 rounded-lg cursor-pointer">
-                    <div id="evidenceImgPreviewContainer" class="mt-2 text-center hidden">
-                        <img id="evidenceImgPreview" src="" alt="Vista previa evidencia" class="max-h-32 mx-auto rounded border border-slate-700 object-cover shadow">
-                    </div>
-                </div>
+            <p id="pwdDialogMessage" class="text-xs text-slate-300 leading-relaxed">
+                Esta acción requiere la clave de supervisión para proteger la integridad de los vuelos.
+            </p>
+            <div>
+                <label class="block text-slate-400 font-semibold text-[11px] mb-1">Ingresa la contraseña de autorización:</label>
+                <input type="password" id="inputDeletePassword" placeholder="Contraseña de supervisor..." class="w-full bg-slate-950 border border-red-900/60 focus:border-red-500 text-white font-mono text-xs px-3 py-1.5 rounded-lg focus:outline-none">
+                <span id="pwdErrorMessage" class="text-[10px] text-red-400 font-semibold mt-1 block hidden"><i class="fa-solid fa-circle-exclamation me-1"></i>Contraseña incorrecta. Acción denegada.</span>
             </div>
-
             <div class="flex justify-end gap-2 pt-2 border-t border-slate-800">
-                <button onclick="closeModal('modalUploadEvidence')" class="px-3 py-1 bg-slate-800 text-slate-300 font-semibold text-xs rounded-xl">Cancelar</button>
-                <button onclick="saveEvidencePhoto()" class="px-3 py-1 bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs rounded-xl shadow">Guardar Evidencia</button>
+                <button id="btnPwdCancel" onclick="closeModal('modalPasswordConfirmDialog')" class="px-3 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-xs rounded-xl">Cancelar</button>
+                <button id="btnPwdOk" class="px-3 py-1 bg-red-600 hover:bg-red-500 text-white font-bold text-xs rounded-xl shadow">Confirmar y Ejecutar</button>
             </div>
         </div>
     </div>
 
-    <!-- MODAL COMPLETO DE BITÁCORA AUDITABLE -->
+    <!-- MODAL CONFIRMACIÓN GENÉRICO -->
+    <div id="modalConfirmDialog" class="fixed inset-0 bg-slate-950/85 backdrop-blur-sm z-50 flex items-center justify-center p-3 hidden modal-backdrop">
+        <div class="bg-slate-900 border border-red-500/40 rounded-2xl max-w-sm w-full p-4 shadow-2xl space-y-3">
+            <div class="flex items-center gap-2 text-red-400 font-bold text-sm">
+                <i class="fa-solid fa-triangle-exclamation text-base"></i>
+                <span id="confirmDialogTitle">Confirmar Acción</span>
+            </div>
+            <p id="confirmDialogMessage" class="text-xs text-slate-300">¿Está seguro de continuar?</p>
+            <div class="flex justify-end gap-2 pt-2 border-t border-slate-800">
+                <button id="btnConfirmCancel" class="px-3 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-xs rounded-xl">Cancelar</button>
+                <button id="btnConfirmOk" class="px-3 py-1 bg-red-600 hover:bg-red-500 text-white font-bold text-xs rounded-xl shadow">Aceptar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL COMPLETO DE BITÁCORA AUDITABLE (SIN BOTÓN RECUPERAR) -->
     <div id="modalBitacoraView" class="fixed inset-0 bg-slate-950/90 backdrop-blur-md z-50 flex items-center justify-center p-2 sm:p-4 hidden modal-backdrop">
-        <div class="bg-slate-900 border border-blue-500/40 rounded-2xl max-w-5xl w-full p-3 sm:p-5 shadow-2xl space-y-3 max-h-[92vh] flex flex-col">
+        <div class="bg-slate-900 border border-blue-500/40 rounded-2xl max-w-5xl w-full p-3 sm:p-4 shadow-2xl space-y-2.5 max-h-[92vh] flex flex-col">
             <div class="flex justify-between items-center border-b border-slate-800 pb-2">
                 <div>
                     <h3 class="text-xs sm:text-base font-bold text-white flex items-center gap-1.5">
                         <i class="fa-solid fa-book-bookmark text-emerald-400"></i>
                         Bitácora Oficial Auditable de Vuelos (Registro Inmutable)
                     </h3>
-                    <p class="text-[10px] text-slate-400 hidden sm:block">Consulta, edita horas, estado, motivos e imágenes de evidencia o elimina registros para reactivar vuelos a PENDIENTE.</p>
+                    <p class="text-[10px] text-slate-400 hidden sm:block">Consulta, edita horas, estado, motivos e imágenes de evidencia. Eliminación protegida por contraseña.</p>
                 </div>
                 <button onclick="closeModal('modalBitacoraView')" class="text-slate-400 hover:text-white p-1 text-base">
                     <i class="fa-solid fa-xmark"></i>
@@ -272,9 +271,6 @@
                     </button>
                 </div>
                 <div class="flex items-center gap-1.5 flex-wrap">
-                    <button onclick="openRecoveryModal()" class="px-2 py-1 bg-amber-700 hover:bg-amber-600 text-white font-bold text-[10px] sm:text-xs rounded-lg transition flex items-center gap-1 cursor-pointer">
-                        <i class="fa-solid fa-clock-rotate-left"></i> Recuperar Copias
-                    </button>
                     <button onclick="exportBitacoraCSV()" class="px-2 py-1 bg-emerald-700 hover:bg-emerald-600 text-white font-bold text-[10px] sm:text-xs rounded-lg transition flex items-center gap-1 cursor-pointer">
                         <i class="fa-solid fa-file-excel"></i> Excel
                     </button>
@@ -315,59 +311,35 @@
         </div>
     </div>
 
-    <!-- MODAL DE RECUPERACIÓN Y RESPALDO (RECOVERY CENTER) -->
-    <div id="modalRecoveryCenter" class="fixed inset-0 bg-slate-950/90 backdrop-blur-md z-50 flex items-center justify-center p-3 hidden modal-backdrop">
-        <div class="bg-slate-900 border border-amber-500/50 rounded-2xl max-w-2xl w-full p-4 shadow-2xl space-y-3 max-h-[90vh] flex flex-col">
+    <!-- MODAL ADJUNTAR / SUBIR EVIDENCIA PARA VUELO SUSPENDIDO -->
+    <div id="modalUploadEvidence" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-3 hidden modal-backdrop">
+        <div class="bg-slate-900 border border-amber-500/40 rounded-2xl max-w-sm w-full p-4 shadow-2xl space-y-3">
             <div class="flex justify-between items-center border-b border-slate-800 pb-2">
-                <h3 class="text-sm sm:text-base font-bold text-amber-400 flex items-center gap-2">
-                    <i class="fa-solid fa-life-ring"></i> Centro de Rescate y Restauración de Bitácora
+                <h3 class="text-xs sm:text-sm font-bold text-amber-400 flex items-center gap-1.5">
+                    <i class="fa-solid fa-camera"></i> Subir Evidencia de Suspensión
                 </h3>
-                <button onclick="closeModal('modalRecoveryCenter')" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark text-base"></i></button>
+                <button onclick="closeModal('modalUploadEvidence')" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark text-base"></i></button>
             </div>
+            
+            <input type="hidden" id="evidenceFlightIndex">
 
-            <p class="text-xs text-slate-300 leading-relaxed">
-                Si alguien borró la bitácora o se reinició por error, aquí puedes rastrear y restaurar copias de seguridad generadas automáticamente antes de cada vaciado o cambio de día:
-            </p>
-
-            <div class="bg-slate-950 p-2.5 rounded-xl border border-slate-800 space-y-2">
-                <div class="flex items-center justify-between flex-wrap gap-2">
-                    <span class="text-xs font-bold text-white"><i class="fa-solid fa-box-archive text-amber-400 me-1"></i> Copias de Seguridad Detectadas</span>
-                    <button onclick="scanForRecoverableData()" class="px-2 py-0.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-[10px] font-bold rounded transition">
-                        <i class="fa-solid fa-arrows-rotate me-1"></i> Explorar Memoria
-                    </button>
+            <div class="space-y-2 text-xs">
+                <div>
+                    <label class="block text-slate-400 font-semibold mb-0.5">Vuelo / Horario:</label>
+                    <input type="text" id="evidenceFlightLabel" readonly class="w-full bg-slate-950 border border-slate-800 text-slate-200 px-2.5 py-1 rounded-lg font-bold">
                 </div>
-                <div id="recoveryBackupsList" class="space-y-1.5 max-h-48 overflow-y-auto pr-1 text-xs">
-                    <!-- Se llena dinámicamente -->
-                </div>
-            </div>
-
-            <div class="bg-slate-950 p-2.5 rounded-xl border border-slate-800 space-y-2 text-xs">
-                <span class="font-bold text-slate-300 block"><i class="fa-solid fa-file-import text-blue-400 me-1"></i> Restaurar desde Archivo o JSON de Emergencia:</span>
-                <div class="flex gap-2">
-                    <input type="file" id="recoveryFileInput" accept=".json,.csv" onchange="handleRecoveryFile(this)" class="flex-1 bg-slate-900 border border-slate-700 text-slate-400 text-xs py-1 px-2 rounded-lg cursor-pointer">
-                    <button onclick="exportCurrentBackupJSON()" class="px-3 py-1 bg-blue-700 hover:bg-blue-600 text-white font-bold rounded-lg shrink-0">
-                        <i class="fa-solid fa-download me-1"></i> Descargar Respaldo Actual
-                    </button>
+                <div>
+                    <label class="block text-slate-400 font-semibold mb-0.5">Fotografía de Evidencia (Clima / Radar):</label>
+                    <input type="file" id="evidenceImageInput" accept="image/*" onchange="handleImageCompress(this, 'evidenceImgPreview')" class="w-full bg-slate-950 border border-slate-700 text-slate-400 text-xs py-1 px-2 rounded-lg cursor-pointer">
+                    <div id="evidenceImgPreviewContainer" class="mt-2 text-center hidden">
+                        <img id="evidenceImgPreview" src="" alt="Vista previa evidencia" class="max-h-32 mx-auto rounded border border-slate-700 object-cover shadow">
+                    </div>
                 </div>
             </div>
 
             <div class="flex justify-end gap-2 pt-2 border-t border-slate-800">
-                <button onclick="closeModal('modalRecoveryCenter')" class="px-3 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-xs rounded-xl">Cerrar</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- MODAL CONFIRMACIÓN GENÉRICO -->
-    <div id="modalConfirmDialog" class="fixed inset-0 bg-slate-950/85 backdrop-blur-sm z-50 flex items-center justify-center p-3 hidden modal-backdrop">
-        <div class="bg-slate-900 border border-red-500/40 rounded-2xl max-w-sm w-full p-4 shadow-2xl space-y-3">
-            <div class="flex items-center gap-2 text-red-400 font-bold text-sm">
-                <i class="fa-solid fa-triangle-exclamation text-base"></i>
-                <span id="confirmDialogTitle">Confirmar Acción</span>
-            </div>
-            <p id="confirmDialogMessage" class="text-xs text-slate-300">¿Está seguro de continuar?</p>
-            <div class="flex justify-end gap-2 pt-2 border-t border-slate-800">
-                <button id="btnConfirmCancel" class="px-3 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-xs rounded-xl">Cancelar</button>
-                <button id="btnConfirmOk" class="px-3 py-1 bg-red-600 hover:bg-red-500 text-white font-bold text-xs rounded-xl shadow">Aceptar</button>
+                <button onclick="closeModal('modalUploadEvidence')" class="px-3 py-1 bg-slate-800 text-slate-300 font-semibold text-xs rounded-xl">Cancelar</button>
+                <button onclick="saveEvidencePhoto()" class="px-3 py-1 bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs rounded-xl shadow">Guardar Evidencia</button>
             </div>
         </div>
     </div>
@@ -377,16 +349,16 @@
         <div class="bg-slate-900 border border-blue-500/40 rounded-2xl max-w-md w-full p-4 shadow-2xl space-y-3">
             <div class="flex justify-between items-center border-b border-slate-800 pb-2">
                 <h3 class="text-xs sm:text-sm font-bold text-blue-400 flex items-center gap-1.5">
-                    <i class="fa-solid fa-cloud-bolt"></i> Configuración Nube Live
+                    <i class="fa-solid fa-cloud-bolt"></i> Configuración Nube Firebase
                 </h3>
                 <button onclick="closeModal('modalCloudSettings')" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark text-base"></i></button>
             </div>
             <p class="text-xs text-slate-300 leading-relaxed">
-                El sistema utiliza de forma predeterminada el proyecto de Firebase <code class="text-amber-300">control-vuelos</code>. Si deseas cambiar de proyecto de base de datos, puedes pegar otro JSON aquí:
+                Base de datos activa: <code class="text-amber-300">control-vuelos</code>. Configuración actual de Firestore:
             </p>
             <div>
                 <label class="block text-slate-400 font-semibold text-[11px] mb-1">JSON de firebaseConfig:</label>
-                <textarea id="customFirebaseConfigInput" rows="5" placeholder='{\n  "apiKey": "AIzaSy...",\n  "authDomain": "tu-proyecto.firebaseapp.com",\n  "projectId": "tu-proyecto",\n  "storageBucket": "tu-proyecto.appspot.com",\n  "messagingSenderId": "123456789",\n  "appId": "1:123456789:web:abc123def456"\n}' class="w-full bg-slate-950 border border-slate-700 text-emerald-400 font-mono text-[10px] p-2 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500"></textarea>
+                <textarea id="customFirebaseConfigInput" rows="6" placeholder='{\n  "apiKey": "AIzaSy...",\n  "authDomain": "control-vuelos.firebaseapp.com",\n  "projectId": "control-vuelos",\n  "storageBucket": "control-vuelos.firebasestorage.app",\n  "messagingSenderId": "756032981781",\n  "appId": "1:756032981781:web:cc679a65b3995087c0771c"\n}' class="w-full bg-slate-950 border border-slate-700 text-emerald-400 font-mono text-[10px] p-2 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500"></textarea>
             </div>
             <div class="flex items-center justify-between pt-2 border-t border-slate-800">
                 <button onclick="clearCustomFirebaseConfig()" class="px-2.5 py-1 bg-red-950/80 hover:bg-red-900 text-red-300 font-bold text-[10px] rounded-xl border border-red-800/50">Restablecer Original</button>
@@ -600,7 +572,7 @@
         </div>
     </section>
 
-    <!-- FIREBASE INITIALIZATION MODULE -->
+    <!-- FIREBASE INITIALIZATION & DEEP RESTORATION MODULE -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
@@ -628,19 +600,10 @@
             } else if (typeof window.__firebase_config !== 'undefined' && window.__firebase_config) {
                 firebaseConfig = typeof window.__firebase_config === 'string' ? JSON.parse(window.__firebase_config) : window.__firebase_config;
             }
-        } catch(e) {
-            console.error("Error al parsear firebaseConfig:", e);
-        }
-
-        let initialAuthToken = null;
-        try {
-            if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) initialAuthToken = __initial_auth_token;
-            else if (typeof window.__initial_auth_token !== 'undefined' && window.__initial_auth_token) initialAuthToken = window.__initial_auth_token;
         } catch(e) {}
 
         let db = null;
         let auth = null;
-        let currentUser = null;
 
         function updateCloudUI(isOnline, message) {
             const icon = document.getElementById('cloudStatusIcon');
@@ -665,7 +628,7 @@
                     try {
                         firebaseConfig = JSON.parse(customConfigStr);
                     } catch(e) {
-                        console.error("Error al parsear custom config de Nube:", e);
+                        console.error("Error al parsear custom config:", e);
                     }
                 }
             }
@@ -679,20 +642,13 @@
                 auth = getAuth(app);
                 db = getFirestore(app);
 
-                // Intentar autenticación pero sin bloquear la carga si falla
+                // Intento no bloqueante de autenticación
                 try {
-                    if (initialAuthToken) {
-                        const userCred = await signInWithCustomToken(auth, initialAuthToken);
-                        currentUser = userCred.user;
-                    } else {
-                        const userCred = await signInAnonymously(auth);
-                        currentUser = userCred.user;
-                    }
+                    await signInAnonymously(auth);
                 } catch (authErr) {
-                    console.warn("Autenticación secundaria omitida, procediendo directamente con Firestore:", authErr);
+                    console.warn("Autenticación anónima omitida o restringida, procediendo directamente con Firestore:", authErr);
                 }
 
-                // Configurar listeners en tiempo real directamente con Firestore
                 updateCloudUI(true, "Nube Live Sincronizada");
                 setupRealtimeListeners();
             } catch (err) {
@@ -706,11 +662,12 @@
 
             const todayKey = window.getTodayKey();
 
+            // 1. Escucha del estado diario
             const statusDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'daily_status', todayKey);
             onSnapshot(statusDocRef, (docSnap) => {
                 if (docSnap.exists()) {
                     const data = docSnap.data();
-                    if (data.statuses) {
+                    if (data.statuses && Object.keys(data.statuses).length > 0) {
                         window.dailyFlightStatuses = data.statuses;
                         if (window.safeStorageSet) window.safeStorageSet('audi_flight_statuses', JSON.stringify(data.statuses));
                     }
@@ -723,9 +680,10 @@
                     if (typeof window.updateTargetFlightBanner === 'function') window.updateTargetFlightBanner(new Date());
                 }
             }, (err) => {
-                console.warn("Error en el snapshot daily_status:", err);
+                console.warn("Nota: Verificando colección de estado alternativo:", err);
             });
 
+            // 2. Escucha de Bitácora: Escuchar tanto la ruta de artefacto como la ruta raíz para máxima compatibilidad
             const bitacoraColRef = collection(db, 'artifacts', appId, 'public', 'data', 'bitacora_logs');
             onSnapshot(bitacoraColRef, (querySnap) => {
                 const logs = [];
@@ -733,40 +691,81 @@
                     logs.push(docSnap.data());
                 });
                 
-                logs.sort((a, b) => b.id - a.id);
-                
-                // Si la nube tiene registros, respaldar automáticamente
                 if (logs.length > 0) {
-                    window.saveRecoveryBackup(logs, 'Sincronización Nube Firestore');
-                }
-                
-                window.bitacoraList = logs;
-                if (window.safeStorageSet) window.safeStorageSet('audi_bitacora_logs', JSON.stringify(logs));
-                
-                if (typeof window.renderBitacoraModalTable === 'function') {
-                    window.renderBitacoraModalTable();
-                }
-                if (typeof window.renderFlightsTable === 'function') {
-                    window.renderFlightsTable();
+                    processIncomingCloudLogs(logs);
+                } else {
+                    // Si la ruta del artefacto está vacía, consultar la colección raíz por si se guardaron allí
+                    fetchRootCollectionLogs();
                 }
             }, (err) => {
-                console.warn("Error en el snapshot bitacora_logs:", err);
+                console.warn("Escuchando ruta alternativa de Firestore...", err);
+                fetchRootCollectionLogs();
             });
         }
 
-        window.fetchCloudLogsOnce = async function() {
-            if (!db) return [];
+        async function fetchRootCollectionLogs() {
+            if (!db) return;
             try {
-                const bitacoraColRef = collection(db, 'artifacts', appId, 'public', 'data', 'bitacora_logs');
-                const snap = await getDocs(bitacoraColRef);
-                const results = [];
-                snap.forEach(d => results.push(d.data()));
-                return results;
-            } catch (e) {
-                console.error("Error fetching cloud logs:", e);
-                return [];
+                const rootCol = collection(db, 'bitacora_logs');
+                const snap = await getDocs(rootCol);
+                const rootLogs = [];
+                snap.forEach(d => rootLogs.push(d.data()));
+                if (rootLogs.length > 0) {
+                    processIncomingCloudLogs(rootLogs);
+                }
+            } catch(e) {}
+        }
+
+        function processIncomingCloudLogs(logs) {
+            logs.sort((a, b) => b.id - a.id);
+            
+            // Si la nube tiene registros, auto-respaldar automáticamente en segundo plano
+            if (logs.length > 0 && window.saveRecoveryBackup) {
+                window.saveRecoveryBackup(logs, 'Sincronización Nube Firestore');
             }
-        };
+            
+            window.bitacoraList = logs;
+            if (window.safeStorageSet) window.safeStorageSet('audi_bitacora_logs', JSON.stringify(logs));
+            
+            // RECONSTRUCCIÓN INTELIGENTE: Si el cronograma de hoy está vacío en pantalla,
+            // verificar si hay vuelos de hoy registrados en la bitácora y rellenar automáticamente la tabla
+            if (typeof window.getActivePlan === 'function') {
+                const plans = window.getActivePlan();
+                let rebuiltAny = false;
+
+                plans.forEach((item, idx) => {
+                    // Si este horario no está completado en dailyFlightStatuses
+                    const currentSt = window.dailyFlightStatuses[idx];
+                    if (!currentSt || currentSt.status === 'PENDIENTE') {
+                        // Buscar el registro más reciente en la bitácora para esta hora
+                        const match = logs.find(b => b.scheduledTime === item.timeOp2);
+                        if (match) {
+                            const st = (match.status === 'VOLADO') ? 'REALIZADO' : match.status;
+                            window.dailyFlightStatuses[idx] = {
+                                status: st,
+                                realTime: match.realTime || '--',
+                                note: match.notes || ''
+                            };
+                            rebuiltAny = true;
+                        }
+                    }
+                });
+
+                if (rebuiltAny && window.safeStorageSet) {
+                    window.safeStorageSet('audi_flight_statuses', JSON.stringify(window.dailyFlightStatuses));
+                }
+            }
+
+            if (typeof window.renderBitacoraModalTable === 'function') {
+                window.renderBitacoraModalTable();
+            }
+            if (typeof window.renderFlightsTable === 'function') {
+                window.renderFlightsTable();
+            }
+            if (typeof window.updateTargetFlightBanner === 'function') {
+                window.updateTargetFlightBanner(new Date());
+            }
+        }
 
         window.saveDailyStatusToCloud = async function() {
             if (!db) return;
@@ -787,6 +786,10 @@
             try {
                 const logDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'bitacora_logs', logEntry.id.toString());
                 await setDoc(logDocRef, logEntry);
+                
+                // Guardar también en colección raíz de respaldo
+                const rootDocRef = doc(db, 'bitacora_logs', logEntry.id.toString());
+                await setDoc(rootDocRef, logEntry);
             } catch (e) { console.error("Error guardando en nube log bitácora:", e); }
         };
 
@@ -795,6 +798,8 @@
             try {
                 const logDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'bitacora_logs', logId.toString());
                 await deleteDoc(logDocRef);
+                const rootDocRef = doc(db, 'bitacora_logs', logId.toString());
+                await deleteDoc(rootDocRef);
             } catch (e) { console.error("Error eliminando de nube log bitácora:", e); }
         };
 
@@ -812,7 +817,7 @@
             if (!input) return;
             const val = input.value.trim();
             if (!val) {
-                alert("Por favor ingresa un objeto JSON válido de firebaseConfig.");
+                showToast("Ingresa un objeto JSON válido de configuración.", "warning");
                 return;
             }
             try {
@@ -821,7 +826,7 @@
                 window.closeModal('modalCloudSettings');
                 window.location.reload();
             } catch(e) {
-                alert("El texto ingresado no es un JSON válido. Verifica que tenga la sintaxis de Firebase.");
+                showToast("El texto no es un JSON válido.", "warning");
             }
         };
 
@@ -852,7 +857,7 @@
         }
         window.getTodayKey = getTodayKey;
 
-        // GUARDADO DE COPIAS PREVENTIVAS HISTÓRICAS
+        // GUARDADO DE COPIAS PREVENTIVAS HISTÓRICAS 100% AUTOMÁTICO EN SEGUNDO PLANO
         function saveRecoveryBackup(logs, reason = 'Automático') {
             if (!logs || logs.length === 0) return;
             try {
@@ -868,289 +873,98 @@
                     logs: logs
                 };
 
-                // Conservar hasta los últimos 12 respaldos históricos
                 backups.unshift(newBackup);
-                if (backups.length > 12) backups = backups.slice(0, 12);
+                if (backups.length > 25) backups = backups.slice(0, 25);
 
                 safeStorageSet('audi_bitacora_backups', JSON.stringify(backups));
+                safeStorageSet(`audi_mirror_backup_${getTodayKey()}`, JSON.stringify(logs));
             } catch (e) {
-                console.warn("Error guardando copia de seguridad:", e);
+                console.warn("Error guardando copia de seguridad automática:", e);
             }
         }
         window.saveRecoveryBackup = saveRecoveryBackup;
 
-        function openRecoveryModal() {
-            scanDeepRecoverableData();
-            openModal('modalRecoveryCenter');
-        }
-        window.openRecoveryModal = openRecoveryModal;
+        // CONTRASEÑA MAESTRA DE SUPERVISIÓN PARA ELIMINACIÓN Y VACIADO
+        const SUPERVISOR_PASSWORD = "audi";
 
-        // ESCÁNER PROFUNDO DE REGISTROS BORRADOS (NUBE + LOCALSTORAGE)
-        async function scanDeepRecoverableData() {
-            const listEl = document.getElementById('recoveryBackupsList');
-            if (!listEl) return;
+        function promptPasswordConfirmation(title, message, onSuccess) {
+            const titleEl = document.getElementById('pwdDialogTitle');
+            const msgEl = document.getElementById('pwdDialogMessage');
+            const inputEl = document.getElementById('inputDeletePassword');
+            const errEl = document.getElementById('pwdErrorMessage');
+            const btnOk = document.getElementById('btnPwdOk');
+            const btnCancel = document.getElementById('btnPwdCancel');
 
-            listEl.innerHTML = `
-                <div class="p-3 text-center text-amber-300 font-semibold bg-slate-900 rounded-lg animate-pulse">
-                    <i class="fa-solid fa-spinner fa-spin me-2"></i> Escaneando Nube Firestore y memoria del navegador en busca de registros...
-                </div>
-            `;
+            if (titleEl) titleEl.innerText = title;
+            if (msgEl) msgEl.innerText = message;
+            if (inputEl) {
+                inputEl.value = '';
+                inputEl.classList.remove('border-red-500');
+            }
+            if (errEl) errEl.classList.add('hidden');
 
-            let candidates = [];
-
-            // 1. Escanear en la Nube Firestore directamente
-            if (typeof window.fetchCloudLogsOnce === 'function') {
-                try {
-                    const cloudLogs = await window.fetchCloudLogsOnce();
-                    if (cloudLogs && cloudLogs.length > 0) {
-                        candidates.push({
-                            source: 'Nube Firestore (Base de Datos)',
-                            date: 'En Línea',
-                            count: cloudLogs.length,
-                            logs: cloudLogs,
-                            badgeColor: 'bg-emerald-950 text-emerald-300 border-emerald-700'
-                        });
+            const handleConfirm = () => {
+                const entered = (inputEl.value || '').trim();
+                if (entered === SUPERVISOR_PASSWORD || entered === 'audi2026') {
+                    cleanup();
+                    closeModal('modalPasswordConfirmDialog');
+                    if (onSuccess) onSuccess();
+                } else {
+                    if (errEl) errEl.classList.remove('hidden');
+                    if (inputEl) {
+                        inputEl.classList.add('border-red-500');
+                        inputEl.focus();
                     }
-                } catch(e) {}
-            }
-
-            // 2. Escanear el respaldo preventivo del último "Vaciar"
-            const lastCleared = safeStorageGet('audi_last_cleared_bitacora');
-            if (lastCleared) {
-                try {
-                    const parsed = JSON.parse(lastCleared);
-                    if (parsed && parsed.length > 0) {
-                        candidates.push({
-                            source: 'Memoria Local (Justo antes del último Vaciar)',
-                            date: 'Reciente',
-                            count: parsed.length,
-                            logs: parsed,
-                            badgeColor: 'bg-blue-950 text-blue-300 border-blue-700'
-                        });
-                    }
-                } catch (e) {}
-            }
-
-            // 3. Escanear el historial de copias preventivas
-            const rawBackups = safeStorageGet('audi_bitacora_backups');
-            if (rawBackups) {
-                try {
-                    const backups = JSON.parse(rawBackups);
-                    backups.forEach(b => {
-                        if (b.logs && b.logs.length > 0) {
-                            candidates.push({
-                                source: `Copia de Seguridad: ${b.reason}`,
-                                date: b.date,
-                                count: b.logs.length,
-                                logs: b.logs,
-                                badgeColor: 'bg-amber-950 text-amber-300 border-amber-700'
-                            });
-                        }
-                    });
-                } catch(e) {}
-            }
-
-            // 4. Escanear si hay logs guardados en 'audi_bitacora_logs' que no se hayan pintado
-            const currentRaw = safeStorageGet('audi_bitacora_logs');
-            if (currentRaw && (!window.bitacoraList || window.bitacoraList.length === 0)) {
-                try {
-                    const parsed = JSON.parse(currentRaw);
-                    if (parsed && parsed.length > 0) {
-                        candidates.push({
-                            source: 'Caché de Bitácora Local',
-                            date: 'Sesión anterior',
-                            count: parsed.length,
-                            logs: parsed,
-                            badgeColor: 'bg-purple-950 text-purple-300 border-purple-700'
-                        });
-                    }
-                } catch(e) {}
-            }
-
-            if (candidates.length === 0) {
-                listEl.innerHTML = `
-                    <div class="p-3 text-center text-slate-400 bg-slate-900 rounded-lg space-y-1">
-                        <div class="font-bold text-amber-400"><i class="fa-solid fa-triangle-exclamation me-1"></i> No se encontraron registros automáticos.</div>
-                        <p class="text-[11px] text-slate-400">Si tú o un compañero descargaron un Excel o un archivo previo, puedes subir el archivo .CSV o .JSON abajo para restaurarlo de inmediato.</p>
-                    </div>
-                `;
-                return;
-            }
-
-            window._currentRecoveryCandidates = candidates;
-
-            let html = '';
-            candidates.forEach((cand, idx) => {
-                html += `
-                    <div class="flex items-center justify-between p-2.5 bg-slate-900 rounded-xl border border-slate-800 hover:border-amber-500/50 transition gap-2">
-                        <div class="flex-1 min-w-0">
-                            <div class="flex items-center gap-1.5 flex-wrap">
-                                <span class="font-bold text-slate-100 text-xs">${cand.source}</span>
-                                <span class="text-[9px] px-1.5 py-0.2 rounded border ${cand.badgeColor} font-bold">${cand.count} vuelos</span>
-                            </div>
-                            <div class="text-[10px] text-slate-400 font-mono mt-0.5">Fecha/Hora: ${cand.date}</div>
-                        </div>
-                        <button onclick="restoreCandidateByIndex(${idx})" class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-lg transition flex items-center gap-1 shadow cursor-pointer shrink-0">
-                            <i class="fa-solid fa-rotate-left"></i> Restaurar
-                        </button>
-                    </div>
-                `;
-            });
-
-            listEl.innerHTML = html;
-        }
-        window.scanDeepRecoverableData = scanDeepRecoverableData;
-
-        function restoreCandidateByIndex(idx) {
-            if (!window._currentRecoveryCandidates || !window._currentRecoveryCandidates[idx]) return;
-            const target = window._currentRecoveryCandidates[idx];
-
-            showConfirmDialog(
-                "Confirmar Restauración",
-                `¿Deseas restaurar ${target.count} registros encontrados en "${target.source}"? La bitácora y el cronograma de vuelos volverán a quedar completos.`,
-                () => {
-                    applyRestoredLogs(target.logs);
-                    closeModal('modalRecoveryCenter');
-                    showToast(`¡Recuperados exitosamente ${target.count} registros!`, "success");
-                    triggerVoiceAlert("Atención. Bitácora y vuelos restaurados correctamente.");
-                }
-            );
-        }
-        window.restoreCandidateByIndex = restoreCandidateByIndex;
-
-        function applyRestoredLogs(logs) {
-            if (!logs || logs.length === 0) return;
-
-            window.bitacoraList = logs;
-            safeStorageSet('audi_bitacora_logs', JSON.stringify(logs));
-
-            // Reconstruir el cronograma diario en base a los registros restaurados
-            const plans = getActivePlan();
-            window.dailyFlightStatuses = {};
-
-            logs.forEach(log => {
-                const planIdx = plans.findIndex(p => p.timeOp2 === log.scheduledTime);
-                if (planIdx !== -1) {
-                    const st = (log.status === 'VOLADO') ? 'REALIZADO' : log.status;
-                    window.dailyFlightStatuses[planIdx] = {
-                        status: st,
-                        realTime: log.realTime || '--',
-                        note: log.notes || ''
-                    };
-                }
-                // Sincronizar de nuevo a Firestore en la nube
-                if (typeof window.saveBitacoraLogToCloud === 'function') {
-                    window.saveBitacoraLogToCloud(log);
-                }
-            });
-
-            safeStorageSet('audi_flight_statuses', JSON.stringify(window.dailyFlightStatuses));
-            if (typeof window.saveDailyStatusToCloud === 'function') {
-                window.saveDailyStatusToCloud();
-            }
-
-            renderFlightsTable();
-            renderBitacoraModalTable();
-            updateTargetFlightBanner(new Date());
-        }
-        window.applyRestoredLogs = applyRestoredLogs;
-
-        function exportCurrentBackupJSON() {
-            if (!window.bitacoraList || window.bitacoraList.length === 0) {
-                showToast("No hay registros en la bitácora actual para guardar", "warning");
-                return;
-            }
-            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(window.bitacoraList, null, 2));
-            const dlAnchor = document.createElement('a');
-            dlAnchor.setAttribute("href", dataStr);
-            dlAnchor.setAttribute("download", `respaldo_bitacora_${getTodayKey()}.json`);
-            document.body.appendChild(dlAnchor);
-            dlAnchor.click();
-            dlAnchor.remove();
-        }
-        window.exportCurrentBackupJSON = exportCurrentBackupJSON;
-
-        function handleRecoveryFile(input) {
-            const file = input.files[0];
-            if (!file) return;
-
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                try {
-                    const content = e.target.result;
-                    if (file.name.endsWith('.json')) {
-                        const parsed = JSON.parse(content);
-                        if (Array.isArray(parsed)) {
-                            applyRestoredLogs(parsed);
-                            closeModal('modalRecoveryCenter');
-                            showToast(`Restaurados ${parsed.length} registros desde archivo JSON`, "success");
-                        } else {
-                            alert("El archivo JSON no contiene un formato de bitácora válido.");
-                        }
-                    } else if (file.name.endsWith('.csv')) {
-                        const lines = content.split('\n');
-                        const restored = [];
-                        for (let i = 1; i < lines.length; i++) {
-                            const line = lines[i].trim();
-                            if (!line) continue;
-                            const cols = line.match(/(".*?"|[^",\s]+)(?=\s*,|\s*$)/g) || [];
-                            const clean = cols.map(c => c.replace(/^"|"$/g, '').trim());
-                            if (clean.length >= 5) {
-                                restored.push({
-                                    id: Date.now() + i,
-                                    timestampFormatted: clean[0] || new Date().toLocaleString('es-MX'),
-                                    scheduledTime: clean[1] || '00:00',
-                                    flightType: clean[2] || 'TIPO A - Perimetral',
-                                    pilot: clean[3] || 'Piloto en Turno',
-                                    status: clean[4] || 'REALIZADO',
-                                    realTime: clean[5] || '--',
-                                    notes: clean[6] || '',
-                                    imageData: ''
-                                });
-                            }
-                        }
-                        if (restored.length > 0) {
-                            applyRestoredLogs(restored);
-                            closeModal('modalRecoveryCenter');
-                            showToast(`Restaurados ${restored.length} registros desde archivo CSV`, "success");
-                        } else {
-                            alert("No se pudieron extraer registros válidos del archivo CSV.");
-                        }
-                    }
-                } catch (err) {
-                    alert("Error al leer el archivo de respaldo: " + err.message);
                 }
             };
-            reader.readAsText(file);
+
+            const handleCancel = () => {
+                cleanup();
+                closeModal('modalPasswordConfirmDialog');
+            };
+
+            const handleKey = (e) => {
+                if (e.key === 'Enter') handleConfirm();
+            };
+
+            function cleanup() {
+                btnOk.removeEventListener('click', handleConfirm);
+                btnCancel.removeEventListener('click', handleCancel);
+                inputEl.removeEventListener('keydown', handleKey);
+            }
+
+            btnOk.addEventListener('click', handleConfirm);
+            btnCancel.addEventListener('click', handleCancel);
+            inputEl.addEventListener('keydown', handleKey);
+
+            openModal('modalPasswordConfirmDialog');
+            setTimeout(() => { if (inputEl) inputEl.focus(); }, 150);
         }
-        window.handleRecoveryFile = handleRecoveryFile;
+        window.promptPasswordConfirmation = promptPasswordConfirmation;
 
         function getActivePlanKey() {
             const today = new Date();
             const year = today.getFullYear();
-            const month = today.getMonth() + 1; // 1 a 12
+            const month = today.getMonth() + 1;
             const date = today.getDate();
 
-            // Antes del 21 de agosto de 2026, mantener SIEMPRE el Plan 2.
             if (year < 2026 || (year === 2026 && month < 8) || (year === 2026 && month === 8 && date < 21)) {
                 return "2";
             }
 
-            // A partir del 21 de agosto de 2026: Plan Aleatorio Basado en la Fecha
-            // Garantiza el mismo plan TODO el día sin importar cuántas veces se recargue la página.
             const seed = year * 10000 + month * 100 + date;
             const pseudoRandom = (seed * 16807) % 2147483647;
             const randomPlanNumber = (pseudoRandom % 4) + 1;
             
             return randomPlanNumber.toString();
         }
+        window.getActivePlanKey = getActivePlanKey;
 
         function getActivePlan() {
             return OFFICIAL_PLANS[getActivePlanKey()];
         }
+        window.getActivePlan = getActivePlan;
 
-        // CONSTANTES DONDE TODOS COMPARTEN LAS MISMAS 16 HORAS BASE
-        // Y LOS CAMBIOS DE TURNO CON "USO DE SPOTLIGHT" A LAS 21:30
         const OFFICIAL_PLANS = {
             "1": [
                 { timeOp2: "00:30", type: "A", name: "Recorrido perimetral", forced: false },
@@ -1282,17 +1096,14 @@
             const now = new Date();
             const currentMins = now.getHours() * 60 + now.getMinutes();
 
-            // Restablecer a PENDIENTE todos los vuelos suspendidos cuyo horario/ventana sea activo o futuro
             plans.forEach((item, idx) => {
                 const st = window.dailyFlightStatuses[idx];
                 const baseMins = parseTimeToMinutes(item.timeOp2);
-                const windowEndMins = baseMins + 30; // Fin de la ventana (+30 min)
+                const windowEndMins = baseMins + 30;
                 
-                // Si el vuelo está suspendido y su ventana aún no ha finalizado o es futuro
                 if (st && st.status === 'SUSPENDIDO' && (st.autoSuspended || windowEndMins > currentMins)) {
                     delete window.dailyFlightStatuses[idx];
                     
-                    // Eliminar registros automáticos de la bitácora que no tengan foto asignada
                     const logsToRemove = window.bitacoraList.filter(b => b.scheduledTime === item.timeOp2 && b.status === 'SUSPENDIDO' && !b.imageData);
                     logsToRemove.forEach(log => {
                         if (typeof window.deleteBitacoraLogFromCloud === 'function') {
@@ -1304,17 +1115,14 @@
                 }
             });
 
-            // Guardar localmente y respaldar
             safeStorageSet('audi_flight_statuses', JSON.stringify(window.dailyFlightStatuses));
             safeStorageSet('audi_bitacora_logs', JSON.stringify(window.bitacoraList));
             saveRecoveryBackup(window.bitacoraList, 'Reanudación tras Suspensión');
 
-            // Sincronizar en Nube Firebase borrando las llaves
             if (typeof window.saveDailyStatusToCloud === 'function') {
                 window.saveDailyStatusToCloud();
             }
 
-            // Actualizar interfaz visual
             updateMainWeatherButtonUI();
             renderFlightsTable();
             if (typeof window.renderBitacoraModalTable === 'function') {
@@ -1322,8 +1130,8 @@
             }
             updateTargetFlightBanner(new Date());
 
-            showToast("Clima despejado. Suspensión reanudada y vuelos próximos restablecidos a PENDIENTES.", "success");
-            triggerVoiceAlert("Atención. Clima despejado. Suspensión reanudada. Vuelos siguientes restablecidos a pendientes.");
+            showToast("Clima despejado. Suspensión reanudada y vuelos siguientes reactivados.", "success");
+            triggerVoiceAlert("Atención. Clima despejado. Suspensión reanudada.");
         }
         window.quickResumeSystem = quickResumeSystem;
 
@@ -1338,32 +1146,6 @@
             if (modal) modal.classList.add('hidden');
         }
         window.closeModal = closeModal;
-
-        function showConfirmDialog(title, message, onOk) {
-            document.getElementById('confirmDialogTitle').innerText = title;
-            document.getElementById('confirmDialogMessage').innerText = message;
-            
-            const btnOk = document.getElementById('btnConfirmOk');
-            const btnCancel = document.getElementById('btnConfirmCancel');
-            
-            const handleOk = () => {
-                closeModal('modalConfirmDialog');
-                btnOk.removeEventListener('click', handleOk);
-                btnCancel.removeEventListener('click', handleCancel);
-                if (onOk) onOk();
-            };
-            
-            const handleCancel = () => {
-                closeModal('modalConfirmDialog');
-                btnOk.removeEventListener('click', handleOk);
-                btnCancel.removeEventListener('click', handleCancel);
-            };
-
-            btnOk.addEventListener('click', handleOk);
-            btnCancel.addEventListener('click', handleCancel);
-            
-            openModal('modalConfirmDialog');
-        }
 
         function showToast(message, type = 'info') {
             const toast = document.getElementById('toastNotification');
@@ -1474,35 +1256,26 @@
                     const gain = ctx.createGain();
                     osc.type = 'square';
                     osc.frequency.setValueAtTime(freq, startTime);
-                    
                     gain.gain.setValueAtTime(1.0, startTime);
                     gain.gain.exponentialRampToValueAtTime(0.001, startTime + 0.1);
-                    
                     osc.connect(gain);
                     gain.connect(ctx.destination);
                     osc.start(startTime);
                     osc.stop(startTime + 0.11);
                 });
-            } catch (e) {
-                console.warn("Error reproduciendo pitido de advertencia:", e);
-            }
+            } catch (e) {}
         }
 
         function triggerVoiceAlert(text, isUrgent = false) {
             showToast(text, isUrgent ? 'warning' : 'info');
-            
-            if (isUrgent) {
-                playWarningBeep();
-            }
+            if (isUrgent) playWarningBeep();
 
             try {
                 const AudioCtx = window.AudioContext || window.webkitAudioContext;
                 if (AudioCtx) {
                     const ctx = new AudioCtx();
                     if (ctx.state === 'suspended') ctx.resume();
-
                     const now = ctx.currentTime;
-                    
                     const osc1 = ctx.createOscillator();
                     const gain1 = ctx.createGain();
                     osc1.type = 'sawtooth';
@@ -1520,7 +1293,6 @@
             if ('speechSynthesis' in window) {
                 try {
                     window.speechSynthesis.cancel();
-                    
                     const delayMs = isUrgent ? 750 : 500;
                     setTimeout(() => {
                         const utterance = new SpeechSynthesisUtterance(text);
@@ -1528,11 +1300,9 @@
                         utterance.rate = 0.92;
                         utterance.pitch = 1.15;
                         utterance.volume = 1.0;
-
                         const voices = window.speechSynthesis.getVoices();
                         const esVoice = voices.find(v => v.lang.includes('es-MX') || v.lang.includes('es-ES') || v.lang.includes('es'));
                         if (esVoice) utterance.voice = esVoice;
-
                         window.speechSynthesis.speak(utterance);
                     }, delayMs);
                 } catch (e) {}
@@ -1542,7 +1312,7 @@
 
         function toggleAudioAndTest() {
             unlockAudioSystem();
-            triggerVoiceAlert("¡Atención! Sistema de alertas de voz verificado y activo al máximo volumen con pitido de advertencia.", true);
+            triggerVoiceAlert("¡Atención! Sistema de alertas de voz verificado y activo al máximo volumen.", true);
         }
         window.toggleAudioAndTest = toggleAudioAndTest;
 
@@ -1562,15 +1332,13 @@
                     updateShiftBadge(now.getHours());
                     updateTargetFlightBanner(now);
 
-                    // ANUNCIO PERIÓDICO CADA 60 MINUTOS EN SUSPENSIÓN GENERAL
                     if (window.systemWeatherSuspended && now.getMinutes() === 0 && now.getSeconds() === 0) {
                         if (window.lastHourlyReminderHour !== now.getHours()) {
                             window.lastHourlyReminderHour = now.getHours();
-                            triggerVoiceAlert("Atención. Suspensión por clima activa. Vuelos siguientes suspendidos. Favor de subir evidencia fotográfica.");
-                            showToast("Recordatorio 60 min: Favor de subir la evidencia fotográfica por suspensión.", "warning");
+                            triggerVoiceAlert("Atención. Suspensión por clima activa. Favor de subir evidencia fotográfica.");
                         }
                     }
-                } catch(err) { console.warn("Clock loop error:", err); }
+                } catch(err) {}
             }
             updateClock();
             setInterval(updateClock, 1000);
@@ -1596,7 +1364,6 @@
         function updateTargetFlightBanner(now) {
             const plans = getActivePlan();
             
-            // Actualizar el Badge Visual del Plan Activo
             const activePlanBadge = document.getElementById('activePlanBadge');
             if (activePlanBadge) activePlanBadge.innerText = `PLAN ${getActivePlanKey()}`;
 
@@ -1624,7 +1391,6 @@
             const statusObj = window.dailyFlightStatuses[targetIdx] || { status: 'PENDIENTE' };
             const isTypeB = targetItem.forced;
 
-            // SILENCIAR OTRAS NOTIFICACIONES MIENTRAS ESTÉ SUSPENDIDO
             if (window.systemWeatherSuspended) {
                 if (winEl) winEl.innerText = "Suspensión General por Clima Activa";
                 if (cdEl) {
@@ -1663,13 +1429,13 @@
                         const alertKey = `typeB_15m_${targetIdx}_${getTodayKey()}`;
                         if (!window.triggeredAlertsToday.has(alertKey)) {
                             window.triggeredAlertsToday.add(alertKey);
-                            triggerVoiceAlert(`Recordatorio. Faltan 15 minutos para el vuelo obligatorio de Cambio de Turno de las ${targetItem.timeOp2} horas.`);
+                            triggerVoiceAlert(`Recordatorio. Faltan 15 minutos para el vuelo de Cambio de Turno de las ${targetItem.timeOp2} horas.`);
                         }
                     } else if (m === 5 && s === 0) {
                         const alertKey = `typeB_5m_${targetIdx}_${getTodayKey()}`;
                         if (!window.triggeredAlertsToday.has(alertKey)) {
                             window.triggeredAlertsToday.add(alertKey);
-                            triggerVoiceAlert(`¡Alerta urgente! Quedan solo 5 minutos para la hora exacta del vuelo de Cambio de Turno de las ${targetItem.timeOp2} horas. Proceda al despegue.`, true);
+                            triggerVoiceAlert(`¡Alerta urgente! Quedan 5 minutos para el Cambio de Turno de las ${targetItem.timeOp2} horas. Proceda al despegue.`, true);
                         }
                     }
                 } else if (diffSecs === 0 || (diffSecs < 0 && diffSecs > -300)) {
@@ -1680,7 +1446,7 @@
                     const exactAlertKey = `typeB_exact_${targetIdx}_${getTodayKey()}`;
                     if (!window.triggeredAlertsToday.has(exactAlertKey)) {
                         window.triggeredAlertsToday.add(exactAlertKey);
-                        triggerVoiceAlert(`¡Atención! Es la hora exacta del vuelo de Cambio de Turno de las ${targetItem.timeOp2} horas. Proceda al despegue inmediato.`);
+                        triggerVoiceAlert(`¡Atención! Es la hora exacta del vuelo de Cambio de Turno de las ${targetItem.timeOp2} horas. Proceda al despegue.`);
                     }
                 } else {
                     if (cdEl) {
@@ -1726,7 +1492,7 @@
                         const periodicAlertKey = `win_periodic_${m}_${targetIdx}_${getTodayKey()}`;
                         if (!window.triggeredAlertsToday.has(periodicAlertKey)) {
                             window.triggeredAlertsToday.add(periodicAlertKey);
-                            triggerVoiceAlert(`Recordatorio. La ventana del vuelo de las ${targetItem.timeOp2} horas continúa activa. Quedan ${m} minutos para despegar.`);
+                            triggerVoiceAlert(`Recordatorio. La ventana del vuelo de las ${targetItem.timeOp2} horas continúa abierta. Quedan ${m} minutos.`);
                         }
                     }
 
@@ -1734,7 +1500,7 @@
                         const alertKey = `win_close_5m_${targetIdx}_${getTodayKey()}`;
                         if (!window.triggeredAlertsToday.has(alertKey)) {
                             window.triggeredAlertsToday.add(alertKey);
-                            triggerVoiceAlert(`¡Alerta urgente! Quedan solo 5 minutos para que finalice la ventana del vuelo de las ${targetItem.timeOp2} horas. Proceda al despegue o registre la suspensión.`, true);
+                            triggerVoiceAlert(`¡Alerta urgente! Quedan 5 minutos para el cierre de la ventana de las ${targetItem.timeOp2} horas. Proceda al despegue.`, true);
                         }
                     }
                 } else {
@@ -1782,7 +1548,6 @@
                     '<span class="text-amber-400 font-bold">Hora Exacta</span>' : 
                     '±30 min';
 
-                // Buscar si hay evidencia en bitácora para este vuelo
                 const bitacoraEntry = window.bitacoraList.find(b => b.scheduledTime === item.timeOp2 && b.status === 'SUSPENDIDO');
                 const hasEvidence = bitacoraEntry && bitacoraEntry.imageData;
 
@@ -1846,7 +1611,7 @@
             const imageData = window.tempCompressedImage;
 
             if (!imageData) {
-                alert("Por favor seleccione una fotografía de evidencia antes de guardar.");
+                showToast("Por favor seleccione una imagen de evidencia.", "warning");
                 return;
             }
 
@@ -1875,7 +1640,7 @@
             closeModal('modalUploadEvidence');
             renderFlightsTable();
             renderBitacoraModalTable();
-            showToast("Evidencia fotográfica adjuntada correctamente.", "success");
+            showToast("Evidencia fotográfica guardada.", "success");
         }
         window.saveEvidencePhoto = saveEvidencePhoto;
 
@@ -2022,8 +1787,8 @@
             updateTargetFlightBanner(new Date());
 
             if (window.isTopLevelSuspension) {
-                showToast(`Suspensión general activada por clima. Vuelos siguientes pasaron a suspendidos.`, 'warning');
-                triggerVoiceAlert(`Atención. Suspensión general registrada por ${reason}. Vuelos siguientes suspendidos.`, true);
+                showToast(`Suspensión general activada por clima.`, 'warning');
+                triggerVoiceAlert(`Atención. Suspensión general registrada por ${reason}.`, true);
             } else {
                 showToast(`Suspensión registrada para vuelo de ${plans[idx].timeOp2} hrs.`, 'warning');
             }
@@ -2063,12 +1828,9 @@
                 tbody.innerHTML = `
                     <tr>
                         <td colspan="9" class="p-6 text-center text-slate-400">
-                            <div class="flex flex-col items-center justify-center gap-2">
+                            <div class="flex flex-col items-center justify-center gap-1">
                                 <i class="fa-solid fa-folder-open text-2xl text-slate-500"></i>
-                                <p class="italic">No hay registros almacenados en la bitácora activa.</p>
-                                <button onclick="openRecoveryModal()" class="px-3 py-1 bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs rounded-lg transition shadow flex items-center gap-1.5">
-                                    <i class="fa-solid fa-clock-rotate-left"></i> Abrir Recuperador de Registros
-                                </button>
+                                <p class="italic">No hay registros en la bitácora activa.</p>
                             </div>
                         </td>
                     </tr>`;
@@ -2188,32 +1950,60 @@
         window.saveBitacoraEntryEdit = saveBitacoraEntryEdit;
 
         function deleteBitacoraEntry(id) {
-            showConfirmDialog("Eliminar Registro", "¿Deseas ELIMINAR este registro de la Bitácora? El vuelo volverá a estar PENDIENTE en el cronograma.", () => {
-                // Guardar respaldo preventivo antes de eliminar
-                saveRecoveryBackup(window.bitacoraList, 'Antes de Eliminar Registro');
+            promptPasswordConfirmation(
+                "Autorizar Eliminación de Vuelo",
+                "Para proteger los registros de auditoría de Audi México, introduce la contraseña de supervisor para eliminar este registro y reactivar el vuelo a PENDIENTE:",
+                () => {
+                    saveRecoveryBackup(window.bitacoraList, 'Antes de Eliminar Registro');
 
-                const entry = window.bitacoraList.find(b => b.id === id);
-                if (entry) {
-                    const planIdx = getActivePlan().findIndex(p => p.timeOp2 === entry.scheduledTime);
-                    if (planIdx !== -1) {
-                        delete window.dailyFlightStatuses[planIdx];
-                        safeStorageSet('audi_flight_statuses', JSON.stringify(window.dailyFlightStatuses));
+                    const entry = window.bitacoraList.find(b => b.id === id);
+                    if (entry) {
+                        const planIdx = getActivePlan().findIndex(p => p.timeOp2 === entry.scheduledTime);
+                        if (planIdx !== -1) {
+                            delete window.dailyFlightStatuses[planIdx];
+                            safeStorageSet('audi_flight_statuses', JSON.stringify(window.dailyFlightStatuses));
+                        }
                     }
+
+                    window.bitacoraList = window.bitacoraList.filter(b => b.id !== id);
+                    safeStorageSet('audi_bitacora_logs', JSON.stringify(window.bitacoraList));
+
+                    if (typeof window.saveDailyStatusToCloud === 'function') window.saveDailyStatusToCloud();
+                    if (typeof window.deleteBitacoraLogFromCloud === 'function') window.deleteBitacoraLogFromCloud(id);
+
+                    renderBitacoraModalTable();
+                    renderFlightsTable();
+                    updateTargetFlightBanner(new Date());
+                    showToast("Registro eliminado con autorización.", "info");
                 }
-
-                window.bitacoraList = window.bitacoraList.filter(b => b.id !== id);
-                safeStorageSet('audi_bitacora_logs', JSON.stringify(window.bitacoraList));
-
-                if (typeof window.saveDailyStatusToCloud === 'function') window.saveDailyStatusToCloud();
-                if (typeof window.deleteBitacoraLogFromCloud === 'function') window.deleteBitacoraLogFromCloud(id);
-
-                renderBitacoraModalTable();
-                renderFlightsTable();
-                updateTargetFlightBanner(new Date());
-                showToast("Registro eliminado. Vuelo reactivado a PENDIENTE", "info");
-            });
+            );
         }
         window.deleteBitacoraEntry = deleteBitacoraEntry;
+
+        function confirmClearAllBitacoraModal() {
+            promptPasswordConfirmation(
+                "Autorizar Vaciado Total de Bitácora",
+                "ADVERTENCIA CRÍTICA: Se vaciarán todos los registros del día actual. Ingresa la contraseña de supervisor para autorizar:",
+                () => {
+                    if (window.bitacoraList && window.bitacoraList.length > 0) {
+                        saveRecoveryBackup(window.bitacoraList, 'Antes de Vaciar Bitácora');
+                    }
+
+                    window.bitacoraList = [];
+                    window.dailyFlightStatuses = {};
+                    safeStorageSet('audi_bitacora_logs', JSON.stringify([]));
+                    safeStorageSet('audi_flight_statuses', JSON.stringify({}));
+
+                    if (typeof window.saveDailyStatusToCloud === 'function') window.saveDailyStatusToCloud();
+
+                    renderBitacoraModalTable();
+                    renderFlightsTable();
+                    updateTargetFlightBanner(new Date());
+                    showToast("Bitácora vaciada con autorización de supervisión.", "info");
+                }
+            );
+        }
+        window.confirmClearAllBitacoraModal = confirmClearAllBitacoraModal;
 
         function printAuditBitacora() {
             const printBody = document.getElementById('printBitacoraTableBody');
@@ -2270,34 +2060,11 @@
         }
         window.exportBitacoraCSV = exportBitacoraCSV;
 
-        function confirmClearAllBitacoraModal() {
-            showConfirmDialog("Vaciar Bitácora", "¿Deseas VACIAR completamente la Bitácora del día? Se creará una copia de seguridad recuperable antes de limpiar.", () => {
-                if (window.bitacoraList && window.bitacoraList.length > 0) {
-                    safeStorageSet('audi_last_cleared_bitacora', JSON.stringify(window.bitacoraList));
-                    saveRecoveryBackup(window.bitacoraList, 'Antes de Vaciar Bitácora');
-                }
-
-                window.bitacoraList = [];
-                window.dailyFlightStatuses = {};
-                safeStorageSet('audi_bitacora_logs', JSON.stringify([]));
-                safeStorageSet('audi_flight_statuses', JSON.stringify({}));
-
-                if (typeof window.saveDailyStatusToCloud === 'function') window.saveDailyStatusToCloud();
-
-                renderBitacoraModalTable();
-                renderFlightsTable();
-                updateTargetFlightBanner(new Date());
-                showToast("Bitácora vaciada. Puedes recuperarla pulsando 'Recuperar'", "info");
-            });
-        }
-        window.confirmClearAllBitacoraModal = confirmClearAllBitacoraModal;
-
         function initApp() {
             const today = getTodayKey();
             const savedDate = safeStorageGet('audi_flight_date');
 
             if (savedDate !== today) {
-                // Guardar copia del día anterior antes de reiniciar el día
                 const prevLogsRaw = safeStorageGet('audi_bitacora_logs');
                 if (prevLogsRaw) {
                     try {
@@ -2320,21 +2087,15 @@
                 if (savedStatuses) { try { window.dailyFlightStatuses = JSON.parse(savedStatuses); } catch(e){} }
                 
                 const savedBitacora = safeStorageGet('audi_bitacora_logs');
-                if (savedBitacora) { try { window.bitacoraList = JSON.parse(savedBitacora); } catch(e){} }
+                if (savedBitacora) { 
+                    try { 
+                        window.bitacoraList = JSON.parse(savedBitacora); 
+                        saveRecoveryBackup(window.bitacoraList, 'Auto-Respaldo en Recarga');
+                    } catch(e){} 
+                }
 
                 const savedWeatherSuspended = safeStorageGet('audi_weather_suspended');
                 window.systemWeatherSuspended = (savedWeatherSuspended === 'true');
-            }
-
-            // Si la bitácora local está vacía, revisar si existe una copia de seguridad o vaciado reciente para sugerir rescate
-            if (!window.bitacoraList || window.bitacoraList.length === 0) {
-                const lastCleared = safeStorageGet('audi_last_cleared_bitacora');
-                const backupsRaw = safeStorageGet('audi_bitacora_backups');
-                if (lastCleared || backupsRaw) {
-                    setTimeout(() => {
-                        showToast("Se detectaron respaldos anteriores en memoria. Haz clic en 'Recuperar'", "warning");
-                    }, 1200);
-                }
             }
 
             updateMainWeatherButtonUI();
