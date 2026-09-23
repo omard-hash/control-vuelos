@@ -231,21 +231,6 @@
         </div>
     </div>
 
-    <!-- MODAL CONFIRMACIÓN GENÉRICO -->
-    <div id="modalConfirmDialog" class="fixed inset-0 bg-slate-950/85 backdrop-blur-sm z-50 flex items-center justify-center p-3 hidden modal-backdrop">
-        <div class="bg-slate-900 border border-red-500/40 rounded-2xl max-w-sm w-full p-4 shadow-2xl space-y-3">
-            <div class="flex items-center gap-2 text-red-400 font-bold text-sm">
-                <i class="fa-solid fa-triangle-exclamation text-base"></i>
-                <span id="confirmDialogTitle">Confirmar Acción</span>
-            </div>
-            <p id="confirmDialogMessage" class="text-xs text-slate-300">¿Está seguro de continuar?</p>
-            <div class="flex justify-end gap-2 pt-2 border-t border-slate-800">
-                <button id="btnConfirmCancel" class="px-3 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-xs rounded-xl">Cancelar</button>
-                <button id="btnConfirmOk" class="px-3 py-1 bg-red-600 hover:bg-red-500 text-white font-bold text-xs rounded-xl shadow">Aceptar</button>
-            </div>
-        </div>
-    </div>
-
     <!-- MODAL COMPLETO DE BITÁCORA AUDITABLE CON SELECTOR DE CALENDARIO -->
     <div id="modalBitacoraView" class="fixed inset-0 bg-slate-950/90 backdrop-blur-md z-50 flex items-center justify-center p-2 sm:p-4 hidden modal-backdrop">
         <div class="bg-slate-900 border border-blue-500/40 rounded-2xl max-w-6xl w-full p-3 sm:p-4 shadow-2xl space-y-2.5 max-h-[94vh] flex flex-col">
@@ -293,7 +278,7 @@
                     </button>
                 </div>
 
-                <!-- Botones de Acción: Escanear Histórico, Excel, PDF, Vaciar -->
+                <!-- Botones de Acción: Escanear Histórico, Excel, PDF con rango, Vaciar -->
                 <div class="flex items-center gap-1.5 flex-wrap">
                     <button onclick="triggerDeepRecoveryScan()" title="Buscar y recuperar vuelos históricos de la nube" class="px-2 py-1 bg-indigo-900/80 hover:bg-indigo-800 text-indigo-200 font-bold text-[10px] rounded-lg border border-indigo-700/50 transition flex items-center gap-1 cursor-pointer">
                         <i class="fa-solid fa-rotate text-amber-300"></i> Sincronizar Histórico
@@ -301,7 +286,7 @@
                     <button onclick="exportBitacoraCSV()" class="px-2 py-1 bg-emerald-700 hover:bg-emerald-600 text-white font-bold text-[10px] sm:text-xs rounded-lg transition flex items-center gap-1 cursor-pointer">
                         <i class="fa-solid fa-file-excel"></i> Excel
                     </button>
-                    <button onclick="printAuditBitacora()" class="px-2 py-1 bg-blue-700 hover:bg-blue-600 text-white font-bold text-[10px] sm:text-xs rounded-lg transition flex items-center gap-1 cursor-pointer">
+                    <button onclick="openPrintRangeModal()" class="px-2.5 py-1 bg-blue-700 hover:bg-blue-600 text-white font-bold text-[10px] sm:text-xs rounded-lg transition flex items-center gap-1 cursor-pointer shadow">
                         <i class="fa-solid fa-print"></i> PDF / Imprimir
                     </button>
                     <button onclick="confirmClearAllBitacoraModal()" class="px-2 py-1 bg-red-950/80 hover:bg-red-900 text-red-300 font-bold text-[10px] sm:text-xs rounded-lg transition flex items-center gap-1 cursor-pointer">
@@ -335,6 +320,60 @@
                 <span id="bitacoraFooterFilterInfo" class="text-[10px] text-slate-400 font-mono">Mostrando: Histórico Completo</span>
                 <button onclick="closeModal('modalBitacoraView')" class="px-3 py-1 bg-slate-800 text-slate-300 font-semibold text-xs rounded-xl hover:bg-slate-700">
                     Cerrar Bitácora
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL SELECTOR DE FECHAS PARA PDF / IMPRESIÓN (SIN AFECTAR REGISTROS) -->
+    <div id="modalPrintRange" class="fixed inset-0 bg-slate-950/85 backdrop-blur-sm z-50 flex items-center justify-center p-3 hidden modal-backdrop">
+        <div class="bg-slate-900 border border-blue-500/40 rounded-2xl max-w-md w-full p-4 shadow-2xl space-y-3">
+            <div class="flex justify-between items-center border-b border-slate-800 pb-2">
+                <h3 class="text-xs sm:text-sm font-bold text-white flex items-center gap-1.5">
+                    <i class="fa-solid fa-file-pdf text-audi-red"></i> Generar Reporte PDF de Bitácora
+                </h3>
+                <button onclick="closeModal('modalPrintRange')" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark text-base"></i></button>
+            </div>
+            
+            <p class="text-xs text-slate-300 leading-relaxed">
+                Selecciona el rango de fechas para generar el reporte en PDF. <span class="text-emerald-400 font-semibold">Tus registros almacenados no serán afectados ni modificados.</span>
+            </p>
+
+            <div class="grid grid-cols-2 gap-2 text-xs">
+                <div>
+                    <label class="block text-slate-400 font-semibold mb-1">Fecha Desde:</label>
+                    <input type="date" id="printRangeFrom" onchange="updatePrintPreviewCount()" class="w-full bg-slate-950 border border-slate-700 text-white font-mono text-xs px-2.5 py-1.5 rounded-lg focus:outline-none focus:border-blue-500">
+                </div>
+                <div>
+                    <label class="block text-slate-400 font-semibold mb-1">Fecha Hasta:</label>
+                    <input type="date" id="printRangeTo" onchange="updatePrintPreviewCount()" class="w-full bg-slate-950 border border-slate-700 text-white font-mono text-xs px-2.5 py-1.5 rounded-lg focus:outline-none focus:border-blue-500">
+                </div>
+            </div>
+
+            <!-- Accesos rápidos de rango -->
+            <div class="flex items-center gap-1.5 flex-wrap pt-0.5">
+                <span class="text-[10px] text-slate-400 font-semibold">Rango rápido:</span>
+                <button type="button" onclick="setPrintQuickRange('today')" class="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-[10px] text-slate-200 border border-slate-700 cursor-pointer">Hoy</button>
+                <button type="button" onclick="setPrintQuickRange('yesterday')" class="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-[10px] text-slate-200 border border-slate-700 cursor-pointer">Ayer</button>
+                <button type="button" onclick="setPrintQuickRange('last7')" class="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-[10px] text-slate-200 border border-slate-700 cursor-pointer">Últimos 7 días</button>
+                <button type="button" onclick="setPrintQuickRange('month')" class="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-[10px] text-slate-200 border border-slate-700 cursor-pointer">Este Mes</button>
+                <button type="button" onclick="setPrintQuickRange('all')" class="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-[10px] text-slate-200 border border-slate-700 cursor-pointer">Todo</button>
+            </div>
+
+            <div class="bg-slate-950/70 p-2.5 rounded-xl border border-slate-800 text-[11px] text-slate-300 flex items-center justify-between">
+                <span>Registros encontrados para el PDF:</span>
+                <strong id="printPreviewCount" class="text-emerald-400 font-mono text-xs">0 registros</strong>
+            </div>
+
+            <div class="text-[10px] text-slate-400 flex items-start gap-1.5 bg-blue-950/30 p-2 rounded-lg border border-blue-900/40">
+                <i class="fa-solid fa-circle-check text-emerald-400 mt-0.5 shrink-0"></i>
+                <span>En cumplimiento con el formato oficial, la columna con el <strong>Nombre del Piloto ha sido omitida</strong> de la tabla del PDF.</span>
+            </div>
+
+            <div class="flex justify-end gap-2 pt-2 border-t border-slate-800">
+                <button onclick="closeModal('modalPrintRange')" class="px-3 py-1 bg-slate-800 text-slate-300 font-semibold text-xs rounded-xl hover:bg-slate-700">Cancelar</button>
+                <button onclick="executeRangePrint()" class="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs rounded-xl shadow flex items-center gap-1.5 cursor-pointer">
+                    <i class="fa-solid fa-print"></i> Generar PDF / Imprimir
                 </button>
             </div>
         </div>
@@ -559,7 +598,7 @@
         <span id="toastMessage" class="font-semibold text-[11px]">Notificación</span>
     </div>
 
-    <!-- SECCIÓN OCULTA PARA IMPRESIÓN Y PDF DE LA BITÁCORA -->
+    <!-- SECCIÓN OCULTA PARA IMPRESIÓN Y PDF DE LA BITÁCORA (OMITIENDO COLUMNA PILOTO) -->
     <section id="bitacoraPrintSection" class="p-4 bg-white text-black">
         <div class="border-b-2 border-black pb-2 mb-3 flex justify-between items-center">
             <div>
@@ -567,8 +606,9 @@
                 <h2 class="text-xs font-semibold">Bitácora Oficial Auditable de Vuelos con Drone (24/7)</h2>
             </div>
             <div class="text-right text-[10px]">
-                <div>Fecha de Reporte: <strong id="printReportDate">--</strong></div>
-                <div>Generado: <strong id="printReportTime">--</strong></div>
+                <div>Período Reportado: <strong id="printReportRange">Histórico Completo</strong></div>
+                <div>Fecha de Emisión: <strong id="printReportDate">--</strong></div>
+                <div>Hora de Emisión: <strong id="printReportTime">--</strong></div>
             </div>
         </div>
 
@@ -578,7 +618,6 @@
                     <th class="p-1 border-r border-black">Fecha/Hora Reg</th>
                     <th class="p-1 border-r border-black">Prog.</th>
                     <th class="p-1 border-r border-black">Tipo Vuelo</th>
-                    <th class="p-1 border-r border-black">Piloto</th>
                     <th class="p-1 border-r border-black">Estado</th>
                     <th class="p-1 border-r border-black">Hora Real</th>
                     <th class="p-1 border-r border-black">Detalle / Motivo</th>
@@ -591,8 +630,8 @@
 
         <div class="grid grid-cols-2 gap-8 pt-8 text-center text-[10px]">
             <div class="border-t border-black pt-1">
-                <strong>Piloto en Turno Responsable</strong><br>
-                Firma y Nombre del Operador
+                <strong>Operaciones de Vuelo / Bitácora Drone</strong><br>
+                Validación Operativa Audi México
             </div>
             <div class="border-t border-black pt-1">
                 <strong>Supervisión de Seguridad Audi México</strong><br>
@@ -604,7 +643,7 @@
     <!-- FIREBASE INITIALIZATION & DEEP RESTORATION MODULE -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, doc, setDoc, deleteDoc, onSnapshot, collection, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         let appId = 'audi-mexico-drones';
@@ -673,22 +712,20 @@
                 db = getFirestore(app);
                 window.__firebase_db = db;
 
-                // Intento no bloqueante de autenticación
                 try {
                     await signInAnonymously(auth);
                 } catch (authErr) {
-                    console.warn("Autenticación anónima omitida o restringida, procediendo directamente con Firestore:", authErr);
+                    console.warn("Autenticación anónima:", authErr);
                 }
 
                 updateCloudUI(true, "Nube Live Sincronizada");
                 setupRealtimeListeners();
 
-                // Escaneo profundo inicial para rescatar registros históricos de la base de datos
                 setTimeout(() => {
                     if (window.triggerDeepRecoveryScan) window.triggerDeepRecoveryScan(true);
                 }, 1000);
             } catch (err) {
-                console.error("Error al inicializar la persistencia en nube Firebase:", err);
+                console.error("Error persistencia Firebase:", err);
                 updateCloudUI(false, "Modo Local");
             }
         }
@@ -698,7 +735,6 @@
 
             const todayKey = window.getTodayKey();
 
-            // 1. Escucha del estado diario
             const statusDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'daily_status', todayKey);
             onSnapshot(statusDocRef, (docSnap) => {
                 if (docSnap.exists()) {
@@ -716,10 +752,9 @@
                     if (typeof window.updateTargetFlightBanner === 'function') window.updateTargetFlightBanner(new Date());
                 }
             }, (err) => {
-                console.warn("Nota estado diario alternativo:", err);
+                console.warn("Nota estado diario:", err);
             });
 
-            // 2. Escucha de Bitácora
             const bitacoraColRef = collection(db, 'artifacts', appId, 'public', 'data', 'bitacora_logs');
             onSnapshot(bitacoraColRef, (querySnap) => {
                 const logs = [];
@@ -733,7 +768,6 @@
                     fetchRootCollectionLogs();
                 }
             }, (err) => {
-                console.warn("Escuchando ruta alternativa de Firestore...", err);
                 fetchRootCollectionLogs();
             });
         }
@@ -754,7 +788,6 @@
         function processIncomingCloudLogs(newLogs) {
             if (!newLogs || newLogs.length === 0) return;
 
-            // Merge sin duplicados con los registros existentes
             const currentMap = new Map();
             (window.bitacoraList || []).forEach(item => {
                 if (item && item.id) currentMap.set(String(item.id), item);
@@ -773,7 +806,6 @@
             if (window.safeStorageSet) window.safeStorageSet('audi_bitacora_logs', JSON.stringify(merged));
             if (window.saveRecoveryBackup) window.saveRecoveryBackup(merged, 'Sincronización Nube Firestore');
 
-            // Reconstrucción inteligente del cronograma de hoy
             if (typeof window.getActivePlan === 'function') {
                 const plans = window.getActivePlan();
                 let rebuiltAny = false;
@@ -782,7 +814,6 @@
                 plans.forEach((item, idx) => {
                     const currentSt = window.dailyFlightStatuses[idx];
                     if (!currentSt || currentSt.status === 'PENDIENTE') {
-                        // Buscar el registro de hoy para este horario
                         const match = merged.find(b => 
                             b.scheduledTime === item.timeOp2 && 
                             (b.timestampFormatted && b.timestampFormatted.includes(todayStr))
@@ -807,6 +838,7 @@
             if (typeof window.renderBitacoraModalTable === 'function') window.renderBitacoraModalTable();
             if (typeof window.renderFlightsTable === 'function') window.renderFlightsTable();
             if (typeof window.updateTargetFlightBanner === 'function') window.updateTargetFlightBanner(new Date());
+            if (typeof window.updatePrintPreviewCount === 'function') window.updatePrintPreviewCount();
         }
 
         window.saveDailyStatusToCloud = async function() {
@@ -843,7 +875,6 @@
             } catch (e) { console.error("Error eliminando log:", e); }
         };
 
-        // Escaneo exhaustivo en todas las colecciones posibles de Firestore
         window.triggerDeepRecoveryScan = async function(isSilent = false) {
             if (!db) {
                 if (!isSilent) window.showToast("Conectando con la base de datos...", "warning");
@@ -875,7 +906,6 @@
                 } catch(e) {}
             }
 
-            // Rescatar también de los respaldos históricos locales
             try {
                 const rawBackups = window.safeStorageGet('audi_bitacora_backups');
                 if (rawBackups) {
@@ -888,7 +918,6 @@
                 }
             } catch(e) {}
 
-            // Revisar claves espejo locales
             try {
                 for (let i = 0; i < localStorage.length; i++) {
                     const key = localStorage.key(i);
@@ -962,6 +991,45 @@
             return `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
         }
         window.getTodayKey = getTodayKey;
+
+        function formatYMDToDMY(ymd) {
+            if (!ymd) return '';
+            const parts = ymd.split('-');
+            if (parts.length === 3) return `${parts[2]}/${parts[1]}/${parts[0]}`;
+            return ymd;
+        }
+
+        // Parseo seguro de fecha de cada registro de bitácora
+        function parseEntryDate(item) {
+            if (!item) return new Date();
+            if (item.timestampFormatted) {
+                const clean = item.timestampFormatted.split(',')[0].trim();
+                if (clean.includes('/')) {
+                    const parts = clean.split('/');
+                    if (parts.length === 3) {
+                        const day = parseInt(parts[0], 10);
+                        const month = parseInt(parts[1], 10) - 1;
+                        const year = parseInt(parts[2], 10);
+                        if (!isNaN(day) && !isNaN(month) && !isNaN(year)) {
+                            return new Date(year, month, day);
+                        }
+                    }
+                } else if (clean.includes('-')) {
+                    const parts = clean.split('-');
+                    if (parts.length === 3) {
+                        if (parts[0].length === 4) {
+                            return new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+                        } else {
+                            return new Date(parseInt(parts[2], 10), parseInt(parts[1], 10) - 1, parseInt(parts[0], 10));
+                        }
+                    }
+                }
+            }
+            if (item.id && typeof item.id === 'number' && item.id > 1500000000000) {
+                return new Date(item.id);
+            }
+            return new Date();
+        }
 
         // GUARDADO DE COPIAS PREVENTIVAS HISTÓRICAS 100% AUTOMÁTICO EN SEGUNDO PLANO
         function saveRecoveryBackup(logs, reason = 'Automático') {
@@ -1153,7 +1221,7 @@
         window.audioUnlocked = false;
         window.triggeredAlertsToday = new Set();
         window.bitacoraSortAsc = false;
-        window.bitacoraFilterMode = 'ALL'; // 'ALL', 'TODAY', 'CALENDAR'
+        window.bitacoraFilterMode = 'ALL';
         window.bitacoraSelectedDate = "";
         window.systemWeatherSuspended = false;
         window.isTopLevelSuspension = false;
@@ -1904,7 +1972,6 @@
         window.confirmSuspension = confirmSuspension;
 
         function openBitacoraModal() {
-            // Inicializar el input de fecha con la fecha de hoy
             const dateInput = document.getElementById('bitacoraDateInput');
             if (dateInput && !dateInput.value) {
                 dateInput.value = getTodayKey();
@@ -2191,36 +2258,163 @@
         }
         window.confirmClearAllBitacoraModal = confirmClearAllBitacoraModal;
 
-        function printAuditBitacora() {
-            const printBody = document.getElementById('printBitacoraTableBody');
-            const now = new Date();
-            document.getElementById('printReportDate').innerText = now.toLocaleDateString('es-MX');
-            document.getElementById('printReportTime').innerText = now.toLocaleTimeString('es-MX');
+        // FILTRADO NO DESTRUCTIVO PARA GENERACIÓN DE PDF
+        function getFilteredRecordsForPrint(fromStr, toStr) {
+            if (!window.bitacoraList || window.bitacoraList.length === 0) return [];
 
-            if (!window.bitacoraList || window.bitacoraList.length === 0) {
-                printBody.innerHTML = `<tr><td colspan="8" class="p-3 text-center">Sin registros en la bitácora.</td></tr>`;
-            } else {
-                let html = '';
-                window.bitacoraList.forEach(item => {
-                    const imgHtml = item.imageData ? `<img src="${item.imageData}" style="max-height: 40px; margin: auto;">` : 'Pendiente foto';
-                    const printStatus = (item.status === 'VOLADO') ? 'REALIZADO' : item.status;
-                    html += `
-                        <tr class="border-b border-black">
-                            <td class="p-1 border-r border-black">${item.timestampFormatted}</td>
-                            <td class="p-1 border-r border-black font-bold">${item.scheduledTime} hrs</td>
-                            <td class="p-1 border-r border-black">${item.flightType}</td>
-                            <td class="p-1 border-r border-black">${item.pilot}</td>
-                            <td class="p-1 border-r border-black font-bold">${printStatus}</td>
-                            <td class="p-1 border-r border-black">${item.realTime}</td>
-                            <td class="p-1 border-r border-black">${item.notes}</td>
-                            <td class="p-1 text-center">${imgHtml}</td>
-                        </tr>
-                    `;
-                });
-                printBody.innerHTML = html;
+            let fromDate = null;
+            let toDate = null;
+
+            if (fromStr) {
+                const [y, m, d] = fromStr.split('-').map(Number);
+                fromDate = new Date(y, m - 1, d, 0, 0, 0, 0);
+            }
+            if (toStr) {
+                const [y, m, d] = toStr.split('-').map(Number);
+                toDate = new Date(y, m - 1, d, 23, 59, 59, 999);
             }
 
-            window.print();
+            return window.bitacoraList.filter(item => {
+                const itemDate = parseEntryDate(item);
+                if (fromDate && itemDate < fromDate) return false;
+                if (toDate && itemDate > toDate) return false;
+                return true;
+            });
+        }
+
+        function openPrintRangeModal() {
+            const fromInput = document.getElementById('printRangeFrom');
+            const toInput = document.getElementById('printRangeTo');
+
+            if (window.bitacoraFilterMode === 'CALENDAR' && window.bitacoraSelectedDate) {
+                if (fromInput) fromInput.value = window.bitacoraSelectedDate;
+                if (toInput) toInput.value = window.bitacoraSelectedDate;
+            } else if (window.bitacoraFilterMode === 'TODAY') {
+                const todayKey = getTodayKey();
+                if (fromInput) fromInput.value = todayKey;
+                if (toInput) toInput.value = todayKey;
+            } else {
+                const todayKey = getTodayKey();
+                if (fromInput && !fromInput.value) fromInput.value = todayKey;
+                if (toInput && !toInput.value) toInput.value = todayKey;
+            }
+
+            updatePrintPreviewCount();
+            openModal('modalPrintRange');
+        }
+        window.openPrintRangeModal = openPrintRangeModal;
+
+        function setPrintQuickRange(rangeType) {
+            const today = new Date();
+            const fromInput = document.getElementById('printRangeFrom');
+            const toInput = document.getElementById('printRangeTo');
+            if (!fromInput || !toInput) return;
+
+            const toYMD = (d) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+
+            if (rangeType === 'today') {
+                const str = toYMD(today);
+                fromInput.value = str;
+                toInput.value = str;
+            } else if (rangeType === 'yesterday') {
+                const yest = new Date(today);
+                yest.setDate(yest.getDate() - 1);
+                const str = toYMD(yest);
+                fromInput.value = str;
+                toInput.value = str;
+            } else if (rangeType === 'last7') {
+                const past = new Date(today);
+                past.setDate(past.getDate() - 6);
+                fromInput.value = toYMD(past);
+                toInput.value = toYMD(today);
+            } else if (rangeType === 'month') {
+                const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
+                fromInput.value = toYMD(firstDay);
+                toInput.value = toYMD(today);
+            } else if (rangeType === 'all') {
+                fromInput.value = '';
+                toInput.value = '';
+            }
+
+            updatePrintPreviewCount();
+        }
+        window.setPrintQuickRange = setPrintQuickRange;
+
+        function updatePrintPreviewCount() {
+            const fromVal = document.getElementById('printRangeFrom')?.value || '';
+            const toVal = document.getElementById('printRangeTo')?.value || '';
+            const previewEl = document.getElementById('printPreviewCount');
+            if (!previewEl) return;
+
+            const filtered = getFilteredRecordsForPrint(fromVal, toVal);
+            previewEl.innerText = `${filtered.length} registro(s)`;
+        }
+        window.updatePrintPreviewCount = updatePrintPreviewCount;
+
+        function executeRangePrint() {
+            const fromVal = document.getElementById('printRangeFrom')?.value || '';
+            const toVal = document.getElementById('printRangeTo')?.value || '';
+
+            const filtered = getFilteredRecordsForPrint(fromVal, toVal);
+            if (filtered.length === 0) {
+                showToast("No hay registros en el rango de fechas seleccionado.", "warning");
+                return;
+            }
+
+            const printBody = document.getElementById('printBitacoraTableBody');
+            const now = new Date();
+            const repDateEl = document.getElementById('printReportDate');
+            const repTimeEl = document.getElementById('printReportTime');
+            const rangeLabelEl = document.getElementById('printReportRange');
+
+            if (repDateEl) repDateEl.innerText = now.toLocaleDateString('es-MX');
+            if (repTimeEl) repTimeEl.innerText = now.toLocaleTimeString('es-MX');
+
+            if (rangeLabelEl) {
+                if (!fromVal && !toVal) {
+                    rangeLabelEl.innerText = "Histórico Completo";
+                } else if (fromVal && toVal) {
+                    rangeLabelEl.innerText = `${formatYMDToDMY(fromVal)} al ${formatYMDToDMY(toVal)}`;
+                } else if (fromVal) {
+                    rangeLabelEl.innerText = `Desde ${formatYMDToDMY(fromVal)}`;
+                } else {
+                    rangeLabelEl.innerText = `Hasta ${formatYMDToDMY(toVal)}`;
+                }
+            }
+
+            let itemsToPrint = [...filtered];
+            if (window.bitacoraSortAsc) {
+                itemsToPrint.reverse();
+            }
+
+            let html = '';
+            itemsToPrint.forEach(item => {
+                const imgHtml = item.imageData ? `<img src="${item.imageData}" style="max-height: 40px; margin: auto;">` : 'Sin evidencia';
+                const printStatus = (item.status === 'VOLADO') ? 'REALIZADO' : item.status;
+                // NOTA: Se omite por completo la columna del nombre del piloto en la tabla impresa/PDF
+                html += `
+                    <tr class="border-b border-black">
+                        <td class="p-1 border-r border-black font-mono">${item.timestampFormatted}</td>
+                        <td class="p-1 border-r border-black font-bold font-mono">${item.scheduledTime} hrs</td>
+                        <td class="p-1 border-r border-black">${item.flightType}</td>
+                        <td class="p-1 border-r border-black font-bold">${printStatus}</td>
+                        <td class="p-1 border-r border-black font-mono">${item.realTime}</td>
+                        <td class="p-1 border-r border-black">${item.notes || '--'}</td>
+                        <td class="p-1 text-center">${imgHtml}</td>
+                    </tr>
+                `;
+            });
+            printBody.innerHTML = html;
+
+            closeModal('modalPrintRange');
+            setTimeout(() => {
+                window.print();
+            }, 250);
+        }
+        window.executeRangePrint = executeRangePrint;
+
+        function printAuditBitacora() {
+            openPrintRangeModal();
         }
         window.printAuditBitacora = printAuditBitacora;
 
@@ -2233,7 +2427,7 @@
             let csvContent = "data:text/csv;charset=utf-8,Fecha Registro,Hora Programada,Tipo Vuelo,Piloto,Estado,Hora Real,Notas / Motivo\n";
             window.bitacoraList.forEach(item => {
                 const csvStatus = (item.status === 'VOLADO') ? 'REALIZADO' : item.status;
-                csvContent += `"${item.timestampFormatted}","${item.scheduledTime}","${item.flightType}","${item.pilot}","${csvStatus}","${item.realTime}","${item.notes.replace(/"/g, '""')}"\n`;
+                csvContent += `"${item.timestampFormatted}","${item.scheduledTime}","${item.flightType}","${item.pilot}","${csvStatus}","${item.realTime}","${(item.notes || '').replace(/"/g, '""')}"\n`;
             });
 
             const encodedUri = encodeURI(csvContent);
@@ -2250,7 +2444,6 @@
             const today = getTodayKey();
             const savedDate = safeStorageGet('audi_flight_date');
 
-            // Cargar bitácora histórica almacenada sin borrar días anteriores
             const savedBitacora = safeStorageGet('audi_bitacora_logs');
             if (savedBitacora) { 
                 try { 
@@ -2259,7 +2452,6 @@
                 } catch(e){} 
             }
 
-            // Si es un nuevo día, solo reiniciamos el cronograma de hoy, pero conservamos la bitácora histórica
             if (savedDate !== today) {
                 safeStorageSet('audi_flight_date', today);
                 window.dailyFlightStatuses = {};
