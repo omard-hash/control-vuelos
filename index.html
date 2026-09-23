@@ -56,11 +56,9 @@
 </head>
 <body class="h-screen flex flex-col bg-slate-950 text-slate-100 antialiased selection:bg-red-600 selection:text-white overflow-hidden">
 
-    <!-- HEADER / BARRA SUPERIOR FIJA -->
     <header class="bg-slate-900 border-b border-slate-800 sticky top-0 z-40 shadow-xl py-2 px-2 sm:px-3 shrink-0">
         <div class="max-w-7xl mx-auto flex flex-col xs:flex-row justify-between items-center gap-2">
             
-            <!-- Logo Audi e Indicadores -->
             <div class="flex items-center gap-2 shrink-0">
                 <div class="p-1.5 bg-audi-red text-white rounded-lg shadow flex items-center justify-center shrink-0">
                     <i class="fa-solid fa-plane-departure text-sm"></i>
@@ -69,26 +67,22 @@
                     <span class="text-[9px] font-extrabold tracking-wider uppercase bg-slate-800 text-red-400 px-1.5 py-0.5 rounded border border-red-900/40 shrink-0">Audi México</span>
                     <span id="shiftBadge" class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-950/80 text-emerald-400 border border-emerald-800/40 shrink-0">Turno --</span>
                     
-                    <!-- INDICADOR DE ESTADO DE SUSPENSIÓN SISTEMA -->
                     <span id="systemStatusBadge" class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-950/80 text-emerald-400 border border-emerald-800/40 shrink-0 flex items-center gap-1">
                         <i id="systemStatusIcon" class="fa-solid fa-circle-check text-emerald-400"></i>
                         <span id="systemStatusText">Operación Normal</span>
                     </span>
 
-                    <!-- INDICADOR DE CONEXIÓN NUBE EN LÍNEA -->
                     <span id="cloudStatusBadge" onclick="openCloudSettingsModal()" title="Configuración de Firebase" class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-950/80 text-amber-400 border border-amber-800/40 shrink-0 flex items-center gap-1 cursor-pointer hover:opacity-90">
                         <i id="cloudStatusIcon" class="fa-solid fa-hard-drive text-amber-400"></i> <span id="cloudStatusText">Conectando Nube...</span>
                     </span>
                 </div>
             </div>
 
-            <!-- RELOJ DESTACADO, FECHA Y CONTROLES -->
             <div class="flex items-center justify-between xs:justify-end gap-2 w-full xs:w-auto bg-slate-950/90 px-2.5 py-1.5 rounded-xl border border-slate-800 shadow-inner">
                 <div class="text-left xs:text-right flex flex-col items-start xs:items-end me-1">
                     <div id="liveClock" class="text-2xl sm:text-4xl font-mono font-black text-amber-300 tracking-wider leading-none drop-shadow-md">00:00:00</div>
                     <div id="liveDate" class="text-[9.5px] text-slate-400 font-semibold mt-0.5 truncate max-w-[130px] sm:max-w-none">Cargando fecha...</div>
                     
-                    <!-- Indicador de estado de Audio ubicado DEBAJO del reloj -->
                     <div id="audioStatusBadge" class="mt-1 text-[8.5px] font-bold px-1.5 py-0.5 rounded bg-slate-800 text-amber-300 border border-amber-700/60 flex items-center gap-1 shrink-0 cursor-pointer" onclick="unlockAudioSystem()">
                         <i id="audioStatusIcon" class="fa-solid fa-volume-xmark text-amber-400"></i> <span id="audioStatusText">Audio Inactivo</span>
                     </div>
@@ -109,10 +103,8 @@
         </div>
     </header>
 
-    <!-- CONTENIDO PRINCIPAL FIJO -->
     <main class="flex-1 max-w-7xl w-full mx-auto px-2 sm:px-4 py-2 flex flex-col gap-2 overflow-hidden">
 
-        <!-- TARJETA PRINCIPAL DEL VUELO ACTIVO Y CRONÓMETRO GIGANTE -->
         <section id="nextFlightCard" class="bg-gradient-to-r from-slate-900 via-blue-950/60 to-slate-900 p-2.5 sm:p-3.5 rounded-2xl border border-blue-500/40 shadow-2xl relative overflow-hidden shrink-0">
             <div class="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-2.5">
                 
@@ -137,7 +129,6 @@
                     </p>
                 </div>
 
-                <!-- CONTROLES Y CRONÓMETRO DESTACADO -->
                 <div class="flex flex-col xs:flex-row items-stretch xs:items-center gap-2.5 bg-slate-950/90 p-2.5 rounded-xl border border-slate-800/90 shadow-lg">
                     <div class="text-center xs:text-right px-3 py-1 bg-slate-900/80 rounded-lg border border-slate-800 flex-1 xs:flex-none">
                         <div class="text-[9.5px] uppercase font-bold text-slate-400 tracking-wider">Estado / Cronómetro</div>
@@ -157,7 +148,6 @@
             </div>
         </section>
 
-        <!-- TARJETAS DE CONTEO -->
         <section class="bg-slate-900/90 p-2 sm:p-2.5 rounded-xl border border-slate-800 shadow-lg grid grid-cols-3 gap-2 shrink-0">
             <div class="bg-slate-950/80 p-1.5 sm:p-2 rounded-xl border border-slate-800/80 text-center flex flex-col justify-center shadow-inner">
                 <span class="text-[9.5px] sm:text-xs uppercase font-bold text-slate-400 tracking-wider">Jornada 24h</span>
@@ -178,7 +168,6 @@
             </div>
         </section>
 
-        <!-- CRONOGRAMA DIARIO DE VUELOS -->
         <section class="bg-slate-900 p-2 sm:p-2.5 rounded-2xl border border-slate-800 shadow-xl space-y-1.5 flex-1 flex flex-col overflow-hidden min-h-0">
             <div class="flex items-center justify-between border-b border-slate-800 pb-1.5 shrink-0">
                 <h3 class="text-xs font-bold text-white flex items-center gap-1.5">
@@ -209,7 +198,6 @@
 
     </main>
 
-    <!-- MODAL CONFIRMACIÓN CON CONTRASEÑA DE SUPERVISIÓN -->
     <div id="modalPasswordConfirmDialog" class="fixed inset-0 bg-slate-950/85 backdrop-blur-sm z-50 flex items-center justify-center p-3 hidden modal-backdrop">
         <div class="bg-slate-900 border border-red-500/50 rounded-2xl max-w-sm w-full p-4 shadow-2xl space-y-3">
             <div class="flex items-center gap-2 text-red-400 font-bold text-sm">
@@ -231,7 +219,20 @@
         </div>
     </div>
 
-    <!-- MODAL COMPLETO DE BITÁCORA AUDITABLE CON SELECTOR DE CALENDARIO -->
+    <div id="modalConfirmDialog" class="fixed inset-0 bg-slate-950/85 backdrop-blur-sm z-50 flex items-center justify-center p-3 hidden modal-backdrop">
+        <div class="bg-slate-900 border border-red-500/40 rounded-2xl max-w-sm w-full p-4 shadow-2xl space-y-3">
+            <div class="flex items-center gap-2 text-red-400 font-bold text-sm">
+                <i class="fa-solid fa-triangle-exclamation text-base"></i>
+                <span id="confirmDialogTitle">Confirmar Acción</span>
+            </div>
+            <p id="confirmDialogMessage" class="text-xs text-slate-300">¿Está seguro de continuar?</p>
+            <div class="flex justify-end gap-2 pt-2 border-t border-slate-800">
+                <button id="btnConfirmCancel" class="px-3 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-xs rounded-xl">Cancelar</button>
+                <button id="btnConfirmOk" class="px-3 py-1 bg-red-600 hover:bg-red-500 text-white font-bold text-xs rounded-xl shadow">Aceptar</button>
+            </div>
+        </div>
+    </div>
+
     <div id="modalBitacoraView" class="fixed inset-0 bg-slate-950/90 backdrop-blur-md z-50 flex items-center justify-center p-2 sm:p-4 hidden modal-backdrop">
         <div class="bg-slate-900 border border-blue-500/40 rounded-2xl max-w-6xl w-full p-3 sm:p-4 shadow-2xl space-y-2.5 max-h-[94vh] flex flex-col">
             <div class="flex justify-between items-center border-b border-slate-800 pb-2">
@@ -247,23 +248,19 @@
                 </button>
             </div>
 
-            <!-- BARRA DE FILTRO Y CALENDARIO DE LA BITÁCORA -->
             <div class="flex items-center justify-between gap-2 flex-wrap bg-slate-950/90 p-2.5 rounded-xl border border-slate-800 text-xs shadow-inner">
                 
-                <!-- Controles de Vista: Total, Calendario Picker y Modos -->
                 <div class="flex items-center gap-2 flex-wrap">
                     <span class="text-[11px] text-slate-300 font-semibold">
                         Registros: <strong id="bitacoraRecordCount" class="text-emerald-400 font-mono">0</strong>
                     </span>
 
-                    <!-- Selector de Fecha / Calendario Interactivo -->
                     <div class="flex items-center gap-1 bg-slate-900 px-2 py-1 rounded-lg border border-blue-500/40 shadow-sm">
                         <i class="fa-solid fa-calendar-days text-amber-400 text-xs"></i>
                         <label for="bitacoraDateInput" class="text-[10px] font-bold text-slate-300">Día:</label>
                         <input type="date" id="bitacoraDateInput" onchange="filterBitacoraByCalendar(this.value)" class="bg-slate-950 text-white font-mono text-[11px] px-1.5 py-0.5 rounded border border-slate-700 focus:outline-none focus:border-blue-400 cursor-pointer">
                     </div>
 
-                    <!-- Botones Rápidos de Histórico -->
                     <button onclick="setBitacoraViewMode('ALL')" id="btnViewAll" class="px-2.5 py-1 bg-blue-600 text-white font-bold text-[10px] rounded-lg border border-blue-400/40 transition flex items-center gap-1 cursor-pointer">
                         <i class="fa-solid fa-layer-group"></i> Ver Todo el Histórico
                     </button>
@@ -278,7 +275,6 @@
                     </button>
                 </div>
 
-                <!-- Botones de Acción: Escanear Histórico, Excel, PDF con rango, Vaciar -->
                 <div class="flex items-center gap-1.5 flex-wrap">
                     <button onclick="triggerDeepRecoveryScan()" title="Buscar y recuperar vuelos históricos de la nube" class="px-2 py-1 bg-indigo-900/80 hover:bg-indigo-800 text-indigo-200 font-bold text-[10px] rounded-lg border border-indigo-700/50 transition flex items-center gap-1 cursor-pointer">
                         <i class="fa-solid fa-rotate text-amber-300"></i> Sincronizar Histórico
@@ -286,7 +282,15 @@
                     <button onclick="exportBitacoraCSV()" class="px-2 py-1 bg-emerald-700 hover:bg-emerald-600 text-white font-bold text-[10px] sm:text-xs rounded-lg transition flex items-center gap-1 cursor-pointer">
                         <i class="fa-solid fa-file-excel"></i> Excel
                     </button>
-                    <button onclick="openPrintRangeModal()" class="px-2.5 py-1 bg-blue-700 hover:bg-blue-600 text-white font-bold text-[10px] sm:text-xs rounded-lg transition flex items-center gap-1 cursor-pointer shadow">
+                    
+                    <div class="flex items-center gap-1 bg-slate-900 px-1.5 py-1 rounded-lg border border-blue-500/40 shadow-sm ml-1">
+                        <span class="text-[9px] font-bold text-slate-300">Rango PDF:</span>
+                        <input type="date" id="pdfStartDate" class="bg-slate-950 text-white font-mono text-[9px] px-1 py-0.5 rounded border border-slate-700 focus:outline-none focus:border-blue-400 cursor-pointer" title="Fecha de inicio">
+                        <span class="text-[9px] font-bold text-slate-300">a</span>
+                        <input type="date" id="pdfEndDate" class="bg-slate-950 text-white font-mono text-[9px] px-1 py-0.5 rounded border border-slate-700 focus:outline-none focus:border-blue-400 cursor-pointer" title="Fecha de fin">
+                    </div>
+
+                    <button onclick="printAuditBitacora()" class="px-2 py-1 bg-blue-700 hover:bg-blue-600 text-white font-bold text-[10px] sm:text-xs rounded-lg transition flex items-center gap-1 cursor-pointer">
                         <i class="fa-solid fa-print"></i> PDF / Imprimir
                     </button>
                     <button onclick="confirmClearAllBitacoraModal()" class="px-2 py-1 bg-red-950/80 hover:bg-red-900 text-red-300 font-bold text-[10px] sm:text-xs rounded-lg transition flex items-center gap-1 cursor-pointer">
@@ -295,7 +299,6 @@
                 </div>
             </div>
 
-            <!-- TABLA DE LA BITÁCORA -->
             <div class="overflow-y-auto overflow-x-auto flex-1 border border-slate-800 rounded-xl">
                 <table class="w-full text-left text-xs min-w-[750px]">
                     <thead class="bg-slate-950 text-slate-400 uppercase font-bold tracking-wider border-b border-slate-800 text-[9.5px] sticky top-0 z-10 shadow">
@@ -303,7 +306,6 @@
                             <th class="px-2.5 py-2">Fecha / Hora</th>
                             <th class="px-2.5 py-2">Programada</th>
                             <th class="px-2.5 py-2">Tipo Vuelo</th>
-                            <th class="px-2.5 py-2">Piloto</th>
                             <th class="px-2.5 py-2">Estado</th>
                             <th class="px-2.5 py-2">Hora Real</th>
                             <th class="px-2.5 py-2">Detalle / Motivo</th>
@@ -325,61 +327,6 @@
         </div>
     </div>
 
-    <!-- MODAL SELECTOR DE FECHAS PARA PDF / IMPRESIÓN (SIN AFECTAR REGISTROS) -->
-    <div id="modalPrintRange" class="fixed inset-0 bg-slate-950/85 backdrop-blur-sm z-50 flex items-center justify-center p-3 hidden modal-backdrop">
-        <div class="bg-slate-900 border border-blue-500/40 rounded-2xl max-w-md w-full p-4 shadow-2xl space-y-3">
-            <div class="flex justify-between items-center border-b border-slate-800 pb-2">
-                <h3 class="text-xs sm:text-sm font-bold text-white flex items-center gap-1.5">
-                    <i class="fa-solid fa-file-pdf text-audi-red"></i> Generar Reporte PDF de Bitácora
-                </h3>
-                <button onclick="closeModal('modalPrintRange')" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark text-base"></i></button>
-            </div>
-            
-            <p class="text-xs text-slate-300 leading-relaxed">
-                Selecciona el rango de fechas para generar el reporte en PDF. <span class="text-emerald-400 font-semibold">Tus registros almacenados no serán afectados ni modificados.</span>
-            </p>
-
-            <div class="grid grid-cols-2 gap-2 text-xs">
-                <div>
-                    <label class="block text-slate-400 font-semibold mb-1">Fecha Desde:</label>
-                    <input type="date" id="printRangeFrom" onchange="updatePrintPreviewCount()" class="w-full bg-slate-950 border border-slate-700 text-white font-mono text-xs px-2.5 py-1.5 rounded-lg focus:outline-none focus:border-blue-500">
-                </div>
-                <div>
-                    <label class="block text-slate-400 font-semibold mb-1">Fecha Hasta:</label>
-                    <input type="date" id="printRangeTo" onchange="updatePrintPreviewCount()" class="w-full bg-slate-950 border border-slate-700 text-white font-mono text-xs px-2.5 py-1.5 rounded-lg focus:outline-none focus:border-blue-500">
-                </div>
-            </div>
-
-            <!-- Accesos rápidos de rango -->
-            <div class="flex items-center gap-1.5 flex-wrap pt-0.5">
-                <span class="text-[10px] text-slate-400 font-semibold">Rango rápido:</span>
-                <button type="button" onclick="setPrintQuickRange('today')" class="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-[10px] text-slate-200 border border-slate-700 cursor-pointer">Hoy</button>
-                <button type="button" onclick="setPrintQuickRange('yesterday')" class="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-[10px] text-slate-200 border border-slate-700 cursor-pointer">Ayer</button>
-                <button type="button" onclick="setPrintQuickRange('last7')" class="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-[10px] text-slate-200 border border-slate-700 cursor-pointer">Últimos 7 días</button>
-                <button type="button" onclick="setPrintQuickRange('month')" class="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-[10px] text-slate-200 border border-slate-700 cursor-pointer">Este Mes</button>
-                <button type="button" onclick="setPrintQuickRange('all')" class="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-[10px] text-slate-200 border border-slate-700 cursor-pointer">Todo</button>
-            </div>
-
-            <div class="bg-slate-950/70 p-2.5 rounded-xl border border-slate-800 text-[11px] text-slate-300 flex items-center justify-between">
-                <span>Registros encontrados para el PDF:</span>
-                <strong id="printPreviewCount" class="text-emerald-400 font-mono text-xs">0 registros</strong>
-            </div>
-
-            <div class="text-[10px] text-slate-400 flex items-start gap-1.5 bg-blue-950/30 p-2 rounded-lg border border-blue-900/40">
-                <i class="fa-solid fa-circle-check text-emerald-400 mt-0.5 shrink-0"></i>
-                <span>En cumplimiento con el formato oficial, la columna con el <strong>Nombre del Piloto ha sido omitida</strong> de la tabla del PDF.</span>
-            </div>
-
-            <div class="flex justify-end gap-2 pt-2 border-t border-slate-800">
-                <button onclick="closeModal('modalPrintRange')" class="px-3 py-1 bg-slate-800 text-slate-300 font-semibold text-xs rounded-xl hover:bg-slate-700">Cancelar</button>
-                <button onclick="executeRangePrint()" class="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs rounded-xl shadow flex items-center gap-1.5 cursor-pointer">
-                    <i class="fa-solid fa-print"></i> Generar PDF / Imprimir
-                </button>
-            </div>
-        </div>
-    </div>
-
-    <!-- MODAL ADJUNTAR / SUBIR EVIDENCIA PARA VUELO SUSPENDIDO -->
     <div id="modalUploadEvidence" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-3 hidden modal-backdrop">
         <div class="bg-slate-900 border border-amber-500/40 rounded-2xl max-w-sm w-full p-4 shadow-2xl space-y-3">
             <div class="flex justify-between items-center border-b border-slate-800 pb-2">
@@ -412,7 +359,6 @@
         </div>
     </div>
 
-    <!-- MODAL DE CONFIGURACIÓN DE NUBE FIREBASE -->
     <div id="modalCloudSettings" class="fixed inset-0 bg-slate-950/85 backdrop-blur-sm z-50 flex items-center justify-center p-3 hidden modal-backdrop">
         <div class="bg-slate-900 border border-blue-500/40 rounded-2xl max-w-md w-full p-4 shadow-2xl space-y-3">
             <div class="flex justify-between items-center border-b border-slate-800 pb-2">
@@ -438,7 +384,6 @@
         </div>
     </div>
 
-    <!-- MODAL EDICIÓN COMPLETA DE REGISTRO EN BITÁCORA -->
     <div id="modalEditBitacoraEntry" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-3 hidden modal-backdrop">
         <div class="bg-slate-900 border border-blue-500/40 rounded-2xl max-w-md w-full p-4 shadow-2xl space-y-2.5 max-h-[90vh] overflow-y-auto">
             <div class="flex justify-between items-center border-b border-slate-800 pb-2">
@@ -466,7 +411,7 @@
                     <label class="block text-slate-400 font-semibold mb-0.5">Hora Real Ejecutada / Anotada:</label>
                     <input type="text" id="editBitacoraRealTime" class="w-full bg-slate-950 border border-slate-700 text-emerald-400 font-mono px-2.5 py-1 rounded-lg">
                 </div>
-                <div>
+                <div class="hidden">
                     <label class="block text-slate-400 font-semibold mb-0.5">Piloto / Operador:</label>
                     <input type="text" id="editBitacoraPilot" class="w-full bg-slate-950 border border-slate-700 text-slate-200 px-2.5 py-1 rounded-lg">
                 </div>
@@ -491,7 +436,6 @@
         </div>
     </div>
 
-    <!-- MODAL REGISTRAR DESPEGUE -->
     <div id="modalTakeoff" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-3 hidden modal-backdrop">
         <div class="bg-slate-900 border border-emerald-500/40 rounded-2xl max-w-sm w-full p-4 shadow-2xl space-y-2.5">
             <div class="flex justify-between items-center border-b border-slate-800 pb-2">
@@ -509,7 +453,7 @@
                     <label class="block text-slate-400 font-semibold mb-0.5">Hora Real de Despegue:</label>
                     <input type="text" id="takeoffRealTime" class="w-full bg-slate-950 border border-slate-700 text-emerald-400 font-mono text-xs font-bold px-2.5 py-1 rounded-lg">
                 </div>
-                <div>
+                <div class="hidden">
                     <label class="block text-slate-400 font-semibold mb-0.5">Nombre / Firma Operador:</label>
                     <input type="text" id="takeoffPilotName" value="Jonathan Rodriguez Morales" class="w-full bg-slate-950 border border-slate-700 text-slate-200 px-2.5 py-1 rounded-lg">
                 </div>
@@ -525,7 +469,6 @@
         </div>
     </div>
 
-    <!-- MODAL REGISTRAR SUSPENSIÓN -->
     <div id="modalSuspension" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-3 hidden modal-backdrop">
         <div class="bg-slate-900 border border-amber-500/40 rounded-2xl max-w-sm w-full p-4 shadow-2xl space-y-2.5 max-h-[90vh] overflow-y-auto">
             <div class="flex justify-between items-center border-b border-slate-800 pb-2">
@@ -540,7 +483,7 @@
                     <label class="block text-slate-400 font-semibold mb-0.5">Vuelo / Horario:</label>
                     <input type="text" id="suspendFlightLabel" readonly class="w-full bg-slate-950 border border-slate-800 text-slate-200 px-2.5 py-1 rounded-lg font-bold">
                 </div>
-                <div>
+                <div class="hidden">
                     <label class="block text-slate-400 font-semibold mb-0.5">Nombre / Firma Operador:</label>
                     <input type="text" id="suspendPilotName" value="Jonathan Rodriguez Morales" class="w-full bg-slate-950 border border-slate-700 text-slate-200 px-2.5 py-1 rounded-lg">
                 </div>
@@ -576,7 +519,6 @@
         </div>
     </div>
 
-    <!-- MODAL DE VISUALIZACIÓN DE FOTO COMPLETA -->
     <div id="modalImagePreview" class="fixed inset-0 bg-slate-950/90 backdrop-blur-md z-50 flex items-center justify-center p-3 hidden modal-backdrop">
         <div class="bg-slate-900 border border-slate-700 rounded-2xl max-w-2xl w-full p-3 space-y-2 text-center">
             <div class="flex justify-between items-center border-b border-slate-800 pb-2">
@@ -592,13 +534,11 @@
         </div>
     </div>
 
-    <!-- TOAST NOTIFICACIÓN EN PANTALLA -->
     <div id="toastNotification" class="fixed bottom-3 right-3 bg-slate-900 border border-slate-700 text-white px-3 py-2 rounded-xl shadow-2xl z-50 flex items-center gap-2 transition-all duration-300 opacity-0 translate-y-5 pointer-events-none max-w-xs text-xs">
         <i id="toastIcon" class="fa-solid fa-circle-info text-blue-400 text-sm"></i>
         <span id="toastMessage" class="font-semibold text-[11px]">Notificación</span>
     </div>
 
-    <!-- SECCIÓN OCULTA PARA IMPRESIÓN Y PDF DE LA BITÁCORA (OMITIENDO COLUMNA PILOTO) -->
     <section id="bitacoraPrintSection" class="p-4 bg-white text-black">
         <div class="border-b-2 border-black pb-2 mb-3 flex justify-between items-center">
             <div>
@@ -606,9 +546,8 @@
                 <h2 class="text-xs font-semibold">Bitácora Oficial Auditable de Vuelos con Drone (24/7)</h2>
             </div>
             <div class="text-right text-[10px]">
-                <div>Período Reportado: <strong id="printReportRange">Histórico Completo</strong></div>
-                <div>Fecha de Emisión: <strong id="printReportDate">--</strong></div>
-                <div>Hora de Emisión: <strong id="printReportTime">--</strong></div>
+                <div>Fecha de Reporte: <strong id="printReportDate">--</strong></div>
+                <div>Generado: <strong id="printReportTime">--</strong></div>
             </div>
         </div>
 
@@ -630,8 +569,8 @@
 
         <div class="grid grid-cols-2 gap-8 pt-8 text-center text-[10px]">
             <div class="border-t border-black pt-1">
-                <strong>Operaciones de Vuelo / Bitácora Drone</strong><br>
-                Validación Operativa Audi México
+                <strong>Piloto en Turno Responsable</strong><br>
+                Firma y Nombre del Operador
             </div>
             <div class="border-t border-black pt-1">
                 <strong>Supervisión de Seguridad Audi México</strong><br>
@@ -640,10 +579,9 @@
         </div>
     </section>
 
-    <!-- FIREBASE INITIALIZATION & DEEP RESTORATION MODULE -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, doc, setDoc, deleteDoc, onSnapshot, collection, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         let appId = 'audi-mexico-drones';
@@ -696,9 +634,7 @@
                 if (customConfigStr) {
                     try {
                         firebaseConfig = JSON.parse(customConfigStr);
-                    } catch(e) {
-                        console.error("Error al parsear custom config:", e);
-                    }
+                    } catch(e) {}
                 }
             }
 
@@ -714,9 +650,7 @@
 
                 try {
                     await signInAnonymously(auth);
-                } catch (authErr) {
-                    console.warn("Autenticación anónima:", authErr);
-                }
+                } catch (authErr) {}
 
                 updateCloudUI(true, "Nube Live Sincronizada");
                 setupRealtimeListeners();
@@ -725,7 +659,6 @@
                     if (window.triggerDeepRecoveryScan) window.triggerDeepRecoveryScan(true);
                 }, 1000);
             } catch (err) {
-                console.error("Error persistencia Firebase:", err);
                 updateCloudUI(false, "Modo Local");
             }
         }
@@ -751,9 +684,7 @@
                     if (typeof window.renderFlightsTable === 'function') window.renderFlightsTable();
                     if (typeof window.updateTargetFlightBanner === 'function') window.updateTargetFlightBanner(new Date());
                 }
-            }, (err) => {
-                console.warn("Nota estado diario:", err);
-            });
+            }, (err) => {});
 
             const bitacoraColRef = collection(db, 'artifacts', appId, 'public', 'data', 'bitacora_logs');
             onSnapshot(bitacoraColRef, (querySnap) => {
@@ -810,13 +741,14 @@
                 const plans = window.getActivePlan();
                 let rebuiltAny = false;
                 const todayStr = new Date().toLocaleDateString('es-MX');
+                const todayKey = window.getTodayKey();
 
                 plans.forEach((item, idx) => {
                     const currentSt = window.dailyFlightStatuses[idx];
                     if (!currentSt || currentSt.status === 'PENDIENTE') {
                         const match = merged.find(b => 
                             b.scheduledTime === item.timeOp2 && 
-                            (b.timestampFormatted && b.timestampFormatted.includes(todayStr))
+                            (b.dateKey === todayKey || (b.timestampFormatted && b.timestampFormatted.includes(todayStr)))
                         );
                         if (match) {
                             const st = (match.status === 'VOLADO') ? 'REALIZADO' : match.status;
@@ -838,7 +770,6 @@
             if (typeof window.renderBitacoraModalTable === 'function') window.renderBitacoraModalTable();
             if (typeof window.renderFlightsTable === 'function') window.renderFlightsTable();
             if (typeof window.updateTargetFlightBanner === 'function') window.updateTargetFlightBanner(new Date());
-            if (typeof window.updatePrintPreviewCount === 'function') window.updatePrintPreviewCount();
         }
 
         window.saveDailyStatusToCloud = async function() {
@@ -852,7 +783,7 @@
                     weatherSuspended: window.systemWeatherSuspended,
                     updatedAt: new Date().toISOString()
                 });
-            } catch (e) { console.error("Error guardando daily_status:", e); }
+            } catch (e) {}
         };
 
         window.saveBitacoraLogToCloud = async function(logEntry) {
@@ -862,7 +793,7 @@
                 await setDoc(logDocRef, logEntry);
                 const rootDocRef = doc(db, 'bitacora_logs', logEntry.id.toString());
                 await setDoc(rootDocRef, logEntry);
-            } catch (e) { console.error("Error guardando log:", e); }
+            } catch (e) {}
         };
 
         window.deleteBitacoraLogFromCloud = async function(logId) {
@@ -872,7 +803,7 @@
                 await deleteDoc(logDocRef);
                 const rootDocRef = doc(db, 'bitacora_logs', logId.toString());
                 await deleteDoc(rootDocRef);
-            } catch (e) { console.error("Error eliminando log:", e); }
+            } catch (e) {}
         };
 
         window.triggerDeepRecoveryScan = async function(isSilent = false) {
@@ -881,7 +812,7 @@
                 return;
             }
 
-            if (!isSilent) window.showToast("Buscando historial completo en la nube...", "info");
+            if (!isSilent) window.showToast("Buscando y empujando historial a la nube...", "info");
 
             const candidateCollections = [
                 collection(db, 'artifacts', appId, 'public', 'data', 'bitacora_logs'),
@@ -894,6 +825,7 @@
 
             let recoveredLogs = [];
 
+            // Buscar en Nube
             for (const colRef of candidateCollections) {
                 try {
                     const snap = await getDocs(colRef);
@@ -906,6 +838,7 @@
                 } catch(e) {}
             }
 
+            // Buscar en respaldos locales (Los que se quedaron atrapados ayer)
             try {
                 const rawBackups = window.safeStorageGet('audi_bitacora_backups');
                 if (rawBackups) {
@@ -932,9 +865,17 @@
 
             if (recoveredLogs.length > 0) {
                 processIncomingCloudLogs(recoveredLogs);
-                if (!isSilent) window.showToast(`¡Sincronización completa! Total registros: ${window.bitacoraList.length}`, "success");
+                
+                // NUEVO: Asegurarse de que los registros atrapados localmente se suban a la nube de verdad
+                recoveredLogs.forEach(log => {
+                    if (log && log.id && typeof window.saveBitacoraLogToCloud === 'function') {
+                        window.saveBitacoraLogToCloud(log);
+                    }
+                });
+
+                if (!isSilent) window.showToast(`¡Sincronización completa! Se empujaron los datos al servidor. Total: ${window.bitacoraList.length}`, "success");
             } else {
-                if (!isSilent) window.showToast("No se encontraron registros adicionales en otras carpetas.", "info");
+                if (!isSilent) window.showToast("No se encontraron registros adicionales.", "info");
             }
         };
 
@@ -974,7 +915,6 @@
         initCloudPersistence();
     </script>
 
-    <!-- MAIN APPLICATION SCRIPT -->
     <script>
         const memoryStorageFallback = {};
         function safeStorageGet(key) {
@@ -992,46 +932,6 @@
         }
         window.getTodayKey = getTodayKey;
 
-        function formatYMDToDMY(ymd) {
-            if (!ymd) return '';
-            const parts = ymd.split('-');
-            if (parts.length === 3) return `${parts[2]}/${parts[1]}/${parts[0]}`;
-            return ymd;
-        }
-
-        // Parseo seguro de fecha de cada registro de bitácora
-        function parseEntryDate(item) {
-            if (!item) return new Date();
-            if (item.timestampFormatted) {
-                const clean = item.timestampFormatted.split(',')[0].trim();
-                if (clean.includes('/')) {
-                    const parts = clean.split('/');
-                    if (parts.length === 3) {
-                        const day = parseInt(parts[0], 10);
-                        const month = parseInt(parts[1], 10) - 1;
-                        const year = parseInt(parts[2], 10);
-                        if (!isNaN(day) && !isNaN(month) && !isNaN(year)) {
-                            return new Date(year, month, day);
-                        }
-                    }
-                } else if (clean.includes('-')) {
-                    const parts = clean.split('-');
-                    if (parts.length === 3) {
-                        if (parts[0].length === 4) {
-                            return new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
-                        } else {
-                            return new Date(parseInt(parts[2], 10), parseInt(parts[1], 10) - 1, parseInt(parts[0], 10));
-                        }
-                    }
-                }
-            }
-            if (item.id && typeof item.id === 'number' && item.id > 1500000000000) {
-                return new Date(item.id);
-            }
-            return new Date();
-        }
-
-        // GUARDADO DE COPIAS PREVENTIVAS HISTÓRICAS 100% AUTOMÁTICO EN SEGUNDO PLANO
         function saveRecoveryBackup(logs, reason = 'Automático') {
             if (!logs || logs.length === 0) return;
             try {
@@ -1052,13 +952,10 @@
 
                 safeStorageSet('audi_bitacora_backups', JSON.stringify(backups));
                 safeStorageSet(`audi_mirror_backup_${getTodayKey()}`, JSON.stringify(logs));
-            } catch (e) {
-                console.warn("Error guardando copia de seguridad:", e);
-            }
+            } catch (e) {}
         }
         window.saveRecoveryBackup = saveRecoveryBackup;
 
-        // CONTRASEÑA MAESTRA DE SUPERVISIÓN PARA ELIMINACIÓN Y VACIADO
         const SUPERVISOR_PASSWORD = "audi";
 
         function promptPasswordConfirmation(title, message, onSuccess) {
@@ -1221,7 +1118,7 @@
         window.audioUnlocked = false;
         window.triggeredAlertsToday = new Set();
         window.bitacoraSortAsc = false;
-        window.bitacoraFilterMode = 'ALL';
+        window.bitacoraFilterMode = 'ALL'; 
         window.bitacoraSelectedDate = "";
         window.systemWeatherSuspended = false;
         window.isTopLevelSuspension = false;
@@ -1271,23 +1168,25 @@
             const plans = getActivePlan();
             const now = new Date();
             const currentMins = now.getHours() * 60 + now.getMinutes();
+            const todayKey = getTodayKey();
 
             plans.forEach((item, idx) => {
                 const st = window.dailyFlightStatuses[idx];
                 const baseMins = parseTimeToMinutes(item.timeOp2);
                 const windowEndMins = baseMins + 30;
                 
-                if (st && st.status === 'SUSPENDIDO' && (st.autoSuspended || windowEndMins > currentMins)) {
+                if (st && st.status === 'SUSPENDIDO' && (windowEndMins > currentMins)) {
                     delete window.dailyFlightStatuses[idx];
                     
-                    const logsToRemove = window.bitacoraList.filter(b => b.scheduledTime === item.timeOp2 && b.status === 'SUSPENDIDO' && !b.imageData);
+                    const logsToRemove = window.bitacoraList.filter(b => b.scheduledTime === item.timeOp2 && b.status === 'SUSPENDIDO' && !b.imageData && b.dateKey === todayKey);
+                    
                     logsToRemove.forEach(log => {
                         if (typeof window.deleteBitacoraLogFromCloud === 'function') {
                             window.deleteBitacoraLogFromCloud(log.id);
                         }
                     });
 
-                    window.bitacoraList = window.bitacoraList.filter(b => !(b.scheduledTime === item.timeOp2 && b.status === 'SUSPENDIDO' && !b.imageData));
+                    window.bitacoraList = window.bitacoraList.filter(b => !logsToRemove.includes(b));
                 }
             });
 
@@ -1797,12 +1696,12 @@
             } else {
                 logEntry = {
                     id: Date.now(),
+                    dateKey: getTodayKey(), 
                     timestampFormatted: new Date().toLocaleString('es-MX'),
                     scheduledTime: item.timeOp2,
                     flightType: `TIPO ${item.type} - ${item.name}`,
                     status: 'SUSPENDIDO',
                     realTime: 'N/A',
-                    pilot: 'Jonathan Rodriguez Morales',
                     notes: 'Suspensión general - Evidencia adjuntada',
                     imageData: imageData
                 };
@@ -1853,7 +1752,6 @@
             const idx = window.activeModalIndex;
             const item = getActivePlan()[idx];
             const realTime = document.getElementById('takeoffRealTime').value || '--';
-            const pilot = document.getElementById('takeoffPilotName').value || 'Jonathan Rodriguez Morales';
             const notes = document.getElementById('takeoffNotes').value || 'Patrullaje completo sin novedades';
 
             window.dailyFlightStatuses[idx] = { status: 'REALIZADO', realTime: realTime, note: notes };
@@ -1861,12 +1759,12 @@
 
             const logEntry = {
                 id: Date.now(),
+                dateKey: getTodayKey(), 
                 timestampFormatted: new Date().toLocaleString('es-MX'),
                 scheduledTime: item.timeOp2,
                 flightType: `TIPO ${item.type} - ${item.name}`,
                 status: 'REALIZADO',
                 realTime: realTime,
-                pilot: pilot,
                 notes: notes,
                 imageData: ""
             };
@@ -1887,7 +1785,6 @@
 
         function confirmSuspension() {
             const idx = window.activeModalIndex;
-            const pilot = document.getElementById('suspendPilotName').value || 'Jonathan Rodriguez Morales';
             const reason = document.getElementById('suspendReasonSelect').value;
             const notes = document.getElementById('suspendNotes').value;
             const imageData = window.tempCompressedImage || "";
@@ -1899,6 +1796,7 @@
             }
 
             const plans = getActivePlan();
+            const todayKey = getTodayKey();
 
             if (window.isTopLevelSuspension) {
                 for (let i = idx; i < plans.length; i++) {
@@ -1917,12 +1815,12 @@
 
                         const logEntry = {
                             id: Date.now() + i,
+                            dateKey: todayKey,
                             timestampFormatted: new Date().toLocaleString('es-MX'),
                             scheduledTime: item.timeOp2,
                             flightType: `TIPO ${item.type} - ${item.name}`,
                             status: 'SUSPENDIDO',
                             realTime: 'N/A',
-                            pilot: pilot,
                             notes: `${reason}: ${notes}${!photoForThisFlight ? ' (Pendiente subir evidencia)' : ''}`,
                             imageData: photoForThisFlight,
                             autoSuspended: true
@@ -1938,12 +1836,12 @@
                 
                 const logEntry = {
                     id: Date.now(),
+                    dateKey: todayKey,
                     timestampFormatted: new Date().toLocaleString('es-MX'),
                     scheduledTime: item.timeOp2,
                     flightType: `TIPO ${item.type} - ${item.name}`,
                     status: 'SUSPENDIDO',
                     realTime: 'N/A',
-                    pilot: pilot,
                     notes: `${reason}: ${notes}`,
                     imageData: imageData
                 };
@@ -1987,19 +1885,11 @@
             const btnToday = document.getElementById('btnViewToday');
 
             if (mode === 'ALL') {
-                if (btnAll) {
-                    btnAll.className = "px-2.5 py-1 bg-blue-600 text-white font-bold text-[10px] rounded-lg border border-blue-400/40 transition flex items-center gap-1 cursor-pointer";
-                }
-                if (btnToday) {
-                    btnToday.className = "px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-[10px] rounded-lg border border-slate-700 transition flex items-center gap-1 cursor-pointer";
-                }
+                if (btnAll) btnAll.className = "px-2.5 py-1 bg-blue-600 text-white font-bold text-[10px] rounded-lg border border-blue-400/40 transition flex items-center gap-1 cursor-pointer";
+                if (btnToday) btnToday.className = "px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-[10px] rounded-lg border border-slate-700 transition flex items-center gap-1 cursor-pointer";
             } else if (mode === 'TODAY') {
-                if (btnAll) {
-                    btnAll.className = "px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-[10px] rounded-lg border border-slate-700 transition flex items-center gap-1 cursor-pointer";
-                }
-                if (btnToday) {
-                    btnToday.className = "px-2.5 py-1 bg-emerald-600 text-white font-bold text-[10px] rounded-lg border border-emerald-400/40 transition flex items-center gap-1 cursor-pointer";
-                }
+                if (btnAll) btnAll.className = "px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-[10px] rounded-lg border border-slate-700 transition flex items-center gap-1 cursor-pointer";
+                if (btnToday) btnToday.className = "px-2.5 py-1 bg-emerald-600 text-white font-bold text-[10px] rounded-lg border border-emerald-400/40 transition flex items-center gap-1 cursor-pointer";
             }
 
             renderBitacoraModalTable();
@@ -2044,28 +1934,39 @@
             if (!tbody) return;
 
             const mode = window.bitacoraFilterMode;
-            const todayStr = new Date().toLocaleDateString('es-MX');
-
             let filteredList = [...window.bitacoraList];
 
             if (mode === 'TODAY') {
+                const todayStr = new Date().toLocaleDateString('es-MX');
+                const todayKey = getTodayKey();
+                
                 filteredList = filteredList.filter(item => {
-                    if (!item.timestampFormatted) return true;
-                    return item.timestampFormatted.includes(todayStr) || (item.dateKey && item.dateKey === getTodayKey());
+                    if (item.dateKey && item.dateKey === todayKey) return true;
+                    if (!item.timestampFormatted) return false;
+                    return item.timestampFormatted.includes(todayStr);
                 });
-                if (footerInfoEl) footerInfoEl.innerText = `Mostrando: Solo Jornada de Hoy (${todayStr})`;
+                if (footerInfoEl) footerInfoEl.innerText = `Mostrando: Solo Jornada de Hoy`;
             } else if (mode === 'CALENDAR' && window.bitacoraSelectedDate) {
                 const parts = window.bitacoraSelectedDate.split('-');
-                const day = parseInt(parts[2], 10);
-                const month = parseInt(parts[1], 10);
-                const year = parts[0];
-                const dateFilterPattern = `${day}/${month}/${year}`;
+                const filterYear = parseInt(parts[0], 10);
+                const filterMonth = parseInt(parts[1], 10);
+                const filterDay = parseInt(parts[2], 10);
 
                 filteredList = filteredList.filter(item => {
+                    if (item.dateKey && item.dateKey === window.bitacoraSelectedDate) return true;
                     if (!item.timestampFormatted) return false;
-                    return item.timestampFormatted.includes(dateFilterPattern) || item.timestampFormatted.includes(window.bitacoraSelectedDate);
+                    
+                    const datePart = item.timestampFormatted.split(',')[0].trim();
+                    const dParts = datePart.split('/');
+                    if (dParts.length === 3) {
+                        const itemD = parseInt(dParts[0], 10);
+                        const itemM = parseInt(dParts[1], 10);
+                        const itemY = parseInt(dParts[2], 10);
+                        return itemD === filterDay && itemM === filterMonth && itemY === filterYear;
+                    }
+                    return item.timestampFormatted.includes(`${filterDay}/${filterMonth}/${filterYear}`);
                 });
-                if (footerInfoEl) footerInfoEl.innerText = `Filtrado por Calendario: ${dateFilterPattern}`;
+                if (footerInfoEl) footerInfoEl.innerText = `Filtrado por Calendario: ${filterDay}/${filterMonth}/${filterYear}`;
             } else {
                 if (footerInfoEl) footerInfoEl.innerText = `Mostrando: Histórico Completo (${filteredList.length} registros)`;
             }
@@ -2077,7 +1978,7 @@
             if (!filteredList || filteredList.length === 0) {
                 tbody.innerHTML = `
                     <tr>
-                        <td colspan="9" class="p-6 text-center text-slate-400">
+                        <td colspan="8" class="p-6 text-center text-slate-400">
                             <div class="flex flex-col items-center justify-center gap-1.5">
                                 <i class="fa-solid fa-folder-open text-3xl text-slate-600"></i>
                                 <p class="italic text-xs text-slate-300">No hay registros para la fecha o filtro seleccionado.</p>
@@ -2111,7 +2012,6 @@
                         <td class="px-2.5 py-2 font-mono text-slate-400 text-[10px]">${item.timestampFormatted}</td>
                         <td class="px-2.5 py-2 font-mono font-bold text-amber-300 text-[10.5px]">${item.scheduledTime} hrs</td>
                         <td class="px-2.5 py-2 text-slate-200 text-[10px]">${item.flightType}</td>
-                        <td class="px-2.5 py-2 text-slate-300">${item.pilot}</td>
                         <td class="px-2.5 py-2">${badge}</td>
                         <td class="px-2.5 py-2 font-mono text-emerald-400 text-[10px]">${item.realTime}</td>
                         <td class="px-2.5 py-2 text-slate-300 max-w-[180px] truncate" title="${item.notes}">${item.notes}</td>
@@ -2143,7 +2043,7 @@
             
             document.getElementById('editBitacoraSchedTime').value = entry.scheduledTime;
             document.getElementById('editBitacoraRealTime').value = entry.realTime;
-            document.getElementById('editBitacoraPilot').value = entry.pilot;
+            document.getElementById('editBitacoraPilot').value = entry.pilot || 'Jonathan Rodriguez Morales';
             document.getElementById('editBitacoraNotes').value = entry.notes;
 
             const previewImg = document.getElementById('editBitacoraImgPreview');
@@ -2167,7 +2067,6 @@
             const status = document.getElementById('editBitacoraStatus').value;
             const schedTime = document.getElementById('editBitacoraSchedTime').value;
             const realTime = document.getElementById('editBitacoraRealTime').value;
-            const pilot = document.getElementById('editBitacoraPilot').value;
             const notes = document.getElementById('editBitacoraNotes').value;
             const imageData = window.tempCompressedImage || "";
 
@@ -2176,7 +2075,6 @@
                 status,
                 scheduledTime: schedTime,
                 realTime,
-                pilot,
                 notes,
                 imageData
             };
@@ -2258,163 +2156,78 @@
         }
         window.confirmClearAllBitacoraModal = confirmClearAllBitacoraModal;
 
-        // FILTRADO NO DESTRUCTIVO PARA GENERACIÓN DE PDF
-        function getFilteredRecordsForPrint(fromStr, toStr) {
-            if (!window.bitacoraList || window.bitacoraList.length === 0) return [];
-
-            let fromDate = null;
-            let toDate = null;
-
-            if (fromStr) {
-                const [y, m, d] = fromStr.split('-').map(Number);
-                fromDate = new Date(y, m - 1, d, 0, 0, 0, 0);
-            }
-            if (toStr) {
-                const [y, m, d] = toStr.split('-').map(Number);
-                toDate = new Date(y, m - 1, d, 23, 59, 59, 999);
-            }
-
-            return window.bitacoraList.filter(item => {
-                const itemDate = parseEntryDate(item);
-                if (fromDate && itemDate < fromDate) return false;
-                if (toDate && itemDate > toDate) return false;
-                return true;
-            });
-        }
-
-        function openPrintRangeModal() {
-            const fromInput = document.getElementById('printRangeFrom');
-            const toInput = document.getElementById('printRangeTo');
-
-            if (window.bitacoraFilterMode === 'CALENDAR' && window.bitacoraSelectedDate) {
-                if (fromInput) fromInput.value = window.bitacoraSelectedDate;
-                if (toInput) toInput.value = window.bitacoraSelectedDate;
-            } else if (window.bitacoraFilterMode === 'TODAY') {
-                const todayKey = getTodayKey();
-                if (fromInput) fromInput.value = todayKey;
-                if (toInput) toInput.value = todayKey;
-            } else {
-                const todayKey = getTodayKey();
-                if (fromInput && !fromInput.value) fromInput.value = todayKey;
-                if (toInput && !toInput.value) toInput.value = todayKey;
-            }
-
-            updatePrintPreviewCount();
-            openModal('modalPrintRange');
-        }
-        window.openPrintRangeModal = openPrintRangeModal;
-
-        function setPrintQuickRange(rangeType) {
-            const today = new Date();
-            const fromInput = document.getElementById('printRangeFrom');
-            const toInput = document.getElementById('printRangeTo');
-            if (!fromInput || !toInput) return;
-
-            const toYMD = (d) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-
-            if (rangeType === 'today') {
-                const str = toYMD(today);
-                fromInput.value = str;
-                toInput.value = str;
-            } else if (rangeType === 'yesterday') {
-                const yest = new Date(today);
-                yest.setDate(yest.getDate() - 1);
-                const str = toYMD(yest);
-                fromInput.value = str;
-                toInput.value = str;
-            } else if (rangeType === 'last7') {
-                const past = new Date(today);
-                past.setDate(past.getDate() - 6);
-                fromInput.value = toYMD(past);
-                toInput.value = toYMD(today);
-            } else if (rangeType === 'month') {
-                const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
-                fromInput.value = toYMD(firstDay);
-                toInput.value = toYMD(today);
-            } else if (rangeType === 'all') {
-                fromInput.value = '';
-                toInput.value = '';
-            }
-
-            updatePrintPreviewCount();
-        }
-        window.setPrintQuickRange = setPrintQuickRange;
-
-        function updatePrintPreviewCount() {
-            const fromVal = document.getElementById('printRangeFrom')?.value || '';
-            const toVal = document.getElementById('printRangeTo')?.value || '';
-            const previewEl = document.getElementById('printPreviewCount');
-            if (!previewEl) return;
-
-            const filtered = getFilteredRecordsForPrint(fromVal, toVal);
-            previewEl.innerText = `${filtered.length} registro(s)`;
-        }
-        window.updatePrintPreviewCount = updatePrintPreviewCount;
-
-        function executeRangePrint() {
-            const fromVal = document.getElementById('printRangeFrom')?.value || '';
-            const toVal = document.getElementById('printRangeTo')?.value || '';
-
-            const filtered = getFilteredRecordsForPrint(fromVal, toVal);
-            if (filtered.length === 0) {
-                showToast("No hay registros en el rango de fechas seleccionado.", "warning");
-                return;
-            }
-
+        function printAuditBitacora() {
             const printBody = document.getElementById('printBitacoraTableBody');
             const now = new Date();
-            const repDateEl = document.getElementById('printReportDate');
-            const repTimeEl = document.getElementById('printReportTime');
-            const rangeLabelEl = document.getElementById('printReportRange');
+            document.getElementById('printReportDate').innerText = now.toLocaleDateString('es-MX');
+            document.getElementById('printReportTime').innerText = now.toLocaleTimeString('es-MX');
 
-            if (repDateEl) repDateEl.innerText = now.toLocaleDateString('es-MX');
-            if (repTimeEl) repTimeEl.innerText = now.toLocaleTimeString('es-MX');
+            const startDateInput = document.getElementById('pdfStartDate') ? document.getElementById('pdfStartDate').value : null;
+            const endDateInput = document.getElementById('pdfEndDate') ? document.getElementById('pdfEndDate').value : null;
 
-            if (rangeLabelEl) {
-                if (!fromVal && !toVal) {
-                    rangeLabelEl.innerText = "Histórico Completo";
-                } else if (fromVal && toVal) {
-                    rangeLabelEl.innerText = `${formatYMDToDMY(fromVal)} al ${formatYMDToDMY(toVal)}`;
-                } else if (fromVal) {
-                    rangeLabelEl.innerText = `Desde ${formatYMDToDMY(fromVal)}`;
-                } else {
-                    rangeLabelEl.innerText = `Hasta ${formatYMDToDMY(toVal)}`;
-                }
+            let filteredList = window.bitacoraList;
+
+            if (startDateInput || endDateInput) {
+                filteredList = window.bitacoraList.filter(item => {
+                    let itemDate;
+                    
+                    if (item.dateKey) {
+                        const parts = item.dateKey.split('-');
+                        itemDate = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+                    } else if (item.timestampFormatted) {
+                        const datePart = item.timestampFormatted.split(',')[0].trim();
+                        const dParts = datePart.split('/');
+                        if (dParts.length === 3) {
+                            itemDate = new Date(parseInt(dParts[2], 10), parseInt(dParts[1], 10) - 1, parseInt(dParts[0], 10));
+                        } else {
+                            return true; 
+                        }
+                    } else {
+                        return false; 
+                    }
+                    
+                    let isAfterStart = true;
+                    let isBeforeEnd = true;
+
+                    if (startDateInput) {
+                        const sParts = startDateInput.split('-');
+                        const sDate = new Date(parseInt(sParts[0], 10), parseInt(sParts[1], 10) - 1, parseInt(sParts[2], 10));
+                        isAfterStart = itemDate >= sDate;
+                    }
+
+                    if (endDateInput) {
+                        const eParts = endDateInput.split('-');
+                        const eDate = new Date(parseInt(eParts[0], 10), parseInt(eParts[1], 10) - 1, parseInt(eParts[2], 10));
+                        isBeforeEnd = itemDate <= eDate;
+                    }
+
+                    return isAfterStart && isBeforeEnd;
+                });
             }
 
-            let itemsToPrint = [...filtered];
-            if (window.bitacoraSortAsc) {
-                itemsToPrint.reverse();
+            if (!filteredList || filteredList.length === 0) {
+                printBody.innerHTML = `<tr><td colspan="7" class="p-3 text-center">Sin registros en la bitácora para el rango seleccionado.</td></tr>`;
+            } else {
+                let html = '';
+                filteredList.forEach(item => {
+                    const imgHtml = item.imageData ? `<img src="${item.imageData}" style="max-height: 40px; margin: auto;">` : 'Pendiente foto';
+                    const printStatus = (item.status === 'VOLADO') ? 'REALIZADO' : item.status;
+                    html += `
+                        <tr class="border-b border-black">
+                            <td class="p-1 border-r border-black">${item.timestampFormatted}</td>
+                            <td class="p-1 border-r border-black font-bold">${item.scheduledTime} hrs</td>
+                            <td class="p-1 border-r border-black">${item.flightType}</td>
+                            <td class="p-1 border-r border-black font-bold">${printStatus}</td>
+                            <td class="p-1 border-r border-black">${item.realTime}</td>
+                            <td class="p-1 border-r border-black">${item.notes}</td>
+                            <td class="p-1 text-center">${imgHtml}</td>
+                        </tr>
+                    `;
+                });
+                printBody.innerHTML = html;
             }
 
-            let html = '';
-            itemsToPrint.forEach(item => {
-                const imgHtml = item.imageData ? `<img src="${item.imageData}" style="max-height: 40px; margin: auto;">` : 'Sin evidencia';
-                const printStatus = (item.status === 'VOLADO') ? 'REALIZADO' : item.status;
-                // NOTA: Se omite por completo la columna del nombre del piloto en la tabla impresa/PDF
-                html += `
-                    <tr class="border-b border-black">
-                        <td class="p-1 border-r border-black font-mono">${item.timestampFormatted}</td>
-                        <td class="p-1 border-r border-black font-bold font-mono">${item.scheduledTime} hrs</td>
-                        <td class="p-1 border-r border-black">${item.flightType}</td>
-                        <td class="p-1 border-r border-black font-bold">${printStatus}</td>
-                        <td class="p-1 border-r border-black font-mono">${item.realTime}</td>
-                        <td class="p-1 border-r border-black">${item.notes || '--'}</td>
-                        <td class="p-1 text-center">${imgHtml}</td>
-                    </tr>
-                `;
-            });
-            printBody.innerHTML = html;
-
-            closeModal('modalPrintRange');
-            setTimeout(() => {
-                window.print();
-            }, 250);
-        }
-        window.executeRangePrint = executeRangePrint;
-
-        function printAuditBitacora() {
-            openPrintRangeModal();
+            window.print();
         }
         window.printAuditBitacora = printAuditBitacora;
 
@@ -2424,10 +2237,10 @@
                 return;
             }
 
-            let csvContent = "data:text/csv;charset=utf-8,Fecha Registro,Hora Programada,Tipo Vuelo,Piloto,Estado,Hora Real,Notas / Motivo\n";
+            let csvContent = "data:text/csv;charset=utf-8,Fecha Registro,Hora Programada,Tipo Vuelo,Estado,Hora Real,Notas / Motivo\n";
             window.bitacoraList.forEach(item => {
                 const csvStatus = (item.status === 'VOLADO') ? 'REALIZADO' : item.status;
-                csvContent += `"${item.timestampFormatted}","${item.scheduledTime}","${item.flightType}","${item.pilot}","${csvStatus}","${item.realTime}","${(item.notes || '').replace(/"/g, '""')}"\n`;
+                csvContent += `"${item.timestampFormatted}","${item.scheduledTime}","${item.flightType}","${csvStatus}","${item.realTime}","${item.notes.replace(/"/g, '""')}"\n`;
             });
 
             const encodedUri = encodeURI(csvContent);
