@@ -49,7 +49,20 @@
             * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
             header, main, .no-print, .modal-backdrop { display: none !important; }
             #bitacoraPrintSection { display: block !important; }
-            body { background: #ffffff !important; color: #000000 !important; padding: 0 !important; overflow: auto !important; height: auto !important; font-size: 10px !important; }
+            html, body { 
+                background: #ffffff !important; 
+                color: #000000 !important; 
+                padding: 0 !important; 
+                margin: 0 !important;
+                height: auto !important; 
+                min-height: auto !important;
+                overflow: visible !important; 
+                display: block !important;
+                font-size: 10px !important;
+            }
+            table { page-break-inside: auto; }
+            tr { page-break-inside: avoid; page-break-after: auto; }
+            thead { display: table-header-group; }
         }
         #bitacoraPrintSection { display: none; }
     </style>
@@ -1942,6 +1955,11 @@
                 
                 filteredList = filteredList.filter(item => {
                     if (item.dateKey && item.dateKey === todayKey) return true;
+                    if (item.id && typeof item.id === 'number' && item.id > 1000000000000) {
+                        const d = new Date(item.id);
+                        const tDate = new Date();
+                        return d.getDate() === tDate.getDate() && d.getMonth() === tDate.getMonth() && d.getFullYear() === tDate.getFullYear();
+                    }
                     if (!item.timestampFormatted) return false;
                     return item.timestampFormatted.includes(todayStr);
                 });
@@ -1954,14 +1972,26 @@
 
                 filteredList = filteredList.filter(item => {
                     if (item.dateKey && item.dateKey === window.bitacoraSelectedDate) return true;
+                    
+                    if (item.id && typeof item.id === 'number' && item.id > 1000000000000) {
+                        const d = new Date(item.id);
+                        return d.getDate() === filterDay && (d.getMonth() + 1) === filterMonth && d.getFullYear() === filterYear;
+                    }
+
                     if (!item.timestampFormatted) return false;
                     
                     const datePart = item.timestampFormatted.split(',')[0].trim();
-                    const dParts = datePart.split('/');
+                    const dParts = datePart.split(/[-/]/);
                     if (dParts.length === 3) {
-                        const itemD = parseInt(dParts[0], 10);
-                        const itemM = parseInt(dParts[1], 10);
-                        const itemY = parseInt(dParts[2], 10);
+                        let p1 = parseInt(dParts[0], 10);
+                        let p2 = parseInt(dParts[1], 10);
+                        let p3 = parseInt(dParts[2], 10);
+                        if (p3 < 1000) p3 += 2000;
+                        let itemD, itemM, itemY = p3;
+                        if (p1 > 12) { itemD = p1; itemM = p2; }
+                        else if (p2 > 12) { itemD = p2; itemM = p1; }
+                        else { itemD = p1; itemM = p2; }
+                        
                         return itemD === filterDay && itemM === filterMonth && itemY === filterYear;
                     }
                     return item.timestampFormatted.includes(`${filterDay}/${filterMonth}/${filterYear}`);
@@ -2174,11 +2204,19 @@
                     if (item.dateKey) {
                         const parts = item.dateKey.split('-');
                         itemDate = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+                    } else if (item.id && typeof item.id === 'number' && item.id > 1000000000000) {
+                        itemDate = new Date(item.id);
                     } else if (item.timestampFormatted) {
                         const datePart = item.timestampFormatted.split(',')[0].trim();
-                        const dParts = datePart.split('/');
+                        const dParts = datePart.split(/[-/]/);
                         if (dParts.length === 3) {
-                            itemDate = new Date(parseInt(dParts[2], 10), parseInt(dParts[1], 10) - 1, parseInt(dParts[0], 10));
+                            let p1 = parseInt(dParts[0], 10);
+                            let p2 = parseInt(dParts[1], 10);
+                            let p3 = parseInt(dParts[2], 10);
+                            if (p3 < 1000) p3 += 2000;
+                            if (p1 > 12) itemDate = new Date(p3, p2 - 1, p1);
+                            else if (p2 > 12) itemDate = new Date(p3, p1 - 1, p2);
+                            else itemDate = new Date(p3, p2 - 1, p1);
                         } else {
                             return true; 
                         }
@@ -2186,18 +2224,22 @@
                         return false; 
                     }
                     
+                    itemDate.setHours(0,0,0,0);
+                    
                     let isAfterStart = true;
                     let isBeforeEnd = true;
 
                     if (startDateInput) {
                         const sParts = startDateInput.split('-');
                         const sDate = new Date(parseInt(sParts[0], 10), parseInt(sParts[1], 10) - 1, parseInt(sParts[2], 10));
+                        sDate.setHours(0,0,0,0);
                         isAfterStart = itemDate >= sDate;
                     }
 
                     if (endDateInput) {
                         const eParts = endDateInput.split('-');
                         const eDate = new Date(parseInt(eParts[0], 10), parseInt(eParts[1], 10) - 1, parseInt(eParts[2], 10));
+                        eDate.setHours(23,59,59,999);
                         isBeforeEnd = itemDate <= eDate;
                     }
 
