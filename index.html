@@ -49,6 +49,8 @@
             * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
             header, main, .no-print, .modal-backdrop { display: none !important; }
             #bitacoraPrintSection { display: block !important; }
+            
+            /* Fix for multi-page printing */
             html, body { 
                 background: #ffffff !important; 
                 color: #000000 !important; 
@@ -60,6 +62,8 @@
                 display: block !important;
                 font-size: 10px !important;
             }
+            
+            /* Allow table rows to break across pages */
             table { page-break-inside: auto; }
             tr { page-break-inside: avoid; page-break-after: auto; }
             thead { display: table-header-group; }
@@ -2197,6 +2201,7 @@
 
             let filteredList = window.bitacoraList;
 
+            // FIX DATE PARSING FOR PDF
             if (startDateInput || endDateInput) {
                 filteredList = window.bitacoraList.filter(item => {
                     let itemDate;
@@ -2204,8 +2209,6 @@
                     if (item.dateKey) {
                         const parts = item.dateKey.split('-');
                         itemDate = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
-                    } else if (item.id && typeof item.id === 'number' && item.id > 1000000000000) {
-                        itemDate = new Date(item.id);
                     } else if (item.timestampFormatted) {
                         const datePart = item.timestampFormatted.split(',')[0].trim();
                         const dParts = datePart.split(/[-/]/);
@@ -2213,12 +2216,20 @@
                             let p1 = parseInt(dParts[0], 10);
                             let p2 = parseInt(dParts[1], 10);
                             let p3 = parseInt(dParts[2], 10);
-                            if (p3 < 1000) p3 += 2000;
-                            if (p1 > 12) itemDate = new Date(p3, p2 - 1, p1);
-                            else if (p2 > 12) itemDate = new Date(p3, p1 - 1, p2);
-                            else itemDate = new Date(p3, p2 - 1, p1);
+                            
+                            if (p3 < 1000) {
+                                p3 += 2000;
+                            }
+                            
+                            if (p1 > 12) {
+                                itemDate = new Date(p3, p2 - 1, p1);
+                            } else if (p2 > 12) {
+                                itemDate = new Date(p3, p1 - 1, p2);
+                            } else {
+                                itemDate = new Date(p3, p2 - 1, p1);
+                            }
                         } else {
-                            return true; 
+                            return true; // Fallback
                         }
                     } else {
                         return false; 
