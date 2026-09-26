@@ -115,7 +115,6 @@
                     <div id="liveClock" class="text-2xl sm:text-4xl font-mono font-black text-amber-300 tracking-wider leading-none drop-shadow-md">00:00:00</div>
                     <div id="liveDate" class="text-[9.5px] text-slate-400 font-semibold mt-0.5 truncate max-w-[130px] sm:max-w-none">Cargando fecha...</div>
                     
-                    <!-- Indicador de estado de Audio ubicado DEBAJO del reloj -->
                     <div id="audioStatusBadge" class="mt-1 text-[8.5px] font-bold px-1.5 py-0.5 rounded bg-slate-800 text-amber-300 border border-amber-700/60 flex items-center gap-1 shrink-0 cursor-pointer" onclick="unlockAudioSystem()">
                         <i id="audioStatusIcon" class="fa-solid fa-volume-xmark text-amber-400"></i> <span id="audioStatusText">Audio Inactivo</span>
                     </div>
@@ -136,10 +135,10 @@
         </div>
     </header>
 
-    <!-- CONTENIDO PRINCIPAL FIJO -->
+    <!-- CONTENIDO PRINCIPAL -->
     <main class="flex-1 max-w-7xl w-full mx-auto px-2 sm:px-4 py-2 flex flex-col gap-2 overflow-hidden">
 
-        <!-- TARJETA PRINCIPAL DEL VUELO ACTIVO Y CRONÓMETRO GIGANTE -->
+        <!-- TARJETA PRINCIPAL DEL VUELO ACTIVO Y CRONÓMETRO -->
         <section id="nextFlightCard" class="bg-gradient-to-r from-slate-900 via-blue-950/60 to-slate-900 p-2.5 sm:p-3.5 rounded-2xl border border-blue-500/40 shadow-2xl relative overflow-hidden shrink-0">
             <div class="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-2.5">
                 
@@ -164,19 +163,16 @@
                     </p>
                 </div>
 
-                <!-- CONTROLES Y CRONÓMETRO DESTACADO -->
+                <!-- CONTROLES Y CRONÓMETRO -->
                 <div class="flex flex-col xs:flex-row items-stretch xs:items-center gap-2.5 bg-slate-950/90 p-2.5 rounded-xl border border-slate-800/90 shadow-lg">
                     <div class="text-center xs:text-right px-3 py-1 bg-slate-900/80 rounded-lg border border-slate-800 flex-1 xs:flex-none">
                         <div class="text-[9.5px] uppercase font-bold text-slate-400 tracking-wider">Estado / Cronómetro</div>
                         <div id="targetCountdown" class="text-2xl sm:text-4xl lg:text-5xl font-mono font-black text-emerald-400 mt-0.5">Calculando...</div>
                     </div>
 
-                    <div class="flex items-center gap-1.5 flex-1 xs:flex-none flex-wrap sm:flex-nowrap">
-                        <button id="btnQuickFly" onclick="quickRegisterTakeoff()" class="flex-1 px-3 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs sm:text-sm rounded-xl shadow-md transition flex items-center justify-center gap-1.5 border border-emerald-400/30 cursor-pointer">
+                    <div class="flex items-center gap-1.5 flex-1 xs:flex-none">
+                        <button id="btnQuickFly" onclick="quickRegisterTakeoff()" class="w-full px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs sm:text-sm rounded-xl shadow-md transition flex items-center justify-center gap-1.5 border border-emerald-400/30 cursor-pointer">
                             <i class="fa-solid fa-plane-departure"></i> DESPEGUE
-                        </button>
-                        <button id="btnMainWeatherToggle" onclick="toggleMainWeatherSuspension()" class="flex-1 px-3 py-2 bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs sm:text-sm rounded-xl shadow-md border border-amber-400/30 transition flex items-center justify-center gap-1 cursor-pointer">
-                            <i id="btnMainWeatherIcon" class="fa-solid fa-pause"></i> <span id="btnMainWeatherText">SUSPENDER</span>
                         </button>
                     </div>
                 </div>
@@ -258,7 +254,7 @@
         </div>
     </div>
 
-    <!-- MODAL COMPLETO DE BITÁCORA AUDITABLE CON SELECTOR DE FECHAS PARA PDF -->
+    <!-- MODAL COMPLETO DE BITÁCORA AUDITABLE -->
     <div id="modalBitacoraView" class="fixed inset-0 bg-slate-950/90 backdrop-blur-md z-50 flex items-center justify-center p-2 sm:p-4 hidden modal-backdrop">
         <div class="bg-slate-900 border border-blue-500/40 rounded-2xl max-w-6xl w-full p-3 sm:p-4 shadow-2xl space-y-2.5 max-h-[94vh] flex flex-col">
             <div class="flex justify-between items-center border-b border-slate-800 pb-2">
@@ -277,26 +273,29 @@
             <!-- BARRA DE FILTRO Y CALENDARIO DE LA BITÁCORA -->
             <div class="flex items-center justify-between gap-2 flex-wrap bg-slate-950/90 p-2.5 rounded-xl border border-slate-800 text-xs shadow-inner">
                 
-                <!-- Controles de Vista: Total, Calendario Picker y Modos -->
                 <div class="flex items-center gap-2 flex-wrap">
                     <span class="text-[11px] text-slate-300 font-semibold">
                         Registros: <strong id="bitacoraRecordCount" class="text-emerald-400 font-mono">0</strong>
                     </span>
 
                     <!-- Selector de Fecha / Calendario Interactivo -->
-                    <div class="flex items-center gap-1 bg-slate-900 px-2 py-1 rounded-lg border border-blue-500/40 shadow-sm">
-                        <i class="fa-solid fa-calendar-days text-amber-400 text-xs"></i>
-                        <label for="bitacoraDateInput" class="text-[10px] font-bold text-slate-300">Día:</label>
-                        <input type="date" id="bitacoraDateInput" onchange="filterBitacoraByCalendar(this.value)" class="bg-slate-950 text-white font-mono text-[11px] px-1.5 py-0.5 rounded border border-slate-700 focus:outline-none focus:border-blue-400 cursor-pointer">
+                    <div class="flex items-center gap-1 bg-slate-900 px-2.5 py-1.5 rounded-lg border border-blue-500/50 shadow-sm cursor-pointer hover:border-blue-400 transition" onclick="triggerNativePicker('bitacoraDateInput')">
+                        <i class="fa-solid fa-calendar-days text-amber-400 text-sm"></i>
+                        <label for="bitacoraDateInput" class="text-[10px] font-bold text-slate-300 cursor-pointer">Día:</label>
+                        <input type="date" id="bitacoraDateInput" onchange="filterBitacoraByCalendar(this.value)" class="bg-slate-950 text-white font-mono text-[11px] px-2 py-0.5 rounded border border-slate-700 focus:outline-none focus:border-blue-400 cursor-pointer">
                     </div>
 
-                    <!-- Botones Rápidos de Histórico -->
+                    <!-- Botones Rápidos -->
                     <button onclick="setBitacoraViewMode('ALL')" id="btnViewAll" class="px-2.5 py-1 bg-blue-600 text-white font-bold text-[10px] rounded-lg border border-blue-400/40 transition flex items-center gap-1 cursor-pointer">
-                        <i class="fa-solid fa-layer-group"></i> Ver Todo el Histórico
+                        <i class="fa-solid fa-layer-group"></i> Ver Todo
+                    </button>
+
+                    <button onclick="setBitacoraQuickDay('YESTERDAY')" id="btnViewYesterday" class="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-[10px] rounded-lg border border-slate-700 transition flex items-center gap-1 cursor-pointer">
+                        <i class="fa-solid fa-clock-rotate-left text-amber-400"></i> Ayer (25/09)
                     </button>
 
                     <button onclick="setBitacoraViewMode('TODAY')" id="btnViewToday" class="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-[10px] rounded-lg border border-slate-700 transition flex items-center gap-1 cursor-pointer">
-                        <i class="fa-solid fa-calendar-day text-emerald-400"></i> Solo Hoy
+                        <i class="fa-solid fa-calendar-day text-emerald-400"></i> Hoy (26/09)
                     </button>
 
                     <button onclick="toggleBitacoraSort()" class="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-[10px] rounded-lg border border-slate-700 transition flex items-center gap-1 cursor-pointer">
@@ -305,25 +304,29 @@
                     </button>
                 </div>
 
-                <!-- Botones de Acción: Escanear Histórico, Excel, Filtro Rango PDF, PDF, Vaciar -->
+                <!-- Botones de Acción: Sincronizar, Excel, Calendario PDF, Generar PDF, Vaciar -->
                 <div class="flex items-center gap-1.5 flex-wrap">
                     <button onclick="triggerDeepRecoveryScan()" title="Buscar y recuperar vuelos históricos de la nube" class="px-2 py-1 bg-indigo-900/80 hover:bg-indigo-800 text-indigo-200 font-bold text-[10px] rounded-lg border border-indigo-700/50 transition flex items-center gap-1 cursor-pointer">
-                        <i class="fa-solid fa-rotate text-amber-300"></i> Sincronizar Histórico
+                        <i class="fa-solid fa-rotate text-amber-300"></i> Sincronizar
                     </button>
                     <button onclick="exportBitacoraCSV()" class="px-2 py-1 bg-emerald-700 hover:bg-emerald-600 text-white font-bold text-[10px] sm:text-xs rounded-lg transition flex items-center gap-1 cursor-pointer">
                         <i class="fa-solid fa-file-excel"></i> Excel
                     </button>
                     
-                    <!-- SELECTOR RANGO PDF SIN AFECTAR REGISTROS -->
-                    <div class="flex items-center gap-1 bg-slate-900 px-2 py-1 rounded-lg border border-blue-500/40 shadow-sm">
-                        <span class="text-[9px] font-bold text-slate-300">Rango PDF:</span>
-                        <input type="date" id="pdfStartDate" class="bg-slate-950 text-white font-mono text-[9.5px] px-1 py-0.5 rounded border border-slate-700 focus:outline-none focus:border-blue-400 cursor-pointer" title="Fecha de inicio">
-                        <span class="text-[9px] font-bold text-slate-300">a</span>
-                        <input type="date" id="pdfEndDate" class="bg-slate-950 text-white font-mono text-[9.5px] px-1 py-0.5 rounded border border-slate-700 focus:outline-none focus:border-blue-400 cursor-pointer" title="Fecha de fin">
+                    <!-- SELECTOR CALENDARIO PARA PDF -->
+                    <div class="flex items-center gap-1 bg-slate-900 px-2 py-1 rounded-lg border border-amber-500/40 shadow-sm">
+                        <i class="fa-solid fa-calendar-check text-amber-400 text-xs"></i>
+                        <span class="text-[9.5px] font-bold text-slate-200">Fecha PDF:</span>
+                        <input type="date" id="pdfReportDateInput" onchange="syncPdfSelectedDate(this.value)" class="bg-slate-950 text-amber-300 font-mono text-[10px] px-1.5 py-0.5 rounded border border-slate-700 focus:outline-none focus:border-amber-400 cursor-pointer" title="Selecciona la fecha para generar el PDF">
+                        
+                        <button type="button" onclick="clearPdfCalendarFilter()" title="Limpiar fecha para usar vista actual" class="text-[9px] text-slate-400 hover:text-red-400 px-1">
+                            <i class="fa-solid fa-xmark"></i>
+                        </button>
                     </div>
 
-                    <button onclick="printAuditBitacora()" class="px-2.5 py-1 bg-blue-700 hover:bg-blue-600 text-white font-bold text-[10px] sm:text-xs rounded-lg transition flex items-center gap-1 cursor-pointer shadow">
-                        <i class="fa-solid fa-print"></i> PDF / Imprimir
+                    <button onclick="printAuditBitacora()" class="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white font-extrabold text-[11px] sm:text-xs rounded-lg transition flex items-center gap-1.5 cursor-pointer shadow-lg border border-blue-400/50">
+                        <i class="fa-solid fa-file-pdf text-amber-300 text-sm"></i>
+                        <span>Generar PDF</span>
                     </button>
                     <button onclick="confirmClearAllBitacoraModal()" class="px-2 py-1 bg-red-950/80 hover:bg-red-900 text-red-300 font-bold text-[10px] sm:text-xs rounded-lg transition flex items-center gap-1 cursor-pointer">
                         <i class="fa-solid fa-trash-can"></i> Vaciar
@@ -331,7 +334,7 @@
                 </div>
             </div>
 
-            <!-- TABLA DE LA BITÁCORA SIN COLUMNA PILOTO -->
+            <!-- TABLA DE LA BITÁCORA -->
             <div class="overflow-y-auto overflow-x-auto flex-1 border border-slate-800 rounded-xl">
                 <table class="w-full text-left text-xs min-w-[700px]">
                     <thead class="bg-slate-950 text-slate-400 uppercase font-bold tracking-wider border-b border-slate-800 text-[9.5px] sticky top-0 z-10 shadow">
@@ -360,7 +363,7 @@
         </div>
     </div>
 
-    <!-- MODAL ADJUNTAR / SUBIR EVIDENCIA PARA VUELO SUSPENDIDO -->
+    <!-- MODAL ADJUNTAR EVIDENCIA -->
     <div id="modalUploadEvidence" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-3 hidden modal-backdrop">
         <div class="bg-slate-900 border border-amber-500/40 rounded-2xl max-w-sm w-full p-4 shadow-2xl space-y-3">
             <div class="flex justify-between items-center border-b border-slate-800 pb-2">
@@ -393,7 +396,7 @@
         </div>
     </div>
 
-    <!-- MODAL DE CONFIGURACIÓN DE NUBE FIREBASE -->
+    <!-- MODAL DE CONFIGURACIÓN FIREBASE -->
     <div id="modalCloudSettings" class="fixed inset-0 bg-slate-950/85 backdrop-blur-sm z-50 flex items-center justify-center p-3 hidden modal-backdrop">
         <div class="bg-slate-900 border border-blue-500/40 rounded-2xl max-w-md w-full p-4 shadow-2xl space-y-3">
             <div class="flex justify-between items-center border-b border-slate-800 pb-2">
@@ -407,7 +410,7 @@
             </p>
             <div>
                 <label class="block text-slate-400 font-semibold text-[11px] mb-1">JSON de firebaseConfig:</label>
-                <textarea id="customFirebaseConfigInput" rows="6" placeholder='{\n  "apiKey": "AIzaSy...",\n  "authDomain": "control-vuelos.firebaseapp.com",\n  "projectId": "control-vuelos",\n  "storageBucket": "control-vuelos.firebasestorage.app",\n  "messagingSenderId": "756032981781",\n  "appId": "1:756032981781:web:cc679a65b3995087c0771c"\n}' class="w-full bg-slate-950 border border-slate-700 text-emerald-400 font-mono text-[10px] p-2 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500"></textarea>
+                <textarea id="customFirebaseConfigInput" rows="6" class="w-full bg-slate-950 border border-slate-700 text-emerald-400 font-mono text-[10px] p-2 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500"></textarea>
             </div>
             <div class="flex items-center justify-between pt-2 border-t border-slate-800">
                 <button onclick="clearCustomFirebaseConfig()" class="px-2.5 py-1 bg-red-950/80 hover:bg-red-900 text-red-300 font-bold text-[10px] rounded-xl border border-red-800/50">Restablecer Original</button>
@@ -419,7 +422,7 @@
         </div>
     </div>
 
-    <!-- MODAL EDICIÓN COMPLETA DE REGISTRO EN BITÁCORA -->
+    <!-- MODAL EDICIÓN DE REGISTRO -->
     <div id="modalEditBitacoraEntry" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-3 hidden modal-backdrop">
         <div class="bg-slate-900 border border-blue-500/40 rounded-2xl max-w-md w-full p-4 shadow-2xl space-y-2.5 max-h-[90vh] overflow-y-auto">
             <div class="flex justify-between items-center border-b border-slate-800 pb-2">
@@ -561,13 +564,13 @@
         </div>
     </div>
 
-    <!-- TOAST NOTIFICACIÓN EN PANTALLA -->
+    <!-- TOAST NOTIFICACIÓN -->
     <div id="toastNotification" class="fixed bottom-3 right-3 bg-slate-900 border border-slate-700 text-white px-3 py-2 rounded-xl shadow-2xl z-50 flex items-center gap-2 transition-all duration-300 opacity-0 translate-y-5 pointer-events-none max-w-xs text-xs">
         <i id="toastIcon" class="fa-solid fa-circle-info text-blue-400 text-sm"></i>
         <span id="toastMessage" class="font-semibold text-[11px]">Notificación</span>
     </div>
 
-    <!-- SECCIÓN OCULTA PARA IMPRESIÓN Y PDF DE LA BITÁCORA (LOS 16 VUELOS GARANTIZADOS) -->
+    <!-- SECCIÓN OCULTA PARA IMPRESIÓN Y PDF DE LA BITÁCORA -->
     <section id="bitacoraPrintSection" class="p-3 bg-white text-black">
         <div class="border-b-2 border-black pb-1.5 mb-2 flex justify-between items-center">
             <div>
@@ -608,7 +611,7 @@
         </div>
     </section>
 
-    <!-- SCRIPT DE CONFIGURACIÓN GLOBAL Y PLANES (SE EJECUTA PRIMERO PARA EVITAR ERRORES) -->
+    <!-- SCRIPT DE CONFIGURACIÓN GLOBAL Y PLANES -->
     <script>
         const memoryStorageFallback = {};
         function safeStorageGet(key) {
@@ -745,7 +748,7 @@
                 try {
                     await signInAnonymously(auth);
                 } catch (authErr) {
-                    console.warn("Autenticación anónima omitida o restringida, continuando:", authErr);
+                    console.warn("Autenticación anónima omitida:", authErr);
                 }
 
                 updateCloudUI(true, "Nube Live Sincronizada");
@@ -1072,7 +1075,6 @@
         }
         window.promptPasswordConfirmation = promptPasswordConfirmation;
 
-        // RECUPERACIÓN AUDITABLE DEL DÍA 25 DE SEPTIEMBRE (16 VUELOS COMPLETOS)
         function restoreSeptember25FullAudit() {
             const dateKey25 = "2026-09-25";
             const dateStr25 = "25/9/2026";
@@ -1449,7 +1451,6 @@
             return h * 60 + m;
         }
 
-        // CRONÓMETRO EXACTO EN TIEMPO REAL
         function updateTargetFlightBanner(now) {
             const plans = getActivePlan();
             const activePlanBadge = document.getElementById('activePlanBadge');
@@ -1876,14 +1877,71 @@
             window.bitacoraFilterMode = 'CALENDAR';
             window.bitacoraSelectedDate = selectedDateYMD;
 
+            const pdfDateInput = document.getElementById('pdfReportDateInput');
+            if (pdfDateInput) pdfDateInput.value = selectedDateYMD;
+
             const btnAll = document.getElementById('btnViewAll');
             const btnToday = document.getElementById('btnViewToday');
+            const btnYesterday = document.getElementById('btnViewYesterday');
             if (btnAll) btnAll.className = "px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-[10px] rounded-lg border border-slate-700 transition flex items-center gap-1 cursor-pointer";
             if (btnToday) btnToday.className = "px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-[10px] rounded-lg border border-slate-700 transition flex items-center gap-1 cursor-pointer";
+            if (btnYesterday) btnYesterday.className = "px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-[10px] rounded-lg border border-slate-700 transition flex items-center gap-1 cursor-pointer";
 
             renderBitacoraModalTable();
         }
         window.filterBitacoraByCalendar = filterBitacoraByCalendar;
+
+        function setBitacoraQuickDay(target) {
+            let targetYMD = "";
+            if (target === 'YESTERDAY') {
+                targetYMD = "2026-09-25";
+            } else {
+                targetYMD = getTodayKey();
+            }
+
+            const dateInput = document.getElementById('bitacoraDateInput');
+            const pdfDateInput = document.getElementById('pdfReportDateInput');
+            if (dateInput) dateInput.value = targetYMD;
+            if (pdfDateInput) pdfDateInput.value = targetYMD;
+
+            filterBitacoraByCalendar(targetYMD);
+
+            const btnYesterday = document.getElementById('btnViewYesterday');
+            if (target === 'YESTERDAY' && btnYesterday) {
+                btnYesterday.className = "px-2.5 py-1 bg-amber-600 text-white font-bold text-[10px] rounded-lg border border-amber-400/40 transition flex items-center gap-1 cursor-pointer shadow";
+            }
+        }
+        window.setBitacoraQuickDay = setBitacoraQuickDay;
+
+        function syncPdfSelectedDate(selectedDateYMD) {
+            if (!selectedDateYMD) return;
+            const dateInput = document.getElementById('bitacoraDateInput');
+            if (dateInput) dateInput.value = selectedDateYMD;
+            filterBitacoraByCalendar(selectedDateYMD);
+        }
+        window.syncPdfSelectedDate = syncPdfSelectedDate;
+
+        function clearPdfCalendarFilter() {
+            const pdfDateInput = document.getElementById('pdfReportDateInput');
+            if (pdfDateInput) pdfDateInput.value = "";
+            setBitacoraViewMode('ALL');
+        }
+        window.clearPdfCalendarFilter = clearPdfCalendarFilter;
+
+        function triggerNativePicker(inputId) {
+            const input = document.getElementById(inputId);
+            if (!input) return;
+            try {
+                if (typeof input.showPicker === 'function') {
+                    input.showPicker();
+                } else {
+                    input.focus();
+                }
+            } catch(e) {
+                input.focus();
+            }
+        }
+        window.triggerNativePicker = triggerNativePicker;
 
         function toggleBitacoraSort() {
             window.bitacoraSortAsc = !window.bitacoraSortAsc;
@@ -2130,7 +2188,6 @@
         }
         window.confirmClearAllBitacoraModal = confirmClearAllBitacoraModal;
 
-        // IMPRESIÓN AUDITABLE DIRECTA
         function printAuditBitacora() {
             syncDailyStatusesWithBitacora();
 
@@ -2139,57 +2196,44 @@
             const todayStr = now.toLocaleDateString('es-MX');
             const todayKey = getTodayKey();
 
-            const startDateInput = document.getElementById('pdfStartDate') ? document.getElementById('pdfStartDate').value : null;
-            const endDateInput = document.getElementById('pdfEndDate') ? document.getElementById('pdfEndDate').value : null;
+            const pdfPickerDate = document.getElementById('pdfReportDateInput') ? document.getElementById('pdfReportDateInput').value : null;
 
             let listToPrint = [];
+            let reportDateLabel = "";
+            let fileDateSuffix = "";
 
-            // 1. Rango específico definido por el usuario
-            if (startDateInput || endDateInput) {
-                document.getElementById('printReportDate').innerText = `${startDateInput || 'Inicio'} al ${endDateInput || 'Fin'}`;
+            if (pdfPickerDate) {
+                const parts = pdfPickerDate.split('-');
+                const filterYear = parseInt(parts[0], 10);
+                const filterMonth = parseInt(parts[1], 10);
+                const filterDay = parseInt(parts[2], 10);
+
+                reportDateLabel = `${filterDay}/${filterMonth}/${filterYear}`;
+                fileDateSuffix = `${String(filterDay).padStart(2,'0')}-${String(filterMonth).padStart(2,'0')}-${filterYear}`;
+
+                document.getElementById('printReportDate').innerText = reportDateLabel;
                 document.getElementById('printReportTime').innerText = now.toLocaleTimeString('es-MX');
 
                 listToPrint = window.bitacoraList.filter(item => {
-                    let itemDate;
-                    if (item.dateKey) {
-                        const parts = item.dateKey.split('-');
-                        itemDate = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
-                    } else if (item.timestampFormatted) {
-                        const datePart = item.timestampFormatted.split(',')[0].trim();
-                        const dParts = datePart.split('/');
-                        if (dParts.length === 3) {
-                            itemDate = new Date(parseInt(dParts[2], 10), parseInt(dParts[1], 10) - 1, parseInt(dParts[0], 10));
-                        } else {
-                            return true;
-                        }
-                    } else {
-                        return false; 
+                    if (item.dateKey && item.dateKey === pdfPickerDate) return true;
+                    if (!item.timestampFormatted) return false;
+                    const datePart = item.timestampFormatted.split(',')[0].trim();
+                    const dParts = datePart.split('/');
+                    if (dParts.length === 3) {
+                        return parseInt(dParts[0], 10) === filterDay && parseInt(dParts[1], 10) === filterMonth && parseInt(dParts[2], 10) === filterYear;
                     }
-                    
-                    let isAfterStart = true;
-                    let isBeforeEnd = true;
-
-                    if (startDateInput) {
-                        const sParts = startDateInput.split('-');
-                        const sDate = new Date(parseInt(sParts[0], 10), parseInt(sParts[1], 10) - 1, parseInt(sParts[2], 10));
-                        isAfterStart = itemDate >= sDate;
-                    }
-                    if (endDateInput) {
-                        const eParts = endDateInput.split('-');
-                        const eDate = new Date(parseInt(eParts[0], 10), parseInt(eParts[1], 10) - 1, parseInt(eParts[2], 10));
-                        isBeforeEnd = itemDate <= eDate;
-                    }
-                    return isAfterStart && isBeforeEnd;
+                    return item.timestampFormatted.includes(`${filterDay}/${filterMonth}/${filterYear}`);
                 });
-            } 
-            // 2. Día específico seleccionado en el calendario de la bitácora
-            else if (window.bitacoraFilterMode === 'CALENDAR' && window.bitacoraSelectedDate) {
+            } else if (window.bitacoraFilterMode === 'CALENDAR' && window.bitacoraSelectedDate) {
                 const parts = window.bitacoraSelectedDate.split('-');
                 const filterYear = parseInt(parts[0], 10);
                 const filterMonth = parseInt(parts[1], 10);
                 const filterDay = parseInt(parts[2], 10);
 
-                document.getElementById('printReportDate').innerText = `${filterDay}/${filterMonth}/${filterYear}`;
+                reportDateLabel = `${filterDay}/${filterMonth}/${filterYear}`;
+                fileDateSuffix = `${String(filterDay).padStart(2,'0')}-${String(filterMonth).padStart(2,'0')}-${filterYear}`;
+
+                document.getElementById('printReportDate').innerText = reportDateLabel;
                 document.getElementById('printReportTime').innerText = now.toLocaleTimeString('es-MX');
 
                 listToPrint = window.bitacoraList.filter(item => {
@@ -2202,9 +2246,13 @@
                     }
                     return item.timestampFormatted.includes(`${filterDay}/${filterMonth}/${filterYear}`);
                 });
-            }
-            // 3. Jornada actual (16 vuelos garantizados)
-            else {
+            } else {
+                reportDateLabel = todayStr;
+                const d = now.getDate();
+                const m = now.getMonth() + 1;
+                const y = now.getFullYear();
+                fileDateSuffix = `${String(d).padStart(2,'0')}-${String(m).padStart(2,'0')}-${y}`;
+
                 document.getElementById('printReportDate').innerText = todayStr;
                 document.getElementById('printReportTime').innerText = now.toLocaleTimeString('es-MX');
 
@@ -2232,7 +2280,7 @@
             }
 
             if (!listToPrint || listToPrint.length === 0) {
-                printBody.innerHTML = `<tr><td colspan="7" class="p-3 text-center">Sin registros en la bitácora para la fecha o rango seleccionado.</td></tr>`;
+                printBody.innerHTML = `<tr><td colspan="7" class="p-3 text-center">Sin registros en la bitácora para la fecha seleccionada.</td></tr>`;
             } else {
                 listToPrint.sort((a, b) => {
                     const minsA = parseTimeToMinutes(a.scheduledTime || '00:00');
@@ -2264,7 +2312,15 @@
                 printBody.innerHTML = html;
             }
 
+            const previousTitle = document.title;
+            const pdfSuggestedFileName = `Bitacora_${fileDateSuffix || getTodayKey()}`;
+            document.title = pdfSuggestedFileName;
+
             window.print();
+
+            setTimeout(() => {
+                document.title = previousTitle;
+            }, 2500);
         }
         window.printAuditBitacora = printAuditBitacora;
 
@@ -2292,7 +2348,6 @@
         }
         window.exportBitacoraCSV = exportBitacoraCSV;
 
-        // INICIALIZACIÓN ROBUSTA DEL SISTEMA
         function initApp() {
             const today = getTodayKey();
             const savedDate = safeStorageGet('audi_flight_date');
