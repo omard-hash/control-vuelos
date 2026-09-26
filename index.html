@@ -50,7 +50,7 @@
             header, main, .no-print, .modal-backdrop { display: none !important; }
             #bitacoraPrintSection { display: block !important; }
             
-            /* Corrección clave para impresión en múltiples páginas sin cortes */
+            /* Corrección clave para impresión en múltiples páginas sin cortes. ¡ESTO ARREGLA QUE SALGAN LOS 16 VUELOS! */
             html, body { 
                 background: #ffffff !important; 
                 color: #000000 !important; 
@@ -317,6 +317,7 @@
                 </div>
             </div>
 
+            <!-- TABLA SIN COLUMNA PILOTO -->
             <div class="overflow-y-auto overflow-x-auto flex-1 border border-slate-800 rounded-xl">
                 <table class="w-full text-left text-xs min-w-[750px]">
                     <thead class="bg-slate-950 text-slate-400 uppercase font-bold tracking-wider border-b border-slate-800 text-[9.5px] sticky top-0 z-10 shadow">
@@ -729,11 +730,9 @@
             newLogs.forEach(item => {
                 if (item && item.id) {
                     const existing = currentMap.get(String(item.id));
-                    // PRECAUCIÓN: Proteger las imágenes si la nube manda un registro sin imagen
                     if (existing && existing.imageData && !item.imageData) {
                         item.imageData = existing.imageData;
                     }
-                    // FIX: No sobreescribir estado SUSPENDIDO localmente si la nube tiene un error
                     if (existing && existing.status === 'SUSPENDIDO' && item.status === 'REALIZADO') {
                          item.status = 'SUSPENDIDO';
                     }
@@ -762,7 +761,6 @@
                             (b.dateKey === todayKey || (b.timestampFormatted && b.timestampFormatted.includes(todayStr)))
                         );
                         if (match) {
-                            // FIX: Respetar que si dice SUSPENDIDO se quede como SUSPENDIDO.
                             const st = (match.status === 'VOLADO') ? 'REALIZADO' : match.status;
                             window.dailyFlightStatuses[idx] = {
                                 status: st,
@@ -1110,7 +1108,7 @@
 
         window.dailyFlightStatuses = {};
         window.bitacoraList = [];
-        window.currentFilteredBitacora = []; // Variable global esencial para imprimir el PDF exactamente como se ve.
+        window.currentFilteredBitacora = []; 
         window.activeModalIndex = 0;
         window.tempCompressedImage = "";
         window.audioUnlocked = false;
@@ -1173,8 +1171,7 @@
                 const baseMins = parseTimeToMinutes(item.timeOp2);
                 const windowEndMins = baseMins + 30;
                 
-                // FIX: SOLO limpia suspensiones del FUTURO. 
-                // Protege los registros ya vencidos en el pasado.
+                // FIX: SOLO limpia suspensiones del FUTURO. Protege los registros ya vencidos.
                 if (st && st.status === 'SUSPENDIDO' && (windowEndMins > currentMins)) {
                     delete window.dailyFlightStatuses[idx];
                     
@@ -1975,6 +1972,9 @@
                 cntEl.innerText = `${filteredList.length} (de ${window.bitacoraList.length} total)`;
             }
 
+            // GUARDAR ESTA LISTA EXACTA PARA EL PDF
+            window.currentFilteredBitacora = [...filteredList];
+
             if (!filteredList || filteredList.length === 0) {
                 tbody.innerHTML = `
                     <tr>
@@ -1988,7 +1988,6 @@
                             </div>
                         </td>
                     </tr>`;
-                window.currentFilteredBitacora = [];
                 return;
             }
 
@@ -1996,9 +1995,7 @@
             if (window.bitacoraSortAsc) {
                 sortedList.reverse();
             }
-
-            // IMPORTANTE: Guardamos exactamente lo que se ve para que el PDF lo imprima igual
-            window.currentFilteredBitacora = sortedList;
+            window.currentFilteredBitacora = sortedList; // Actualizar orden
 
             let html = '';
             sortedList.forEach(item => {
@@ -2171,28 +2168,24 @@
             let listToPrint = [];
 
             if (startDateInput || endDateInput) {
+                // Filtrado exclusivo solo si se ingresaron fechas manuales
                 listToPrint = window.bitacoraList.filter(item => {
                     let itemDate;
-                    
                     if (item.dateKey) {
                         const parts = item.dateKey.split('-');
                         itemDate = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
                     } else if (item.timestampFormatted) {
                         const datePart = item.timestampFormatted.split(',')[0].trim();
-                        const dParts = datePart.split(/[-/]/);
+                        const dParts = datePart.split('/');
                         if (dParts.length === 3) {
-                            let p1 = parseInt(dParts[0], 10);
-                            let p2 = parseInt(dParts[1], 10);
-                            let p3 = parseInt(dParts[2], 10);
-                            if (p3 < 1000) p3 += 2000;
-                            if (p1 > 12) itemDate = new Date(p3, p2 - 1, p1);
-                            else if (p2 > 12) itemDate = new Date(p3, p1 - 1, p2);
-                            else itemDate = new Date(p3, p2 - 1, p1); 
+                            itemDate = new Date(parseInt(dParts[2], 10), parseInt(dParts[1], 10) - 1, parseInt(dParts[0], 10));
+                        } else {
+                            return true;
                         }
+                    } else {
+                        return false; 
                     }
                     
-                    if (!itemDate) return true; 
-
                     let isAfterStart = true;
                     let isBeforeEnd = true;
 
@@ -2201,17 +2194,15 @@
                         const sDate = new Date(parseInt(sParts[0], 10), parseInt(sParts[1], 10) - 1, parseInt(sParts[2], 10));
                         isAfterStart = itemDate >= sDate;
                     }
-
                     if (endDateInput) {
                         const eParts = endDateInput.split('-');
                         const eDate = new Date(parseInt(eParts[0], 10), parseInt(eParts[1], 10) - 1, parseInt(eParts[2], 10));
                         isBeforeEnd = itemDate <= eDate;
                     }
-
                     return isAfterStart && isBeforeEnd;
                 });
             } else {
-                // FIX CRITICO: Si no seleccionas fechas en el PDF, agarra exactamente los registros de la pantalla, sin perder ninguno.
+                // CLAVE PARA TUS 16 VUELOS: Toma la tabla exacta que tienes en pantalla
                 listToPrint = window.currentFilteredBitacora && window.currentFilteredBitacora.length > 0 
                                 ? window.currentFilteredBitacora 
                                 : window.bitacoraList;
@@ -2222,8 +2213,10 @@
             } else {
                 let html = '';
                 listToPrint.forEach(item => {
+                    // Evidencias cargadas en la tabla de PDF
                     const imgHtml = item.imageData ? `<img src="${item.imageData}" style="max-height: 60px; width: auto; margin: auto; display: block; object-fit: contain;">` : 'Pendiente foto';
                     const printStatus = (item.status === 'VOLADO') ? 'REALIZADO' : item.status;
+                    
                     html += `
                         <tr style="border-bottom: 1px solid #000; page-break-inside: avoid;">
                             <td class="p-1 border-r border-black" style="vertical-align: middle;">${item.timestampFormatted}</td>
