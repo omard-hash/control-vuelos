@@ -1383,6 +1383,8 @@
             const activePlanBadge = document.getElementById('activePlanBadge');
             if (activePlanBadge) activePlanBadge.innerText = `PLAN ${getActivePlanKey()}`;
 
+            const currentMins = now.getHours() * 60 + now.getMinutes();
+
             let targetIdx = plans.findIndex((p, idx) => {
                 const st = window.dailyFlightStatuses[idx];
                 return !st || st.status === 'PENDIENTE';
@@ -1392,6 +1394,8 @@
             window.activeTargetIdx = targetIdx;
 
             const targetItem = plans[targetIdx];
+            const baseMins = parseTimeToMinutes(targetItem.timeOp2);
+
             const timeEl = document.getElementById('targetFlightTime');
             const winEl = document.getElementById('targetFlightWindow');
             const badgeEl = document.getElementById('targetFlightBadge');
@@ -1401,16 +1405,130 @@
             if (badgeEl) badgeEl.innerText = `TIPO ${targetItem.type} - ${targetItem.name}`;
 
             const statusObj = window.dailyFlightStatuses[targetIdx] || { status: 'PENDIENTE' };
+            const isTypeB = targetItem.forced;
 
-            if (statusObj.status !== 'PENDIENTE') {
+            if (window.systemWeatherSuspended) {
+                if (winEl) winEl.innerText = "Suspensión General por Clima Activa";
                 if (cdEl) {
-                    cdEl.innerText = `ESTADO: ${statusObj.status}`;
-                    cdEl.className = "text-xl font-mono font-black text-slate-400 mt-1";
+                    cdEl.innerText = "SUSPENDIDO";
+                    cdEl.className = "text-2xl sm:text-4xl lg:text-5xl font-mono font-black text-amber-400 mt-1 animate-pulse";
+                }
+                renderFlightsTable();
+                return;
+            }
+
+            if (isTypeB) {
+                if (winEl) winEl.innerText = `Hora Exacta (${targetItem.timeOp2} hrs - Sin Ventana)`;
+                
+                const diffSecs = Math.floor((baseMins - currentMins) * 60 - now.getSeconds());
+                const m = Math.floor(diffSecs / 60);
+                const s = ((diffSecs % 60) + 60) % 60;
+
+                if (statusObj.status !== 'PENDIENTE') {
+                    if (cdEl) {
+                        cdEl.innerText = `ESTADO: ${statusObj.status}`;
+                        cdEl.className = "text-xl font-mono font-black text-slate-400 mt-1";
+                    }
+                } else if (diffSecs > 0) {
+                    if (cdEl) {
+                        cdEl.innerText = `Faltan ${m}m ${String(s).padStart(2,'0')}s (Hora Exacta)`;
+                        cdEl.className = "text-2xl sm:text-4xl font-mono font-black text-amber-300 mt-1";
+                    }
+
+                    if (m === 30 && s === 0) {
+                        const alertKey = `typeB_30m_${targetIdx}_${getTodayKey()}`;
+                        if (!window.triggeredAlertsToday.has(alertKey)) {
+                            window.triggeredAlertsToday.add(alertKey);
+                            triggerVoiceAlert(`Atención. Faltan 30 minutos para el vuelo obligatorio de Cambio de Turno de las ${targetItem.timeOp2} horas.`);
+                        }
+                    } else if (m === 15 && s === 0) {
+                        const alertKey = `typeB_15m_${targetIdx}_${getTodayKey()}`;
+                        if (!window.triggeredAlertsToday.has(alertKey)) {
+                            window.triggeredAlertsToday.add(alertKey);
+                            triggerVoiceAlert(`Recordatorio. Faltan 15 minutos para el vuelo de Cambio de Turno de las ${targetItem.timeOp2} horas.`);
+                        }
+                    } else if (m === 5 && s === 0) {
+                        const alertKey = `typeB_5m_${targetIdx}_${getTodayKey()}`;
+                        if (!window.triggeredAlertsToday.has(alertKey)) {
+                            window.triggeredAlertsToday.add(alertKey);
+                            triggerVoiceAlert(`¡Alerta urgente! Quedan 5 minutos para el Cambio de Turno de las ${targetItem.timeOp2} horas. Proceda al despegue.`, true);
+                        }
+                    }
+                } else if (diffSecs === 0 || (diffSecs < 0 && diffSecs > -300)) {
+                    if (cdEl) {
+                        cdEl.innerText = `¡HORA EXACTA RELEVO!`;
+                        cdEl.className = "text-2xl sm:text-4xl lg:text-5xl font-mono font-black text-emerald-400 mt-1 animate-pulse";
+                    }
+                    const exactAlertKey = `typeB_exact_${targetIdx}_${getTodayKey()}`;
+                    if (!window.triggeredAlertsToday.has(exactAlertKey)) {
+                        window.triggeredAlertsToday.add(exactAlertKey);
+                        triggerVoiceAlert(`¡Atención! Es la hora exacta del vuelo de Cambio de Turno de las ${targetItem.timeOp2} horas. Proceda al despegue.`);
+                    }
+                } else {
+                    if (cdEl) {
+                        cdEl.innerText = `HORA VENCIDA`;
+                        cdEl.className = "text-xl font-mono font-black text-red-400 mt-1";
+                    }
                 }
             } else {
-                if (cdEl) {
-                    cdEl.innerText = `EN ESPERA`;
-                    cdEl.className = "text-2xl font-mono font-black text-amber-300 mt-1";
+                const winStartMins = baseMins - 30;
+                const winEndMins = baseMins + 30;
+
+                const startH = Math.floor((winStartMins + 1440) % 1440 / 60);
+                const startM = (winStartMins + 1440) % 60;
+                const endH = Math.floor((winEndMins + 1440) % 1440 / 60);
+                const endM = (winEndMins + 1440) % 60;
+
+                if (winEl) winEl.innerText = `${String(startH).padStart(2,'0')}:${String(startM).padStart(2,'0')} - ${String(endH).padStart(2,'0')}:${String(endM).padStart(2,'0')} hrs`;
+
+                if (statusObj.status !== 'PENDIENTE') {
+                    if (cdEl) {
+                        cdEl.innerText = `ESTADO: ${statusObj.status}`;
+                        cdEl.className = "text-xl font-mono font-black text-slate-400 mt-1";
+                    }
+                } else if (currentMins < winStartMins) {
+                    const diffSecs = Math.floor((winStartMins - currentMins) * 60 - now.getSeconds());
+                    const m = Math.floor(diffSecs / 60);
+                    const s = ((diffSecs % 60) + 60) % 60;
+                    if (cdEl) {
+                        cdEl.innerText = `Abre en ${m}m ${String(s).padStart(2,'0')}s`;
+                        cdEl.className = "text-2xl sm:text-4xl font-mono font-black text-amber-300 mt-1";
+                    }
+                } else if (currentMins >= winStartMins && currentMins <= winEndMins) {
+                    const remSecs = Math.floor((winEndMins - currentMins) * 60 - now.getSeconds());
+                    const m = Math.floor(remSecs / 60);
+                    const s = ((remSecs % 60) + 60) % 60;
+                    if (cdEl) {
+                        cdEl.innerText = `ABIERTA (${m}m ${String(s).padStart(2,'0')}s)`;
+                        cdEl.className = "text-2xl sm:text-4xl lg:text-5xl font-mono font-black text-emerald-400 mt-1 animate-pulse";
+                    }
+
+                    const openAlertKey = `win_open_${targetIdx}_${getTodayKey()}`;
+                    if (!window.triggeredAlertsToday.has(openAlertKey)) {
+                        window.triggeredAlertsToday.add(openAlertKey);
+                        triggerVoiceAlert(`Atención. Se ha abierto la ventana del vuelo de las ${targetItem.timeOp2} horas.`);
+                    }
+
+                    if (s === 0 && (m % 15 === 0) && m > 5 && m < 60) {
+                        const periodicAlertKey = `win_periodic_${m}_${targetIdx}_${getTodayKey()}`;
+                        if (!window.triggeredAlertsToday.has(periodicAlertKey)) {
+                            window.triggeredAlertsToday.add(periodicAlertKey);
+                            triggerVoiceAlert(`Recordatorio. La ventana del vuelo de las ${targetItem.timeOp2} horas continúa abierta. Quedan ${m} minutos.`);
+                        }
+                    }
+
+                    if (m === 5 && s === 0) {
+                        const alertKey = `win_close_5m_${targetIdx}_${getTodayKey()}`;
+                        if (!window.triggeredAlertsToday.has(alertKey)) {
+                            window.triggeredAlertsToday.add(alertKey);
+                            triggerVoiceAlert(`¡Alerta urgente! Quedan 5 minutos para el cierre de la ventana de las ${targetItem.timeOp2} horas. Proceda al despegue.`, true);
+                        }
+                    }
+                } else {
+                    if (cdEl) {
+                        cdEl.innerText = `VENTANA VENCIDA`;
+                        cdEl.className = "text-xl font-mono font-black text-red-400 mt-1";
+                    }
                 }
             }
 
