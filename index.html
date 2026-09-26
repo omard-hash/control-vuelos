@@ -50,7 +50,7 @@
             header, main, .no-print, .modal-backdrop { display: none !important; }
             #bitacoraPrintSection { display: block !important; }
             
-            /* Fix for multi-page printing */
+            /* Corrección para impresión en múltiples páginas sin cortes */
             html, body { 
                 background: #ffffff !important; 
                 color: #000000 !important; 
@@ -63,10 +63,11 @@
                 font-size: 10px !important;
             }
             
-            /* Allow table rows to break across pages */
-            table { page-break-inside: auto; }
+            /* Permite que las filas de la tabla pasen a la siguiente página */
+            table { page-break-inside: auto; width: 100%; border-collapse: collapse; }
             tr { page-break-inside: avoid; page-break-after: auto; }
             thead { display: table-header-group; }
+            td, th { padding: 4px; border: 1px solid #000; }
         }
         #bitacoraPrintSection { display: none; }
     </style>
@@ -743,17 +744,23 @@
 
             newLogs.forEach(item => {
                 if (item && item.id) {
+                    const existing = currentMap.get(String(item.id));
+                    // PRECAUCIÓN DE DATOS: No sobrescribir la foto local si la nube no la tiene (por problemas de tamaño o latencia)
+                    if (existing && existing.imageData && !item.imageData) {
+                        item.imageData = existing.imageData;
+                    }
                     currentMap.set(String(item.id), item);
                 }
             });
 
             const merged = Array.from(currentMap.values());
-            merged.sort((a, b) => b.id - a.id);
+            merged.sort((a, b) => b.id - a.id); // Orden descendente por ID
             
             window.bitacoraList = merged;
             if (window.safeStorageSet) window.safeStorageSet('audi_bitacora_logs', JSON.stringify(merged));
             if (window.saveRecoveryBackup) window.saveRecoveryBackup(merged, 'Sincronización Nube Firestore');
 
+            // Reconstrucción del panel frontal solo para registros pendientes
             if (typeof window.getActivePlan === 'function') {
                 const plans = window.getActivePlan();
                 let rebuiltAny = false;
@@ -763,6 +770,7 @@
                 plans.forEach((item, idx) => {
                     const currentSt = window.dailyFlightStatuses[idx];
                     if (!currentSt || currentSt.status === 'PENDIENTE') {
+                        // Busca el primer registro de hoy para esa hora
                         const match = merged.find(b => 
                             b.scheduledTime === item.timeOp2 && 
                             (b.dateKey === todayKey || (b.timestampFormatted && b.timestampFormatted.includes(todayStr)))
@@ -829,7 +837,7 @@
                 return;
             }
 
-            if (!isSilent) window.showToast("Buscando y empujando historial a la nube...", "info");
+            if (!isSilent) window.showToast("Buscando historial completo en la nube...", "info");
 
             const candidateCollections = [
                 collection(db, 'artifacts', appId, 'public', 'data', 'bitacora_logs'),
@@ -842,7 +850,6 @@
 
             let recoveredLogs = [];
 
-            // Buscar en Nube
             for (const colRef of candidateCollections) {
                 try {
                     const snap = await getDocs(colRef);
@@ -855,7 +862,6 @@
                 } catch(e) {}
             }
 
-            // Buscar en respaldos locales (Los que se quedaron atrapados ayer)
             try {
                 const rawBackups = window.safeStorageGet('audi_bitacora_backups');
                 if (rawBackups) {
@@ -882,15 +888,7 @@
 
             if (recoveredLogs.length > 0) {
                 processIncomingCloudLogs(recoveredLogs);
-                
-                // NUEVO: Asegurarse de que los registros atrapados localmente se suban a la nube de verdad
-                recoveredLogs.forEach(log => {
-                    if (log && log.id && typeof window.saveBitacoraLogToCloud === 'function') {
-                        window.saveBitacoraLogToCloud(log);
-                    }
-                });
-
-                if (!isSilent) window.showToast(`¡Sincronización completa! Se empujaron los datos al servidor. Total: ${window.bitacoraList.length}`, "success");
+                if (!isSilent) window.showToast(`¡Sincronización completa! Total registros: ${window.bitacoraList.length}`, "success");
             } else {
                 if (!isSilent) window.showToast("No se encontraron registros adicionales.", "info");
             }
@@ -1130,6 +1128,7 @@
 
         window.dailyFlightStatuses = {};
         window.bitacoraList = [];
+        window.currentFilteredBitacora = []; // VARIABLE GLOBAL PARA SINCRONIZAR TABLA Y PDF
         window.activeModalIndex = 0;
         window.tempCompressedImage = "";
         window.audioUnlocked = false;
@@ -1959,11 +1958,6 @@
                 
                 filteredList = filteredList.filter(item => {
                     if (item.dateKey && item.dateKey === todayKey) return true;
-                    if (item.id && typeof item.id === 'number' && item.id > 1000000000000) {
-                        const d = new Date(item.id);
-                        const tDate = new Date();
-                        return d.getDate() === tDate.getDate() && d.getMonth() === tDate.getMonth() && d.getFullYear() === tDate.getFullYear();
-                    }
                     if (!item.timestampFormatted) return false;
                     return item.timestampFormatted.includes(todayStr);
                 });
@@ -1976,12 +1970,6 @@
 
                 filteredList = filteredList.filter(item => {
                     if (item.dateKey && item.dateKey === window.bitacoraSelectedDate) return true;
-                    
-                    if (item.id && typeof item.id === 'number' && item.id > 1000000000000) {
-                        const d = new Date(item.id);
-                        return d.getDate() === filterDay && (d.getMonth() + 1) === filterMonth && d.getFullYear() === filterYear;
-                    }
-
                     if (!item.timestampFormatted) return false;
                     
                     const datePart = item.timestampFormatted.split(',')[0].trim();
@@ -1995,7 +1983,6 @@
                         if (p1 > 12) { itemD = p1; itemM = p2; }
                         else if (p2 > 12) { itemD = p2; itemM = p1; }
                         else { itemD = p1; itemM = p2; }
-                        
                         return itemD === filterDay && itemM === filterMonth && itemY === filterYear;
                     }
                     return item.timestampFormatted.includes(`${filterDay}/${filterMonth}/${filterYear}`);
@@ -2022,6 +2009,7 @@
                             </div>
                         </td>
                     </tr>`;
+                window.currentFilteredBitacora = [];
                 return;
             }
 
@@ -2029,6 +2017,9 @@
             if (window.bitacoraSortAsc) {
                 sortedList.reverse();
             }
+
+            // GUARDAR LA LISTA EXACTA PARA QUE EL PDF IMPRIMA LO MISMO QUE SE VE
+            window.currentFilteredBitacora = sortedList;
 
             let html = '';
             sortedList.forEach(item => {
@@ -2077,7 +2068,6 @@
             
             document.getElementById('editBitacoraSchedTime').value = entry.scheduledTime;
             document.getElementById('editBitacoraRealTime').value = entry.realTime;
-            document.getElementById('editBitacoraPilot').value = entry.pilot || 'Jonathan Rodriguez Morales';
             document.getElementById('editBitacoraNotes').value = entry.notes;
 
             const previewImg = document.getElementById('editBitacoraImgPreview');
@@ -2199,11 +2189,12 @@
             const startDateInput = document.getElementById('pdfStartDate') ? document.getElementById('pdfStartDate').value : null;
             const endDateInput = document.getElementById('pdfEndDate') ? document.getElementById('pdfEndDate').value : null;
 
-            let filteredList = window.bitacoraList;
+            let listToPrint = [];
 
-            // FIX DATE PARSING FOR PDF
+            // Si hay un rango de fechas escrito, lo usamos.
+            // Si está vacío, simplemente imprimimos lo que la persona ESTÁ VIENDO en la tabla en ese momento.
             if (startDateInput || endDateInput) {
-                filteredList = window.bitacoraList.filter(item => {
+                listToPrint = window.bitacoraList.filter(item => {
                     let itemDate;
                     
                     if (item.dateKey) {
@@ -2216,25 +2207,15 @@
                             let p1 = parseInt(dParts[0], 10);
                             let p2 = parseInt(dParts[1], 10);
                             let p3 = parseInt(dParts[2], 10);
-                            
-                            if (p3 < 1000) {
-                                p3 += 2000;
-                            }
-                            
-                            if (p1 > 12) {
-                                itemDate = new Date(p3, p2 - 1, p1);
-                            } else if (p2 > 12) {
-                                itemDate = new Date(p3, p1 - 1, p2);
-                            } else {
-                                itemDate = new Date(p3, p2 - 1, p1);
-                            }
-                        } else {
-                            return true; // Fallback
+                            if (p3 < 1000) p3 += 2000;
+                            if (p1 > 12) itemDate = new Date(p3, p2 - 1, p1);
+                            else if (p2 > 12) itemDate = new Date(p3, p1 - 1, p2);
+                            else itemDate = new Date(p3, p2 - 1, p1);
                         }
-                    } else {
-                        return false; 
                     }
                     
+                    if (!itemDate) return true; 
+
                     itemDate.setHours(0,0,0,0);
                     
                     let isAfterStart = true;
@@ -2256,24 +2237,29 @@
 
                     return isAfterStart && isBeforeEnd;
                 });
+            } else {
+                // USA LA LISTA QUE SE VE EN PANTALLA ACTUALMENTE (Con fotos y todo intacto)
+                listToPrint = window.currentFilteredBitacora && window.currentFilteredBitacora.length > 0 
+                                ? window.currentFilteredBitacora 
+                                : window.bitacoraList;
             }
 
-            if (!filteredList || filteredList.length === 0) {
-                printBody.innerHTML = `<tr><td colspan="7" class="p-3 text-center">Sin registros en la bitácora para el rango seleccionado.</td></tr>`;
+            if (!listToPrint || listToPrint.length === 0) {
+                printBody.innerHTML = `<tr><td colspan="7" class="p-3 text-center">Sin registros en la bitácora para el filtro seleccionado.</td></tr>`;
             } else {
                 let html = '';
-                filteredList.forEach(item => {
-                    const imgHtml = item.imageData ? `<img src="${item.imageData}" style="max-height: 40px; margin: auto;">` : 'Pendiente foto';
+                listToPrint.forEach(item => {
+                    const imgHtml = item.imageData ? `<img src="${item.imageData}" style="max-height: 60px; width: auto; margin: auto; display: block; object-fit: contain;">` : 'Pendiente foto';
                     const printStatus = (item.status === 'VOLADO') ? 'REALIZADO' : item.status;
                     html += `
-                        <tr class="border-b border-black">
-                            <td class="p-1 border-r border-black">${item.timestampFormatted}</td>
-                            <td class="p-1 border-r border-black font-bold">${item.scheduledTime} hrs</td>
-                            <td class="p-1 border-r border-black">${item.flightType}</td>
-                            <td class="p-1 border-r border-black font-bold">${printStatus}</td>
-                            <td class="p-1 border-r border-black">${item.realTime}</td>
-                            <td class="p-1 border-r border-black">${item.notes}</td>
-                            <td class="p-1 text-center">${imgHtml}</td>
+                        <tr style="border-bottom: 1px solid #000; page-break-inside: avoid;">
+                            <td class="p-1 border-r border-black" style="vertical-align: middle;">${item.timestampFormatted}</td>
+                            <td class="p-1 border-r border-black font-bold" style="vertical-align: middle;">${item.scheduledTime} hrs</td>
+                            <td class="p-1 border-r border-black" style="vertical-align: middle;">${item.flightType}</td>
+                            <td class="p-1 border-r border-black font-bold" style="vertical-align: middle;">${printStatus}</td>
+                            <td class="p-1 border-r border-black" style="vertical-align: middle;">${item.realTime}</td>
+                            <td class="p-1 border-r border-black" style="vertical-align: middle;">${item.notes}</td>
+                            <td class="p-1 text-center" style="vertical-align: middle;">${imgHtml}</td>
                         </tr>
                     `;
                 });
