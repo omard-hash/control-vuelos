@@ -50,7 +50,7 @@
             header, main, .no-print, .modal-backdrop { display: none !important; }
             #bitacoraPrintSection { display: block !important; }
             
-            /* Corrección para impresión en múltiples páginas sin cortes */
+            /* Corrección clave para impresión en múltiples páginas sin cortes */
             html, body { 
                 background: #ffffff !important; 
                 color: #000000 !important; 
@@ -650,15 +650,11 @@
             if (!firebaseConfig) {
                 const customConfigStr = window.safeStorageGet ? window.safeStorageGet('audi_custom_firebase_config') : null;
                 if (customConfigStr) {
-                    try {
-                        firebaseConfig = JSON.parse(customConfigStr);
-                    } catch(e) {}
+                    try { firebaseConfig = JSON.parse(customConfigStr); } catch(e) {}
                 }
             }
 
-            if (!firebaseConfig) {
-                firebaseConfig = DEFAULT_FIREBASE_CONFIG;
-            }
+            if (!firebaseConfig) { firebaseConfig = DEFAULT_FIREBASE_CONFIG; }
 
             try {
                 const app = initializeApp(firebaseConfig);
@@ -666,9 +662,7 @@
                 db = getFirestore(app);
                 window.__firebase_db = db;
 
-                try {
-                    await signInAnonymously(auth);
-                } catch (authErr) {}
+                try { await signInAnonymously(auth); } catch (authErr) {}
 
                 updateCloudUI(true, "Nube Live Sincronizada");
                 setupRealtimeListeners();
@@ -707,18 +701,10 @@
             const bitacoraColRef = collection(db, 'artifacts', appId, 'public', 'data', 'bitacora_logs');
             onSnapshot(bitacoraColRef, (querySnap) => {
                 const logs = [];
-                querySnap.forEach((docSnap) => {
-                    logs.push(docSnap.data());
-                });
-                
-                if (logs.length > 0) {
-                    processIncomingCloudLogs(logs);
-                } else {
-                    fetchRootCollectionLogs();
-                }
-            }, (err) => {
-                fetchRootCollectionLogs();
-            });
+                querySnap.forEach((docSnap) => { logs.push(docSnap.data()); });
+                if (logs.length > 0) { processIncomingCloudLogs(logs); } 
+                else { fetchRootCollectionLogs(); }
+            }, (err) => { fetchRootCollectionLogs(); });
         }
 
         async function fetchRootCollectionLogs() {
@@ -728,9 +714,7 @@
                 const snap = await getDocs(rootCol);
                 const rootLogs = [];
                 snap.forEach(d => rootLogs.push(d.data()));
-                if (rootLogs.length > 0) {
-                    processIncomingCloudLogs(rootLogs);
-                }
+                if (rootLogs.length > 0) { processIncomingCloudLogs(rootLogs); }
             } catch(e) {}
         }
 
@@ -745,22 +729,25 @@
             newLogs.forEach(item => {
                 if (item && item.id) {
                     const existing = currentMap.get(String(item.id));
-                    // PRECAUCIÓN DE DATOS: No sobrescribir la foto local si la nube no la tiene (por problemas de tamaño o latencia)
+                    // PRECAUCIÓN: Proteger las imágenes si la nube manda un registro sin imagen
                     if (existing && existing.imageData && !item.imageData) {
                         item.imageData = existing.imageData;
+                    }
+                    // FIX: No sobreescribir estado SUSPENDIDO localmente si la nube tiene un error
+                    if (existing && existing.status === 'SUSPENDIDO' && item.status === 'REALIZADO') {
+                         item.status = 'SUSPENDIDO';
                     }
                     currentMap.set(String(item.id), item);
                 }
             });
 
             const merged = Array.from(currentMap.values());
-            merged.sort((a, b) => b.id - a.id); // Orden descendente por ID
+            merged.sort((a, b) => b.id - a.id);
             
             window.bitacoraList = merged;
             if (window.safeStorageSet) window.safeStorageSet('audi_bitacora_logs', JSON.stringify(merged));
             if (window.saveRecoveryBackup) window.saveRecoveryBackup(merged, 'Sincronización Nube Firestore');
 
-            // Reconstrucción del panel frontal solo para registros pendientes
             if (typeof window.getActivePlan === 'function') {
                 const plans = window.getActivePlan();
                 let rebuiltAny = false;
@@ -770,12 +757,12 @@
                 plans.forEach((item, idx) => {
                     const currentSt = window.dailyFlightStatuses[idx];
                     if (!currentSt || currentSt.status === 'PENDIENTE') {
-                        // Busca el primer registro de hoy para esa hora
                         const match = merged.find(b => 
                             b.scheduledTime === item.timeOp2 && 
                             (b.dateKey === todayKey || (b.timestampFormatted && b.timestampFormatted.includes(todayStr)))
                         );
                         if (match) {
+                            // FIX: Respetar que si dice SUSPENDIDO se quede como SUSPENDIDO.
                             const st = (match.status === 'VOLADO') ? 'REALIZADO' : match.status;
                             window.dailyFlightStatuses[idx] = {
                                 status: st,
@@ -890,16 +877,14 @@
                 processIncomingCloudLogs(recoveredLogs);
                 if (!isSilent) window.showToast(`¡Sincronización completa! Total registros: ${window.bitacoraList.length}`, "success");
             } else {
-                if (!isSilent) window.showToast("No se encontraron registros adicionales.", "info");
+                if (!isSilent) window.showToast("No se encontraron registros adicionales en otras carpetas.", "info");
             }
         };
 
         window.openCloudSettingsModal = function() {
             const savedConfig = window.safeStorageGet('audi_custom_firebase_config');
             const input = document.getElementById('customFirebaseConfigInput');
-            if (input && savedConfig) {
-                input.value = savedConfig;
-            }
+            if (input && savedConfig) { input.value = savedConfig; }
             window.openModal('modalCloudSettings');
         };
 
@@ -907,10 +892,7 @@
             const input = document.getElementById('customFirebaseConfigInput');
             if (!input) return;
             const val = input.value.trim();
-            if (!val) {
-                showToast("Ingresa un objeto JSON válido de configuración.", "warning");
-                return;
-            }
+            if (!val) { showToast("Ingresa un objeto JSON válido.", "warning"); return; }
             try {
                 JSON.parse(val);
                 window.safeStorageSet('audi_custom_firebase_config', val);
@@ -1128,7 +1110,7 @@
 
         window.dailyFlightStatuses = {};
         window.bitacoraList = [];
-        window.currentFilteredBitacora = []; // VARIABLE GLOBAL PARA SINCRONIZAR TABLA Y PDF
+        window.currentFilteredBitacora = []; // Variable global esencial para imprimir el PDF exactamente como se ve.
         window.activeModalIndex = 0;
         window.tempCompressedImage = "";
         window.audioUnlocked = false;
@@ -1191,6 +1173,8 @@
                 const baseMins = parseTimeToMinutes(item.timeOp2);
                 const windowEndMins = baseMins + 30;
                 
+                // FIX: SOLO limpia suspensiones del FUTURO. 
+                // Protege los registros ya vencidos en el pasado.
                 if (st && st.status === 'SUSPENDIDO' && (windowEndMins > currentMins)) {
                     delete window.dailyFlightStatuses[idx];
                     
@@ -1831,7 +1815,7 @@
 
                         const logEntry = {
                             id: Date.now() + i,
-                            dateKey: todayKey,
+                            dateKey: todayKey, 
                             timestampFormatted: new Date().toLocaleString('es-MX'),
                             scheduledTime: item.timeOp2,
                             flightType: `TIPO ${item.type} - ${item.name}`,
@@ -1852,7 +1836,7 @@
                 
                 const logEntry = {
                     id: Date.now(),
-                    dateKey: todayKey,
+                    dateKey: todayKey, 
                     timestampFormatted: new Date().toLocaleString('es-MX'),
                     scheduledTime: item.timeOp2,
                     flightType: `TIPO ${item.type} - ${item.name}`,
@@ -1973,16 +1957,11 @@
                     if (!item.timestampFormatted) return false;
                     
                     const datePart = item.timestampFormatted.split(',')[0].trim();
-                    const dParts = datePart.split(/[-/]/);
+                    const dParts = datePart.split('/');
                     if (dParts.length === 3) {
-                        let p1 = parseInt(dParts[0], 10);
-                        let p2 = parseInt(dParts[1], 10);
-                        let p3 = parseInt(dParts[2], 10);
-                        if (p3 < 1000) p3 += 2000;
-                        let itemD, itemM, itemY = p3;
-                        if (p1 > 12) { itemD = p1; itemM = p2; }
-                        else if (p2 > 12) { itemD = p2; itemM = p1; }
-                        else { itemD = p1; itemM = p2; }
+                        const itemD = parseInt(dParts[0], 10);
+                        const itemM = parseInt(dParts[1], 10);
+                        const itemY = parseInt(dParts[2], 10);
                         return itemD === filterDay && itemM === filterMonth && itemY === filterYear;
                     }
                     return item.timestampFormatted.includes(`${filterDay}/${filterMonth}/${filterYear}`);
@@ -2018,7 +1997,7 @@
                 sortedList.reverse();
             }
 
-            // GUARDAR LA LISTA EXACTA PARA QUE EL PDF IMPRIMA LO MISMO QUE SE VE
+            // IMPORTANTE: Guardamos exactamente lo que se ve para que el PDF lo imprima igual
             window.currentFilteredBitacora = sortedList;
 
             let html = '';
@@ -2191,8 +2170,6 @@
 
             let listToPrint = [];
 
-            // Si hay un rango de fechas escrito, lo usamos.
-            // Si está vacío, simplemente imprimimos lo que la persona ESTÁ VIENDO en la tabla en ese momento.
             if (startDateInput || endDateInput) {
                 listToPrint = window.bitacoraList.filter(item => {
                     let itemDate;
@@ -2210,42 +2187,38 @@
                             if (p3 < 1000) p3 += 2000;
                             if (p1 > 12) itemDate = new Date(p3, p2 - 1, p1);
                             else if (p2 > 12) itemDate = new Date(p3, p1 - 1, p2);
-                            else itemDate = new Date(p3, p2 - 1, p1);
+                            else itemDate = new Date(p3, p2 - 1, p1); 
                         }
                     }
                     
                     if (!itemDate) return true; 
 
-                    itemDate.setHours(0,0,0,0);
-                    
                     let isAfterStart = true;
                     let isBeforeEnd = true;
 
                     if (startDateInput) {
                         const sParts = startDateInput.split('-');
                         const sDate = new Date(parseInt(sParts[0], 10), parseInt(sParts[1], 10) - 1, parseInt(sParts[2], 10));
-                        sDate.setHours(0,0,0,0);
                         isAfterStart = itemDate >= sDate;
                     }
 
                     if (endDateInput) {
                         const eParts = endDateInput.split('-');
                         const eDate = new Date(parseInt(eParts[0], 10), parseInt(eParts[1], 10) - 1, parseInt(eParts[2], 10));
-                        eDate.setHours(23,59,59,999);
                         isBeforeEnd = itemDate <= eDate;
                     }
 
                     return isAfterStart && isBeforeEnd;
                 });
             } else {
-                // USA LA LISTA QUE SE VE EN PANTALLA ACTUALMENTE (Con fotos y todo intacto)
+                // FIX CRITICO: Si no seleccionas fechas en el PDF, agarra exactamente los registros de la pantalla, sin perder ninguno.
                 listToPrint = window.currentFilteredBitacora && window.currentFilteredBitacora.length > 0 
                                 ? window.currentFilteredBitacora 
                                 : window.bitacoraList;
             }
 
             if (!listToPrint || listToPrint.length === 0) {
-                printBody.innerHTML = `<tr><td colspan="7" class="p-3 text-center">Sin registros en la bitácora para el filtro seleccionado.</td></tr>`;
+                printBody.innerHTML = `<tr><td colspan="7" class="p-3 text-center">Sin registros en la bitácora para el rango seleccionado.</td></tr>`;
             } else {
                 let html = '';
                 listToPrint.forEach(item => {
