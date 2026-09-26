@@ -45,33 +45,49 @@
         ::-webkit-scrollbar-thumb:hover { background: #475569; }
 
         @media print {
-            @page { size: landscape; margin: 6mm; }
-            * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
-            header, main, .no-print, .modal-backdrop { display: none !important; }
-            #bitacoraPrintSection { display: block !important; width: 100% !important; }
-            
+            @page { 
+                size: landscape; 
+                margin: 8mm 6mm; 
+            }
+            * { 
+                -webkit-print-color-adjust: exact !important; 
+                print-color-adjust: exact !important; 
+            }
+            header, main, .no-print, .modal-backdrop { 
+                display: none !important; 
+            }
+            #bitacoraPrintSection { 
+                display: block !important; 
+                width: 100% !important; 
+                margin: 0 !important;
+                padding: 0 !important;
+            }
             html, body { 
                 background: #ffffff !important; 
                 color: #000000 !important; 
                 padding: 0 !important; 
                 margin: 0 !important;
                 height: auto !important; 
-                min-height: 100% !important;
+                min-height: auto !important;
                 overflow: visible !important; 
                 display: block !important;
                 font-size: 8.5px !important;
             }
-            
             table { 
-                page-break-inside: auto; 
+                page-break-inside: auto !important; 
                 width: 100% !important; 
                 border-collapse: collapse !important; 
             }
             tr { 
                 page-break-inside: avoid !important; 
-                page-break-after: auto; 
+                page-break-after: auto !important; 
             }
-            thead { display: table-header-group; }
+            thead { 
+                display: table-header-group !important; 
+            }
+            tbody {
+                display: table-row-group !important;
+            }
             td, th { 
                 padding: 3px 5px !important; 
                 border: 1px solid #000 !important; 
@@ -163,7 +179,7 @@
                     </p>
                 </div>
 
-                <!-- CONTROLES Y CRONÓMETRO -->
+                <!-- CONTROLES Y CRONÓMETRO (Solo botón DESPEGUE en la tarjeta principal) -->
                 <div class="flex flex-col xs:flex-row items-stretch xs:items-center gap-2.5 bg-slate-950/90 p-2.5 rounded-xl border border-slate-800/90 shadow-lg">
                     <div class="text-center xs:text-right px-3 py-1 bg-slate-900/80 rounded-lg border border-slate-800 flex-1 xs:flex-none">
                         <div class="text-[9.5px] uppercase font-bold text-slate-400 tracking-wider">Estado / Cronómetro</div>
@@ -254,7 +270,7 @@
         </div>
     </div>
 
-    <!-- MODAL COMPLETO DE BITÁCORA AUDITABLE -->
+    <!-- MODAL COMPLETO DE BITÁCORA AUDITABLE (SIN COLUMNA PILOTO) -->
     <div id="modalBitacoraView" class="fixed inset-0 bg-slate-950/90 backdrop-blur-md z-50 flex items-center justify-center p-2 sm:p-4 hidden modal-backdrop">
         <div class="bg-slate-900 border border-blue-500/40 rounded-2xl max-w-6xl w-full p-3 sm:p-4 shadow-2xl space-y-2.5 max-h-[94vh] flex flex-col">
             <div class="flex justify-between items-center border-b border-slate-800 pb-2">
@@ -334,7 +350,7 @@
                 </div>
             </div>
 
-            <!-- TABLA DE LA BITÁCORA -->
+            <!-- TABLA DE LA BITÁCORA (Sin columna Piloto) -->
             <div class="overflow-y-auto overflow-x-auto flex-1 border border-slate-800 rounded-xl">
                 <table class="w-full text-left text-xs min-w-[700px]">
                     <thead class="bg-slate-950 text-slate-400 uppercase font-bold tracking-wider border-b border-slate-800 text-[9.5px] sticky top-0 z-10 shadow">
@@ -422,7 +438,7 @@
         </div>
     </div>
 
-    <!-- MODAL EDICIÓN DE REGISTRO -->
+    <!-- MODAL EDICIÓN DE REGISTRO (Sin campo Piloto) -->
     <div id="modalEditBitacoraEntry" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-3 hidden modal-backdrop">
         <div class="bg-slate-900 border border-blue-500/40 rounded-2xl max-w-md w-full p-4 shadow-2xl space-y-2.5 max-h-[90vh] overflow-y-auto">
             <div class="flex justify-between items-center border-b border-slate-800 pb-2">
@@ -543,7 +559,7 @@
 
             <div class="flex justify-end gap-2 pt-2 border-t border-slate-800">
                 <button onclick="closeModal('modalSuspension')" class="px-3 py-1 bg-slate-800 text-slate-300 font-semibold text-xs rounded-xl">Cancelar</button>
-                <button onclick="confirmSuspension()" class="px-3 py-1 bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs rounded-xl shadow">Confirmar Suspensión General</button>
+                <button onclick="confirmSuspension()" class="px-3 py-1 bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs rounded-xl shadow">Confirmar Suspensión</button>
             </div>
         </div>
     </div>
@@ -570,7 +586,7 @@
         <span id="toastMessage" class="font-semibold text-[11px]">Notificación</span>
     </div>
 
-    <!-- SECCIÓN OCULTA PARA IMPRESIÓN Y PDF DE LA BITÁCORA -->
+    <!-- SECCIÓN OCULTA PARA IMPRESIÓN Y PDF DE LA BITÁCORA (Sin columna Piloto) -->
     <section id="bitacoraPrintSection" class="p-3 bg-white text-black">
         <div class="border-b-2 border-black pb-1.5 mb-2 flex justify-between items-center">
             <div>
@@ -611,7 +627,7 @@
         </div>
     </section>
 
-    <!-- SCRIPT DE CONFIGURACIÓN GLOBAL Y PLANES -->
+    <!-- SCRIPT DE CONFIGURACIÓN GLOBAL Y PLANES (Rotación aleatoria con Plan 2 bloqueado hoy) -->
     <script>
         const memoryStorageFallback = {};
         function safeStorageGet(key) {
@@ -629,7 +645,26 @@
         }
         window.getTodayKey = getTodayKey;
 
+        // CATÁLOGO COMPLETO DE LOS 4 PLANES OFICIALES (16 VUELOS CADA UNO)
         const OFFICIAL_PLANS = {
+            "1": [
+                { timeOp2: "00:30", type: "C", name: "Interior de planta", forced: false },
+                { timeOp2: "02:00", type: "A", name: "Recorrido perimetral", forced: false },
+                { timeOp2: "03:30", type: "D", name: "Zonas lejanas", forced: false },
+                { timeOp2: "05:00", type: "A", name: "Recorrido perimetral", forced: false },
+                { timeOp2: "06:00", type: "B", name: "Cambio de turno", forced: true },
+                { timeOp2: "07:30", type: "C", name: "Interior de planta", forced: false },
+                { timeOp2: "09:00", type: "A", name: "Recorrido perimetral", forced: false },
+                { timeOp2: "10:30", type: "D", name: "Zonas lejanas", forced: false },
+                { timeOp2: "12:00", type: "A", name: "Recorrido perimetral", forced: false },
+                { timeOp2: "14:00", type: "B", name: "Cambio de turno", forced: true },
+                { timeOp2: "15:30", type: "C", name: "Interior de planta", forced: false },
+                { timeOp2: "17:00", type: "B", name: "Cambio de turno", forced: true },
+                { timeOp2: "18:30", type: "A", name: "Recorrido perimetral", forced: false },
+                { timeOp2: "20:00", type: "D", name: "Zonas lejanas", forced: false },
+                { timeOp2: "21:30", type: "B", name: "Cambio de turno - Uso de Spotlight", forced: true },
+                { timeOp2: "23:00", type: "A", name: "Recorrido perimetral", forced: false }
+            ],
             "2": [
                 { timeOp2: "00:30", type: "A", name: "Recorrido perimetral", forced: false },
                 { timeOp2: "02:00", type: "D", name: "Zonas lejanas", forced: false },
@@ -647,11 +682,64 @@
                 { timeOp2: "20:00", type: "C", name: "Interior de planta", forced: false },
                 { timeOp2: "21:30", type: "B", name: "Cambio de turno - Uso de Spotlight", forced: true },
                 { timeOp2: "23:00", type: "A", name: "Recorrido perimetral", forced: false }
+            ],
+            "3": [
+                { timeOp2: "01:00", type: "D", name: "Zonas lejanas", forced: false },
+                { timeOp2: "02:30", type: "A", name: "Recorrido perimetral", forced: false },
+                { timeOp2: "04:00", type: "C", name: "Interior de planta", forced: false },
+                { timeOp2: "05:00", type: "A", name: "Recorrido perimetral", forced: false },
+                { timeOp2: "06:00", type: "B", name: "Cambio de turno", forced: true },
+                { timeOp2: "07:30", type: "A", name: "Recorrido perimetral", forced: false },
+                { timeOp2: "09:00", type: "C", name: "Interior de planta", forced: false },
+                { timeOp2: "10:30", type: "A", name: "Recorrido perimetral", forced: false },
+                { timeOp2: "12:30", type: "D", name: "Zonas lejanas", forced: false },
+                { timeOp2: "14:00", type: "B", name: "Cambio de turno", forced: true },
+                { timeOp2: "15:30", type: "A", name: "Recorrido perimetral", forced: false },
+                { timeOp2: "17:00", type: "B", name: "Cambio de turno", forced: true },
+                { timeOp2: "18:30", type: "C", name: "Interior de planta", forced: false },
+                { timeOp2: "20:00", type: "A", name: "Recorrido perimetral", forced: false },
+                { timeOp2: "21:30", type: "B", name: "Cambio de turno - Uso de Spotlight", forced: true },
+                { timeOp2: "23:00", type: "D", name: "Zonas lejanas", forced: false }
+            ],
+            "4": [
+                { timeOp2: "00:30", type: "D", name: "Zonas lejanas", forced: false },
+                { timeOp2: "02:00", type: "C", name: "Interior de planta", forced: false },
+                { timeOp2: "03:30", type: "A", name: "Recorrido perimetral", forced: false },
+                { timeOp2: "05:00", type: "A", name: "Recorrido perimetral", forced: false },
+                { timeOp2: "06:00", type: "B", name: "Cambio de turno", forced: true },
+                { timeOp2: "08:00", type: "C", name: "Interior de planta", forced: false },
+                { timeOp2: "09:30", type: "D", name: "Zonas lejanas", forced: false },
+                { timeOp2: "11:00", type: "A", name: "Recorrido perimetral", forced: false },
+                { timeOp2: "12:30", type: "C", name: "Interior de planta", forced: false },
+                { timeOp2: "14:00", type: "B", name: "Cambio de turno", forced: true },
+                { timeOp2: "15:30", type: "A", name: "Recorrido perimetral", forced: false },
+                { timeOp2: "17:00", type: "B", name: "Cambio de turno", forced: true },
+                { timeOp2: "18:30", type: "D", name: "Zonas lejanas", forced: false },
+                { timeOp2: "20:00", type: "C", name: "Interior de planta", forced: false },
+                { timeOp2: "21:30", type: "B", name: "Cambio de turno - Uso de Spotlight", forced: true },
+                { timeOp2: "23:00", type: "A", name: "Recorrido perimetral", forced: false }
             ]
         };
 
+        // SELECCIÓN: Plan 2 bloqueado para hoy (25 y 26 de septiembre), y pseudoaleatorio para los demás días
         function getActivePlanKey() {
-            return "2";
+            const today = getTodayKey();
+            if (today === '2026-09-25' || today === '2026-09-26') {
+                return "2";
+            }
+            
+            const savedPlan = safeStorageGet(`audi_assigned_plan_${today}`);
+            if (savedPlan && OFFICIAL_PLANS[savedPlan]) {
+                return savedPlan;
+            }
+
+            const parts = today.split('-').map(Number);
+            const seed = (parts[0] * 365 + parts[1] * 31 + parts[2] * 7 + 11);
+            const planList = ["1", "2", "3", "4"];
+            const selectedPlan = planList[seed % 4];
+
+            safeStorageSet(`audi_assigned_plan_${today}`, selectedPlan);
+            return selectedPlan;
         }
         window.getActivePlanKey = getActivePlanKey;
 
@@ -671,6 +759,7 @@
         window.bitacoraSelectedDate = "";
         window.systemWeatherSuspended = false;
         window.isTopLevelSuspension = false;
+        window.triggeredVoiceAlerts = new Set();
     </script>
 
     <!-- FIREBASE INITIALIZATION & DEEP RESTORATION MODULE -->
@@ -1020,6 +1109,186 @@
 
         const SUPERVISOR_PASSWORD = "audi";
 
+        // GESTIÓN DEL SISTEMA DE AUDIO Y TONO CHIME
+        let audioCtxInstance = null;
+        function getAudioContext() {
+            if (!audioCtxInstance) {
+                const AudioCtx = window.AudioContext || window.webkitAudioContext;
+                if (AudioCtx) {
+                    audioCtxInstance = new AudioCtx();
+                }
+            }
+            if (audioCtxInstance && audioCtxInstance.state === 'suspended') {
+                audioCtxInstance.resume();
+            }
+            return audioCtxInstance;
+        }
+
+        function playAirportChime(isUrgent = false) {
+            try {
+                const ctx = getAudioContext();
+                if (!ctx) return;
+
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+
+                const now = ctx.currentTime;
+                if (isUrgent) {
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(880, now);
+                    osc.frequency.setValueAtTime(659, now + 0.15);
+                    gain.gain.setValueAtTime(0.25, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.45);
+                    osc.start(now);
+                    osc.stop(now + 0.45);
+                } else {
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(587.33, now); // D5
+                    osc.frequency.setValueAtTime(880, now + 0.18);    // A5
+                    gain.gain.setValueAtTime(0.2, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.5);
+                    osc.start(now);
+                    osc.stop(now + 0.5);
+                }
+            } catch(e) {}
+        }
+
+        function triggerVoiceAlert(text, isUrgent = false) {
+            showToast(text, isUrgent ? 'warning' : 'info');
+            playAirportChime(isUrgent);
+
+            if ('speechSynthesis' in window) {
+                try {
+                    window.speechSynthesis.cancel();
+                    setTimeout(() => {
+                        const utterance = new SpeechSynthesisUtterance(text);
+                        utterance.lang = 'es-MX';
+                        utterance.rate = 0.98;
+                        utterance.pitch = 1.0;
+                        utterance.volume = 1.0;
+                        window.speechSynthesis.speak(utterance);
+                    }, 220);
+                } catch (e) {}
+            }
+        }
+        window.triggerVoiceAlert = triggerVoiceAlert;
+
+        function unlockAudioSystem() {
+            window.audioUnlocked = true;
+            getAudioContext();
+            const badgeText = document.getElementById('audioStatusText');
+            const badgeIcon = document.getElementById('audioStatusIcon');
+            const badgeContainer = document.getElementById('audioStatusBadge');
+
+            if (badgeText) badgeText.innerText = "Audio Activo (Vol. Máx)";
+            if (badgeIcon) badgeIcon.className = "fa-solid fa-volume-high text-emerald-400 animate-pulse";
+            if (badgeContainer) badgeContainer.className = "mt-1 text-[8.5px] font-bold px-1.5 py-0.5 rounded bg-emerald-950/80 text-emerald-400 border border-emerald-800/60 flex items-center gap-1 shrink-0 cursor-pointer";
+        }
+        window.unlockAudioSystem = unlockAudioSystem;
+
+        function toggleAudioAndTest() {
+            unlockAudioSystem();
+            triggerVoiceAlert("Sistema de audio verificado y activo para operaciones de vuelo Audi México.");
+        }
+        window.toggleAudioAndTest = toggleAudioAndTest;
+
+        // EVALUACIÓN DE ALERTAS AUTOMÁTICAS DE VENTANA Y HORA EXACTA
+        function checkAndTriggerFlightAlerts(now, targetItem, baseMins, currentMins, statusObj) {
+            if (statusObj.status !== 'PENDIENTE' || window.systemWeatherSuspended) return;
+
+            const today = getTodayKey();
+            const isTypeB = targetItem.forced;
+
+            if (isTypeB) {
+                const diffSecs = Math.floor((baseMins - currentMins) * 60 - now.getSeconds());
+                
+                // 30 minutos antes
+                if (diffSecs <= 1800 && diffSecs > 1740) {
+                    const alertKey = `${today}_${targetItem.timeOp2}_B_30m`;
+                    if (!window.triggeredVoiceAlerts.has(alertKey)) {
+                        window.triggeredVoiceAlerts.add(alertKey);
+                        triggerVoiceAlert(`Atención. Faltan 30 minutos para el vuelo obligatorio de Cambio de Turno de las ${targetItem.timeOp2} horas.`);
+                    }
+                }
+                // 15 minutos antes
+                else if (diffSecs <= 900 && diffSecs > 840) {
+                    const alertKey = `${today}_${targetItem.timeOp2}_B_15m`;
+                    if (!window.triggeredVoiceAlerts.has(alertKey)) {
+                        window.triggeredVoiceAlerts.add(alertKey);
+                        triggerVoiceAlert(`Recordatorio. Faltan 15 minutos para el vuelo de Cambio de Turno de las ${targetItem.timeOp2} horas.`);
+                    }
+                }
+                // 5 minutos antes (Urgente)
+                else if (diffSecs <= 300 && diffSecs > 240) {
+                    const alertKey = `${today}_${targetItem.timeOp2}_B_5m`;
+                    if (!window.triggeredVoiceAlerts.has(alertKey)) {
+                        window.triggeredVoiceAlerts.add(alertKey);
+                        triggerVoiceAlert(`¡Alerta urgente! Quedan 5 minutos para el Cambio de Turno de las ${targetItem.timeOp2} horas. Proceda al despegue.`, true);
+                    }
+                }
+                // Hora exacta de relevo
+                else if (diffSecs <= 0 && diffSecs > -60) {
+                    const alertKey = `${today}_${targetItem.timeOp2}_B_EXACT`;
+                    if (!window.triggeredVoiceAlerts.has(alertKey)) {
+                        window.triggeredVoiceAlerts.add(alertKey);
+                        triggerVoiceAlert(`¡Atención! Es la hora exacta del vuelo de Cambio de Turno de las ${targetItem.timeOp2} horas. Proceda al despegue.`, true);
+                    }
+                }
+            } else {
+                const winStartMins = baseMins - 30;
+                const winEndMins = baseMins + 30;
+
+                // Apertura de ventana (30m antes de hora base)
+                if (currentMins >= winStartMins && currentMins < winStartMins + 1) {
+                    const alertKey = `${today}_${targetItem.timeOp2}_OPEN`;
+                    if (!window.triggeredVoiceAlerts.has(alertKey)) {
+                        window.triggeredVoiceAlerts.add(alertKey);
+                        triggerVoiceAlert(`Atención. Se ha abierto la ventana del vuelo de las ${targetItem.timeOp2} horas.`);
+                    }
+                }
+
+                // 15 minutos después de abrir (45 min restantes)
+                if (currentMins === winStartMins + 15) {
+                    const alertKey = `${today}_${targetItem.timeOp2}_45m_REM`;
+                    if (!window.triggeredVoiceAlerts.has(alertKey)) {
+                        window.triggeredVoiceAlerts.add(alertKey);
+                        triggerVoiceAlert(`Recordatorio. La ventana del vuelo de las ${targetItem.timeOp2} horas continúa abierta. Quedan 45 minutos.`);
+                    }
+                }
+
+                // Hora base del vuelo (30 min restantes)
+                if (currentMins === baseMins) {
+                    const alertKey = `${today}_${targetItem.timeOp2}_BASE`;
+                    if (!window.triggeredVoiceAlerts.has(alertKey)) {
+                        window.triggeredVoiceAlerts.add(alertKey);
+                        triggerVoiceAlert(`Recordatorio. Es la hora base del vuelo de las ${targetItem.timeOp2} horas. Quedan 30 minutos de ventana.`);
+                    }
+                }
+
+                // A los 15 minutos para el cierre
+                if (currentMins === winEndMins - 15) {
+                    const alertKey = `${today}_${targetItem.timeOp2}_15m_CLOSE`;
+                    if (!window.triggeredVoiceAlerts.has(alertKey)) {
+                        window.triggeredVoiceAlerts.add(alertKey);
+                        triggerVoiceAlert(`Recordatorio. La ventana del vuelo de las ${targetItem.timeOp2} horas continúa abierta. Quedan 15 minutos.`);
+                    }
+                }
+
+                // A los 5 minutos para el cierre (Urgente)
+                if (currentMins === winEndMins - 5) {
+                    const alertKey = `${today}_${targetItem.timeOp2}_5m_CLOSE`;
+                    if (!window.triggeredVoiceAlerts.has(alertKey)) {
+                        window.triggeredVoiceAlerts.add(alertKey);
+                        triggerVoiceAlert(`¡Alerta urgente! Quedan 5 minutos para el cierre de la ventana de las ${targetItem.timeOp2} horas. Proceda al despegue.`, true);
+                    }
+                }
+            }
+        }
+
+        // MODAL DE AUTORIZACIÓN CON CONTRASEÑA
         function promptPasswordConfirmation(title, message, onSuccess) {
             const titleEl = document.getElementById('pwdDialogTitle');
             const msgEl = document.getElementById('pwdDialogMessage');
@@ -1075,6 +1344,7 @@
         }
         window.promptPasswordConfirmation = promptPasswordConfirmation;
 
+        // RESTAURACIÓN BLINDADA DE LOS 16 VUELOS DEL DÍA 25 DE SEPTIEMBRE (14 Realizados y 2 Suspendidos)
         function restoreSeptember25FullAudit() {
             const dateKey25 = "2026-09-25";
             const dateStr25 = "25/9/2026";
@@ -1145,6 +1415,7 @@
         }
         window.restoreSeptember25FullAudit = restoreSeptember25FullAudit;
 
+        // FUSIÓN Y RESCATE: Sincroniza los 16 vuelos de la pantalla hacia la bitácora
         function syncDailyStatusesWithBitacora() {
             const plans = getActivePlan();
             const todayKey = getTodayKey();
@@ -1202,92 +1473,6 @@
             }
         }
         window.syncDailyStatusesWithBitacora = syncDailyStatusesWithBitacora;
-
-        function updateMainWeatherButtonUI() {
-            const btn = document.getElementById('btnMainWeatherToggle');
-            const icon = document.getElementById('btnMainWeatherIcon');
-            const text = document.getElementById('btnMainWeatherText');
-            const sysBadge = document.getElementById('systemStatusBadge');
-            const sysIcon = document.getElementById('systemStatusIcon');
-            const sysText = document.getElementById('systemStatusText');
-
-            if (window.systemWeatherSuspended) {
-                if (btn) btn.className = "flex-1 px-3 py-2 bg-blue-600 hover:bg-blue-500 text-white font-black text-xs sm:text-sm rounded-xl shadow-lg border border-blue-400/50 transition flex items-center justify-center gap-1 cursor-pointer animate-pulse";
-                if (icon) icon.className = "fa-solid fa-sun text-amber-300";
-                if (text) text.innerText = "REANUDAR";
-
-                if (sysBadge) sysBadge.className = "text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-950/80 text-amber-400 border border-amber-800/40 shrink-0 flex items-center gap-1 animate-pulse";
-                if (sysIcon) sysIcon.className = "fa-solid fa-triangle-exclamation text-amber-400";
-                if (sysText) sysText.innerText = "SUSPENSIÓN GENERAL CLIMA";
-            } else {
-                if (btn) btn.className = "flex-1 px-3 py-2 bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs sm:text-sm rounded-xl shadow-md border border-amber-400/30 transition flex items-center justify-center gap-1 cursor-pointer";
-                if (icon) icon.className = "fa-solid fa-pause";
-                if (text) text.innerText = "SUSPENDER";
-
-                if (sysBadge) sysBadge.className = "text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-950/80 text-emerald-400 border border-emerald-800/40 shrink-0 flex items-center gap-1";
-                if (sysIcon) sysIcon.className = "fa-solid fa-circle-check text-emerald-400";
-                if (sysText) sysText.innerText = "Operación Normal";
-            }
-        }
-        window.updateMainWeatherButtonUI = updateMainWeatherButtonUI;
-
-        function toggleMainWeatherSuspension() {
-            if (window.systemWeatherSuspended) {
-                quickResumeSystem();
-            } else {
-                openSuspensionModalForIdx(window.activeTargetIdx || 0, true);
-            }
-        }
-        window.toggleMainWeatherSuspension = toggleMainWeatherSuspension;
-
-        function quickResumeSystem() {
-            window.systemWeatherSuspended = false;
-            safeStorageSet('audi_weather_suspended', 'false');
-            
-            const plans = getActivePlan();
-            const now = new Date();
-            const currentMins = now.getHours() * 60 + now.getMinutes();
-            const todayKey = getTodayKey();
-
-            plans.forEach((item, idx) => {
-                const st = window.dailyFlightStatuses[idx];
-                const baseMins = parseTimeToMinutes(item.timeOp2);
-                const windowEndMins = baseMins + 30;
-                
-                if (st && st.status === 'SUSPENDIDO' && (windowEndMins > currentMins)) {
-                    delete window.dailyFlightStatuses[idx];
-                    
-                    const logsToRemove = window.bitacoraList.filter(b => b.scheduledTime === item.timeOp2 && b.status === 'SUSPENDIDO' && !b.imageData && b.dateKey === todayKey);
-                    
-                    logsToRemove.forEach(log => {
-                        if (typeof window.deleteBitacoraLogFromCloud === 'function') {
-                            window.deleteBitacoraLogFromCloud(log.id);
-                        }
-                    });
-
-                    window.bitacoraList = window.bitacoraList.filter(b => !logsToRemove.includes(b));
-                }
-            });
-
-            safeStorageSet('audi_flight_statuses', JSON.stringify(window.dailyFlightStatuses));
-            safeStorageSet('audi_bitacora_logs', JSON.stringify(window.bitacoraList));
-            saveRecoveryBackup(window.bitacoraList, 'Reanudación tras Suspensión');
-
-            if (typeof window.saveDailyStatusToCloud === 'function') {
-                window.saveDailyStatusToCloud();
-            }
-
-            updateMainWeatherButtonUI();
-            renderFlightsTable();
-            if (typeof window.renderBitacoraModalTable === 'function') {
-                renderBitacoraModalTable();
-            }
-            updateTargetFlightBanner(new Date());
-
-            showToast("Clima despejado. Suspensión reanudada y vuelos siguientes reactivados.", "success");
-            triggerVoiceAlert("Atención. Clima despejado. Suspensión reanudada.");
-        }
-        window.quickResumeSystem = quickResumeSystem;
 
         function openModal(id) {
             const modal = document.getElementById(id);
@@ -1371,48 +1556,6 @@
         }
         window.openFullImagePreview = openFullImagePreview;
 
-        function unlockAudioSystem() {
-            window.audioUnlocked = true;
-            const badgeText = document.getElementById('audioStatusText');
-            const badgeIcon = document.getElementById('audioStatusIcon');
-            const badgeContainer = document.getElementById('audioStatusBadge');
-
-            if (badgeText) badgeText.innerText = "Audio Activo (Vol. Máx)";
-            if (badgeIcon) badgeIcon.className = "fa-solid fa-volume-high text-emerald-400 animate-pulse";
-            if (badgeContainer) badgeContainer.className = "mt-1 text-[8.5px] font-bold px-1.5 py-0.5 rounded bg-emerald-950/80 text-emerald-400 border border-emerald-800/60 flex items-center gap-1 shrink-0 cursor-pointer";
-
-            try {
-                const AudioCtx = window.AudioContext || window.webkitAudioContext;
-                if (AudioCtx) {
-                    const ctx = new AudioCtx();
-                    if (ctx.state === 'suspended') ctx.resume();
-                }
-            } catch(e) {}
-        }
-        window.unlockAudioSystem = unlockAudioSystem;
-
-        function triggerVoiceAlert(text, isUrgent = false) {
-            showToast(text, isUrgent ? 'warning' : 'info');
-            if ('speechSynthesis' in window) {
-                try {
-                    window.speechSynthesis.cancel();
-                    setTimeout(() => {
-                        const utterance = new SpeechSynthesisUtterance(text);
-                        utterance.lang = 'es-MX';
-                        utterance.rate = 0.95;
-                        window.speechSynthesis.speak(utterance);
-                    }, 200);
-                } catch (e) {}
-            }
-        }
-        window.triggerVoiceAlert = triggerVoiceAlert;
-
-        function toggleAudioAndTest() {
-            unlockAudioSystem();
-            triggerVoiceAlert("Sistema de audio verificado y activo.");
-        }
-        window.toggleAudioAndTest = toggleAudioAndTest;
-
         function startLiveClock() {
             function updateClock() {
                 try {
@@ -1479,6 +1622,9 @@
 
             const statusObj = window.dailyFlightStatuses[targetIdx] || { status: 'PENDIENTE' };
             const isTypeB = targetItem.forced;
+
+            // Verificación de alertas automáticas por voz
+            checkAndTriggerFlightAlerts(now, targetItem, baseMins, currentMins, statusObj);
 
             if (window.systemWeatherSuspended) {
                 if (winEl) winEl.innerText = "Suspensión General por Clima Activa";
@@ -1763,68 +1909,26 @@
             const reason = document.getElementById('suspendReasonSelect').value;
             const notes = document.getElementById('suspendNotes').value;
             const imageData = window.tempCompressedImage || "";
-
-            if (window.isTopLevelSuspension) {
-                window.systemWeatherSuspended = true;
-                safeStorageSet('audi_weather_suspended', 'true');
-                updateMainWeatherButtonUI();
-            }
-
             const plans = getActivePlan();
             const todayKey = getTodayKey();
+            const item = plans[idx];
 
-            if (window.isTopLevelSuspension) {
-                for (let i = idx; i < plans.length; i++) {
-                    const currentStatus = window.dailyFlightStatuses[i];
-                    if (!currentStatus || currentStatus.status === 'PENDIENTE') {
-                        const item = plans[i];
-                        const isFirst = (i === idx);
-                        const photoForThisFlight = isFirst ? imageData : "";
+            window.dailyFlightStatuses[idx] = { status: 'SUSPENDIDO', realTime: 'N/A', note: `${reason} - ${notes}`, imageData: imageData };
+            
+            const logEntry = {
+                id: Date.now(),
+                dateKey: todayKey, 
+                timestampFormatted: new Date().toLocaleString('es-MX'),
+                scheduledTime: item.timeOp2,
+                flightType: `TIPO ${item.type} - ${item.name}`,
+                status: 'SUSPENDIDO',
+                realTime: 'N/A',
+                notes: `${reason}: ${notes}`,
+                imageData: imageData
+            };
 
-                        window.dailyFlightStatuses[i] = { 
-                            status: 'SUSPENDIDO', 
-                            realTime: 'N/A', 
-                            note: `${reason} - ${notes}`,
-                            imageData: photoForThisFlight,
-                            autoSuspended: true
-                        };
-
-                        const logEntry = {
-                            id: Date.now() + i,
-                            dateKey: todayKey, 
-                            timestampFormatted: new Date().toLocaleString('es-MX'),
-                            scheduledTime: item.timeOp2,
-                            flightType: `TIPO ${item.type} - ${item.name}`,
-                            status: 'SUSPENDIDO',
-                            realTime: 'N/A',
-                            notes: `${reason}: ${notes}${!photoForThisFlight ? ' (Pendiente subir evidencia)' : ''}`,
-                            imageData: photoForThisFlight,
-                            autoSuspended: true
-                        };
-
-                        window.bitacoraList.unshift(logEntry);
-                        if (typeof window.saveBitacoraLogToCloud === 'function') window.saveBitacoraLogToCloud(logEntry);
-                    }
-                }
-            } else {
-                const item = plans[idx];
-                window.dailyFlightStatuses[idx] = { status: 'SUSPENDIDO', realTime: 'N/A', note: `${reason} - ${notes}`, imageData: imageData };
-                
-                const logEntry = {
-                    id: Date.now(),
-                    dateKey: todayKey, 
-                    timestampFormatted: new Date().toLocaleString('es-MX'),
-                    scheduledTime: item.timeOp2,
-                    flightType: `TIPO ${item.type} - ${item.name}`,
-                    status: 'SUSPENDIDO',
-                    realTime: 'N/A',
-                    notes: `${reason}: ${notes}`,
-                    imageData: imageData
-                };
-
-                window.bitacoraList.unshift(logEntry);
-                if (typeof window.saveBitacoraLogToCloud === 'function') window.saveBitacoraLogToCloud(logEntry);
-            }
+            window.bitacoraList.unshift(logEntry);
+            if (typeof window.saveBitacoraLogToCloud === 'function') window.saveBitacoraLogToCloud(logEntry);
 
             safeStorageSet('audi_flight_statuses', JSON.stringify(window.dailyFlightStatuses));
             safeStorageSet('audi_bitacora_logs', JSON.stringify(window.bitacoraList));
@@ -1836,11 +1940,7 @@
             renderFlightsTable();
             updateTargetFlightBanner(new Date());
 
-            if (window.isTopLevelSuspension) {
-                showToast(`Suspensión general activada por clima.`, 'warning');
-            } else {
-                showToast(`Suspensión registrada para vuelo de ${plans[idx].timeOp2} hrs.`, 'warning');
-            }
+            showToast(`Suspensión registrada para vuelo de ${plans[idx].timeOp2} hrs.`, 'warning');
         }
         window.confirmSuspension = confirmSuspension;
 
@@ -2312,6 +2412,7 @@
                 printBody.innerHTML = html;
             }
 
+            // Asignación automática de nombre sugerido de archivo al guardar como PDF
             const previousTitle = document.title;
             const pdfSuggestedFileName = `Bitacora_${fileDateSuffix || getTodayKey()}`;
             document.title = pdfSuggestedFileName;
@@ -2360,6 +2461,7 @@
                 } catch(e){} 
             }
 
+            // AUTO-RESTAURACIÓN: Garantiza que los 16 vuelos del 25 de septiembre estén en la bitácora
             restoreSeptember25FullAudit();
 
             if (savedDate !== today) {
@@ -2380,7 +2482,6 @@
 
             syncDailyStatusesWithBitacora();
 
-            updateMainWeatherButtonUI();
             document.addEventListener('click', unlockAudioSystem, { once: false });
             document.addEventListener('touchstart', unlockAudioSystem, { once: false });
 
