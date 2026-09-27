@@ -308,11 +308,11 @@
                     </button>
 
                     <button onclick="setBitacoraQuickDay('YESTERDAY')" id="btnViewYesterday" class="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-[10px] rounded-lg border border-slate-700 transition flex items-center gap-1 cursor-pointer">
-                        <i class="fa-solid fa-clock-rotate-left text-amber-400"></i> Ayer (25/09 - 16 Vuelos)
+                        <i class="fa-solid fa-clock-rotate-left text-amber-400"></i> <span id="labelBtnYesterday">Ayer (26/09)</span>
                     </button>
 
                     <button onclick="setBitacoraViewMode('TODAY')" id="btnViewToday" class="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-[10px] rounded-lg border border-slate-700 transition flex items-center gap-1 cursor-pointer">
-                        <i class="fa-solid fa-calendar-day text-emerald-400"></i> Hoy (16 Vuelos)
+                        <i class="fa-solid fa-calendar-day text-emerald-400"></i> <span id="labelBtnToday">Hoy</span>
                     </button>
 
                     <button onclick="toggleBitacoraSort()" class="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-[10px] rounded-lg border border-slate-700 transition flex items-center gap-1 cursor-pointer">
@@ -645,6 +645,13 @@
             return `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
         }
         window.getTodayKey = getTodayKey;
+
+        function getYesterdayKey() {
+            const d = new Date();
+            d.setDate(d.getDate() - 1);
+            return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+        }
+        window.getYesterdayKey = getYesterdayKey;
 
         // CATÁLOGO COMPLETO DE LOS 4 PLANES: TODOS COMPARTEN EXACTAMENTE LOS MISMOS 16 HORARIOS BASE
         const OFFICIAL_PLANS = {
@@ -2069,11 +2076,15 @@
         window.filterBitacoraByCalendar = filterBitacoraByCalendar;
 
         function setBitacoraQuickDay(target) {
-            let targetYMD = "2026-09-26";
+            let targetYMD = "";
             if (target === 'YESTERDAY') {
-                targetYMD = "2026-09-25";
+                targetYMD = getYesterdayKey(); // Si hoy es 27, devuelve 2026-09-26
             } else if (target === '26') {
                 targetYMD = "2026-09-26";
+            } else if (target === '25') {
+                targetYMD = "2026-09-25";
+            } else {
+                targetYMD = target;
             }
 
             const dateInput = document.getElementById('bitacoraDateInput');
@@ -2407,7 +2418,7 @@
 
             // Si no hay fecha específica seleccionada en el calendario, priorizamos el día que tiene los 16 registros listos (26/09/2026)
             if (!targetDateYMD) {
-                targetDateYMD = "2026-09-26";
+                targetDateYMD = getYesterdayKey();
             }
 
             const parts = targetDateYMD.split('-');
@@ -2504,6 +2515,18 @@
         function initApp() {
             const today = getTodayKey();
             const savedDate = safeStorageGet('audi_flight_date');
+
+            // Actualizar dinámicamente etiquetas de los botones de la bitácora según la fecha en curso
+            try {
+                const now = new Date();
+                const yest = new Date();
+                yest.setDate(now.getDate() - 1);
+
+                const labelYest = document.getElementById('labelBtnYesterday');
+                const labelToday = document.getElementById('labelBtnToday');
+                if (labelYest) labelYest.innerText = `Ayer (${String(yest.getDate()).padStart(2, '0')}/${String(yest.getMonth() + 1).padStart(2, '0')})`;
+                if (labelToday) labelToday.innerText = `Hoy (${String(now.getDate()).padStart(2, '0')}/${String(now.getMonth() + 1).padStart(2, '0')})`;
+            } catch (e) {}
 
             const savedBitacora = safeStorageGet('audi_bitacora_logs');
             if (savedBitacora) { 
