@@ -223,7 +223,7 @@
                 <h3 class="text-xs font-bold text-white flex items-center gap-1.5">
                     <i class="fa-solid fa-list-check text-audi-red"></i>
                     Cronograma Diario 
-                    <span id="activePlanBadge" onclick="randomizePlanManually()" title="Haga clic para sortear otro plan aleatorio" class="ml-1 px-1.5 py-0.5 bg-blue-900/40 hover:bg-blue-800/60 text-blue-300 font-extrabold rounded border border-blue-500/40 text-[9px] tracking-widest uppercase cursor-pointer transition">Plan --</span>
+                    <span id="activePlanBadge" onclick="randomizePlanManually()" title="Haga clic para cambiar de plan (Requiere clave de supervisor)" class="ml-1 px-1.5 py-0.5 bg-blue-900/40 hover:bg-blue-800/60 text-blue-300 font-extrabold rounded border border-blue-500/40 text-[9px] tracking-widest uppercase cursor-pointer transition">Plan --</span>
                 </h3>
                 <span class="text-[9.5px] text-slate-400 font-mono">Ventana: &plusmn;30 min</span>
             </div>
@@ -764,8 +764,23 @@
         }
         window.getActivePlanKey = getActivePlanKey;
 
-        // Función interactiva para sortear manualmente otro plan en cualquier momento si se desea
+        // Función interactiva protegida con contraseña para sortear manualmente otro plan
         function randomizePlanManually() {
+            if (typeof window.promptPasswordConfirmation === 'function') {
+                window.promptPasswordConfirmation(
+                    "Autorización para Cambio de Plan",
+                    "Para cambiar el plan de vuelo asignado a la jornada, ingresa la contraseña de supervisor:",
+                    () => {
+                        executePlanRandomization();
+                    }
+                );
+            } else {
+                executePlanRandomization();
+            }
+        }
+        window.randomizePlanManually = randomizePlanManually;
+
+        function executePlanRandomization() {
             const currentPlan = getActivePlanKey();
             const candidates = ["1", "2", "3", "4"].filter(p => p !== currentPlan);
             const nextPlan = candidates[Math.floor(Math.random() * candidates.length)];
@@ -777,9 +792,9 @@
 
             if (typeof window.renderFlightsTable === 'function') window.renderFlightsTable();
             if (typeof window.updateTargetFlightBanner === 'function') window.updateTargetFlightBanner(new Date());
-            if (typeof window.showToast === 'function') window.showToast(`Plan asignado aleatoriamente: Plan ${nextPlan}`, "info");
+            if (typeof window.showToast === 'function') window.showToast(`Plan asignado con autorización: Plan ${nextPlan}`, "success");
         }
-        window.randomizePlanManually = randomizePlanManually;
+        window.executePlanRandomization = executePlanRandomization;
 
         function getActivePlan() {
             return OFFICIAL_PLANS[getActivePlanKey()] || OFFICIAL_PLANS["1"];
