@@ -2055,13 +2055,18 @@
             const btnToday = document.getElementById('btnViewToday');
             const btnYesterday = document.getElementById('btnViewYesterday');
             const dateInput = document.getElementById('bitacoraDateInput');
-            if (dateInput && mode !== 'CALENDAR') dateInput.value = "";
+            const pdfDateInput = document.getElementById('pdfReportDateInput');
 
             if (mode === 'ALL') {
+                if (dateInput) dateInput.value = "";
+                if (pdfDateInput) pdfDateInput.value = "";
                 if (btnAll) btnAll.className = "px-2.5 py-1 bg-blue-600 text-white font-bold text-[10px] rounded-lg border border-blue-400/40 transition flex items-center gap-1 cursor-pointer";
                 if (btnToday) btnToday.className = "px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-[10px] rounded-lg border border-slate-700 transition flex items-center gap-1 cursor-pointer";
                 if (btnYesterday) btnYesterday.className = "px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-[10px] rounded-lg border border-slate-700 transition flex items-center gap-1 cursor-pointer";
             } else if (mode === 'TODAY') {
+                const todayKey = getTodayKey();
+                if (dateInput) dateInput.value = todayKey;
+                if (pdfDateInput) pdfDateInput.value = todayKey;
                 if (btnAll) btnAll.className = "px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-[10px] rounded-lg border border-slate-700 transition flex items-center gap-1 cursor-pointer";
                 if (btnToday) btnToday.className = "px-2.5 py-1 bg-emerald-600 text-white font-bold text-[10px] rounded-lg border border-emerald-400/40 transition flex items-center gap-1 cursor-pointer";
                 if (btnYesterday) btnYesterday.className = "px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-[10px] rounded-lg border border-slate-700 transition flex items-center gap-1 cursor-pointer";
@@ -2261,10 +2266,14 @@
 
             let html = '';
             sortedList.forEach(item => {
-                const isRealizado = (item.status === 'VOLADO' || item.status === 'REALIZADO');
-                const badge = isRealizado ?
-                    '<span class="px-1.5 py-0.5 rounded text-[9px] font-bold bg-emerald-950 text-emerald-400 border border-emerald-800">REALIZADO</span>' :
-                    '<span class="px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-950 text-amber-400 border border-amber-800">SUSPENDIDO</span>';
+                let badge = '';
+                if (item.status === 'VOLADO' || item.status === 'REALIZADO') {
+                    badge = '<span class="px-1.5 py-0.5 rounded text-[9px] font-bold bg-emerald-950 text-emerald-400 border border-emerald-800">REALIZADO</span>';
+                } else if (item.status === 'SUSPENDIDO') {
+                    badge = '<span class="px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-950 text-amber-400 border border-amber-800">SUSPENDIDO</span>';
+                } else {
+                    badge = '<span class="px-1.5 py-0.5 rounded text-[9px] font-bold bg-slate-800 text-slate-400 border border-slate-700">PENDIENTE</span>';
+                }
 
                 const imgThumbnail = item.imageData ? 
                     `<img src="${item.imageData}" onclick="openFullImagePreview('${item.imageData}')" class="h-8 w-12 object-cover mx-auto rounded border border-slate-700 cursor-pointer hover:opacity-80 transition shadow">` : 
@@ -2276,7 +2285,7 @@
                         <td class="px-2.5 py-2 font-mono font-bold text-amber-300 text-[10.5px]">${item.scheduledTime} hrs</td>
                         <td class="px-2.5 py-2 text-slate-200 text-[10px]">${item.flightType}</td>
                         <td class="px-2.5 py-2">${badge}</td>
-                        <td class="px-2.5 py-2 font-mono text-emerald-400 text-[10px]">${item.realTime}</td>
+                        <td class="px-2.5 py-2 font-mono ${item.status === 'PENDIENTE' ? 'text-slate-500' : 'text-emerald-400'} text-[10px]">${item.realTime}</td>
                         <td class="px-2.5 py-2 text-slate-300 max-w-[180px] truncate" title="${item.notes}">${item.notes}</td>
                         <td class="px-2.5 py-2 text-center">${imgThumbnail}</td>
                         <td class="px-2.5 py-2 text-right">
@@ -2425,15 +2434,16 @@
             const printBody = document.getElementById('printBitacoraTableBody');
             const now = new Date();
 
-            // Detectar qué fecha se debe imprimir
+            // Detectar qué fecha se debe imprimir según selección activa
             let targetDateYMD = document.getElementById('pdfReportDateInput') ? document.getElementById('pdfReportDateInput').value : '';
-            if (!targetDateYMD && window.bitacoraFilterMode === 'CALENDAR' && window.bitacoraSelectedDate) {
-                targetDateYMD = window.bitacoraSelectedDate;
-            }
-
-            // Si no hay fecha específica seleccionada en el calendario, priorizamos el día que tiene los 16 registros listos (26/09/2026)
             if (!targetDateYMD) {
-                targetDateYMD = getYesterdayKey();
+                if (window.bitacoraFilterMode === 'TODAY') {
+                    targetDateYMD = getTodayKey();
+                } else if (window.bitacoraFilterMode === 'CALENDAR' && window.bitacoraSelectedDate) {
+                    targetDateYMD = window.bitacoraSelectedDate;
+                } else {
+                    targetDateYMD = getTodayKey();
+                }
             }
 
             const parts = targetDateYMD.split('-');
@@ -2445,9 +2455,10 @@
             const fileDateSuffix = `${String(filterDay).padStart(2,'0')}-${String(filterMonth).padStart(2,'0')}-${filterYear}`;
 
             document.getElementById('printReportDate').innerText = reportDateLabel;
-            document.getElementById('printReportTime').innerText = "1:02:25 a.m.";
+            // Para la auditoría histórica del 26 conservamos su hora oficial de cierre; para hoy o cualquier otro día, la hora en tiempo real
+            document.getElementById('printReportTime').innerText = (targetDateYMD === '2026-09-26') ? "1:02:25 a.m." : now.toLocaleTimeString('es-MX');
 
-            // Filtrar exactamente los registros reales guardados para esa fecha
+            // Filtrar registros para esa fecha
             let listToPrint = window.bitacoraList.filter(item => {
                 if (item.dateKey && item.dateKey === targetDateYMD) return true;
                 if (!item.timestampFormatted) return false;
@@ -2459,13 +2470,33 @@
                 return item.timestampFormatted.includes(`${filterDay}/${filterMonth}/${filterYear}`);
             });
 
-            // Si por algún motivo aún no hay registros para esa fecha, usar los 16 oficiales de esa fecha
-            if (listToPrint.length === 0 && targetDateYMD === '2026-09-26') {
+            // Si es la jornada de hoy y aún no están los 16 vuelos volados, imprimir los 16 con sus estados reales/pendientes
+            if (targetDateYMD === getTodayKey() && listToPrint.length < 16) {
+                const plans = getActivePlan();
+                const todayStr = now.toLocaleDateString('es-MX');
+                listToPrint = plans.map((planItem, idx) => {
+                    const st = window.dailyFlightStatuses[idx] || { status: 'PENDIENTE', realTime: '--', note: '' };
+                    const match = window.bitacoraList.find(b => 
+                        b.scheduledTime === planItem.timeOp2 && 
+                        (b.dateKey === targetDateYMD || (b.timestampFormatted && b.timestampFormatted.includes(todayStr)))
+                    );
+                    const normSt = (st.status === 'VOLADO') ? 'REALIZADO' : st.status;
+                    return {
+                        timestampFormatted: (match && match.timestampFormatted) ? match.timestampFormatted : `${todayStr}, ${planItem.timeOp2}:00`,
+                        scheduledTime: planItem.timeOp2,
+                        flightType: `TIPO ${planItem.type} - ${planItem.name}`,
+                        status: normSt,
+                        realTime: (st.realTime && st.realTime !== '--') ? st.realTime : (match ? match.realTime : '--'),
+                        notes: st.note || (match ? match.notes : (normSt === 'REALIZADO' ? 'Patrullaje completo sin novedades' : 'Vuelo programado de la jornada')),
+                        imageData: (match && match.imageData) ? match.imageData : (st.imageData || "")
+                    };
+                });
+            } else if (listToPrint.length === 0 && targetDateYMD === '2026-09-26') {
                 restoreHistoricalAudits();
                 listToPrint = window.bitacoraList.filter(item => item.dateKey === '2026-09-26');
             }
 
-            // Ordenar de 00:30 a 23:00 de forma cronológica
+            // Ordenar cronológicamente de 00:30 a 23:00
             listToPrint.sort((a, b) => parseTimeToMinutes(a.scheduledTime || '00:00') - parseTimeToMinutes(b.scheduledTime || '00:00'));
 
             let html = '';
@@ -2474,9 +2505,16 @@
                     ? `<img src="${item.imageData}" style="max-height: 38px; max-width: 60px; margin: auto; display: block; object-fit: contain; border: 1px solid #999; border-radius: 2px;">` 
                     : 'N/A';
                 
-                const isRealizado = (item.status === 'REALIZADO' || item.status === 'VOLADO');
-                const statusColor = isRealizado ? 'color: #047857; font-weight: bold;' : 'color: #b45309; font-weight: bold;';
-                const statusText = isRealizado ? 'REALIZADO' : 'SUSPENDIDO';
+                let statusColor = 'color: #64748b; font-weight: bold;';
+                let statusText = 'PENDIENTE';
+
+                if (item.status === 'REALIZADO' || item.status === 'VOLADO') {
+                    statusColor = 'color: #047857; font-weight: bold;';
+                    statusText = 'REALIZADO';
+                } else if (item.status === 'SUSPENDIDO') {
+                    statusColor = 'color: #b45309; font-weight: bold;';
+                    statusText = 'SUSPENDIDO';
+                }
 
                 html += `
                     <tr style="border-bottom: 1px solid #000; page-break-inside: avoid;">
