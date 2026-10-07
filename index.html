@@ -108,20 +108,31 @@
                 <div class="p-1.5 bg-audi-red text-white rounded-lg shadow flex items-center justify-center shrink-0">
                     <i class="fa-solid fa-plane-departure text-sm"></i>
                 </div>
-                <div class="flex items-center gap-1 flex-wrap">
-                    <span class="text-[9px] font-extrabold tracking-wider uppercase bg-slate-800 text-red-400 px-1.5 py-0.5 rounded border border-red-900/40 shrink-0">Audi México</span>
-                    <span id="shiftBadge" class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-950/80 text-emerald-400 border border-emerald-800/40 shrink-0">Turno --</span>
-                    
-                    <!-- INDICADOR DE ESTADO DE SUSPENSIÓN SISTEMA -->
-                    <span id="systemStatusBadge" class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-950/80 text-emerald-400 border border-emerald-800/40 shrink-0 flex items-center gap-1">
-                        <i id="systemStatusIcon" class="fa-solid fa-circle-check text-emerald-400"></i>
-                        <span id="systemStatusText">Operación Normal</span>
-                    </span>
+                <div class="flex flex-col gap-1 shrink-0">
+                    <div class="flex items-center gap-1 flex-wrap">
+                        <span class="text-[9px] font-extrabold tracking-wider uppercase bg-slate-800 text-red-400 px-1.5 py-0.5 rounded border border-red-900/40 shrink-0">Audi México</span>
+                        <span id="shiftBadge" class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-950/80 text-emerald-400 border border-emerald-800/40 shrink-0">Turno --</span>
+                        
+                        <!-- INDICADOR DE ESTADO DE SUSPENSIÓN SISTEMA -->
+                        <span id="systemStatusBadge" class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-950/80 text-emerald-400 border border-emerald-800/40 shrink-0 flex items-center gap-1">
+                            <i id="systemStatusIcon" class="fa-solid fa-circle-check text-emerald-400"></i>
+                            <span id="systemStatusText">Operación Normal</span>
+                        </span>
 
-                    <!-- INDICADOR DE CONEXIÓN NUBE EN LÍNEA -->
-                    <span id="cloudStatusBadge" onclick="openCloudSettingsModal()" title="Configuración de Firebase" class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-950/80 text-amber-400 border border-amber-800/40 shrink-0 flex items-center gap-1 cursor-pointer hover:opacity-90">
-                        <i id="cloudStatusIcon" class="fa-solid fa-hard-drive text-amber-400"></i> <span id="cloudStatusText">Conectando Nube...</span>
-                    </span>
+                        <!-- INDICADOR DE CONEXIÓN NUBE EN LÍNEA -->
+                        <span id="cloudStatusBadge" onclick="openCloudSettingsModal()" title="Configuración de Firebase" class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-950/80 text-amber-400 border border-amber-800/40 shrink-0 flex items-center gap-1 cursor-pointer hover:opacity-90">
+                            <i id="cloudStatusIcon" class="fa-solid fa-hard-drive text-amber-400"></i> <span id="cloudStatusText">Conectando Nube...</span>
+                        </span>
+                    </div>
+
+                    <!-- LOGO OMAR DOMINGUEZ UBICADO DEBAJO DE NUBE LIVE SINCRONIZADA -->
+                    <div class="flex items-center justify-end w-full">
+                        <img src="logo.png" 
+                             onerror="this.onerror=null; this.src='data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 200 100\' fill=\'%230e284f\'%3E%3Cpath d=\'M62,15 A35,35 0 1 0 62,85 A35,35 0 1 0 62,15 Z M62,69 A19,19 0 1 1 62,31 A19,19 0 1 1 62,69 Z\'/%3E%3Cpath d=\'M98,15 L135,15 C158,15 178,31 178,50 C178,69 158,85 135,85 L98,85 C107,75 112,63 112,50 C112,37 107,25 98,15 Z M132,69 C145,69 158,61 158,50 C158,39 145,31 132,31 L115,31 C121,37 125,43 125,50 C125,57 121,63 115,69 L132,69 Z\'/%3E%3C/svg%3E';"
+                             alt="Omar Dominguez" 
+                             title="Omar Dominguez" 
+                             class="h-6 sm:h-7 w-auto max-w-[85px] object-contain rounded bg-white/95 px-1.5 py-0.5 border border-slate-700/80 shadow hover:scale-105 transition-all duration-200 cursor-pointer">
+                    </div>
                 </div>
             </div>
 
@@ -1244,7 +1255,7 @@
 
         function toggleAudioAndTest() {
             unlockAudioSystem();
-            triggerVoiceAlert("Sistema de audio verificado y activo para operaciones de vuelo Audi México.");
+            triggerVoiceAlert("Sistema de audio verificado y activo para operaciones de vuelo. Elaborado por Omar Dominguez.");
         }
         window.toggleAudioAndTest = toggleAudioAndTest;
 
@@ -1399,7 +1410,6 @@
 
         // RESTAURACIÓN BLINDADA DE AUDITORÍAS HISTÓRICAS REALES (25/09 Y 26/09)
         function restoreHistoricalAudits() {
-            // 1. REGISTROS OFICIALES REALES DEL 26 DE SEPTIEMBRE (TAL COMO EN TU DOCUMENTO Y PDF)
             const dateKey26 = "2026-09-26";
             const dateStr26 = "26/9/2026";
             const official26Records = [
@@ -1421,7 +1431,6 @@
                 { time: "23:00", type: "A", name: "Recorrido perimetral", status: "REALIZADO", real: "23:00", notes: "Patrullaje completo sin novedades", stamp: "26/9/2026, 11:00:05 p.m." }
             ];
 
-            // 2. REGISTROS OFICIALES REALES DEL 25 DE SEPTIEMBRE
             const dateKey25 = "2026-09-25";
             const dateStr25 = "25/9/2026";
             const official25Records = [
@@ -1445,7 +1454,6 @@
 
             let modified = false;
 
-            // Inserción / verificación para el día 26
             official26Records.forEach((rec, idx) => {
                 let existing = window.bitacoraList.find(b => 
                     b.scheduledTime === rec.time && 
@@ -1467,7 +1475,6 @@
                     modified = true;
                     if (typeof window.saveBitacoraLogToCloud === 'function') window.saveBitacoraLogToCloud(newLog);
                 } else {
-                    // Asegurar que conserve las horas y notas reales exactas
                     existing.timestampFormatted = rec.stamp;
                     existing.realTime = rec.real;
                     existing.status = rec.status;
@@ -1476,7 +1483,6 @@
                 }
             });
 
-            // Inserción / verificación para el día 25
             official25Records.forEach((rec, idx) => {
                 let existing = window.bitacoraList.find(b => 
                     b.scheduledTime === rec.time && 
@@ -1507,7 +1513,6 @@
         window.restoreHistoricalAudits = restoreHistoricalAudits;
         window.restoreSeptember25FullAudit = restoreHistoricalAudits;
 
-        // FUSIÓN Y RESCATE: Sincroniza los vuelos del cronograma hacia la bitácora
         function syncDailyStatusesWithBitacora() {
             const plans = getActivePlan();
             const todayKey = getTodayKey();
@@ -1715,7 +1720,6 @@
             const statusObj = window.dailyFlightStatuses[targetIdx] || { status: 'PENDIENTE' };
             const isTypeB = targetItem.forced;
 
-            // Verificación de alertas automáticas por voz
             checkAndTriggerFlightAlerts(now, targetItem, baseMins, currentMins, statusObj);
 
             if (window.systemWeatherSuspended) {
@@ -2098,7 +2102,7 @@
         function setBitacoraQuickDay(target) {
             let targetYMD = "";
             if (target === 'YESTERDAY') {
-                targetYMD = getYesterdayKey(); // Si hoy es 27, devuelve 2026-09-26
+                targetYMD = getYesterdayKey();
             } else if (target === '26') {
                 targetYMD = "2026-09-26";
             } else if (target === '25') {
@@ -2187,7 +2191,6 @@
                     return item.timestampFormatted.includes(todayStr);
                 });
 
-                // Si hoy aún no se han registrado los 16 vuelos en la bitácora, mostramos los 16 vuelos programados de la jornada
                 if (loggedToday.length < 16) {
                     const plans = getActivePlan();
                     filteredList = plans.map((planItem, idx) => {
@@ -2434,7 +2437,6 @@
             const printBody = document.getElementById('printBitacoraTableBody');
             const now = new Date();
 
-            // Detectar qué fecha se debe imprimir según selección activa
             let targetDateYMD = document.getElementById('pdfReportDateInput') ? document.getElementById('pdfReportDateInput').value : '';
             if (!targetDateYMD) {
                 if (window.bitacoraFilterMode === 'TODAY') {
@@ -2455,10 +2457,8 @@
             const fileDateSuffix = `${String(filterDay).padStart(2,'0')}-${String(filterMonth).padStart(2,'0')}-${filterYear}`;
 
             document.getElementById('printReportDate').innerText = reportDateLabel;
-            // Para la auditoría histórica del 26 conservamos su hora oficial de cierre; para hoy o cualquier otro día, la hora en tiempo real
             document.getElementById('printReportTime').innerText = (targetDateYMD === '2026-09-26') ? "1:02:25 a.m." : now.toLocaleTimeString('es-MX');
 
-            // Filtrar registros para esa fecha
             let listToPrint = window.bitacoraList.filter(item => {
                 if (item.dateKey && item.dateKey === targetDateYMD) return true;
                 if (!item.timestampFormatted) return false;
@@ -2470,7 +2470,6 @@
                 return item.timestampFormatted.includes(`${filterDay}/${filterMonth}/${filterYear}`);
             });
 
-            // Si es la jornada de hoy y aún no están los 16 vuelos volados, imprimir los 16 con sus estados reales/pendientes
             if (targetDateYMD === getTodayKey() && listToPrint.length < 16) {
                 const plans = getActivePlan();
                 const todayStr = now.toLocaleDateString('es-MX');
@@ -2496,7 +2495,6 @@
                 listToPrint = window.bitacoraList.filter(item => item.dateKey === '2026-09-26');
             }
 
-            // Ordenar cronológicamente de 00:30 a 23:00
             listToPrint.sort((a, b) => parseTimeToMinutes(a.scheduledTime || '00:00') - parseTimeToMinutes(b.scheduledTime || '00:00'));
 
             let html = '';
@@ -2569,7 +2567,6 @@
             const today = getTodayKey();
             const savedDate = safeStorageGet('audi_flight_date');
 
-            // Actualizar dinámicamente etiquetas de los botones de la bitácora según la fecha en curso
             try {
                 const now = new Date();
                 const yest = new Date();
@@ -2589,7 +2586,6 @@
                 } catch(e){} 
             }
 
-            // AUTO-RESTAURACIÓN BLINDADA: Garantiza que los 16 vuelos del 26/09 y 25/09 existan siempre intactos
             restoreHistoricalAudits();
 
             if (savedDate !== today) {
