@@ -740,24 +740,43 @@
             ])
         });
 
+        // ALGORITMO DETERMINISTA POR FECHA:
+        // Todas las PCs, celulares y navegadores obtienen exactamente el mismo plan hoy sin re-sortear cada segundo.
+        function getDeterministicPlanForDate(dateStr) {
+            let hash = 0;
+            for (let i = 0; i < dateStr.length; i++) {
+                hash = ((hash << 5) - hash) + dateStr.charCodeAt(i);
+                hash |= 0;
+            }
+            const planNum = (Math.abs(hash) % 4) + 1;
+            return String(planNum);
+        }
+
+        let memoryCachedPlanKey = null;
+        let memoryCachedPlanDate = "";
+
         function getActivePlanKey() {
             const today = getTodayKey();
-            let savedPlan = safeStorageGet(`audi_assigned_plan_${today}`);
 
+            // 1. Si ya se fijó en memoria para la jornada de hoy, retornar de inmediato (sin parpadeos)
+            if (memoryCachedPlanKey && memoryCachedPlanDate === today) {
+                return memoryCachedPlanKey;
+            }
+
+            // 2. Verificar si hay un plan guardado localmente o asignado manualmente por supervisor
+            let savedPlan = safeStorageGet(`audi_assigned_plan_${today}`);
             if (savedPlan && OFFICIAL_PLANS[savedPlan]) {
+                memoryCachedPlanKey = savedPlan;
+                memoryCachedPlanDate = today;
                 return savedPlan;
             }
 
-            const previousPlan = safeStorageGet('audi_last_assigned_plan');
-            let pool = ["1", "2", "3", "4"];
-            if (previousPlan && pool.includes(previousPlan)) {
-                pool = pool.filter(p => p !== previousPlan);
-            }
-            const selectedRandom = pool[Math.floor(Math.random() * pool.length)];
-
-            safeStorageSet(`audi_assigned_plan_${today}`, selectedRandom);
-            safeStorageSet('audi_last_assigned_plan', selectedRandom);
-            return selectedRandom;
+            // 3. Asignar el plan matemático fijo del día (idéntico en cualquier dispositivo)
+            const deterministicPlan = getDeterministicPlanForDate(today);
+            memoryCachedPlanKey = deterministicPlan;
+            memoryCachedPlanDate = today;
+            safeStorageSet(`audi_assigned_plan_${today}`, deterministicPlan);
+            return deterministicPlan;
         }
         window.getActivePlanKey = getActivePlanKey;
 
@@ -785,8 +804,9 @@
             const nextPlan = candidates[Math.floor(Math.random() * candidates.length)];
             const today = getTodayKey();
 
+            memoryCachedPlanKey = nextPlan;
+            memoryCachedPlanDate = today;
             safeStorageSet(`audi_assigned_plan_${today}`, nextPlan);
-            safeStorageSet('audi_last_assigned_plan', nextPlan);
 
             if (typeof window.saveDailyStatusToCloud === 'function') window.saveDailyStatusToCloud();
             if (typeof window.renderFlightsTable === 'function') window.renderFlightsTable();
@@ -902,8 +922,12 @@
                             window.dailyFlightStatuses = data.statuses;
                             if (window.safeStorageSet) window.safeStorageSet('audi_flight_statuses', JSON.stringify(data.statuses));
                         }
-                        if (data.assignedPlan && window.safeStorageSet) {
-                            window.safeStorageSet(`audi_assigned_plan_${todayKey}`, data.assignedPlan);
+                        if (data.assignedPlan && OFFICIAL_PLANS[data.assignedPlan]) {
+                            memoryCachedPlanKey = data.assignedPlan;
+                            memoryCachedPlanDate = todayKey;
+                            if (window.safeStorageSet) {
+                                window.safeStorageSet(`audi_assigned_plan_${todayKey}`, data.assignedPlan);
+                            }
                         }
                         if (data.weatherSuspended !== undefined) {
                             window.systemWeatherSuspended = data.weatherSuspended;
