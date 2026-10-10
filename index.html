@@ -926,6 +926,15 @@
                 onSnapshot(statusDocRef, (docSnap) => {
                     if (docSnap.exists()) {
                         const data = docSnap.data();
+                        if (data.assignedPlan && window.OFFICIAL_PLANS && window.OFFICIAL_PLANS[data.assignedPlan]) {
+                            const currentSaved = window.safeStorageGet ? window.safeStorageGet(`audi_assigned_plan_${todayKey}`) : null;
+                            if (currentSaved !== data.assignedPlan) {
+                                if (window.safeStorageSet) {
+                                    window.safeStorageSet(`audi_assigned_plan_${todayKey}`, data.assignedPlan);
+                                    window.safeStorageSet('audi_last_assigned_plan', data.assignedPlan);
+                                }
+                            }
+                        }
                         if (data.statuses && Object.keys(data.statuses).length > 0) {
                             window.dailyFlightStatuses = data.statuses;
                             if (window.safeStorageSet) window.safeStorageSet('audi_flight_statuses', JSON.stringify(data.statuses));
@@ -1037,6 +1046,7 @@
                 const statusDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'daily_status', todayKey);
                 await setDoc(statusDocRef, {
                     date: todayKey,
+                    assignedPlan: (typeof window.getActivePlanKey === 'function') ? window.getActivePlanKey() : "1",
                     statuses: window.dailyFlightStatuses,
                     weatherSuspended: window.systemWeatherSuspended,
                     updatedAt: new Date().toISOString()
@@ -2265,157 +2275,158 @@
             let sortedList = [...filteredList];
             if (window.bitacoraSortAsc) {
                 sortedList.reverse();
+        function getYesterdayKey() {
+            const d = new Date();
+            d.setDate(d.getDate() - 1);
+            return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+        }
+        window.getYesterdayKey = getYesterdayKey;
+
+        // CATÁLOGO COMPLETO DE LOS 4 PLANES: CADA PLAN TIENE SUS RECORRIDOS 100% FIJOS E INMUTABLES
+        const OFFICIAL_PLANS = Object.freeze({
+            "1": Object.freeze([
+                { timeOp2: "00:30", type: "C", name: "Interior de planta", forced: false },
+                { timeOp2: "02:00", type: "A", name: "Recorrido perimetral", forced: false },
+                { timeOp2: "03:30", type: "D", name: "Zonas lejanas", forced: false },
+                { timeOp2: "05:00", type: "A", name: "Recorrido perimetral", forced: false },
+                { timeOp2: "06:00", type: "B", name: "Cambio de turno", forced: true },
+                { timeOp2: "08:00", type: "C", name: "Interior de planta", forced: false },
+                { timeOp2: "09:30", type: "A", name: "Recorrido perimetral", forced: false },
+                { timeOp2: "11:00", type: "D", name: "Zonas lejanas", forced: false },
+                { timeOp2: "12:30", type: "A", name: "Recorrido perimetral", forced: false },
+                { timeOp2: "14:00", type: "B", name: "Cambio de turno", forced: true },
+                { timeOp2: "15:30", type: "C", name: "Interior de planta", forced: false },
+                { timeOp2: "17:00", type: "B", name: "Cambio de turno", forced: true },
+                { timeOp2: "18:30", type: "A", name: "Recorrido perimetral", forced: false },
+                { timeOp2: "20:00", type: "D", name: "Zonas lejanas", forced: false },
+                { timeOp2: "21:30", type: "B", name: "Cambio de turno - Uso de Spotlight", forced: true },
+                { timeOp2: "23:00", type: "A", name: "Recorrido perimetral", forced: false }
+            ]),
+            "2": Object.freeze([
+                { timeOp2: "00:30", type: "A", name: "Recorrido perimetral", forced: false },
+                { timeOp2: "02:00", type: "D", name: "Zonas lejanas", forced: false },
+                { timeOp2: "03:30", type: "A", name: "Recorrido perimetral", forced: false },
+                { timeOp2: "05:00", type: "C", name: "Interior de planta", forced: false },
+                { timeOp2: "06:00", type: "B", name: "Cambio de turno", forced: true },
+                { timeOp2: "08:00", type: "A", name: "Recorrido perimetral", forced: false },
+                { timeOp2: "09:30", type: "A", name: "Recorrido perimetral", forced: false },
+                { timeOp2: "11:00", type: "C", name: "Interior de planta", forced: false },
+                { timeOp2: "12:30", type: "A", name: "Recorrido perimetral", forced: false },
+                { timeOp2: "14:00", type: "B", name: "Cambio de turno", forced: true },
+                { timeOp2: "15:30", type: "A", name: "Recorrido perimetral", forced: false },
+                { timeOp2: "17:00", type: "B", name: "Cambio de turno", forced: true },
+                { timeOp2: "18:30", type: "A", name: "Recorrido perimetral", forced: false },
+                { timeOp2: "20:00", type: "C", name: "Interior de planta", forced: false },
+                { timeOp2: "21:30", type: "B", name: "Cambio de turno - Uso de Spotlight", forced: true },
+                { timeOp2: "23:00", type: "A", name: "Recorrido perimetral", forced: false }
+            ]),
+            "3": Object.freeze([
+                { timeOp2: "00:30", type: "D", name: "Zonas lejanas", forced: false },
+                { timeOp2: "02:00", type: "A", name: "Recorrido perimetral", forced: false },
+                { timeOp2: "03:30", type: "C", name: "Interior de planta", forced: false },
+                { timeOp2: "05:00", type: "A", name: "Recorrido perimetral", forced: false },
+                { timeOp2: "06:00", type: "B", name: "Cambio de turno", forced: true },
+                { timeOp2: "08:00", type: "A", name: "Recorrido perimetral", forced: false },
+                { timeOp2: "09:30", type: "C", name: "Interior de planta", forced: false },
+                { timeOp2: "11:00", type: "A", name: "Recorrido perimetral", forced: false },
+                { timeOp2: "12:30", type: "D", name: "Zonas lejanas", forced: false },
+                { timeOp2: "14:00", type: "B", name: "Cambio de turno", forced: true },
+                { timeOp2: "15:30", type: "A", name: "Recorrido perimetral", forced: false },
+                { timeOp2: "17:00", type: "B", name: "Cambio de turno", forced: true },
+                { timeOp2: "18:30", type: "C", name: "Interior de planta", forced: false },
+                { timeOp2: "20:00", type: "A", name: "Recorrido perimetral", forced: false },
+                { timeOp2: "21:30", type: "B", name: "Cambio de turno - Uso de Spotlight", forced: true },
+                { timeOp2: "23:00", type: "D", name: "Zonas lejanas", forced: false }
+            ]),
+            "4": Object.freeze([
+                { timeOp2: "00:30", type: "D", name: "Zonas lejanas", forced: false },
+                { timeOp2: "02:00", type: "C", name: "Interior de planta", forced: false },
+                { timeOp2: "03:30", type: "A", name: "Recorrido perimetral", forced: false },
+                { timeOp2: "05:00", type: "A", name: "Recorrido perimetral", forced: false },
+                { timeOp2: "06:00", type: "B", name: "Cambio de turno", forced: true },
+                { timeOp2: "08:00", type: "C", name: "Interior de planta", forced: false },
+                { timeOp2: "09:30", type: "D", name: "Zonas lejanas", forced: false },
+                { timeOp2: "11:00", type: "A", name: "Recorrido perimetral", forced: false },
+                { timeOp2: "12:30", type: "C", name: "Interior de planta", forced: false },
+                { timeOp2: "14:00", type: "B", name: "Cambio de turno", forced: true },
+                { timeOp2: "15:30", type: "A", name: "Recorrido perimetral", forced: false },
+                { timeOp2: "17:00", type: "B", name: "Cambio de turno", forced: true },
+                { timeOp2: "18:30", type: "D", name: "Zonas lejanas", forced: false },
+                { timeOp2: "20:00", type: "C", name: "Interior de planta", forced: false },
+                { timeOp2: "21:30", type: "B", name: "Cambio de turno - Uso de Spotlight", forced: true },
+                { timeOp2: "23:00", type: "A", name: "Recorrido perimetral", forced: false }
+            ])
+        });
+        window.OFFICIAL_PLANS = OFFICIAL_PLANS;
+
+        // ASIGNACIÓN DEL PLAN: Se elige aleatoriamente UNA SOLA VEZ por día y se mantiene fijo las 24 horas
+        function getActivePlanKey() {
+            const today = getTodayKey();
+            let savedPlan = safeStorageGet(`audi_assigned_plan_${today}`);
+
+            // Si el plan para el día de hoy ya está definido, se mantiene 100% fijo durante toda la jornada
+            if (savedPlan && OFFICIAL_PLANS[savedPlan]) {
+                return savedPlan;
             }
 
-            let html = '';
-            sortedList.forEach(item => {
-                let badge = '';
-                if (item.status === 'VOLADO' || item.status === 'REALIZADO') {
-                    badge = '<span class="px-1.5 py-0.5 rounded text-[9px] font-bold bg-emerald-950 text-emerald-400 border border-emerald-800">REALIZADO</span>';
-                } else if (item.status === 'SUSPENDIDO') {
-                    badge = '<span class="px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-950 text-amber-400 border border-amber-800">SUSPENDIDO</span>';
-                } else {
-                    badge = '<span class="px-1.5 py-0.5 rounded text-[9px] font-bold bg-slate-800 text-slate-400 border border-slate-700">PENDIENTE</span>';
-                }
+            // Si es un día nuevo o primera carga: selección aleatoria de 1 a 4 sin repetir el del día previo
+            const previousPlan = safeStorageGet('audi_last_assigned_plan');
+            let pool = ["1", "2", "3", "4"];
+            if (previousPlan && pool.includes(previousPlan)) {
+                pool = pool.filter(p => p !== previousPlan);
+            }
+            const selectedRandom = pool[Math.floor(Math.random() * pool.length)];
 
-                const imgThumbnail = item.imageData ? 
-                    `<img src="${item.imageData}" onclick="openFullImagePreview('${item.imageData}')" class="h-8 w-12 object-cover mx-auto rounded border border-slate-700 cursor-pointer hover:opacity-80 transition shadow">` : 
-                    (item.status === 'SUSPENDIDO' ? '<span class="text-amber-400 text-[9px] font-semibold"><i class="fa-solid fa-clock me-1"></i>Pendiente foto</span>' : '<span class="text-slate-500 text-[9px]">N/A</span>');
+            safeStorageSet(`audi_assigned_plan_${today}`, selectedRandom);
+            safeStorageSet('audi_last_assigned_plan', selectedRandom);
+            
+            // Guardar en la nube para que todos los dispositivos vean exactamente el mismo plan
+            if (typeof window.saveDailyStatusToCloud === 'function') {
+                window.saveDailyStatusToCloud();
+            }
 
-                html += `
-                    <tr class="hover:bg-slate-800/40">
-                        <td class="px-2.5 py-2 font-mono text-slate-400 text-[10px]">${item.timestampFormatted}</td>
-                        <td class="px-2.5 py-2 font-mono font-bold text-amber-300 text-[10.5px]">${item.scheduledTime} hrs</td>
-                        <td class="px-2.5 py-2 text-slate-200 text-[10px]">${item.flightType}</td>
-                        <td class="px-2.5 py-2">${badge}</td>
-                        <td class="px-2.5 py-2 font-mono ${item.status === 'PENDIENTE' ? 'text-slate-500' : 'text-emerald-400'} text-[10px]">${item.realTime}</td>
-                        <td class="px-2.5 py-2 text-slate-300 max-w-[180px] truncate" title="${item.notes}">${item.notes}</td>
-                        <td class="px-2.5 py-2 text-center">${imgThumbnail}</td>
-                        <td class="px-2.5 py-2 text-right">
-                            <div class="flex items-center justify-end gap-1">
-                                <button onclick="openEditBitacoraEntry(${item.id})" class="p-1 bg-blue-900/60 hover:bg-blue-800 text-blue-300 rounded border border-blue-700/50 text-[10px]" title="Editar Registro"><i class="fa-solid fa-pen-to-square"></i></button>
-                                <button onclick="deleteBitacoraEntry(${item.id})" class="p-1 bg-red-950/80 hover:bg-red-900 text-red-300 rounded border border-red-800/50 text-[10px]" title="Eliminar Registro"><i class="fa-solid fa-trash-can"></i></button>
-                            </div>
-                        </td>
-                    </tr>
-                `;
-            });
-
-            tbody.innerHTML = html;
+            return selectedRandom;
         }
-        window.renderBitacoraModalTable = renderBitacoraModalTable;
+        window.getActivePlanKey = getActivePlanKey;
 
-        function openEditBitacoraEntry(id) {
-            const entry = window.bitacoraList.find(b => b.id === id);
-            if (!entry) return;
-
-            window.tempCompressedImage = entry.imageData || "";
-            document.getElementById('editBitacoraId').value = entry.id;
-            
-            let st = entry.status;
-            if (st === 'VOLADO') st = 'REALIZADO';
-            document.getElementById('editBitacoraStatus').value = st;
-            
-            document.getElementById('editBitacoraSchedTime').value = entry.scheduledTime;
-            document.getElementById('editBitacoraRealTime').value = entry.realTime;
-            document.getElementById('editBitacoraNotes').value = entry.notes;
-
-            const previewImg = document.getElementById('editBitacoraImgPreview');
-            if (entry.imageData) {
-                previewImg.src = entry.imageData;
-                previewImg.parentElement.classList.remove('hidden');
+        // Función interactiva protegida con contraseña para sortear manualmente otro plan
+        function randomizePlanManually() {
+            if (typeof window.promptPasswordConfirmation === 'function') {
+                window.promptPasswordConfirmation(
+                    "Autorización para Cambio de Plan",
+                    "Para cambiar el plan de vuelo asignado a la jornada, ingresa la contraseña de supervisor:",
+                    () => {
+                        executePlanRandomization();
+                    }
+                );
             } else {
-                previewImg.src = "";
-                previewImg.parentElement.classList.add('hidden');
+                executePlanRandomization();
             }
-
-            openModal('modalEditBitacoraEntry');
         }
-        window.openEditBitacoraEntry = openEditBitacoraEntry;
+        window.randomizePlanManually = randomizePlanManually;
 
-        function saveBitacoraEntryEdit() {
-            const id = parseInt(document.getElementById('editBitacoraId').value, 10);
-            const entryIdx = window.bitacoraList.findIndex(b => b.id === id);
-            if (entryIdx === -1) return;
+        function executePlanRandomization() {
+            const currentPlan = getActivePlanKey();
+            const candidates = ["1", "2", "3", "4"].filter(p => p !== currentPlan);
+            const nextPlan = candidates[Math.floor(Math.random() * candidates.length)];
+            const today = getTodayKey();
 
-            const status = document.getElementById('editBitacoraStatus').value;
-            const schedTime = document.getElementById('editBitacoraSchedTime').value;
-            const realTime = document.getElementById('editBitacoraRealTime').value;
-            const notes = document.getElementById('editBitacoraNotes').value;
-            const imageData = window.tempCompressedImage || "";
-
-            const updatedEntry = {
-                ...window.bitacoraList[entryIdx],
-                status,
-                scheduledTime: schedTime,
-                realTime,
-                notes,
-                imageData
-            };
-
-            window.bitacoraList[entryIdx] = updatedEntry;
-            safeStorageSet('audi_bitacora_logs', JSON.stringify(window.bitacoraList));
-            saveRecoveryBackup(window.bitacoraList, `Edición ${schedTime}`);
-
-            const planIdx = getActivePlan().findIndex(p => p.timeOp2 === schedTime);
-            if (planIdx !== -1) {
-                window.dailyFlightStatuses[planIdx] = { status, realTime, note: notes, imageData: imageData };
-                safeStorageSet('audi_flight_statuses', JSON.stringify(window.dailyFlightStatuses));
-            }
+            safeStorageSet(`audi_assigned_plan_${today}`, nextPlan);
+            safeStorageSet('audi_last_assigned_plan', nextPlan);
 
             if (typeof window.saveDailyStatusToCloud === 'function') window.saveDailyStatusToCloud();
-            if (typeof window.saveBitacoraLogToCloud === 'function') window.saveBitacoraLogToCloud(updatedEntry);
-
-            closeModal('modalEditBitacoraEntry');
-            renderBitacoraModalTable();
-            renderFlightsTable();
-            updateTargetFlightBanner(new Date());
-            showToast("Registro editado correctamente", "success");
+            if (typeof window.renderFlightsTable === 'function') window.renderFlightsTable();
+            if (typeof window.updateTargetFlightBanner === 'function') window.updateTargetFlightBanner(new Date());
+            if (typeof window.showToast === 'function') window.showToast(`Plan asignado con autorización: Plan ${nextPlan}`, "success");
         }
-        window.saveBitacoraEntryEdit = saveBitacoraEntryEdit;
+        window.executePlanRandomization = executePlanRandomization;
 
-        function deleteBitacoraEntry(id) {
-            promptPasswordConfirmation(
-                "Autorizar Eliminación de Vuelo",
-                "Para proteger los registros de auditoría de Audi México, introduce la contraseña de supervisor:",
-                () => {
-                    saveRecoveryBackup(window.bitacoraList, 'Antes de Eliminar Registro');
-
-                    const entry = window.bitacoraList.find(b => b.id === id);
-                    if (entry) {
-                        const planIdx = getActivePlan().findIndex(p => p.timeOp2 === entry.scheduledTime);
-                        if (planIdx !== -1) {
-                            delete window.dailyFlightStatuses[planIdx];
-                            safeStorageSet('audi_flight_statuses', JSON.stringify(window.dailyFlightStatuses));
-                        }
-                    }
-
-                    window.bitacoraList = window.bitacoraList.filter(b => b.id !== id);
-                    safeStorageSet('audi_bitacora_logs', JSON.stringify(window.bitacoraList));
-
-                    if (typeof window.saveDailyStatusToCloud === 'function') window.saveDailyStatusToCloud();
-                    if (typeof window.deleteBitacoraLogFromCloud === 'function') window.deleteBitacoraLogFromCloud(id);
-
-                    renderBitacoraModalTable();
-                    renderFlightsTable();
-                    updateTargetFlightBanner(new Date());
-                    showToast("Registro eliminado con autorización.", "info");
-                }
-            );
+        function getActivePlan() {
+            return OFFICIAL_PLANS[getActivePlanKey()] || OFFICIAL_PLANS["1"];
         }
-        window.deleteBitacoraEntry = deleteBitacoraEntry;
+        window.getActivePlan = getActivePlan;
 
-        function confirmClearAllBitacoraModal() {
-            promptPasswordConfirmation(
-                "Autorizar Vaciado Total de Bitácora",
-                "ADVERTENCIA CRÍTICA: Se vaciarán los registros. Ingresa la contraseña de supervisor:",
-                () => {
-                    if (window.bitacoraList && window.bitacoraList.length > 0) {
-                        saveRecoveryBackup(window.bitacoraList, 'Antes de Vaciar Bitácora');
-                    }
-
-                    window.bitacoraList = [];
-                    window.dailyFlightStatuses = {};
+        window.dailyFlightStatuses = {};
                     safeStorageSet('audi_bitacora_logs', JSON.stringify([]));
                     safeStorageSet('audi_flight_statuses', JSON.stringify({}));
 
@@ -2596,6 +2607,9 @@
                 window.systemWeatherSuspended = false;
                 safeStorageSet('audi_flight_statuses', JSON.stringify({}));
                 safeStorageSet('audi_weather_suspended', 'false');
+
+                // Asignar el nuevo plan aleatorio diario y fijarlo para toda la jornada de hoy
+                getActivePlanKey();
             } else {
                 const savedStatuses = safeStorageGet('audi_flight_statuses');
                 if (savedStatuses) { try { window.dailyFlightStatuses = JSON.parse(savedStatuses); } catch(e){} }
