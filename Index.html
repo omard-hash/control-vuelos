@@ -1,0 +1,2434 @@
+<!DOCTYPE html>
+<html lang="es" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <title>Audi México - Sistema Control de Vuelos & Bitácora Drone</title>
+
+    <!-- Tailwind CSS & FontAwesome CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        audi: {
+                            red: '#bb0a30',
+                            redDark: '#8b0520',
+                            darkBg: '#090d16',
+                            cardBg: '#131b2e',
+                            slateAccent: '#1e293b'
+                        }
+                    },
+                    screens: {
+                        'xs': '400px'
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <style>
+        body {
+            background-color: #090d16;
+            color: #f1f5f9;
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            overflow: hidden;
+            height: 100vh;
+        }
+        ::-webkit-scrollbar { width: 5px; height: 5px; }
+        ::-webkit-scrollbar-track { background: #0f172a; }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #475569; }
+
+        @media print {
+            @page { 
+                size: landscape; 
+                margin: 5mm 5mm; 
+            }
+            * { 
+                -webkit-print-color-adjust: exact !important; 
+                print-color-adjust: exact !important; 
+            }
+            header, main, .no-print, .modal-backdrop { 
+                display: none !important; 
+            }
+            #bitacoraPrintSection { 
+                display: block !important; 
+                width: 100% !important; 
+                margin: 0 !important;
+                padding: 0 !important;
+            }
+            html, body { 
+                background: #ffffff !important; 
+                color: #000000 !important; 
+                padding: 0 !important; 
+                margin: 0 !important;
+                height: auto !important; 
+                min-height: auto !important;
+                overflow: visible !important; 
+                display: block !important;
+                font-size: 8px !important;
+            }
+            table { 
+                page-break-inside: avoid !important; 
+                width: 100% !important; 
+                border-collapse: collapse !important; 
+            }
+            tr { 
+                page-break-inside: avoid !important; 
+            }
+            thead { 
+                display: table-header-group !important; 
+            }
+            tbody {
+                display: table-row-group !important;
+            }
+            td, th { 
+                padding: 2.5px 4px !important; 
+                border: 1px solid #000 !important; 
+                vertical-align: middle !important;
+            }
+        }
+        #bitacoraPrintSection { display: none; }
+    </style>
+</head>
+<body class="h-screen flex flex-col bg-slate-950 text-slate-100 antialiased selection:bg-red-600 selection:text-white overflow-hidden">
+
+    <!-- HEADER / BARRA SUPERIOR FIJA -->
+    <header class="bg-slate-900 border-b border-slate-800 sticky top-0 z-40 shadow-xl py-2 px-2 sm:px-3 shrink-0">
+        <div class="max-w-7xl mx-auto flex flex-col xs:flex-row justify-between items-center gap-2">
+            
+            <!-- Logo Audi e Indicadores -->
+            <div class="flex items-center gap-2 shrink-0">
+                <div class="p-1.5 bg-audi-red text-white rounded-lg shadow flex items-center justify-center shrink-0">
+                    <i class="fa-solid fa-plane-departure text-sm"></i>
+                </div>
+                <div class="flex flex-col gap-1 shrink-0">
+                    <div class="flex items-center gap-1 flex-wrap">
+                        <span class="text-[9px] font-extrabold tracking-wider uppercase bg-slate-800 text-red-400 px-1.5 py-0.5 rounded border border-red-900/40 shrink-0">Audi México</span>
+                        <span id="shiftBadge" class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-950/80 text-emerald-400 border border-emerald-800/40 shrink-0">Turno --</span>
+                        
+                        <!-- INDICADOR DE ESTADO -->
+                        <span id="systemStatusBadge" class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-950/80 text-emerald-400 border border-emerald-800/40 shrink-0 flex items-center gap-1">
+                            <i id="systemStatusIcon" class="fa-solid fa-circle-check text-emerald-400"></i>
+                            <span id="systemStatusText">Operación Normal</span>
+                        </span>
+
+                        <!-- INDICADOR DE CONEXIÓN NUBE -->
+                        <span id="cloudStatusBadge" onclick="openCloudSettingsModal()" title="Configuración de Firebase" class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-950/80 text-amber-400 border border-amber-800/40 shrink-0 flex items-center gap-1 cursor-pointer hover:opacity-90">
+                            <i id="cloudStatusIcon" class="fa-solid fa-hard-drive text-amber-400"></i> <span id="cloudStatusText">Conectando Nube...</span>
+                        </span>
+                    </div>
+
+                    <!-- LOGO OMAR DOMINGUEZ -->
+                    <div class="flex items-center justify-end w-full">
+                        <img src="logo.png" 
+                             onerror="this.onerror=null; this.src='data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 200 100\' fill=\'%230e284f\'%3E%3Cpath d=\'M62,15 A35,35 0 1 0 62,85 A35,35 0 1 0 62,15 Z M62,69 A19,19 0 1 1 62,31 A19,19 0 1 1 62,69 Z\'/%3E%3Cpath d=\'M98,15 L135,15 C158,15 178,31 178,50 C178,69 158,85 135,85 L98,85 C107,75 112,63 112,50 C112,37 107,25 98,15 Z M132,69 C145,69 158,61 158,50 C158,39 145,31 132,31 L115,31 C121,37 125,43 125,50 C125,57 121,63 115,69 L132,69 Z\'/%3E%3C/svg%3E';"
+                             alt="Omar Dominguez" 
+                             title="Omar Dominguez" 
+                             class="h-6 sm:h-7 w-auto max-w-[85px] object-contain rounded bg-white/95 px-1.5 py-0.5 border border-slate-700/80 shadow hover:scale-105 transition-all duration-200 cursor-pointer">
+                    </div>
+                </div>
+            </div>
+
+            <!-- RELOJ DESTACADO, FECHA Y CONTROLES -->
+            <div class="flex items-center justify-between xs:justify-end gap-2 w-full xs:w-auto bg-slate-950/90 px-2.5 py-1.5 rounded-xl border border-slate-800 shadow-inner">
+                <div class="text-left xs:text-right flex flex-col items-start xs:items-end me-1">
+                    <div id="liveClock" class="text-2xl sm:text-4xl font-mono font-black text-amber-300 tracking-wider leading-none drop-shadow-md">00:00:00</div>
+                    <div id="liveDate" class="text-[9.5px] text-slate-400 font-semibold mt-0.5 truncate max-w-[130px] sm:max-w-none">Cargando fecha...</div>
+                    
+                    <div id="audioStatusBadge" class="mt-1 text-[8.5px] font-bold px-1.5 py-0.5 rounded bg-slate-800 text-amber-300 border border-amber-700/60 flex items-center gap-1 shrink-0 cursor-pointer" onclick="unlockAudioSystem()">
+                        <i id="audioStatusIcon" class="fa-solid fa-volume-xmark text-amber-400"></i> <span id="audioStatusText">Audio Inactivo</span>
+                    </div>
+                </div>
+                
+                <div class="flex items-center gap-1.5 shrink-0">
+                    <button onclick="openBitacoraModal()" id="btnOpenBitacora" class="px-2.5 py-1.5 rounded-lg text-xs font-black bg-blue-600 hover:bg-blue-500 text-white border border-blue-400/40 shadow-md transition flex items-center gap-1 cursor-pointer shrink-0">
+                        <i class="fa-solid fa-book-bookmark text-amber-300"></i>
+                        <span class="text-[10px]">Bitácora</span>
+                    </button>
+
+                    <button id="btnTestVoice" onclick="toggleAudioAndTest()" title="Probar Alerta de Voz" class="p-1.5 rounded-lg bg-amber-950/80 hover:bg-amber-900 text-amber-300 text-xs border border-amber-700/60 transition flex items-center gap-1 shrink-0">
+                        <i id="btnTestVoiceIcon" class="fa-solid fa-volume-high text-amber-400"></i>
+                    </button>
+                </div>
+            </div>
+
+        </div>
+    </header>
+
+    <!-- CONTENIDO PRINCIPAL -->
+    <main class="flex-1 max-w-7xl w-full mx-auto px-2 sm:px-4 py-2 flex flex-col gap-2 overflow-hidden">
+
+        <!-- TARJETA PRINCIPAL DEL VUELO ACTIVO Y CRONÓMETRO -->
+        <section id="nextFlightCard" class="bg-gradient-to-r from-slate-900 via-blue-950/60 to-slate-900 p-2.5 sm:p-3.5 rounded-2xl border border-blue-500/40 shadow-2xl relative overflow-hidden shrink-0">
+            <div class="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-2.5">
+                
+                <div class="space-y-1">
+                    <div class="flex items-center gap-1.5 flex-wrap">
+                        <span class="px-2 py-0.5 rounded text-[10px] font-extrabold bg-blue-500/20 text-blue-300 border border-blue-500/30 uppercase tracking-wide">
+                            <i class="fa-solid fa-crosshairs me-1"></i>Vuelo Siguiente / Activo
+                        </span>
+                        <span id="targetFlightBadge" class="px-2 py-0.5 rounded text-[10px] font-extrabold bg-audi-red text-white">
+                            TIPO A - Perimetral
+                        </span>
+                    </div>
+
+                    <div class="flex items-baseline gap-2 flex-wrap">
+                        <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">Hora Base:</span>
+                        <h2 id="targetFlightTime" class="text-2xl sm:text-4xl font-mono font-black text-amber-300 tracking-tight">00:30 hrs</h2>
+                    </div>
+
+                    <p class="text-xs text-slate-300 flex items-center gap-1.5 flex-wrap">
+                        <span class="font-semibold text-slate-400">Ventana (&plusmn;30m):</span>
+                        <strong id="targetFlightWindow" class="text-xs text-emerald-400 font-mono font-bold bg-slate-950/90 px-2 py-0.5 rounded border border-emerald-500/40">00:00 - 01:00 hrs</strong>
+                    </p>
+                </div>
+
+                <!-- CONTROLES Y CRONÓMETRO -->
+                <div class="flex flex-col xs:flex-row items-stretch xs:items-center gap-2.5 bg-slate-950/90 p-2.5 rounded-xl border border-slate-800/90 shadow-lg">
+                    <div class="text-center xs:text-right px-3 py-1 bg-slate-900/80 rounded-lg border border-slate-800 flex-1 xs:flex-none">
+                        <div class="text-[9.5px] uppercase font-bold text-slate-400 tracking-wider">Estado / Cronómetro</div>
+                        <div id="targetCountdown" class="text-2xl sm:text-4xl lg:text-5xl font-mono font-black text-emerald-400 mt-0.5">Calculando...</div>
+                    </div>
+
+                    <div class="flex items-center gap-1.5 flex-1 xs:flex-none">
+                        <button id="btnQuickFly" onclick="quickRegisterTakeoff()" class="w-full px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs sm:text-sm rounded-xl shadow-md transition flex items-center justify-center gap-1.5 border border-emerald-400/30 cursor-pointer">
+                            <i class="fa-solid fa-plane-departure"></i> DESPEGUE
+                        </button>
+                    </div>
+                </div>
+
+            </div>
+        </section>
+
+        <!-- TARJETAS DE CONTEO -->
+        <section class="bg-slate-900/90 p-2 sm:p-2.5 rounded-xl border border-slate-800 shadow-lg grid grid-cols-3 gap-2 shrink-0">
+            <div class="bg-slate-950/80 p-1.5 sm:p-2 rounded-xl border border-slate-800/80 text-center flex flex-col justify-center shadow-inner">
+                <span class="text-[9.5px] sm:text-xs uppercase font-bold text-slate-400 tracking-wider">Jornada 24h</span>
+                <span id="cntTotal" class="text-base sm:text-xl font-black text-white my-0.5">16 Vuelos</span>
+                <span class="text-[8.5px] sm:text-[9.5px] text-slate-500 hidden sm:inline">12:00 AM - 11:59 PM</span>
+            </div>
+            
+            <div class="bg-slate-950/80 p-1.5 sm:p-2 rounded-xl border border-emerald-900/40 text-center flex flex-col justify-center shadow-inner">
+                <span class="text-[9.5px] sm:text-xs uppercase font-bold text-emerald-400 tracking-wider">Realizados</span>
+                <span id="cntFlown" class="text-lg sm:text-2xl font-black text-emerald-400 my-0.5 drop-shadow-md">0</span>
+                <span class="text-[8.5px] sm:text-[9.5px] text-slate-500 hidden sm:inline">Ejecutados</span>
+            </div>
+
+            <div class="bg-slate-950/80 p-1.5 sm:p-2 rounded-xl border border-amber-900/40 text-center flex flex-col justify-center shadow-inner">
+                <span class="text-[9.5px] sm:text-xs uppercase font-bold text-amber-400 tracking-wider">Suspendidos</span>
+                <span id="cntSuspended" class="text-lg sm:text-2xl font-black text-amber-400 my-0.5 drop-shadow-md">0</span>
+                <span class="text-[8.5px] sm:text-[9.5px] text-slate-500 hidden sm:inline">Con/Sin evidencia</span>
+            </div>
+        </section>
+
+        <!-- CRONOGRAMA DIARIO DE VUELOS -->
+        <section class="bg-slate-900 p-2 sm:p-2.5 rounded-2xl border border-slate-800 shadow-xl space-y-1.5 flex-1 flex flex-col overflow-hidden min-h-0">
+            <div class="flex items-center justify-between border-b border-slate-800 pb-1.5 shrink-0">
+                <h3 class="text-xs font-bold text-white flex items-center gap-1.5">
+                    <i class="fa-solid fa-list-check text-audi-red"></i>
+                    Cronograma Diario 
+                    <span id="activePlanBadge" onclick="randomizePlanManually()" title="Haga clic para cambiar de plan (Requiere clave de supervisor)" class="ml-1 px-1.5 py-0.5 bg-blue-900/40 hover:bg-blue-800/60 text-blue-300 font-extrabold rounded border border-blue-500/40 text-[9px] tracking-widest uppercase cursor-pointer transition">Plan --</span>
+                </h3>
+                <span class="text-[9.5px] text-slate-400 font-mono">Ventana: &plusmn;30 min</span>
+            </div>
+
+            <div class="flex-1 overflow-y-auto overflow-x-auto pr-1">
+                <table class="w-full text-left text-xs min-w-[550px]">
+                    <thead class="bg-slate-950 text-slate-400 uppercase font-bold tracking-wider border-b border-slate-800 text-[9px] sticky top-0 z-10 shadow">
+                        <tr>
+                            <th class="px-2 py-1.5">#</th>
+                            <th class="px-2 py-1.5">Hora Base</th>
+                            <th class="px-2 py-1.5">Ventana</th>
+                            <th class="px-2 py-1.5">Tipo / Recorrido</th>
+                            <th class="px-2 py-1.5">Estado Actual</th>
+                            <th class="px-2 py-1.5">Hora Real / Motivo</th>
+                            <th class="px-2 py-1.5 text-right">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody id="flightsTableBody" class="divide-y divide-slate-800/60 font-medium text-[10.5px]">
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- MODAL CONFIRMACIÓN CON CONTRASEÑA DE SUPERVISIÓN -->
+    <div id="modalPasswordConfirmDialog" class="fixed inset-0 bg-slate-950/85 backdrop-blur-sm z-50 flex items-center justify-center p-3 hidden modal-backdrop">
+        <div class="bg-slate-900 border border-red-500/50 rounded-2xl max-w-sm w-full p-4 shadow-2xl space-y-3">
+            <div class="flex items-center gap-2 text-red-400 font-bold text-sm">
+                <i class="fa-solid fa-shield-halved text-base"></i>
+                <span id="pwdDialogTitle">Autorización de Seguridad Requerida</span>
+            </div>
+            <p id="pwdDialogMessage" class="text-xs text-slate-300 leading-relaxed">
+                Esta acción requiere la clave de supervisión para proteger la integridad de los vuelos.
+            </p>
+            <div>
+                <label class="block text-slate-400 font-semibold text-[11px] mb-1">Ingresa la contraseña de autorización:</label>
+                <input type="password" id="inputDeletePassword" placeholder="Contraseña de supervisor..." class="w-full bg-slate-950 border border-red-900/60 focus:border-red-500 text-white font-mono text-xs px-3 py-1.5 rounded-lg focus:outline-none">
+                <span id="pwdErrorMessage" class="text-[10px] text-red-400 font-semibold mt-1 block hidden"><i class="fa-solid fa-circle-exclamation me-1"></i>Contraseña incorrecta. Acción denegada.</span>
+            </div>
+            <div class="flex justify-end gap-2 pt-2 border-t border-slate-800">
+                <button id="btnPwdCancel" onclick="closeModal('modalPasswordConfirmDialog')" class="px-3 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-xs rounded-xl">Cancelar</button>
+                <button id="btnPwdOk" class="px-3 py-1 bg-red-600 hover:bg-red-500 text-white font-bold text-xs rounded-xl shadow">Confirmar y Ejecutar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL COMPLETO DE BITÁCORA AUDITABLE (DISEÑO LIMPIO ORIGINAL) -->
+    <div id="modalBitacoraView" class="fixed inset-0 bg-slate-950/90 backdrop-blur-md z-50 flex items-center justify-center p-2 sm:p-4 hidden modal-backdrop">
+        <div class="bg-slate-900 border border-blue-500/40 rounded-2xl max-w-6xl w-full p-3 sm:p-4 shadow-2xl space-y-2.5 max-h-[94vh] flex flex-col">
+            <div class="flex justify-between items-center border-b border-slate-800 pb-2">
+                <div>
+                    <h3 class="text-xs sm:text-base font-bold text-white flex items-center gap-1.5">
+                        <i class="fa-solid fa-book-bookmark text-emerald-400"></i>
+                        Bitácora Oficial Auditable de Vuelos (Registro Inmutable)
+                    </h3>
+                    <p class="text-[10px] text-slate-400 hidden sm:block">Filtra por calendario, consulta el histórico completo, edita horas, estado y fotos de evidencia.</p>
+                </div>
+                <button onclick="closeModal('modalBitacoraView')" class="text-slate-400 hover:text-white p-1 text-base">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <!-- BARRA DE FILTRO Y ACCIONES -->
+            <div class="flex items-center justify-between gap-2 flex-wrap bg-slate-950/90 p-2.5 rounded-xl border border-slate-800 text-xs shadow-inner">
+                
+                <div class="flex items-center gap-2 flex-wrap">
+                    <span class="text-[11px] text-slate-300 font-semibold">
+                        Registros: <strong id="bitacoraRecordCount" class="text-emerald-400 font-mono">0</strong>
+                    </span>
+
+                    <!-- Selector de Fecha / Calendario Interactivo -->
+                    <div class="flex items-center gap-1 bg-slate-900 px-2.5 py-1.5 rounded-lg border border-blue-500/50 shadow-sm cursor-pointer hover:border-blue-400 transition" onclick="triggerNativePicker('bitacoraDateInput')">
+                        <i class="fa-solid fa-calendar-days text-amber-400 text-sm"></i>
+                        <label for="bitacoraDateInput" class="text-[10px] font-bold text-slate-300 cursor-pointer">Fecha:</label>
+                        <input type="date" id="bitacoraDateInput" onchange="unifiedDateChanged(this.value)" class="bg-slate-950 text-white font-mono text-[11px] px-2 py-0.5 rounded border border-slate-700 focus:outline-none focus:border-blue-400 cursor-pointer">
+                    </div>
+
+                    <!-- Botones Rápidos -->
+                    <button onclick="setBitacoraViewMode('ALL')" id="btnViewAll" class="px-2.5 py-1 bg-blue-600 text-white font-bold text-[10px] rounded-lg border border-blue-400/40 transition flex items-center gap-1 cursor-pointer">
+                        <i class="fa-solid fa-layer-group"></i> Ver Todo
+                    </button>
+
+                    <button onclick="setBitacoraQuickDay('YESTERDAY')" id="btnViewYesterday" class="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-[10px] rounded-lg border border-slate-700 transition flex items-center gap-1 cursor-pointer">
+                        <i class="fa-solid fa-clock-rotate-left text-amber-400"></i> <span id="labelBtnYesterday">Ayer</span>
+                    </button>
+
+                    <button onclick="setBitacoraViewMode('TODAY')" id="btnViewToday" class="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-[10px] rounded-lg border border-slate-700 transition flex items-center gap-1 cursor-pointer">
+                        <i class="fa-solid fa-calendar-day text-emerald-400"></i> <span id="labelBtnToday">Hoy</span>
+                    </button>
+
+                    <button onclick="toggleBitacoraSort()" class="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-[10px] rounded-lg border border-slate-700 transition flex items-center gap-1 cursor-pointer">
+                        <i id="bitacoraSortIcon" class="fa-solid fa-arrow-down-short-wide text-blue-400"></i>
+                        <span id="bitacoraSortText">Recientes primero</span>
+                    </button>
+                </div>
+
+                <!-- Botones de Acción Oficiales -->
+                <div class="flex items-center gap-1.5 flex-wrap">
+                    <button onclick="triggerDeepRecoveryScan()" title="Buscar y recuperar vuelos históricos de la nube" class="px-2 py-1 bg-indigo-900/80 hover:bg-indigo-800 text-indigo-200 font-bold text-[10px] rounded-lg border border-indigo-700/50 transition flex items-center gap-1 cursor-pointer">
+                        <i class="fa-solid fa-rotate text-amber-300"></i> Sincronizar
+                    </button>
+
+                    <button onclick="exportBitacoraCSV()" class="px-2 py-1 bg-emerald-700 hover:bg-emerald-600 text-white font-bold text-[10px] sm:text-xs rounded-lg transition flex items-center gap-1 cursor-pointer">
+                        <i class="fa-solid fa-file-excel"></i> Excel
+                    </button>
+
+                    <button onclick="printAuditBitacora()" class="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white font-extrabold text-[11px] sm:text-xs rounded-lg transition flex items-center gap-1.5 cursor-pointer shadow-lg border border-blue-400/50">
+                        <i class="fa-solid fa-file-pdf text-amber-300 text-sm"></i>
+                        <span id="lblPrintButton">Generar PDF</span>
+                    </button>
+                    
+                    <button onclick="confirmClearAllBitacoraModal()" class="px-2 py-1 bg-red-950/80 hover:bg-red-900 text-red-300 font-bold text-[10px] sm:text-xs rounded-lg transition flex items-center gap-1 cursor-pointer">
+                        <i class="fa-solid fa-trash-can"></i> Vaciar
+                    </button>
+                </div>
+            </div>
+
+            <!-- TABLA DE LA BITÁCORA -->
+            <div class="overflow-y-auto overflow-x-auto flex-1 border border-slate-800 rounded-xl">
+                <table class="w-full text-left text-xs min-w-[700px]">
+                    <thead class="bg-slate-950 text-slate-400 uppercase font-bold tracking-wider border-b border-slate-800 text-[9.5px] sticky top-0 z-10 shadow">
+                        <tr>
+                            <th class="px-2.5 py-2">Fecha / Hora</th>
+                            <th class="px-2.5 py-2">Programada</th>
+                            <th class="px-2.5 py-2">Tipo Vuelo</th>
+                            <th class="px-2.5 py-2">Estado</th>
+                            <th class="px-2.5 py-2">Hora Real</th>
+                            <th class="px-2.5 py-2">Detalle / Motivo</th>
+                            <th class="px-2.5 py-2 text-center">Foto Evidencia</th>
+                            <th class="px-2.5 py-2 text-right">Gestión</th>
+                        </tr>
+                    </thead>
+                    <tbody id="modalBitacoraTableBody" class="divide-y divide-slate-800/60 font-medium text-[10.5px]">
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="flex justify-between items-center pt-1.5 border-t border-slate-800">
+                <span id="bitacoraFooterFilterInfo" class="text-[10px] text-slate-400 font-mono">Mostrando: Histórico Completo</span>
+                <button onclick="closeModal('modalBitacoraView')" class="px-3 py-1 bg-slate-800 text-slate-300 font-semibold text-xs rounded-xl hover:bg-slate-700">
+                    Cerrar Bitácora
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL ADJUNTAR EVIDENCIA -->
+    <div id="modalUploadEvidence" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-3 hidden modal-backdrop">
+        <div class="bg-slate-900 border border-amber-500/40 rounded-2xl max-w-sm w-full p-4 shadow-2xl space-y-3">
+            <div class="flex justify-between items-center border-b border-slate-800 pb-2">
+                <h3 class="text-xs sm:text-sm font-bold text-amber-400 flex items-center gap-1.5">
+                    <i class="fa-solid fa-camera"></i> Subir Evidencia de Suspensión
+                </h3>
+                <button onclick="closeModal('modalUploadEvidence')" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark text-base"></i></button>
+            </div>
+            
+            <input type="hidden" id="evidenceFlightIndex">
+
+            <div class="space-y-2 text-xs">
+                <div>
+                    <label class="block text-slate-400 font-semibold mb-0.5">Vuelo / Horario:</label>
+                    <input type="text" id="evidenceFlightLabel" readonly class="w-full bg-slate-950 border border-slate-800 text-slate-200 px-2.5 py-1 rounded-lg font-bold">
+                </div>
+                <div>
+                    <label class="block text-slate-400 font-semibold mb-0.5">Fotografía de Evidencia (Clima / Radar):</label>
+                    <input type="file" id="evidenceImageInput" accept="image/*" onchange="handleImageCompress(this, 'evidenceImgPreview')" class="w-full bg-slate-950 border border-slate-700 text-slate-400 text-xs py-1 px-2 rounded-lg cursor-pointer">
+                    <div id="evidenceImgPreviewContainer" class="mt-2 text-center hidden">
+                        <img id="evidenceImgPreview" src="" alt="Vista previa evidencia" class="max-h-32 mx-auto rounded border border-slate-700 object-cover shadow">
+                    </div>
+                </div>
+            </div>
+
+            <div class="flex justify-end gap-2 pt-2 border-t border-slate-800">
+                <button onclick="closeModal('modalUploadEvidence')" class="px-3 py-1 bg-slate-800 text-slate-300 font-semibold text-xs rounded-xl">Cancelar</button>
+                <button onclick="saveEvidencePhoto()" class="px-3 py-1 bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs rounded-xl shadow">Guardar Evidencia</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL DE CONFIGURACIÓN FIREBASE -->
+    <div id="modalCloudSettings" class="fixed inset-0 bg-slate-950/85 backdrop-blur-sm z-50 flex items-center justify-center p-3 hidden modal-backdrop">
+        <div class="bg-slate-900 border border-blue-500/40 rounded-2xl max-w-md w-full p-4 shadow-2xl space-y-3">
+            <div class="flex justify-between items-center border-b border-slate-800 pb-2">
+                <h3 class="text-xs sm:text-sm font-bold text-blue-400 flex items-center gap-1.5">
+                    <i class="fa-solid fa-cloud-bolt"></i> Configuración Nube Firebase
+                </h3>
+                <button onclick="closeModal('modalCloudSettings')" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark text-base"></i></button>
+            </div>
+            <p class="text-xs text-slate-300 leading-relaxed">
+                Base de datos activa: <code class="text-amber-300">control-vuelos</code>. Configuración actual de Firestore:
+            </p>
+            <div>
+                <label class="block text-slate-400 font-semibold text-[11px] mb-1">JSON de firebaseConfig:</label>
+                <textarea id="customFirebaseConfigInput" rows="6" class="w-full bg-slate-950 border border-slate-700 text-emerald-400 font-mono text-[10px] p-2 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500"></textarea>
+            </div>
+            <div class="flex items-center justify-between pt-2 border-t border-slate-800">
+                <button onclick="clearCustomFirebaseConfig()" class="px-2.5 py-1 bg-red-950/80 hover:bg-red-900 text-red-300 font-bold text-[10px] rounded-xl border border-red-800/50">Restablecer Original</button>
+                <div class="flex gap-1.5">
+                    <button onclick="closeModal('modalCloudSettings')" class="px-3 py-1 bg-slate-800 text-slate-300 font-semibold text-xs rounded-xl">Cancelar</button>
+                    <button onclick="saveCustomFirebaseConfig()" class="px-3 py-1 bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs rounded-xl shadow">Guardar y Conectar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL EDICIÓN DE REGISTRO CON SELECTOR DE FECHA AUDITABLE -->
+    <div id="modalEditBitacoraEntry" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-3 hidden modal-backdrop">
+        <div class="bg-slate-900 border border-blue-500/40 rounded-2xl max-w-md w-full p-4 shadow-2xl space-y-2.5 max-h-[90vh] overflow-y-auto">
+            <div class="flex justify-between items-center border-b border-slate-800 pb-2">
+                <h3 class="text-xs sm:text-sm font-bold text-blue-400 flex items-center gap-1.5">
+                    <i class="fa-solid fa-pen-to-square"></i> Editar Registro de Bitácora
+                </h3>
+                <button onclick="closeModal('modalEditBitacoraEntry')" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark text-base"></i></button>
+            </div>
+
+            <input type="hidden" id="editBitacoraId">
+
+            <div class="space-y-2 text-xs">
+                <div>
+                    <label class="block text-amber-300 font-semibold mb-0.5">Fecha del Vuelo (Día/Mes/Año):</label>
+                    <input type="date" id="editBitacoraDateKey" class="w-full bg-slate-950 border border-amber-500/50 text-amber-300 font-mono px-2.5 py-1 rounded-lg focus:outline-none focus:border-amber-400">
+                </div>
+                <div>
+                    <label class="block text-slate-400 font-semibold mb-0.5">Estado del Vuelo:</label>
+                    <select id="editBitacoraStatus" class="w-full bg-slate-950 border border-slate-700 text-slate-200 px-2.5 py-1 rounded-lg font-bold">
+                        <option value="REALIZADO">REALIZADO</option>
+                        <option value="SUSPENDIDO">SUSPENDIDO</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-slate-400 font-semibold mb-0.5">Hora Programada Base:</label>
+                    <input type="text" id="editBitacoraSchedTime" class="w-full bg-slate-950 border border-slate-700 text-amber-300 font-mono px-2.5 py-1 rounded-lg">
+                </div>
+                <div>
+                    <label class="block text-slate-400 font-semibold mb-0.5">Hora Real Ejecutada / Anotada:</label>
+                    <input type="text" id="editBitacoraRealTime" class="w-full bg-slate-950 border border-slate-700 text-emerald-400 font-mono px-2.5 py-1 rounded-lg">
+                </div>
+                <div>
+                    <label class="block text-slate-400 font-semibold mb-0.5">Observaciones / Motivo de Suspensión:</label>
+                    <textarea id="editBitacoraNotes" rows="2" class="w-full bg-slate-950 border border-slate-700 text-slate-200 p-2 rounded-lg"></textarea>
+                </div>
+                <div>
+                    <label class="block text-slate-400 font-semibold mb-0.5">Foto Evidencia (Clima / Radar):</label>
+                    <input type="file" id="editBitacoraImageInput" accept="image/*" onchange="handleImageCompress(this, 'editBitacoraImgPreview')" class="w-full bg-slate-950 border border-slate-700 text-slate-400 text-xs py-1 px-2 rounded-lg cursor-pointer">
+                    <div id="editBitacoraImgPreviewContainer" class="mt-1.5 text-center hidden">
+                        <img id="editBitacoraImgPreview" src="" alt="Vista previa evidencia" class="max-h-24 mx-auto rounded border border-slate-700 object-cover shadow">
+                        <button type="button" onclick="removeImageFromEdit()" class="text-[10px] text-red-400 hover:text-red-300 mt-1 underline">Eliminar Foto</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="flex justify-end gap-2 pt-2 border-t border-slate-800">
+                <button onclick="closeModal('modalEditBitacoraEntry')" class="px-3 py-1 bg-slate-800 text-slate-300 font-semibold text-xs rounded-xl">Cancelar</button>
+                <button onclick="saveBitacoraEntryEdit()" class="px-3 py-1 bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs rounded-xl shadow">Guardar Cambios</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL REGISTRAR DESPEGUE -->
+    <div id="modalTakeoff" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-3 hidden modal-backdrop">
+        <div class="bg-slate-900 border border-emerald-500/40 rounded-2xl max-w-sm w-full p-4 shadow-2xl space-y-2.5">
+            <div class="flex justify-between items-center border-b border-slate-800 pb-2">
+                <h3 class="text-xs sm:text-sm font-bold text-emerald-400 flex items-center gap-1.5">
+                    <i class="fa-solid fa-plane-departure"></i> Registrar Despegue
+                </h3>
+                <button onclick="closeModal('modalTakeoff')" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark text-base"></i></button>
+            </div>
+            <div class="space-y-2 text-xs">
+                <div>
+                    <label class="block text-slate-400 font-semibold mb-0.5">Vuelo / Horario:</label>
+                    <input type="text" id="takeoffFlightLabel" readonly class="w-full bg-slate-950 border border-slate-800 text-slate-200 px-2.5 py-1 rounded-lg font-bold">
+                </div>
+                <div>
+                    <label class="block text-slate-400 font-semibold mb-0.5">Fecha Operativa:</label>
+                    <input type="date" id="takeoffDateInput" class="w-full bg-slate-950 border border-slate-700 text-amber-300 font-mono text-xs font-bold px-2.5 py-1 rounded-lg">
+                </div>
+                <div>
+                    <label class="block text-slate-400 font-semibold mb-0.5">Hora Real de Despegue:</label>
+                    <input type="text" id="takeoffRealTime" class="w-full bg-slate-950 border border-slate-700 text-emerald-400 font-mono text-xs font-bold px-2.5 py-1 rounded-lg">
+                </div>
+                <div>
+                    <label class="block text-slate-400 font-semibold mb-0.5">Observaciones:</label>
+                    <textarea id="takeoffNotes" rows="2" placeholder="Patrullaje completo sin novedades..." class="w-full bg-slate-950 border border-slate-700 text-slate-200 p-2 rounded-lg"></textarea>
+                </div>
+            </div>
+            <div class="flex justify-end gap-2 pt-2 border-t border-slate-800">
+                <button onclick="closeModal('modalTakeoff')" class="px-3 py-1 bg-slate-800 text-slate-300 font-semibold text-xs rounded-xl">Cancelar</button>
+                <button onclick="confirmTakeoff()" class="px-3 py-1 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl shadow">Confirmar Despegue</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL REGISTRAR SUSPENSIÓN -->
+    <div id="modalSuspension" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-3 hidden modal-backdrop">
+        <div class="bg-slate-900 border border-amber-500/40 rounded-2xl max-w-sm w-full p-4 shadow-2xl space-y-2.5 max-h-[90vh] overflow-y-auto">
+            <div class="flex justify-between items-center border-b border-slate-800 pb-2">
+                <h3 class="text-xs sm:text-sm font-bold text-amber-400 flex items-center gap-1.5">
+                    <i class="fa-solid fa-triangle-exclamation"></i> Registrar Suspensión
+                </h3>
+                <button onclick="closeModal('modalSuspension')" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark text-base"></i></button>
+            </div>
+            
+            <div class="space-y-2 text-xs">
+                <div>
+                    <label class="block text-slate-400 font-semibold mb-0.5">Vuelo / Horario:</label>
+                    <input type="text" id="suspendFlightLabel" readonly class="w-full bg-slate-950 border border-slate-800 text-slate-200 px-2.5 py-1 rounded-lg font-bold">
+                </div>
+                <div>
+                    <label class="block text-slate-400 font-semibold mb-0.5">Fecha Operativa:</label>
+                    <input type="date" id="suspendDateInput" class="w-full bg-slate-950 border border-slate-700 text-amber-300 font-mono text-xs font-bold px-2.5 py-1 rounded-lg">
+                </div>
+                <div>
+                    <label class="block text-slate-400 font-semibold mb-0.5">Causa de Suspensión:</label>
+                    <select id="suspendReasonSelect" class="w-full bg-slate-950 border border-slate-700 text-amber-300 px-2.5 py-1 rounded-lg font-bold text-xs">
+                        <option value="NEBLINA DENSA / NULA VISIBILIDAD">Neblina Densa / Visibilidad Nula</option>
+                        <option value="LLUVIA / PRECIPITACIÓN">Lluvia / Precipitación</option>
+                        <option value="VIENTO FUERTE (> 43 km/h)">Viento Fuerte (> 43 km/h)</option>
+                        <option value="TORMENTA ELÉCTRICA">Tormenta Eléctrica</option>
+                        <option value="ATENCIÓN A EMERGENCIA REAL EN PLANTA">Atención a Emergencia en Planta</option>
+                        <option value="MANTENIMIENTO / FALLA TÉCNICA DRON">MANTENIMIENTO / Falla Técnica Dron</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-slate-400 font-semibold mb-0.5">Detalle / Justificación:</label>
+                    <textarea id="suspendNotes" rows="2" placeholder="Detalle la condición meteorológica o el evento..." class="w-full bg-slate-950 border border-slate-700 text-slate-200 p-2 rounded-lg"></textarea>
+                </div>
+
+                <div>
+                    <label class="block text-slate-400 font-semibold mb-0.5">Foto Evidencia (Clima/Radar):</label>
+                    <input type="file" id="suspendImageInput" accept="image/*" onchange="handleImageCompress(this, 'suspendImgPreview')" class="w-full bg-slate-950 border border-slate-700 text-slate-400 text-xs py-1 px-2 rounded-lg cursor-pointer">
+                    <div id="suspendImgPreviewContainer" class="mt-1.5 text-center hidden">
+                        <img id="suspendImgPreview" src="" alt="Evidencia clima" class="max-h-24 mx-auto rounded border border-slate-700 object-cover shadow">
+                    </div>
+                </div>
+            </div>
+
+            <div class="flex justify-end gap-2 pt-2 border-t border-slate-800">
+                <button onclick="closeModal('modalSuspension')" class="px-3 py-1 bg-slate-800 text-slate-300 font-semibold text-xs rounded-xl">Cancelar</button>
+                <button onclick="confirmSuspension()" class="px-3 py-1 bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs rounded-xl shadow">Confirmar Suspensión</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL DE VISUALIZACIÓN DE FOTO COMPLETA -->
+    <div id="modalImagePreview" class="fixed inset-0 bg-slate-950/90 backdrop-blur-md z-50 flex items-center justify-center p-3 hidden modal-backdrop">
+        <div class="bg-slate-900 border border-slate-700 rounded-2xl max-w-2xl w-full p-3 space-y-2 text-center">
+            <div class="flex justify-between items-center border-b border-slate-800 pb-2">
+                <h3 class="text-xs sm:text-sm font-bold text-slate-200"><i class="fa-solid fa-camera me-1"></i> Evidencia Fotográfica</h3>
+                <button onclick="closeModal('modalImagePreview')" class="text-slate-400 hover:text-white text-base"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="max-h-[70vh] overflow-hidden flex justify-center items-center bg-black/60 rounded-xl p-2">
+                <img id="modalFullImageSrc" src="" alt="Evidencia completa" class="max-h-[65vh] w-auto object-contain rounded">
+            </div>
+            <div class="flex justify-end pt-1">
+                <button onclick="closeModal('modalImagePreview')" class="px-3 py-1 bg-slate-800 hover:bg-slate-700 text-white text-xs font-semibold rounded-lg">Cerrar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- TOAST NOTIFICACIÓN -->
+    <div id="toastNotification" class="fixed bottom-3 right-3 bg-slate-900 border border-slate-700 text-white px-3 py-2 rounded-xl shadow-2xl z-50 flex items-center gap-2 transition-all duration-300 opacity-0 translate-y-5 pointer-events-none max-w-xs text-xs">
+        <i id="toastIcon" class="fa-solid fa-circle-info text-blue-400 text-sm"></i>
+        <span id="toastMessage" class="font-semibold text-[11px]">Notificación</span>
+    </div>
+
+    <!-- SECCIÓN OCULTA PARA IMPRESIÓN Y PDF DE LA BITÁCORA -->
+    <section id="bitacoraPrintSection" class="p-2 bg-white text-black">
+        <div class="border-b-2 border-black pb-1 mb-1.5 flex justify-between items-center">
+            <div>
+                <h1 class="text-sm font-bold uppercase tracking-wider">AUDI MÉXICO - PLANTA SAN JOSÉ CHIAPA</h1>
+                <h2 class="text-[11px] font-semibold" id="printReportSubtitle">Bitácora Oficial Auditable de Vuelos con Drone (24/7) - Jornada 16 Vuelos</h2>
+            </div>
+            <div class="text-right text-[8.5px]">
+                <div>Fecha de Jornada: <strong id="printReportDate" class="text-black font-bold">--</strong></div>
+                <div>Generado: <strong id="printReportTime">--</strong></div>
+            </div>
+        </div>
+
+        <table class="w-full text-left border-collapse border border-black text-[8px] mb-2">
+            <thead>
+                <tr class="bg-gray-200 border-b border-black font-bold">
+                    <th class="p-1 border-r border-black" style="width: 14%;">Fecha/Hora Reg</th>
+                    <th class="p-1 border-r border-black" style="width: 8%;">Prog.</th>
+                    <th class="p-1 border-r border-black" style="width: 25%;">Tipo Vuelo</th>
+                    <th class="p-1 border-r border-black" style="width: 10%;">Estado</th>
+                    <th class="p-1 border-r border-black" style="width: 8%;">Hora Real</th>
+                    <th class="p-1 border-r border-black" style="width: 23%;">Detalle / Motivo</th>
+                    <th class="p-1 text-center" style="width: 12%;">Foto Evidencia</th>
+                </tr>
+            </thead>
+            <tbody id="printBitacoraTableBody">
+            </tbody>
+        </table>
+
+        <div class="grid grid-cols-2 gap-8 pt-3 text-center text-[8.5px]">
+            <div class="border-t border-black pt-1">
+                <strong>Operaciones de Vuelo / Bitácora Drone</strong><br>
+                Validación Operativa Audi México
+            </div>
+            <div class="border-t border-black pt-1">
+                <strong>Supervisión de Seguridad Audi México</strong><br>
+                Validación y Sello de Auditoría
+            </div>
+        </div>
+    </section>
+
+    <!-- SCRIPT DE INICIALIZACIÓN, CATALOGO DE PLANES Y FECHAS -->
+    <script>
+        const memoryStorageFallback = {};
+        function safeStorageGet(key) {
+            try { return localStorage.getItem(key); } catch (e) { return memoryStorageFallback[key] || null; }
+        }
+        function safeStorageSet(key, value) {
+            try { localStorage.setItem(key, value); } catch (e) { memoryStorageFallback[key] = value; }
+        }
+        window.safeStorageGet = safeStorageGet;
+        window.safeStorageSet = safeStorageSet;
+
+        function getTodayKey() {
+            const now = new Date();
+            const y = now.getFullYear();
+            const m = String(now.getMonth() + 1).padStart(2, '0');
+            const d = String(now.getDate()).padStart(2, '0');
+            return `${y}-${m}-${d}`;
+        }
+        window.getTodayKey = getTodayKey;
+
+        function getYesterdayKey() {
+            const d = new Date();
+            d.setDate(d.getDate() - 1);
+            const y = d.getFullYear();
+            const m = String(d.getMonth() + 1).padStart(2, '0');
+            const day = String(d.getDate()).padStart(2, '0');
+            return `${y}-${m}-${day}`;
+        }
+        window.getYesterdayKey = getYesterdayKey;
+
+        // FUNCIÓN UNIVERSAL DE NORMALIZACIÓN DE FECHAS
+        function normalizeRecordDateKey(item) {
+            if (!item) return "";
+
+            if (item.timestampFormatted) {
+                const datePart = item.timestampFormatted.split(',')[0].trim();
+                const dParts = datePart.split('/');
+                if (dParts.length === 3) {
+                    const pDay = String(parseInt(dParts[0], 10)).padStart(2, '0');
+                    const pMonth = String(parseInt(dParts[1], 10)).padStart(2, '0');
+                    const pYear = parseInt(dParts[2], 10);
+                    if (pYear > 2000) return `${pYear}-${pMonth}-${pDay}`;
+                }
+                if (/^\d{4}-\d{2}-\d{2}$/.test(datePart)) return datePart;
+            }
+
+            if (item.dateKey && /^\d{4}-\d{2}-\d{2}$/.test(item.dateKey)) {
+                return item.dateKey;
+            }
+
+            if (item.id && typeof item.id === 'number' && item.id > 1600000000000) {
+                const d = new Date(item.id);
+                const y = d.getFullYear();
+                const m = String(d.getMonth() + 1).padStart(2, '0');
+                const day = String(d.getDate()).padStart(2, '0');
+                return `${y}-${m}-${day}`;
+            }
+
+            return item.dateKey || "";
+        }
+        window.normalizeRecordDateKey = normalizeRecordDateKey;
+
+        function recordMatchesDate(item, targetYMD) {
+            if (!item || !targetYMD) return false;
+            
+            const normKey = normalizeRecordDateKey(item);
+            if (normKey === targetYMD) return true;
+
+            const [tYear, tMonth, tDay] = targetYMD.split('-').map(Number);
+            
+            if (item.dateKey && /^\d{4}-\d{2}-\d{2}$/.test(item.dateKey)) {
+                const [iY, iM, iD] = item.dateKey.split('-').map(Number);
+                if (iY === tYear && iM === tMonth && iD === tDay) return true;
+            }
+
+            if (item.timestampFormatted) {
+                const datePart = item.timestampFormatted.split(',')[0].trim();
+                const dParts = datePart.split('/');
+                if (dParts.length === 3) {
+                    const d = parseInt(dParts[0], 10);
+                    const m = parseInt(dParts[1], 10);
+                    const y = parseInt(dParts[2], 10);
+                    if (y === tYear && m === tMonth && d === tDay) return true;
+                }
+            }
+
+            return false;
+        }
+        window.recordMatchesDate = recordMatchesDate;
+
+        // CATÁLOGO INMUTABLE DE LOS 4 PLANES OFICIALES
+        const OFFICIAL_PLANS = Object.freeze({
+            "1": Object.freeze([
+                { timeOp2: "00:30", type: "C", name: "Interior de planta", forced: false },
+                { timeOp2: "02:00", type: "A", name: "Recorrido perimetral", forced: false },
+                { timeOp2: "03:30", type: "D", name: "Zonas lejanas", forced: false },
+                { timeOp2: "05:00", type: "A", name: "Recorrido perimetral", forced: false },
+                { timeOp2: "06:00", type: "B", name: "Cambio de turno", forced: true },
+                { timeOp2: "08:00", type: "C", name: "Interior de planta", forced: false },
+                { timeOp2: "09:30", type: "A", name: "Recorrido perimetral", forced: false },
+                { timeOp2: "11:00", type: "D", name: "Zonas lejanas", forced: false },
+                { timeOp2: "12:30", type: "A", name: "Recorrido perimetral", forced: false },
+                { timeOp2: "14:00", type: "B", name: "Cambio de turno", forced: true },
+                { timeOp2: "15:30", type: "C", name: "Interior de planta", forced: false },
+                { timeOp2: "17:00", type: "B", name: "Cambio de turno", forced: true },
+                { timeOp2: "18:30", type: "A", name: "Recorrido perimetral", forced: false },
+                { timeOp2: "20:00", type: "D", name: "Zonas lejanas", forced: false },
+                { timeOp2: "21:30", type: "B", name: "Cambio de turno - Uso de Spotlight", forced: true },
+                { timeOp2: "23:00", type: "A", name: "Recorrido perimetral", forced: false }
+            ]),
+            "2": Object.freeze([
+                { timeOp2: "00:30", type: "A", name: "Recorrido perimetral", forced: false },
+                { timeOp2: "02:00", type: "D", name: "Zonas lejanas", forced: false },
+                { timeOp2: "03:30", type: "A", name: "Recorrido perimetral", forced: false },
+                { timeOp2: "05:00", type: "C", name: "Interior de planta", forced: false },
+                { timeOp2: "06:00", type: "B", name: "Cambio de turno", forced: true },
+                { timeOp2: "08:00", type: "A", name: "Recorrido perimetral", forced: false },
+                { timeOp2: "09:30", type: "A", name: "Recorrido perimetral", forced: false },
+                { timeOp2: "11:00", type: "C", name: "Interior de planta", forced: false },
+                { timeOp2: "12:30", type: "A", name: "Recorrido perimetral", forced: false },
+                { timeOp2: "14:00", type: "B", name: "Cambio de turno", forced: true },
+                { timeOp2: "15:30", type: "A", name: "Recorrido perimetral", forced: false },
+                { timeOp2: "17:00", type: "B", name: "Cambio de turno", forced: true },
+                { timeOp2: "18:30", type: "A", name: "Recorrido perimetral", forced: false },
+                { timeOp2: "20:00", type: "C", name: "Interior de planta", forced: false },
+                { timeOp2: "21:30", type: "B", name: "Cambio de turno - Uso de Spotlight", forced: true },
+                { timeOp2: "23:00", type: "A", name: "Recorrido perimetral", forced: false }
+            ]),
+            "3": Object.freeze([
+                { timeOp2: "00:30", type: "D", name: "Zonas lejanas", forced: false },
+                { timeOp2: "02:00", type: "A", name: "Recorrido perimetral", forced: false },
+                { timeOp2: "03:30", type: "C", name: "Interior de planta", forced: false },
+                { timeOp2: "05:00", type: "A", name: "Recorrido perimetral", forced: false },
+                { timeOp2: "06:00", type: "B", name: "Cambio de turno", forced: true },
+                { timeOp2: "08:00", type: "A", name: "Recorrido perimetral", forced: false },
+                { timeOp2: "09:30", type: "C", name: "Interior de planta", forced: false },
+                { timeOp2: "11:00", type: "A", name: "Recorrido perimetral", forced: false },
+                { timeOp2: "12:30", type: "D", name: "Zonas lejanas", forced: false },
+                { timeOp2: "14:00", type: "B", name: "Cambio de turno", forced: true },
+                { timeOp2: "15:30", type: "A", name: "Recorrido perimetral", forced: false },
+                { timeOp2: "17:00", type: "B", name: "Cambio de turno", forced: true },
+                { timeOp2: "18:30", type: "C", name: "Interior de planta", forced: false },
+                { timeOp2: "20:00", type: "A", name: "Recorrido perimetral", forced: false },
+                { timeOp2: "21:30", type: "B", name: "Cambio de turno - Uso de Spotlight", forced: true },
+                { timeOp2: "23:00", type: "D", name: "Zonas lejanas", forced: false }
+            ]),
+            "4": Object.freeze([
+                { timeOp2: "00:30", type: "D", name: "Zonas lejanas", forced: false },
+                { timeOp2: "02:00", type: "C", name: "Interior de planta", forced: false },
+                { timeOp2: "03:30", type: "A", name: "Recorrido perimetral", forced: false },
+                { timeOp2: "05:00", type: "A", name: "Recorrido perimetral", forced: false },
+                { timeOp2: "06:00", type: "B", name: "Cambio de turno", forced: true },
+                { timeOp2: "08:00", type: "C", name: "Interior de planta", forced: false },
+                { timeOp2: "09:30", type: "D", name: "Zonas lejanas", forced: false },
+                { timeOp2: "11:00", type: "A", name: "Recorrido perimetral", forced: false },
+                { timeOp2: "12:30", type: "C", name: "Interior de planta", forced: false },
+                { timeOp2: "14:00", type: "B", name: "Cambio de turno", forced: true },
+                { timeOp2: "15:30", type: "A", name: "Recorrido perimetral", forced: false },
+                { timeOp2: "17:00", type: "B", name: "Cambio de turno", forced: true },
+                { timeOp2: "18:30", type: "D", name: "Zonas lejanas", forced: false },
+                { timeOp2: "20:00", type: "C", name: "Interior de planta", forced: false },
+                { timeOp2: "21:30", type: "B", name: "Cambio de turno - Uso de Spotlight", forced: true },
+                { timeOp2: "23:00", type: "A", name: "Recorrido perimetral", forced: false }
+            ])
+        });
+
+        function getDeterministicPlanForDate(dateStr) {
+            let sum = 0;
+            for (let i = 0; i < dateStr.length; i++) {
+                sum += dateStr.charCodeAt(i) * (i + 1);
+            }
+            return String((Math.abs(sum) % 4) + 1);
+        }
+
+        let memoryCachedPlanKey = null;
+
+        function getActivePlanKey() {
+            if (memoryCachedPlanKey && OFFICIAL_PLANS[memoryCachedPlanKey]) {
+                return memoryCachedPlanKey;
+            }
+
+            const today = getTodayKey();
+            const savedPlan = safeStorageGet(`audi_assigned_plan_${today}`);
+
+            if (savedPlan && OFFICIAL_PLANS[savedPlan]) {
+                memoryCachedPlanKey = savedPlan;
+                return savedPlan;
+            }
+
+            const assigned = getDeterministicPlanForDate(today);
+            memoryCachedPlanKey = assigned;
+            safeStorageSet(`audi_assigned_plan_${today}`, assigned);
+            return assigned;
+        }
+        window.getActivePlanKey = getActivePlanKey;
+
+        function getActivePlan() {
+            return OFFICIAL_PLANS[getActivePlanKey()] || OFFICIAL_PLANS["1"];
+        }
+        window.getActivePlan = getActivePlan;
+
+        function randomizePlanManually() {
+            if (typeof window.promptPasswordConfirmation === 'function') {
+                window.promptPasswordConfirmation(
+                    "Autorización para Cambio de Plan",
+                    "Para cambiar el plan de vuelo asignado a la jornada, ingresa la contraseña de supervisor:",
+                    () => { executePlanRandomization(); }
+                );
+            } else {
+                executePlanRandomization();
+            }
+        }
+        window.randomizePlanManually = randomizePlanManually;
+
+        function executePlanRandomization() {
+            const currentPlan = getActivePlanKey();
+            const candidates = ["1", "2", "3", "4"].filter(p => p !== currentPlan);
+            const nextPlan = candidates[Math.floor(Math.random() * candidates.length)];
+            const today = getTodayKey();
+
+            memoryCachedPlanKey = nextPlan;
+            safeStorageSet(`audi_assigned_plan_${today}`, nextPlan);
+
+            if (typeof window.saveDailyStatusToCloud === 'function') window.saveDailyStatusToCloud();
+            if (typeof window.renderFlightsTable === 'function') window.renderFlightsTable();
+            if (typeof window.updateTargetFlightBanner === 'function') window.updateTargetFlightBanner(new Date());
+            if (typeof window.showToast === 'function') window.showToast(`Plan asignado por supervisor: Plan ${nextPlan}`, "success");
+        }
+        window.executePlanRandomization = executePlanRandomization;
+
+        // ESTADO GLOBAL DE LA APLICACIÓN
+        window.dailyFlightStatuses = {};
+        window.bitacoraList = [];
+        window.activeModalIndex = 0;
+        window.activeTargetIdx = 0;
+        window.tempCompressedImage = "";
+        window.audioUnlocked = false;
+        window.bitacoraSortAsc = false;
+        window.bitacoraFilterMode = 'ALL'; 
+        window.bitacoraSelectedDate = "";
+        window.systemWeatherSuspended = false;
+        window.isTopLevelSuspension = false;
+        window.triggeredVoiceAlerts = new Set();
+    </script>
+
+    <!-- FIREBASE MODULE (PERSISTENCIA Y SINCRONIZACIÓN NUBE) -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, setDoc, deleteDoc, onSnapshot, collection, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        let appId = 'audi-mexico-drones';
+        try {
+            if (typeof __app_id !== 'undefined' && __app_id) appId = __app_id;
+            else if (typeof window.__app_id !== 'undefined' && window.__app_id) appId = window.__app_id;
+        } catch(e) {}
+
+        const DEFAULT_FIREBASE_CONFIG = {
+            apiKey: "AIzaSyChAG45qQ2gLup1_HwRGhmJJ5cFyFBd70U",
+            authDomain: "control-vuelos.firebaseapp.com",
+            projectId: "control-vuelos",
+            storageBucket: "control-vuelos.firebasestorage.app",
+            messagingSenderId: "756032981781",
+            appId: "1:756032981781:web:cc679a65b3995087c0771c"
+        };
+
+        let firebaseConfig = null;
+        try {
+            if (typeof __firebase_config !== 'undefined' && __firebase_config) {
+                firebaseConfig = typeof __firebase_config === 'string' ? JSON.parse(__firebase_config) : __firebase_config;
+            } else if (typeof window.__firebase_config !== 'undefined' && window.__firebase_config) {
+                firebaseConfig = typeof window.__firebase_config === 'string' ? JSON.parse(window.__firebase_config) : window.__firebase_config;
+            }
+        } catch(e) {}
+
+        let db = null;
+        let auth = null;
+        window.__firebase_db = null;
+
+        function updateCloudUI(isOnline, message) {
+            const icon = document.getElementById('cloudStatusIcon');
+            const text = document.getElementById('cloudStatusText');
+            const badge = document.getElementById('cloudStatusBadge');
+            
+            if (isOnline) {
+                if (text) text.innerText = message || "Nube Live Sincronizada";
+                if (icon) icon.className = "fa-solid fa-cloud-bolt text-emerald-400 animate-pulse";
+                if (badge) badge.className = "text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-950/80 text-emerald-400 border border-emerald-800/40 shrink-0 flex items-center gap-1 cursor-pointer";
+            } else {
+                if (text) text.innerText = message || "Modo Local";
+                if (icon) icon.className = "fa-solid fa-hard-drive text-amber-400";
+                if (badge) badge.className = "text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-950/80 text-amber-400 border border-amber-800/40 shrink-0 flex items-center gap-1 cursor-pointer";
+            }
+        }
+
+        async function initCloudPersistence() {
+            if (!firebaseConfig) {
+                const customConfigStr = window.safeStorageGet ? window.safeStorageGet('audi_custom_firebase_config') : null;
+                if (customConfigStr) {
+                    try { firebaseConfig = JSON.parse(customConfigStr); } catch(e) {}
+                }
+            }
+
+            if (!firebaseConfig) firebaseConfig = DEFAULT_FIREBASE_CONFIG;
+
+            try {
+                const app = initializeApp(firebaseConfig);
+                auth = getAuth(app);
+                db = getFirestore(app);
+                window.__firebase_db = db;
+
+                try {
+                    await signInAnonymously(auth);
+                } catch (authErr) {}
+
+                updateCloudUI(true, "Nube Live Sincronizada");
+                setupRealtimeListeners();
+            } catch (err) {
+                updateCloudUI(false, "Modo Local");
+            }
+        }
+
+        function setupRealtimeListeners() {
+            if (!db) return;
+            const todayKey = window.getTodayKey ? window.getTodayKey() : '2026-10-13';
+
+            try {
+                const statusDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'daily_status', todayKey);
+                onSnapshot(statusDocRef, (docSnap) => {
+                    if (docSnap.exists()) {
+                        const data = docSnap.data();
+                        let needsTableRefresh = false;
+
+                        if (data.statuses && Object.keys(data.statuses).length > 0) {
+                            window.dailyFlightStatuses = data.statuses;
+                            if (window.safeStorageSet) window.safeStorageSet(`audi_flight_statuses_${todayKey}`, JSON.stringify(data.statuses));
+                            needsTableRefresh = true;
+                        }
+
+                        if (data.assignedPlan && window.getActivePlanKey && window.getActivePlanKey() !== data.assignedPlan) {
+                            if (window.safeStorageSet) {
+                                window.safeStorageSet(`audi_assigned_plan_${todayKey}`, data.assignedPlan);
+                            }
+                            needsTableRefresh = true;
+                        }
+
+                        if (data.weatherSuspended !== undefined && window.systemWeatherSuspended !== data.weatherSuspended) {
+                            window.systemWeatherSuspended = data.weatherSuspended;
+                            needsTableRefresh = true;
+                        }
+
+                        if (needsTableRefresh) {
+                            if (typeof window.renderFlightsTable === 'function') window.renderFlightsTable();
+                            if (typeof window.updateTargetFlightBanner === 'function') window.updateTargetFlightBanner(new Date());
+                        }
+                    }
+                }, () => {});
+            } catch(e){}
+
+            try {
+                const bitacoraColRef = collection(db, 'artifacts', appId, 'public', 'data', 'bitacora_logs');
+                onSnapshot(bitacoraColRef, (querySnap) => {
+                    const logs = [];
+                    querySnap.forEach((docSnap) => { logs.push(docSnap.data()); });
+                    if (logs.length > 0) processIncomingCloudLogs(logs);
+                }, () => {});
+            } catch(e){}
+        }
+
+        function processIncomingCloudLogs(newLogs) {
+            if (!newLogs || newLogs.length === 0) return;
+
+            const currentMap = new Map();
+            (window.bitacoraList || []).forEach(item => {
+                if (item && item.id) currentMap.set(String(item.id), item);
+            });
+
+            newLogs.forEach(item => {
+                if (item && item.id) currentMap.set(String(item.id), item);
+            });
+
+            const merged = Array.from(currentMap.values());
+            merged.sort((a, b) => b.id - a.id);
+            
+            window.bitacoraList = merged;
+            if (window.safeStorageSet) window.safeStorageSet('audi_bitacora_logs', JSON.stringify(merged));
+
+            if (typeof window.runAutoSeparate12and13 === 'function') window.runAutoSeparate12and13(false);
+            if (typeof window.renderBitacoraModalTable === 'function') window.renderBitacoraModalTable();
+            if (typeof window.renderFlightsTable === 'function') window.renderFlightsTable();
+            if (typeof window.updateTargetFlightBanner === 'function') window.updateTargetFlightBanner(new Date());
+        }
+
+        window.saveDailyStatusToCloud = async function() {
+            if (!db) return;
+            const todayKey = window.getTodayKey ? window.getTodayKey() : '';
+            try {
+                const statusDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'daily_status', todayKey);
+                await setDoc(statusDocRef, {
+                    date: todayKey,
+                    assignedPlan: window.getActivePlanKey ? window.getActivePlanKey() : "1",
+                    statuses: window.dailyFlightStatuses,
+                    weatherSuspended: window.systemWeatherSuspended,
+                    updatedAt: new Date().toISOString()
+                });
+            } catch (e) {}
+        };
+
+        window.saveBitacoraLogToCloud = async function(logEntry) {
+            if (!db) return;
+            try {
+                const logDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'bitacora_logs', logEntry.id.toString());
+                await setDoc(logDocRef, logEntry);
+                const rootDocRef = doc(db, 'bitacora_logs', logEntry.id.toString());
+                await setDoc(rootDocRef, logEntry);
+            } catch (e) {}
+        };
+
+        window.deleteBitacoraLogFromCloud = async function(logId) {
+            if (!db) return;
+            try {
+                const logDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'bitacora_logs', logId.toString());
+                await deleteDoc(logDocRef);
+                const rootDocRef = doc(db, 'bitacora_logs', logId.toString());
+                await deleteDoc(rootDocRef);
+            } catch (e) {}
+        };
+
+        window.triggerDeepRecoveryScan = async function(isSilent = false) {
+            if (!db) {
+                if (!isSilent) window.showToast("Modo local activo.", "info");
+                return;
+            }
+            if (!isSilent) window.showToast("Sincronizando con la nube...", "info");
+            try {
+                const colRef = collection(db, 'artifacts', appId, 'public', 'data', 'bitacora_logs');
+                const snap = await getDocs(colRef);
+                const recoveredLogs = [];
+                snap.forEach(d => recoveredLogs.push(d.data()));
+                if (recoveredLogs.length > 0) processIncomingCloudLogs(recoveredLogs);
+                if (!isSilent) window.showToast("Sincronización completa", "success");
+            } catch (e) {
+                if (!isSilent) window.showToast("Registro local al día", "info");
+            }
+        };
+
+        window.openCloudSettingsModal = function() {
+            const savedConfig = window.safeStorageGet('audi_custom_firebase_config');
+            const input = document.getElementById('customFirebaseConfigInput');
+            if (input && savedConfig) input.value = savedConfig;
+            window.openModal('modalCloudSettings');
+        };
+
+        window.saveCustomFirebaseConfig = function() {
+            const input = document.getElementById('customFirebaseConfigInput');
+            if (!input) return;
+            const val = input.value.trim();
+            if (!val) {
+                window.showToast("Ingresa un JSON válido.", "warning");
+                return;
+            }
+            try {
+                JSON.parse(val);
+                window.safeStorageSet('audi_custom_firebase_config', val);
+                window.closeModal('modalCloudSettings');
+                window.location.reload();
+            } catch(e) {
+                window.showToast("El texto no es un JSON válido.", "warning");
+            }
+        };
+
+        window.clearCustomFirebaseConfig = function() {
+            window.safeStorageSet('audi_custom_firebase_config', '');
+            window.closeModal('modalCloudSettings');
+            window.location.reload();
+        };
+
+        initCloudPersistence();
+    </script>
+
+    <!-- SCRIPT PRINCIPAL DE LA APLICACIÓN -->
+    <script>
+        const SUPERVISOR_PASSWORD = "audi";
+
+        // GESTIÓN DE AUDIO
+        let audioCtxInstance = null;
+        function getAudioContext() {
+            if (!audioCtxInstance) {
+                const AudioCtx = window.AudioContext || window.webkitAudioContext;
+                if (AudioCtx) audioCtxInstance = new AudioCtx();
+            }
+            if (audioCtxInstance && audioCtxInstance.state === 'suspended') {
+                audioCtxInstance.resume();
+            }
+            return audioCtxInstance;
+        }
+
+        function playAirportChime(isUrgent = false) {
+            try {
+                const ctx = getAudioContext();
+                if (!ctx) return;
+
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+
+                const now = ctx.currentTime;
+                if (isUrgent) {
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(880, now);
+                    osc.frequency.setValueAtTime(659, now + 0.15);
+                    gain.gain.setValueAtTime(0.25, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.45);
+                    osc.start(now);
+                    osc.stop(now + 0.45);
+                } else {
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(587.33, now);
+                    osc.frequency.setValueAtTime(880, now + 0.18);
+                    gain.gain.setValueAtTime(0.2, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.5);
+                    osc.start(now);
+                    osc.stop(now + 0.5);
+                }
+            } catch(e) {}
+        }
+
+        function triggerVoiceAlert(text, isUrgent = false) {
+            showToast(text, isUrgent ? 'warning' : 'info');
+            playAirportChime(isUrgent);
+
+            if ('speechSynthesis' in window) {
+                try {
+                    window.speechSynthesis.cancel();
+                    setTimeout(() => {
+                        const utterance = new SpeechSynthesisUtterance(text);
+                        utterance.lang = 'es-MX';
+                        utterance.rate = 0.98;
+                        utterance.pitch = 1.0;
+                        utterance.volume = 1.0;
+                        window.speechSynthesis.speak(utterance);
+                    }, 220);
+                } catch (e) {}
+            }
+        }
+        window.triggerVoiceAlert = triggerVoiceAlert;
+
+        function unlockAudioSystem() {
+            window.audioUnlocked = true;
+            getAudioContext();
+            const badgeText = document.getElementById('audioStatusText');
+            const badgeIcon = document.getElementById('audioStatusIcon');
+            const badgeContainer = document.getElementById('audioStatusBadge');
+
+            if (badgeText) badgeText.innerText = "Audio Activo";
+            if (badgeIcon) badgeIcon.className = "fa-solid fa-volume-high text-emerald-400 animate-pulse";
+            if (badgeContainer) badgeContainer.className = "mt-1 text-[8.5px] font-bold px-1.5 py-0.5 rounded bg-emerald-950/80 text-emerald-400 border border-emerald-800/60 flex items-center gap-1 shrink-0 cursor-pointer";
+        }
+        window.unlockAudioSystem = unlockAudioSystem;
+
+        function toggleAudioAndTest() {
+            unlockAudioSystem();
+            triggerVoiceAlert("Sistema de audio verificado y activo para operaciones de vuelo . elaborador por Omar Dominguez");
+        }
+        window.toggleAudioAndTest = toggleAudioAndTest;
+
+        function parseTimeToMinutes(timeStr) {
+            if (!timeStr || !timeStr.includes(':')) return 0;
+            const [h, m] = timeStr.split(':').map(Number);
+            return h * 60 + m;
+        }
+
+        function checkAndTriggerFlightAlerts(now, targetItem, baseMins, currentMins, statusObj) {
+            if (!targetItem || statusObj.status !== 'PENDIENTE' || window.systemWeatherSuspended) return;
+
+            const today = getTodayKey();
+            const isTypeB = targetItem.forced;
+
+            if (isTypeB) {
+                const diffSecs = Math.floor((baseMins - currentMins) * 60 - now.getSeconds());
+                if (diffSecs <= 1800 && diffSecs > 1740) {
+                    const alertKey = `${today}_${targetItem.timeOp2}_B_30m`;
+                    if (!window.triggeredVoiceAlerts.has(alertKey)) {
+                        window.triggeredVoiceAlerts.add(alertKey);
+                        triggerVoiceAlert(`Atención. Faltan 30 minutos para el vuelo obligatorio de Cambio de Turno de las ${targetItem.timeOp2} horas.`);
+                    }
+                } else if (diffSecs <= 900 && diffSecs > 840) {
+                    const alertKey = `${today}_${targetItem.timeOp2}_B_15m`;
+                    if (!window.triggeredVoiceAlerts.has(alertKey)) {
+                        window.triggeredVoiceAlerts.add(alertKey);
+                        triggerVoiceAlert(`Recordatorio. Faltan 15 minutos para el vuelo de Cambio de Turno de las ${targetItem.timeOp2} horas.`);
+                    }
+                } else if (diffSecs <= 300 && diffSecs > 240) {
+                    const alertKey = `${today}_${targetItem.timeOp2}_B_5m`;
+                    if (!window.triggeredVoiceAlerts.has(alertKey)) {
+                        window.triggeredVoiceAlerts.add(alertKey);
+                        triggerVoiceAlert(`¡Alerta urgente! Quedan 5 minutos para el Cambio de Turno de las ${targetItem.timeOp2} horas. Proceda al despegue.`, true);
+                    }
+                } else if (diffSecs <= 0 && diffSecs > -60) {
+                    const alertKey = `${today}_${targetItem.timeOp2}_B_EXACT`;
+                    if (!window.triggeredVoiceAlerts.has(alertKey)) {
+                        window.triggeredVoiceAlerts.add(alertKey);
+                        triggerVoiceAlert(`¡Atención! Es la hora exacta del vuelo de Cambio de Turno de las ${targetItem.timeOp2} horas. Proceda al despegue.`, true);
+                    }
+                }
+            } else {
+                const winStartMins = baseMins - 30;
+                const winEndMins = baseMins + 30;
+
+                if (currentMins >= winStartMins && currentMins < winStartMins + 1) {
+                    const alertKey = `${today}_${targetItem.timeOp2}_OPEN`;
+                    if (!window.triggeredVoiceAlerts.has(alertKey)) {
+                        window.triggeredVoiceAlerts.add(alertKey);
+                        triggerVoiceAlert(`Atención. Se ha abierto la ventana del vuelo de las ${targetItem.timeOp2} horas.`);
+                    }
+                }
+                if (currentMins === baseMins) {
+                    const alertKey = `${today}_${targetItem.timeOp2}_BASE`;
+                    if (!window.triggeredVoiceAlerts.has(alertKey)) {
+                        window.triggeredVoiceAlerts.add(alertKey);
+                        triggerVoiceAlert(`Recordatorio. Es la hora base del vuelo de las ${targetItem.timeOp2} horas. Quedan 30 minutos de ventana.`);
+                    }
+                }
+                if (currentMins === winEndMins - 5) {
+                    const alertKey = `${today}_${targetItem.timeOp2}_5m_CLOSE`;
+                    if (!window.triggeredVoiceAlerts.has(alertKey)) {
+                        window.triggeredVoiceAlerts.add(alertKey);
+                        triggerVoiceAlert(`¡Alerta urgente! Quedan 5 minutos para el cierre de la ventana de las ${targetItem.timeOp2} horas. Proceda al despegue.`, true);
+                    }
+                }
+            }
+        }
+
+        function startLiveClock() {
+            function updateClock() {
+                try {
+                    const now = new Date();
+                    const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
+                    const options = { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' };
+                    const dateStr = now.toLocaleDateString('es-MX', options);
+
+                    const clockEl = document.getElementById('liveClock');
+                    const dateEl = document.getElementById('liveDate');
+                    if (clockEl) clockEl.innerText = timeStr;
+                    if (dateEl) dateEl.innerText = dateStr.charAt(0).toUpperCase() + dateStr.slice(1);
+
+                    updateShiftBadge(now.getHours());
+                    updateTargetFlightBanner(now);
+                } catch(err) {}
+            }
+            updateClock();
+            setInterval(updateClock, 1000);
+        }
+
+        function updateShiftBadge(hour) {
+            const shiftEl = document.getElementById('shiftBadge');
+            if (!shiftEl) return;
+            if (hour >= 6 && hour < 14) {
+                shiftEl.innerText = "Turno 1 (Matutino)";
+            } else if (hour >= 14 && hour < 21) {
+                shiftEl.innerText = "Turno 2 (Vespertino)";
+            } else {
+                shiftEl.innerText = "Turno 3 (Nocturno)";
+            }
+        }
+
+        function updateTargetFlightBanner(now) {
+            const plans = getActivePlan();
+            const activePlanBadge = document.getElementById('activePlanBadge');
+            if (activePlanBadge) activePlanBadge.innerText = `PLAN ${getActivePlanKey()}`;
+
+            const currentMins = now.getHours() * 60 + now.getMinutes();
+
+            let targetIdx = plans.findIndex((p, idx) => {
+                const st = window.dailyFlightStatuses[idx];
+                return !st || st.status === 'PENDIENTE';
+            });
+
+            if (targetIdx === -1) targetIdx = plans.length - 1;
+            window.activeTargetIdx = targetIdx;
+
+            const targetItem = plans[targetIdx];
+            if (!targetItem) return;
+
+            const baseMins = parseTimeToMinutes(targetItem.timeOp2);
+
+            const timeEl = document.getElementById('targetFlightTime');
+            const winEl = document.getElementById('targetFlightWindow');
+            const badgeEl = document.getElementById('targetFlightBadge');
+            const cdEl = document.getElementById('targetCountdown');
+
+            if (timeEl) timeEl.innerText = `${targetItem.timeOp2} hrs`;
+            if (badgeEl) badgeEl.innerText = `TIPO ${targetItem.type} - ${targetItem.name}`;
+
+            const statusObj = window.dailyFlightStatuses[targetIdx] || { status: 'PENDIENTE' };
+            const isTypeB = targetItem.forced;
+
+            checkAndTriggerFlightAlerts(now, targetItem, baseMins, currentMins, statusObj);
+
+            if (window.systemWeatherSuspended) {
+                if (winEl) winEl.innerText = "Suspensión General por Clima Activa";
+                if (cdEl) {
+                    cdEl.innerText = "SUSPENDIDO";
+                    cdEl.className = "text-2xl sm:text-4xl lg:text-5xl font-mono font-black text-amber-400 mt-0.5 animate-pulse";
+                }
+                return;
+            }
+
+            if (isTypeB) {
+                if (winEl) winEl.innerText = `Hora Exacta (${targetItem.timeOp2} hrs - Sin Ventana)`;
+                const diffSecs = Math.floor((baseMins - currentMins) * 60 - now.getSeconds());
+                const m = Math.floor(diffSecs / 60);
+                const s = ((diffSecs % 60) + 60) % 60;
+
+                if (statusObj.status !== 'PENDIENTE') {
+                    if (cdEl) {
+                        cdEl.innerText = `ESTADO: ${statusObj.status}`;
+                        cdEl.className = "text-xl font-mono font-black text-slate-400 mt-0.5";
+                    }
+                } else if (diffSecs > 0) {
+                    if (cdEl) {
+                        cdEl.innerText = `Faltan ${m}m ${String(s).padStart(2,'0')}s`;
+                        cdEl.className = "text-2xl sm:text-4xl font-mono font-black text-amber-300 mt-0.5";
+                    }
+                } else if (diffSecs <= 0 && diffSecs > -300) {
+                    if (cdEl) {
+                        cdEl.innerText = `¡HORA EXACTA RELEVO!`;
+                        cdEl.className = "text-2xl sm:text-4xl lg:text-5xl font-mono font-black text-emerald-400 mt-0.5 animate-pulse";
+                    }
+                } else {
+                    if (cdEl) {
+                        cdEl.innerText = `HORA VENCIDA`;
+                        cdEl.className = "text-xl font-mono font-black text-red-400 mt-0.5";
+                    }
+                }
+            } else {
+                const winStartMins = baseMins - 30;
+                const winEndMins = baseMins + 30;
+
+                const startH = Math.floor((winStartMins + 1440) % 1440 / 60);
+                const startM = (winStartMins + 1440) % 60;
+                const endH = Math.floor((winEndMins + 1440) % 1440 / 60);
+                const endM = (winEndMins + 1440) % 60;
+
+                if (winEl) winEl.innerText = `${String(startH).padStart(2,'0')}:${String(startM).padStart(2,'0')} - ${String(endH).padStart(2,'0')}:${String(endM).padStart(2,'0')} hrs`;
+
+                if (statusObj.status !== 'PENDIENTE') {
+                    if (cdEl) {
+                        cdEl.innerText = `ESTADO: ${statusObj.status}`;
+                        cdEl.className = "text-xl font-mono font-black text-slate-400 mt-0.5";
+                    }
+                } else if (currentMins < winStartMins) {
+                    const diffSecs = Math.floor((winStartMins - currentMins) * 60 - now.getSeconds());
+                    const m = Math.floor(diffSecs / 60);
+                    const s = ((diffSecs % 60) + 60) % 60;
+                    if (cdEl) {
+                        cdEl.innerText = `Abre en ${m}m ${String(s).padStart(2,'0')}s`;
+                        cdEl.className = "text-2xl sm:text-4xl font-mono font-black text-amber-300 mt-0.5";
+                    }
+                } else if (currentMins >= winStartMins && currentMins <= winEndMins) {
+                    const remSecs = Math.floor((winEndMins - currentMins) * 60 - now.getSeconds());
+                    const m = Math.floor(remSecs / 60);
+                    const s = ((remSecs % 60) + 60) % 60;
+                    if (cdEl) {
+                        cdEl.innerText = `ABIERTA (${m}m ${String(s).padStart(2,'0')}s)`;
+                        cdEl.className = "text-2xl sm:text-4xl lg:text-5xl font-mono font-black text-emerald-400 mt-0.5 animate-pulse";
+                    }
+                } else {
+                    if (cdEl) {
+                        cdEl.innerText = `VENTANA VENCIDA`;
+                        cdEl.className = "text-xl font-mono font-black text-red-400 mt-0.5";
+                    }
+                }
+            }
+        }
+        window.updateTargetFlightBanner = updateTargetFlightBanner;
+
+        function renderFlightsTable() {
+            const tbody = document.getElementById('flightsTableBody');
+            if (!tbody) return;
+
+            const plans = getActivePlan();
+            let voladosCount = 0;
+            let suspendidosCount = 0;
+            const todayKey = getTodayKey();
+
+            let html = '';
+            plans.forEach((item, idx) => {
+                const statusObj = window.dailyFlightStatuses[idx] || { status: 'PENDIENTE', realTime: '--', note: '' };
+                const isTypeB = item.forced;
+                
+                let statusBadge = '<span class="px-2 py-0.5 rounded text-[9.5px] font-bold bg-slate-800 text-slate-400 border border-slate-700">PENDIENTE</span>';
+                if (statusObj.status === 'VOLADO' || statusObj.status === 'REALIZADO') {
+                    voladosCount++;
+                    statusBadge = '<span class="px-2 py-0.5 rounded text-[9.5px] font-bold bg-emerald-950 text-emerald-400 border border-emerald-800">REALIZADO</span>';
+                } else if (statusObj.status === 'SUSPENDIDO') {
+                    suspendidosCount++;
+                    statusBadge = '<span class="px-2 py-0.5 rounded text-[9.5px] font-bold bg-amber-950 text-amber-400 border border-amber-800">SUSPENDIDO</span>';
+                }
+
+                let displayRealOrReason = '--';
+                if (statusObj.status === 'VOLADO' || statusObj.status === 'REALIZADO') {
+                    displayRealOrReason = `${statusObj.realTime} hrs`;
+                } else if (statusObj.status === 'SUSPENDIDO') {
+                    displayRealOrReason = statusObj.note || 'Suspendido';
+                }
+
+                const windowColText = isTypeB ? '<span class="text-amber-400 font-bold">Hora Exacta</span>' : '±30 min';
+                const bitacoraEntry = window.bitacoraList.find(b => b.scheduledTime === item.timeOp2 && recordMatchesDate(b, todayKey) && b.status === 'SUSPENDIDO');
+                const hasEvidence = (bitacoraEntry && bitacoraEntry.imageData) || statusObj.imageData;
+
+                html += `
+                    <tr class="${idx === window.activeTargetIdx ? 'bg-blue-950/40' : 'hover:bg-slate-800/40'}">
+                        <td class="px-2 py-1.5 font-bold text-slate-400 text-[10px]">${idx + 1}</td>
+                        <td class="px-2 py-1.5 font-mono font-bold text-amber-300 text-[10.5px]">${item.timeOp2} hrs</td>
+                        <td class="px-2 py-1.5 font-mono text-slate-300 text-[9px]">${windowColText}</td>
+                        <td class="px-2 py-1.5 text-slate-200">${item.forced ? '<span class="text-red-400 font-bold me-1">[RELEVO]</span>' : ''}TIPO ${item.type} - ${item.name}</td>
+                        <td class="px-2 py-1.5">${statusBadge}</td>
+                        <td class="px-2 py-1.5 font-mono text-slate-300 text-[9.5px] truncate max-w-[120px]" title="${displayRealOrReason}">${displayRealOrReason}</td>
+                        <td class="px-2 py-1.5 text-right">
+                            ${statusObj.status === 'PENDIENTE' ? `
+                                <div class="flex items-center justify-end gap-1">
+                                    <button onclick="openTakeoffModalForIdx(${idx})" class="px-1.5 py-0.5 bg-emerald-600 hover:bg-emerald-500 text-white text-[9px] font-bold rounded cursor-pointer">Despegue</button>
+                                    <button onclick="openSuspensionModalForIdx(${idx}, false)" class="px-1.5 py-0.5 bg-amber-600 hover:bg-amber-500 text-white text-[9px] font-bold rounded cursor-pointer">Suspender</button>
+                                </div>
+                            ` : (statusObj.status === 'SUSPENDIDO' && !hasEvidence) ? `
+                                <div class="flex items-center justify-end gap-1">
+                                    <button onclick="openUploadEvidenceModal(${idx})" class="px-2 py-0.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-[9px] rounded shadow animate-pulse cursor-pointer">
+                                        <i class="fa-solid fa-camera me-1"></i>Subir Evidencia
+                                    </button>
+                                </div>
+                            ` : `
+                                <div class="flex items-center justify-end gap-1">
+                                    <span class="text-[9.5px] text-emerald-400 font-bold me-1"><i class="fa-solid fa-circle-check text-emerald-400 me-1"></i>Registrado</span>
+                                </div>
+                            `}
+                        </td>
+                    </tr>
+                `;
+            });
+
+            tbody.innerHTML = html;
+
+            const cntFlownEl = document.getElementById('cntFlown');
+            const cntSuspendedEl = document.getElementById('cntSuspended');
+            if (cntFlownEl) cntFlownEl.innerText = voladosCount;
+            if (cntSuspendedEl) cntSuspendedEl.innerText = suspendidosCount;
+        }
+        window.renderFlightsTable = renderFlightsTable;
+
+        function openModal(id) {
+            const modal = document.getElementById(id);
+            if (modal) modal.classList.remove('hidden');
+        }
+        window.openModal = openModal;
+
+        function closeModal(id) {
+            const modal = document.getElementById(id);
+            if (modal) modal.classList.add('hidden');
+        }
+        window.closeModal = closeModal;
+
+        function showToast(message, type = 'info') {
+            const toast = document.getElementById('toastNotification');
+            const toastMsg = document.getElementById('toastMessage');
+            if (!toast || !toastMsg) return;
+            toastMsg.innerText = message;
+            toast.className = "fixed bottom-3 right-3 bg-slate-900 border border-blue-500/50 text-white px-3 py-2 rounded-xl shadow-2xl z-50 flex items-center gap-2 transition-all duration-300 opacity-100 translate-y-0 max-w-xs text-xs";
+            setTimeout(() => {
+                toast.className = "fixed bottom-3 right-3 bg-slate-900 border border-slate-700 text-white px-3 py-2 rounded-xl shadow-2xl z-50 flex items-center gap-2 transition-all duration-300 opacity-0 translate-y-5 pointer-events-none max-w-xs text-xs";
+            }, 3800);
+        }
+        window.showToast = showToast;
+
+        function openTakeoffModalForIdx(idx) {
+            window.activeModalIndex = idx;
+            const item = getActivePlan()[idx];
+            const now = new Date();
+            const timeNow = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+
+            document.getElementById('takeoffFlightLabel').value = `Vuelo #${idx + 1} - ${item.timeOp2} hrs (TIPO ${item.type})`;
+            document.getElementById('takeoffRealTime').value = timeNow;
+            const dateInput = document.getElementById('takeoffDateInput');
+            if (dateInput) dateInput.value = getTodayKey();
+
+            openModal('modalTakeoff');
+        }
+        window.openTakeoffModalForIdx = openTakeoffModalForIdx;
+
+        function quickRegisterTakeoff() { openTakeoffModalForIdx(window.activeTargetIdx || 0); }
+        window.quickRegisterTakeoff = quickRegisterTakeoff;
+
+        function confirmTakeoff() {
+            const idx = window.activeModalIndex;
+            const item = getActivePlan()[idx];
+            const realTime = document.getElementById('takeoffRealTime').value || '--';
+            const notes = document.getElementById('takeoffNotes').value || 'Patrullaje completo sin novedades';
+            const dateKey = document.getElementById('takeoffDateInput')?.value || getTodayKey();
+
+            const [y, m, d] = dateKey.split('-');
+            const stampFormatted = `${parseInt(d, 10)}/${parseInt(m, 10)}/${y}, ${new Date().toLocaleTimeString('es-MX')}`;
+
+            window.dailyFlightStatuses[idx] = { status: 'REALIZADO', realTime: realTime, note: notes };
+            safeStorageSet(`audi_flight_statuses_${dateKey}`, JSON.stringify(window.dailyFlightStatuses));
+
+            let existing = window.bitacoraList.find(b => b.scheduledTime === item.timeOp2 && recordMatchesDate(b, dateKey));
+            if (existing) {
+                existing.status = 'REALIZADO';
+                existing.realTime = realTime;
+                existing.notes = notes;
+                existing.timestampFormatted = stampFormatted;
+                if (typeof window.saveBitacoraLogToCloud === 'function') window.saveBitacoraLogToCloud(existing);
+            } else {
+                const logEntry = {
+                    id: Date.now(),
+                    dateKey: dateKey, 
+                    timestampFormatted: stampFormatted,
+                    scheduledTime: item.timeOp2,
+                    flightType: `TIPO ${item.type} - ${item.name}`,
+                    status: 'REALIZADO',
+                    realTime: realTime,
+                    notes: notes,
+                    imageData: ""
+                };
+                window.bitacoraList.unshift(logEntry);
+                if (typeof window.saveBitacoraLogToCloud === 'function') window.saveBitacoraLogToCloud(logEntry);
+            }
+
+            safeStorageSet('audi_bitacora_logs', JSON.stringify(window.bitacoraList));
+            if (typeof window.saveDailyStatusToCloud === 'function') window.saveDailyStatusToCloud();
+
+            closeModal('modalTakeoff');
+            renderFlightsTable();
+            updateTargetFlightBanner(new Date());
+            showToast('Despegue registrado correctamente', 'success');
+        }
+        window.confirmTakeoff = confirmTakeoff;
+
+        function openSuspensionModalForIdx(idx, isTopLevel = false) {
+            window.activeModalIndex = idx;
+            window.isTopLevelSuspension = isTopLevel;
+            window.tempCompressedImage = "";
+            const item = getActivePlan()[idx];
+
+            document.getElementById('suspendFlightLabel').value = `Vuelo #${idx + 1} - ${item.timeOp2} hrs (TIPO ${item.type})`;
+            const dateInput = document.getElementById('suspendDateInput');
+            if (dateInput) dateInput.value = getTodayKey();
+            document.getElementById('suspendImgPreview').src = "";
+            document.getElementById('suspendImgPreviewContainer').classList.add('hidden');
+
+            openModal('modalSuspension');
+        }
+        window.openSuspensionModalForIdx = openSuspensionModalForIdx;
+
+        function confirmSuspension() {
+            const idx = window.activeModalIndex;
+            const reason = document.getElementById('suspendReasonSelect').value;
+            const notes = document.getElementById('suspendNotes').value;
+            const imageData = window.tempCompressedImage || "";
+            const plans = getActivePlan();
+            const dateKey = document.getElementById('suspendDateInput')?.value || getTodayKey();
+            const item = plans[idx];
+
+            const [y, m, d] = dateKey.split('-');
+            const stampFormatted = `${parseInt(d, 10)}/${parseInt(m, 10)}/${y}, ${new Date().toLocaleTimeString('es-MX')}`;
+
+            window.dailyFlightStatuses[idx] = { status: 'SUSPENDIDO', realTime: 'N/A', note: `${reason} - ${notes}`, imageData: imageData };
+            safeStorageSet(`audi_flight_statuses_${dateKey}`, JSON.stringify(window.dailyFlightStatuses));
+
+            let existing = window.bitacoraList.find(b => b.scheduledTime === item.timeOp2 && recordMatchesDate(b, dateKey));
+            if (existing) {
+                existing.status = 'SUSPENDIDO';
+                existing.realTime = 'N/A';
+                existing.notes = `${reason}: ${notes}`;
+                existing.imageData = imageData || existing.imageData;
+                existing.timestampFormatted = stampFormatted;
+                if (typeof window.saveBitacoraLogToCloud === 'function') window.saveBitacoraLogToCloud(existing);
+            } else {
+                const logEntry = {
+                    id: Date.now(),
+                    dateKey: dateKey, 
+                    timestampFormatted: stampFormatted,
+                    scheduledTime: item.timeOp2,
+                    flightType: `TIPO ${item.type} - ${item.name}`,
+                    status: 'SUSPENDIDO',
+                    realTime: 'N/A',
+                    notes: `${reason}: ${notes}`,
+                    imageData: imageData
+                };
+                window.bitacoraList.unshift(logEntry);
+                if (typeof window.saveBitacoraLogToCloud === 'function') window.saveBitacoraLogToCloud(logEntry);
+            }
+
+            safeStorageSet('audi_bitacora_logs', JSON.stringify(window.bitacoraList));
+            if (typeof window.saveDailyStatusToCloud === 'function') window.saveDailyStatusToCloud();
+
+            closeModal('modalSuspension');
+            renderFlightsTable();
+            updateTargetFlightBanner(new Date());
+
+            showToast(`Suspensión registrada para vuelo de ${plans[idx].timeOp2} hrs.`, 'warning');
+        }
+        window.confirmSuspension = confirmSuspension;
+
+        function handleImageCompress(inputEl, previewImgId) {
+            const file = inputEl.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const img = new Image();
+                img.onload = function() {
+                    const canvas = document.createElement('canvas');
+                    const maxDim = 800;
+                    let width = img.width;
+                    let height = img.height;
+
+                    if (width > height && width > maxDim) {
+                        height = Math.round((height * maxDim) / width);
+                        width = maxDim;
+                    } else if (height > maxDim) {
+                        width = Math.round((width * maxDim) / height);
+                        height = maxDim;
+                    }
+
+                    canvas.width = width;
+                    canvas.height = height;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, width, height);
+
+                    const compressedBase64 = canvas.toDataURL('image/jpeg', 0.65);
+                    window.tempCompressedImage = compressedBase64;
+
+                    const previewImg = document.getElementById(previewImgId);
+                    if (previewImg) {
+                        previewImg.src = compressedBase64;
+                        previewImg.parentElement.classList.remove('hidden');
+                    }
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+        window.handleImageCompress = handleImageCompress;
+
+        function openUploadEvidenceModal(idx) {
+            window.activeModalIndex = idx;
+            window.tempCompressedImage = "";
+            const item = getActivePlan()[idx];
+
+            document.getElementById('evidenceFlightIndex').value = idx;
+            document.getElementById('evidenceFlightLabel').value = `Vuelo #${idx + 1} - ${item.timeOp2} hrs (TIPO ${item.type})`;
+            document.getElementById('evidenceImgPreview').src = "";
+            document.getElementById('evidenceImgPreviewContainer').classList.add('hidden');
+            document.getElementById('evidenceImageInput').value = "";
+
+            openModal('modalUploadEvidence');
+        }
+        window.openUploadEvidenceModal = openUploadEvidenceModal;
+
+        function saveEvidencePhoto() {
+            const idx = parseInt(document.getElementById('evidenceFlightIndex').value, 10);
+            const item = getActivePlan()[idx];
+            const imageData = window.tempCompressedImage;
+            const todayKey = getTodayKey();
+
+            if (!imageData) {
+                showToast("Por favor seleccione una imagen de evidencia.", "warning");
+                return;
+            }
+
+            if (window.dailyFlightStatuses[idx]) {
+                window.dailyFlightStatuses[idx].imageData = imageData;
+                safeStorageSet(`audi_flight_statuses_${todayKey}`, JSON.stringify(window.dailyFlightStatuses));
+            }
+
+            let logEntry = window.bitacoraList.find(b => b.scheduledTime === item.timeOp2 && recordMatchesDate(b, todayKey) && b.status === 'SUSPENDIDO');
+            if (logEntry) {
+                logEntry.imageData = imageData;
+            } else {
+                const now = new Date();
+                logEntry = {
+                    id: Date.now(),
+                    dateKey: todayKey, 
+                    timestampFormatted: `${now.getDate()}/${now.getMonth() + 1}/${now.getFullYear()}, ${item.timeOp2}:00`,
+                    scheduledTime: item.timeOp2,
+                    flightType: `TIPO ${item.type} - ${item.name}`,
+                    status: 'SUSPENDIDO',
+                    realTime: 'N/A',
+                    notes: 'Suspensión general - Evidencia adjuntada',
+                    imageData: imageData
+                };
+                window.bitacoraList.unshift(logEntry);
+            }
+
+            safeStorageSet('audi_bitacora_logs', JSON.stringify(window.bitacoraList));
+            if (typeof window.saveBitacoraLogToCloud === 'function') window.saveBitacoraLogToCloud(logEntry);
+
+            closeModal('modalUploadEvidence');
+            renderFlightsTable();
+            renderBitacoraModalTable();
+            showToast("Evidencia fotográfica guardada.", "success");
+        }
+        window.saveEvidencePhoto = saveEvidencePhoto;
+
+        function openFullImagePreview(src) {
+            document.getElementById('modalFullImageSrc').src = src;
+            openModal('modalImagePreview');
+        }
+        window.openFullImagePreview = openFullImagePreview;
+
+        function openBitacoraModal() {
+            runAutoSeparate12and13(false);
+            reconcileBitacoraDates();
+            syncDailyStatusesWithBitacora();
+            setBitacoraViewMode('TODAY');
+            openModal('modalBitacoraView');
+        }
+        window.openBitacoraModal = openBitacoraModal;
+
+        // SEPARADOR INTELIGENTE AUTOMÁTICO EN SEGUNDO PLANO (SIN BOTÓN EN PANTALLA)
+        function runAutoSeparate12and13(userAlert = false) {
+            let remappedCount = 0;
+            const target13Key = "2026-10-13";
+            const target12Key = "2026-10-12";
+
+            window.bitacoraList.sort((a, b) => (b.id || 0) - (a.id || 0));
+
+            window.bitacoraList.forEach(item => {
+                if (!item) return;
+
+                const isDay12Candidate = item.timestampFormatted && (
+                    item.timestampFormatted.endsWith(':00') || 
+                    item.timestampFormatted.includes('12/10/2026') ||
+                    (item.timestampFormatted.includes('13/10/2026') && (item.realTime === '09:31' || item.realTime === '11:08' || item.realTime === '12:49' || item.realTime === '16:59' || item.realTime === '18:02' || item.realTime === '19:46' || item.realTime === '22:47'))
+                );
+
+                if (isDay12Candidate && (!item.dateKey || item.dateKey === target13Key || item.timestampFormatted.includes('13/10/2026'))) {
+                    item.dateKey = target12Key;
+                    const timePart = item.timestampFormatted.split(',')[1] || ` ${item.scheduledTime}:00`;
+                    item.timestampFormatted = `12/10/2026,${timePart}`;
+                    remappedCount++;
+                    if (typeof window.saveBitacoraLogToCloud === 'function') window.saveBitacoraLogToCloud(item);
+                }
+            });
+
+            if (remappedCount > 0) {
+                safeStorageSet('audi_bitacora_logs', JSON.stringify(window.bitacoraList));
+                if (userAlert) {
+                    showToast(`Se organizaron registros del 12 y 13.`, 'success');
+                }
+            }
+        }
+        window.runAutoSeparate12and13 = runAutoSeparate12and13;
+
+        // GESTIÓN UNIFICADA DE FILTRO Y FECHA DE REPORTE
+        function unifiedDateChanged(selectedDateYMD) {
+            if (!selectedDateYMD) {
+                setBitacoraViewMode('ALL');
+                return;
+            }
+            window.bitacoraFilterMode = 'CALENDAR';
+            window.bitacoraSelectedDate = selectedDateYMD;
+
+            const btnAll = document.getElementById('btnViewAll');
+            const btnToday = document.getElementById('btnViewToday');
+            const btnYesterday = document.getElementById('btnViewYesterday');
+            if (btnAll) btnAll.className = "px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-[10px] rounded-lg border border-slate-700 transition flex items-center gap-1 cursor-pointer";
+            if (btnToday) btnToday.className = "px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-[10px] rounded-lg border border-slate-700 transition flex items-center gap-1 cursor-pointer";
+            if (btnYesterday) btnYesterday.className = "px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-[10px] rounded-lg border border-slate-700 transition flex items-center gap-1 cursor-pointer";
+
+            const lblBtn = document.getElementById('lblPrintButton');
+            const [y, m, d] = selectedDateYMD.split('-');
+            if (lblBtn) lblBtn.innerText = `PDF (${parseInt(d,10)}/${parseInt(m,10)})`;
+
+            renderBitacoraModalTable();
+        }
+        window.unifiedDateChanged = unifiedDateChanged;
+
+        function setBitacoraViewMode(mode) {
+            window.bitacoraFilterMode = mode;
+            window.bitacoraSelectedDate = "";
+            const btnAll = document.getElementById('btnViewAll');
+            const btnToday = document.getElementById('btnViewToday');
+            const btnYesterday = document.getElementById('btnViewYesterday');
+            const dateInput = document.getElementById('bitacoraDateInput');
+            const lblBtn = document.getElementById('lblPrintButton');
+
+            if (mode === 'ALL') {
+                if (dateInput) dateInput.value = "";
+                if (lblBtn) lblBtn.innerText = "Generar PDF";
+                if (btnAll) btnAll.className = "px-2.5 py-1 bg-blue-600 text-white font-bold text-[10px] rounded-lg border border-blue-400/40 transition flex items-center gap-1 cursor-pointer";
+                if (btnToday) btnToday.className = "px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-[10px] rounded-lg border border-slate-700 transition flex items-center gap-1 cursor-pointer";
+                if (btnYesterday) btnYesterday.className = "px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-[10px] rounded-lg border border-slate-700 transition flex items-center gap-1 cursor-pointer";
+            } else if (mode === 'TODAY') {
+                const todayKey = getTodayKey();
+                if (dateInput) dateInput.value = todayKey;
+                window.bitacoraSelectedDate = todayKey;
+                if (lblBtn) lblBtn.innerText = "PDF (Hoy)";
+                if (btnAll) btnAll.className = "px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-[10px] rounded-lg border border-slate-700 transition flex items-center gap-1 cursor-pointer";
+                if (btnToday) btnToday.className = "px-2.5 py-1 bg-emerald-600 text-white font-bold text-[10px] rounded-lg border border-emerald-400/40 transition flex items-center gap-1 cursor-pointer";
+                if (btnYesterday) btnYesterday.className = "px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-[10px] rounded-lg border border-slate-700 transition flex items-center gap-1 cursor-pointer";
+            }
+
+            renderBitacoraModalTable();
+        }
+        window.setBitacoraViewMode = setBitacoraViewMode;
+
+        function setBitacoraQuickDay(target) {
+            let targetYMD = (target === 'YESTERDAY') ? getYesterdayKey() : target;
+            const dateInput = document.getElementById('bitacoraDateInput');
+            if (dateInput) dateInput.value = targetYMD;
+            
+            const btnAll = document.getElementById('btnViewAll');
+            const btnToday = document.getElementById('btnViewToday');
+            const btnYesterday = document.getElementById('btnViewYesterday');
+            if (btnAll) btnAll.className = "px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-[10px] rounded-lg border border-slate-700 transition flex items-center gap-1 cursor-pointer";
+            if (btnToday) btnToday.className = "px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-[10px] rounded-lg border border-slate-700 transition flex items-center gap-1 cursor-pointer";
+            if (btnYesterday) btnYesterday.className = "px-2.5 py-1 bg-amber-600 text-white font-bold text-[10px] rounded-lg border border-amber-400/40 transition flex items-center gap-1 cursor-pointer shadow";
+
+            unifiedDateChanged(targetYMD);
+        }
+        window.setBitacoraQuickDay = setBitacoraQuickDay;
+
+        function triggerNativePicker(inputId) {
+            const input = document.getElementById(inputId);
+            if (!input) return;
+            try {
+                if (typeof input.showPicker === 'function') input.showPicker();
+                else input.focus();
+            } catch(e) { input.focus(); }
+        }
+        window.triggerNativePicker = triggerNativePicker;
+
+        function toggleBitacoraSort() {
+            window.bitacoraSortAsc = !window.bitacoraSortAsc;
+            const icon = document.getElementById('bitacoraSortIcon');
+            const text = document.getElementById('bitacoraSortText');
+            if (icon && text) {
+                if (window.bitacoraSortAsc) {
+                    icon.className = "fa-solid fa-arrow-up-short-wide text-emerald-400";
+                    text.innerText = "Antiguos primero";
+                } else {
+                    icon.className = "fa-solid fa-arrow-down-short-wide text-blue-400";
+                    text.innerText = "Recientes primero";
+                }
+            }
+            renderBitacoraModalTable();
+        }
+        window.toggleBitacoraSort = toggleBitacoraSort;
+
+        function reconcileBitacoraDates() {
+            let updated = false;
+            window.bitacoraList.forEach(item => {
+                if (!item) return;
+                const correctKey = normalizeRecordDateKey(item);
+                if (correctKey && item.dateKey !== correctKey) {
+                    item.dateKey = correctKey;
+                    updated = true;
+                }
+            });
+            if (updated) {
+                safeStorageSet('audi_bitacora_logs', JSON.stringify(window.bitacoraList));
+            }
+        }
+        window.reconcileBitacoraDates = reconcileBitacoraDates;
+
+        function renderBitacoraModalTable() {
+            const tbody = document.getElementById('modalBitacoraTableBody');
+            const cntEl = document.getElementById('bitacoraRecordCount');
+            const footerInfoEl = document.getElementById('bitacoraFooterFilterInfo');
+            if (!tbody) return;
+
+            reconcileBitacoraDates();
+
+            const mode = window.bitacoraFilterMode;
+            let targetFilterKey = window.bitacoraSelectedDate;
+            let filteredList = [...window.bitacoraList];
+
+            if (mode === 'TODAY' || (mode === 'CALENDAR' && targetFilterKey === getTodayKey())) {
+                const todayKey = getTodayKey();
+                filteredList = filteredList.filter(item => recordMatchesDate(item, todayKey));
+
+                const uniqueByTime = new Map();
+                filteredList.forEach(item => {
+                    if (!uniqueByTime.has(item.scheduledTime)) {
+                        uniqueByTime.set(item.scheduledTime, item);
+                    }
+                });
+                filteredList = Array.from(uniqueByTime.values());
+
+                if (footerInfoEl) footerInfoEl.innerText = `Mostrando: Jornada de Hoy (${todayKey})`;
+            } else if (mode === 'CALENDAR' && targetFilterKey) {
+                const parts = targetFilterKey.split('-');
+                const filterDay = parseInt(parts[2], 10);
+                const filterMonth = parseInt(parts[1], 10);
+                const filterYear = parseInt(parts[0], 10);
+
+                filteredList = filteredList.filter(item => recordMatchesDate(item, targetFilterKey));
+                
+                const uniqueByTime = new Map();
+                filteredList.forEach(item => {
+                    if (!uniqueByTime.has(item.scheduledTime)) {
+                        uniqueByTime.set(item.scheduledTime, item);
+                    }
+                });
+                filteredList = Array.from(uniqueByTime.values());
+
+                if (footerInfoEl) footerInfoEl.innerText = `Filtrado por Fecha: ${filterDay}/${filterMonth}/${filterYear} (${filteredList.length} registros)`;
+            } else {
+                if (footerInfoEl) footerInfoEl.innerText = `Mostrando: Histórico Completo (${filteredList.length} registros)`;
+            }
+
+            if (cntEl) cntEl.innerText = `${filteredList.length} registros`;
+
+            if (!filteredList || filteredList.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="8" class="p-6 text-center text-slate-400">
+                            <div class="flex flex-col items-center justify-center gap-1.5">
+                                <i class="fa-solid fa-folder-open text-3xl text-slate-600"></i>
+                                <p class="italic text-xs text-slate-300">No hay registros para la fecha seleccionada.</p>
+                                <button onclick="setBitacoraViewMode('ALL')" class="px-2.5 py-1 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-bold mt-1 shadow">
+                                    <i class="fa-solid fa-layer-group me-1"></i>Ver todos los registros
+                                </button>
+                            </div>
+                        </td>
+                    </tr>`;
+                return;
+            }
+
+            let sortedList = [...filteredList];
+            if (window.bitacoraSortAsc) sortedList.reverse();
+
+            let html = '';
+            sortedList.forEach(item => {
+                let badge = '';
+                if (item.status === 'VOLADO' || item.status === 'REALIZADO') {
+                    badge = '<span class="px-1.5 py-0.5 rounded text-[9px] font-bold bg-emerald-950 text-emerald-400 border border-emerald-800">REALIZADO</span>';
+                } else if (item.status === 'SUSPENDIDO') {
+                    badge = '<span class="px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-950 text-amber-400 border border-amber-800">SUSPENDIDO</span>';
+                } else {
+                    badge = '<span class="px-1.5 py-0.5 rounded text-[9px] font-bold bg-slate-800 text-slate-400 border border-slate-700">PENDIENTE</span>';
+                }
+
+                const imgThumbnail = item.imageData ? 
+                    `<img src="${item.imageData}" onclick="openFullImagePreview('${item.imageData}')" class="h-8 w-12 object-cover mx-auto rounded border border-slate-700 cursor-pointer hover:opacity-80 transition shadow">` : 
+                    (item.status === 'SUSPENDIDO' ? '<span class="text-amber-400 text-[9px] font-semibold"><i class="fa-solid fa-clock me-1"></i>Pendiente foto</span>' : '<span class="text-slate-500 text-[9px]">N/A</span>');
+
+                html += `
+                    <tr class="hover:bg-slate-800/40">
+                        <td class="px-2.5 py-2 font-mono text-slate-400 text-[10px]">${item.timestampFormatted}</td>
+                        <td class="px-2.5 py-2 font-mono font-bold text-amber-300 text-[10.5px]">${item.scheduledTime} hrs</td>
+                        <td class="px-2.5 py-2 text-slate-200 text-[10px]">${item.flightType}</td>
+                        <td class="px-2.5 py-2">${badge}</td>
+                        <td class="px-2.5 py-2 font-mono ${item.status === 'PENDIENTE' ? 'text-slate-500' : 'text-emerald-400'} text-[10px]">${item.realTime}</td>
+                        <td class="px-2.5 py-2 text-slate-300 max-w-[180px] truncate" title="${item.notes}">${item.notes}</td>
+                        <td class="px-2.5 py-2 text-center">${imgThumbnail}</td>
+                        <td class="px-2.5 py-2 text-right">
+                            <div class="flex items-center justify-end gap-1">
+                                <button onclick="openEditBitacoraEntry(${item.id})" class="p-1 bg-blue-900/60 hover:bg-blue-800 text-blue-300 rounded border border-blue-700/50 text-[10px]" title="Editar Registro"><i class="fa-solid fa-pen-to-square"></i></button>
+                                <button onclick="deleteBitacoraEntry(${item.id})" class="p-1 bg-red-950/80 hover:bg-red-900 text-red-300 rounded border border-red-800/50 text-[10px]" title="Eliminar Registro"><i class="fa-solid fa-trash-can"></i></button>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+            });
+
+            tbody.innerHTML = html;
+        }
+        window.renderBitacoraModalTable = renderBitacoraModalTable;
+
+        function promptPasswordConfirmation(title, message, onSuccess) {
+            const titleEl = document.getElementById('pwdDialogTitle');
+            const msgEl = document.getElementById('pwdDialogMessage');
+            const inputEl = document.getElementById('inputDeletePassword');
+            const errEl = document.getElementById('pwdErrorMessage');
+            const btnOk = document.getElementById('btnPwdOk');
+            const btnCancel = document.getElementById('btnPwdCancel');
+
+            if (titleEl) titleEl.innerText = title;
+            if (msgEl) msgEl.innerText = message;
+            if (inputEl) {
+                inputEl.value = '';
+                inputEl.classList.remove('border-red-500');
+            }
+            if (errEl) errEl.classList.add('hidden');
+
+            const handleConfirm = () => {
+                const entered = (inputEl.value || '').trim();
+                if (entered === SUPERVISOR_PASSWORD || entered === 'audi2026') {
+                    cleanup();
+                    closeModal('modalPasswordConfirmDialog');
+                    if (onSuccess) onSuccess();
+                } else {
+                    if (errEl) errEl.classList.remove('hidden');
+                    if (inputEl) {
+                        inputEl.classList.add('border-red-500');
+                        inputEl.focus();
+                    }
+                }
+            };
+
+            const handleCancel = () => {
+                cleanup();
+                closeModal('modalPasswordConfirmDialog');
+            };
+
+            const handleKey = (e) => {
+                if (e.key === 'Enter') handleConfirm();
+            };
+
+            function cleanup() {
+                btnOk.removeEventListener('click', handleConfirm);
+                btnCancel.removeEventListener('click', handleCancel);
+                inputEl.removeEventListener('keydown', handleKey);
+            }
+
+            btnOk.addEventListener('click', handleConfirm);
+            btnCancel.addEventListener('click', handleCancel);
+            inputEl.addEventListener('keydown', handleKey);
+
+            openModal('modalPasswordConfirmDialog');
+            setTimeout(() => { if (inputEl) inputEl.focus(); }, 150);
+        }
+        window.promptPasswordConfirmation = promptPasswordConfirmation;
+
+        function openEditBitacoraEntry(id) {
+            const entry = window.bitacoraList.find(b => b.id === id);
+            if (!entry) return;
+
+            window.tempCompressedImage = entry.imageData || "";
+            document.getElementById('editBitacoraId').value = entry.id;
+            
+            const dateInput = document.getElementById('editBitacoraDateKey');
+            if (dateInput) {
+                dateInput.value = normalizeRecordDateKey(entry) || getTodayKey();
+            }
+
+            let st = entry.status;
+            if (st === 'VOLADO') st = 'REALIZADO';
+            document.getElementById('editBitacoraStatus').value = st;
+            
+            document.getElementById('editBitacoraSchedTime').value = entry.scheduledTime;
+            document.getElementById('editBitacoraRealTime').value = entry.realTime;
+            document.getElementById('editBitacoraNotes').value = entry.notes;
+
+            const previewImg = document.getElementById('editBitacoraImgPreview');
+            if (entry.imageData) {
+                previewImg.src = entry.imageData;
+                previewImg.parentElement.classList.remove('hidden');
+            } else {
+                previewImg.src = "";
+                previewImg.parentElement.classList.add('hidden');
+            }
+
+            openModal('modalEditBitacoraEntry');
+        }
+        window.openEditBitacoraEntry = openEditBitacoraEntry;
+
+        function saveBitacoraEntryEdit() {
+            const id = parseInt(document.getElementById('editBitacoraId').value, 10);
+            const entryIdx = window.bitacoraList.findIndex(b => b.id === id);
+            if (entryIdx === -1) return;
+
+            const newDateKey = document.getElementById('editBitacoraDateKey')?.value || getTodayKey();
+            const status = document.getElementById('editBitacoraStatus').value;
+            const schedTime = document.getElementById('editBitacoraSchedTime').value;
+            const realTime = document.getElementById('editBitacoraRealTime').value;
+            const notes = document.getElementById('editBitacoraNotes').value;
+            const imageData = window.tempCompressedImage || "";
+
+            const [y, m, d] = newDateKey.split('-');
+            const timePart = (realTime && realTime !== '--' && realTime !== 'N/A') ? realTime : schedTime;
+            const newStampFormatted = `${parseInt(d, 10)}/${parseInt(m, 10)}/${y}, ${timePart}:00`;
+
+            const updatedEntry = {
+                ...window.bitacoraList[entryIdx],
+                dateKey: newDateKey,
+                timestampFormatted: newStampFormatted,
+                status,
+                scheduledTime: schedTime,
+                realTime,
+                notes,
+                imageData
+            };
+
+            window.bitacoraList[entryIdx] = updatedEntry;
+            safeStorageSet('audi_bitacora_logs', JSON.stringify(window.bitacoraList));
+
+            const planIdx = getActivePlan().findIndex(p => p.timeOp2 === schedTime);
+            if (planIdx !== -1 && newDateKey === getTodayKey()) {
+                window.dailyFlightStatuses[planIdx] = { status, realTime, note: notes, imageData: imageData };
+                safeStorageSet(`audi_flight_statuses_${newDateKey}`, JSON.stringify(window.dailyFlightStatuses));
+            }
+
+            if (typeof window.saveDailyStatusToCloud === 'function') window.saveDailyStatusToCloud();
+            if (typeof window.saveBitacoraLogToCloud === 'function') window.saveBitacoraLogToCloud(updatedEntry);
+
+            closeModal('modalEditBitacoraEntry');
+            renderBitacoraModalTable();
+            renderFlightsTable();
+            updateTargetFlightBanner(new Date());
+            showToast("Registro editado correctamente", "success");
+        }
+        window.saveBitacoraEntryEdit = saveBitacoraEntryEdit;
+
+        function deleteBitacoraEntry(id) {
+            promptPasswordConfirmation(
+                "Autorizar Eliminación de Vuelo",
+                "Para proteger los registros de auditoría de Audi México, introduce la contraseña de supervisor:",
+                () => {
+                    const entry = window.bitacoraList.find(b => b.id === id);
+                    if (entry && entry.dateKey === getTodayKey()) {
+                        const planIdx = getActivePlan().findIndex(p => p.timeOp2 === entry.scheduledTime);
+                        if (planIdx !== -1) {
+                            delete window.dailyFlightStatuses[planIdx];
+                            safeStorageSet(`audi_flight_statuses_${getTodayKey()}`, JSON.stringify(window.dailyFlightStatuses));
+                        }
+                    }
+
+                    window.bitacoraList = window.bitacoraList.filter(b => b.id !== id);
+                    safeStorageSet('audi_bitacora_logs', JSON.stringify(window.bitacoraList));
+
+                    if (typeof window.saveDailyStatusToCloud === 'function') window.saveDailyStatusToCloud();
+                    if (typeof window.deleteBitacoraLogFromCloud === 'function') window.deleteBitacoraLogFromCloud(id);
+
+                    renderBitacoraModalTable();
+                    renderFlightsTable();
+                    updateTargetFlightBanner(new Date());
+                    showToast("Registro eliminado.", "info");
+                }
+            );
+        }
+        window.deleteBitacoraEntry = deleteBitacoraEntry;
+
+        function confirmClearAllBitacoraModal() {
+            promptPasswordConfirmation(
+                "Autorizar Vaciado Total de Bitácora",
+                "ADVERTENCIA CRÍTICA: Se vaciarán los registros. Ingresa la contraseña de supervisor:",
+                () => {
+                    window.bitacoraList = [];
+                    window.dailyFlightStatuses = {};
+                    safeStorageSet('audi_bitacora_logs', JSON.stringify([]));
+                    safeStorageSet(`audi_flight_statuses_${getTodayKey()}`, JSON.stringify({}));
+
+                    if (typeof window.saveDailyStatusToCloud === 'function') window.saveDailyStatusToCloud();
+
+                    renderBitacoraModalTable();
+                    renderFlightsTable();
+                    updateTargetFlightBanner(new Date());
+                    showToast("Bitácora vaciada.", "info");
+                }
+            );
+        }
+        window.confirmClearAllBitacoraModal = confirmClearAllBitacoraModal;
+
+        function syncDailyStatusesWithBitacora() {
+            const plans = getActivePlan();
+            const todayKey = getTodayKey();
+            const now = new Date();
+            const dayStr = `${now.getDate()}/${now.getMonth() + 1}/${now.getFullYear()}`;
+            let updated = false;
+
+            plans.forEach((item, idx) => {
+                const dailySt = window.dailyFlightStatuses[idx];
+                if (dailySt && (dailySt.status === 'REALIZADO' || dailySt.status === 'VOLADO' || dailySt.status === 'SUSPENDIDO')) {
+                    const normStatus = (dailySt.status === 'VOLADO') ? 'REALIZADO' : dailySt.status;
+                    
+                    let match = window.bitacoraList.find(b => 
+                        b.scheduledTime === item.timeOp2 && recordMatchesDate(b, todayKey)
+                    );
+
+                    if (!match) {
+                        const newLog = {
+                            id: Date.now() - (16 - idx) * 3000,
+                            dateKey: todayKey,
+                            timestampFormatted: `${dayStr}, ${dailySt.realTime && dailySt.realTime !== '--' && dailySt.realTime !== 'N/A' ? dailySt.realTime : item.timeOp2}:00`,
+                            scheduledTime: item.timeOp2,
+                            flightType: `TIPO ${item.type} - ${item.name}`,
+                            status: normStatus,
+                            realTime: dailySt.realTime || '--',
+                            notes: dailySt.note || (normStatus === 'REALIZADO' ? 'Patrullaje completo sin novedades' : 'Suspensión registrada'),
+                            imageData: dailySt.imageData || ""
+                        };
+                        window.bitacoraList.push(newLog);
+                        updated = true;
+                        if (typeof window.saveBitacoraLogToCloud === 'function') window.saveBitacoraLogToCloud(newLog);
+                    }
+                }
+            });
+
+            if (updated) {
+                safeStorageSet('audi_bitacora_logs', JSON.stringify(window.bitacoraList));
+            }
+        }
+        window.syncDailyStatusesWithBitacora = syncDailyStatusesWithBitacora;
+
+        // GENERACIÓN AUDITABLE DE PDF: EXACTAMENTE 16 FILAS POR JORNADA EN 1 PÁGINA
+        function printAuditBitacora() {
+            runAutoSeparate12and13(false);
+            reconcileBitacoraDates();
+            syncDailyStatusesWithBitacora();
+
+            const printBody = document.getElementById('printBitacoraTableBody');
+            const now = new Date();
+
+            let targetDateYMD = window.bitacoraSelectedDate || document.getElementById('bitacoraDateInput')?.value || '';
+            if (!targetDateYMD) targetDateYMD = getTodayKey();
+
+            const parts = targetDateYMD.split('-');
+            const filterYear = parseInt(parts[0], 10);
+            const filterMonth = parseInt(parts[1], 10);
+            const filterDay = parseInt(parts[2], 10);
+
+            const reportDateLabel = `${String(filterDay).padStart(2, '0')}/${String(filterMonth).padStart(2, '0')}/${filterYear}`;
+            const fileDateSuffix = `${String(filterDay).padStart(2, '0')}-${String(filterMonth).padStart(2, '0')}-${filterYear}`;
+
+            document.getElementById('printReportDate').innerText = reportDateLabel;
+            document.getElementById('printReportTime').innerText = now.toLocaleTimeString('es-MX');
+            const subtitleEl = document.getElementById('printReportSubtitle');
+            if (subtitleEl) {
+                subtitleEl.innerText = `Bitácora Oficial Auditable de Vuelos con Drone (24/7) - Jornada del ${reportDateLabel}`;
+            }
+
+            const rawDateRecords = window.bitacoraList.filter(item => recordMatchesDate(item, targetDateYMD));
+
+            // DEDUPLICACIÓN ESTRICTA: Mapear por horario programado (timeOp2)
+            const mapByTime = new Map();
+            rawDateRecords.forEach(rec => {
+                const timeKey = rec.scheduledTime;
+                if (!mapByTime.has(timeKey)) {
+                    mapByTime.set(timeKey, rec);
+                } else {
+                    const existing = mapByTime.get(timeKey);
+                    // Priorizar el vuelo realizado sobre el pendiente
+                    if (existing.status === 'PENDIENTE' && rec.status !== 'PENDIENTE') {
+                        mapByTime.set(timeKey, rec);
+                    }
+                }
+            });
+
+            const planKey = (targetDateYMD === getTodayKey()) ? getActivePlanKey() : getDeterministicPlanForDate(targetDateYMD);
+            const plans = OFFICIAL_PLANS[planKey] || OFFICIAL_PLANS["1"];
+            const dayStr = `${filterDay}/${filterMonth}/${filterYear}`;
+
+            const listToPrint = plans.map((planItem, idx) => {
+                const match = mapByTime.get(planItem.timeOp2);
+                if (match) {
+                    const normSt = (match.status === 'VOLADO') ? 'REALIZADO' : match.status;
+                    return {
+                        timestampFormatted: match.timestampFormatted || `${dayStr}, ${match.realTime || planItem.timeOp2}:00`,
+                        scheduledTime: planItem.timeOp2,
+                        flightType: `TIPO ${planItem.type} - ${planItem.name}`,
+                        status: normSt,
+                        realTime: match.realTime || '--',
+                        notes: match.notes || (normSt === 'REALIZADO' ? 'Patrullaje completo sin novedades' : ''),
+                        imageData: match.imageData || ""
+                    };
+                }
+
+                let dailySt = (targetDateYMD === getTodayKey()) ? window.dailyFlightStatuses[idx] : null;
+                const normStatus = dailySt ? ((dailySt.status === 'VOLADO') ? 'REALIZADO' : dailySt.status) : 'PENDIENTE';
+                return {
+                    timestampFormatted: `${dayStr}, ${dailySt && dailySt.realTime && dailySt.realTime !== '--' && dailySt.realTime !== 'N/A' ? dailySt.realTime : planItem.timeOp2}:00`,
+                    scheduledTime: planItem.timeOp2,
+                    flightType: `TIPO ${planItem.type} - ${planItem.name}`,
+                    status: normStatus,
+                    realTime: dailySt ? dailySt.realTime : '--',
+                    notes: dailySt ? dailySt.note : 'Vuelo programado de la jornada',
+                    imageData: dailySt ? (dailySt.imageData || "") : ""
+                };
+            });
+
+            listToPrint.sort((a, b) => parseTimeToMinutes(a.scheduledTime || '00:00') - parseTimeToMinutes(b.scheduledTime || '00:00'));
+
+            let html = '';
+            listToPrint.forEach(item => {
+                const imgHtml = item.imageData 
+                    ? `<img src="${item.imageData}" style="max-height: 28px; max-width: 50px; margin: auto; display: block; object-fit: contain; border: 1px solid #999; border-radius: 2px;">` 
+                    : 'N/A';
+                
+                let statusColor = 'color: #64748b; font-weight: bold;';
+                let statusText = 'PENDIENTE';
+
+                if (item.status === 'REALIZADO' || item.status === 'VOLADO') {
+                    statusColor = 'color: #047857; font-weight: bold;';
+                    statusText = 'REALIZADO';
+                } else if (item.status === 'SUSPENDIDO') {
+                    statusColor = 'color: #b45309; font-weight: bold;';
+                    statusText = 'SUSPENDIDO';
+                }
+
+                html += `
+                    <tr style="border-bottom: 1px solid #000; page-break-inside: avoid;">
+                        <td class="p-1 border-r border-black" style="vertical-align: middle; font-family: monospace; white-space: nowrap;">${item.timestampFormatted}</td>
+                        <td class="p-1 border-r border-black font-bold" style="vertical-align: middle; font-family: monospace; white-space: nowrap;">${item.scheduledTime} hrs</td>
+                        <td class="p-1 border-r border-black" style="vertical-align: middle;">${item.flightType}</td>
+                        <td class="p-1 border-r border-black" style="vertical-align: middle; ${statusColor}">${statusText}</td>
+                        <td class="p-1 border-r border-black font-bold" style="vertical-align: middle; font-family: monospace;">${item.realTime}</td>
+                        <td class="p-1 border-r border-black" style="vertical-align: middle;">${item.notes}</td>
+                        <td class="p-1 text-center" style="vertical-align: middle;">${imgHtml}</td>
+                    </tr>
+                `;
+            });
+            printBody.innerHTML = html;
+
+            const previousTitle = document.title;
+            document.title = `Bitacora_${fileDateSuffix}`;
+            window.print();
+            setTimeout(() => { document.title = previousTitle; }, 2500);
+        }
+        window.printAuditBitacora = printAuditBitacora;
+
+        function exportBitacoraCSV() {
+            runAutoSeparate12and13(false);
+            reconcileBitacoraDates();
+            syncDailyStatusesWithBitacora();
+
+            if (!window.bitacoraList || window.bitacoraList.length === 0) {
+                showToast("No hay registros para exportar", "warning");
+                return;
+            }
+
+            let csvContent = "data:text/csv;charset=utf-8,Fecha Registro,Hora Programada,Tipo Vuelo,Estado,Hora Real,Notas / Motivo\n";
+            window.bitacoraList.forEach(item => {
+                const csvStatus = (item.status === 'VOLADO') ? 'REALIZADO' : item.status;
+                csvContent += `"${item.timestampFormatted}","${item.scheduledTime}","${item.flightType}","${csvStatus}","${item.realTime}","${item.notes.replace(/"/g, '""')}"\n`;
+            });
+
+            const encodedUri = encodeURI(csvContent);
+            const link = document.createElement("a");
+            link.setAttribute("href", encodedUri);
+            link.setAttribute("download", `bitacora_drones_audi_${getTodayKey()}.csv`);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+        window.exportBitacoraCSV = exportBitacoraCSV;
+
+        function initApp() {
+            try {
+                const today = getTodayKey();
+                const savedDate = safeStorageGet('audi_flight_date');
+
+                const savedBitacora = safeStorageGet('audi_bitacora_logs');
+                if (savedBitacora) { 
+                    try { window.bitacoraList = JSON.parse(savedBitacora); } catch(e){} 
+                }
+
+                runAutoSeparate12and13(false);
+                reconcileBitacoraDates();
+
+                if (savedDate !== today) {
+                    safeStorageSet('audi_flight_date', today);
+                    window.dailyFlightStatuses = {};
+                    window.systemWeatherSuspended = false;
+                } else {
+                    const savedStatuses = safeStorageGet(`audi_flight_statuses_${today}`) || safeStorageGet('audi_flight_statuses');
+                    if (savedStatuses) { 
+                        try { window.dailyFlightStatuses = JSON.parse(savedStatuses); } catch(e){} 
+                    }
+                }
+
+                syncDailyStatusesWithBitacora();
+
+                document.addEventListener('click', unlockAudioSystem, { once: false });
+                document.addEventListener('touchstart', unlockAudioSystem, { once: false });
+
+                startLiveClock();
+                renderFlightsTable();
+                updateTargetFlightBanner(new Date());
+            } catch (err) {
+                startLiveClock();
+                renderFlightsTable();
+            }
+        }
+
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initApp);
+        } else {
+            initApp();
+        }
+    </script>
+</body>
+</html>
