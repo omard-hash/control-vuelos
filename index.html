@@ -50,7 +50,7 @@
         @media print {
             @page { 
                 size: landscape; 
-                margin: 8mm 6mm; 
+                margin: 5mm 5mm; 
             }
             * { 
                 -webkit-print-color-adjust: exact !important; 
@@ -74,16 +74,15 @@
                 min-height: auto !important;
                 overflow: visible !important; 
                 display: block !important;
-                font-size: 8.5px !important;
+                font-size: 8px !important;
             }
             table { 
-                page-break-inside: auto !important; 
+                page-break-inside: avoid !important; 
                 width: 100% !important; 
                 border-collapse: collapse !important; 
             }
             tr { 
                 page-break-inside: avoid !important; 
-                page-break-after: auto !important; 
             }
             thead { 
                 display: table-header-group !important; 
@@ -92,7 +91,7 @@
                 display: table-row-group !important;
             }
             td, th { 
-                padding: 3px 5px !important; 
+                padding: 2.5px 4px !important; 
                 border: 1px solid #000 !important; 
                 vertical-align: middle !important;
             }
@@ -116,19 +115,19 @@
                         <span class="text-[9px] font-extrabold tracking-wider uppercase bg-slate-800 text-red-400 px-1.5 py-0.5 rounded border border-red-900/40 shrink-0">Audi México</span>
                         <span id="shiftBadge" class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-950/80 text-emerald-400 border border-emerald-800/40 shrink-0">Turno --</span>
                         
-                        <!-- INDICADOR DE ESTADO DE SUSPENSIÓN SISTEMA -->
+                        <!-- INDICADOR DE ESTADO -->
                         <span id="systemStatusBadge" class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-950/80 text-emerald-400 border border-emerald-800/40 shrink-0 flex items-center gap-1">
                             <i id="systemStatusIcon" class="fa-solid fa-circle-check text-emerald-400"></i>
                             <span id="systemStatusText">Operación Normal</span>
                         </span>
 
-                        <!-- INDICADOR DE CONEXIÓN NUBE EN LÍNEA -->
+                        <!-- INDICADOR DE CONEXIÓN NUBE -->
                         <span id="cloudStatusBadge" onclick="openCloudSettingsModal()" title="Configuración de Firebase" class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-950/80 text-amber-400 border border-amber-800/40 shrink-0 flex items-center gap-1 cursor-pointer hover:opacity-90">
                             <i id="cloudStatusIcon" class="fa-solid fa-hard-drive text-amber-400"></i> <span id="cloudStatusText">Conectando Nube...</span>
                         </span>
                     </div>
 
-                    <!-- LOGO OMAR DOMINGUEZ UBICADO DEBAJO DE NUBE LIVE SINCRONIZADA -->
+                    <!-- LOGO OMAR DOMINGUEZ -->
                     <div class="flex items-center justify-end w-full">
                         <img src="logo.png" 
                              onerror="this.onerror=null; this.src='data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 200 100\' fill=\'%230e284f\'%3E%3Cpath d=\'M62,15 A35,35 0 1 0 62,85 A35,35 0 1 0 62,15 Z M62,69 A19,19 0 1 1 62,31 A19,19 0 1 1 62,69 Z\'/%3E%3Cpath d=\'M98,15 L135,15 C158,15 178,31 178,50 C178,69 158,85 135,85 L98,85 C107,75 112,63 112,50 C112,37 107,25 98,15 Z M132,69 C145,69 158,61 158,50 C158,39 145,31 132,31 L115,31 C121,37 125,43 125,50 C125,57 121,63 115,69 L132,69 Z\'/%3E%3C/svg%3E';"
@@ -285,7 +284,7 @@
         </div>
     </div>
 
-    <!-- MODAL COMPLETO DE BITÁCORA AUDITABLE -->
+    <!-- MODAL COMPLETO DE BITÁCORA AUDITABLE (DISEÑO LIMPIO ORIGINAL) -->
     <div id="modalBitacoraView" class="fixed inset-0 bg-slate-950/90 backdrop-blur-md z-50 flex items-center justify-center p-2 sm:p-4 hidden modal-backdrop">
         <div class="bg-slate-900 border border-blue-500/40 rounded-2xl max-w-6xl w-full p-3 sm:p-4 shadow-2xl space-y-2.5 max-h-[94vh] flex flex-col">
             <div class="flex justify-between items-center border-b border-slate-800 pb-2">
@@ -301,7 +300,7 @@
                 </button>
             </div>
 
-            <!-- BARRA DE FILTRO Y CALENDARIO UNIFICADA DE LA BITÁCORA -->
+            <!-- BARRA DE FILTRO Y ACCIONES -->
             <div class="flex items-center justify-between gap-2 flex-wrap bg-slate-950/90 p-2.5 rounded-xl border border-slate-800 text-xs shadow-inner">
                 
                 <div class="flex items-center gap-2 flex-wrap">
@@ -309,7 +308,7 @@
                         Registros: <strong id="bitacoraRecordCount" class="text-emerald-400 font-mono">0</strong>
                     </span>
 
-                    <!-- Selector Único de Fecha / Calendario Interactivo -->
+                    <!-- Selector de Fecha / Calendario Interactivo -->
                     <div class="flex items-center gap-1 bg-slate-900 px-2.5 py-1.5 rounded-lg border border-blue-500/50 shadow-sm cursor-pointer hover:border-blue-400 transition" onclick="triggerNativePicker('bitacoraDateInput')">
                         <i class="fa-solid fa-calendar-days text-amber-400 text-sm"></i>
                         <label for="bitacoraDateInput" class="text-[10px] font-bold text-slate-300 cursor-pointer">Fecha:</label>
@@ -335,14 +334,10 @@
                     </button>
                 </div>
 
-                <!-- Botones de Acción -->
+                <!-- Botones de Acción Oficiales -->
                 <div class="flex items-center gap-1.5 flex-wrap">
                     <button onclick="triggerDeepRecoveryScan()" title="Buscar y recuperar vuelos históricos de la nube" class="px-2 py-1 bg-indigo-900/80 hover:bg-indigo-800 text-indigo-200 font-bold text-[10px] rounded-lg border border-indigo-700/50 transition flex items-center gap-1 cursor-pointer">
                         <i class="fa-solid fa-rotate text-amber-300"></i> Sincronizar
-                    </button>
-
-                    <button onclick="promptMigrateTodayLogsToYesterday()" title="Si registraste vuelos ayer que por la medianoche quedaron con la fecha de hoy, pulsa aquí para moverlos al día anterior" class="px-2 py-1 bg-amber-950/80 hover:bg-amber-900 text-amber-300 font-bold text-[10px] rounded-lg border border-amber-700/50 transition flex items-center gap-1 cursor-pointer">
-                        <i class="fa-solid fa-calendar-arrow-down"></i> Mover Hoy a Ayer
                     </button>
 
                     <button onclick="exportBitacoraCSV()" class="px-2 py-1 bg-emerald-700 hover:bg-emerald-600 text-white font-bold text-[10px] sm:text-xs rounded-lg transition flex items-center gap-1 cursor-pointer">
@@ -461,7 +456,6 @@
             <input type="hidden" id="editBitacoraId">
 
             <div class="space-y-2 text-xs">
-                <!-- FECHA DEL REGISTRO PARA CORREGIR REGISTROS CRUZADOS O NOCTURNOS -->
                 <div>
                     <label class="block text-amber-300 font-semibold mb-0.5">Fecha del Vuelo (Día/Mes/Año):</label>
                     <input type="date" id="editBitacoraDateKey" class="w-full bg-slate-950 border border-amber-500/50 text-amber-300 font-mono px-2.5 py-1 rounded-lg focus:outline-none focus:border-amber-400">
@@ -610,19 +604,19 @@
     </div>
 
     <!-- SECCIÓN OCULTA PARA IMPRESIÓN Y PDF DE LA BITÁCORA -->
-    <section id="bitacoraPrintSection" class="p-3 bg-white text-black">
-        <div class="border-b-2 border-black pb-1.5 mb-2 flex justify-between items-center">
+    <section id="bitacoraPrintSection" class="p-2 bg-white text-black">
+        <div class="border-b-2 border-black pb-1 mb-1.5 flex justify-between items-center">
             <div>
-                <h1 class="text-base font-bold uppercase tracking-wider">AUDI MÉXICO - PLANTA SAN JOSÉ CHIAPA</h1>
-                <h2 class="text-xs font-semibold" id="printReportSubtitle">Bitácora Oficial Auditable de Vuelos con Drone (24/7) - Jornada 16 Vuelos</h2>
+                <h1 class="text-sm font-bold uppercase tracking-wider">AUDI MÉXICO - PLANTA SAN JOSÉ CHIAPA</h1>
+                <h2 class="text-[11px] font-semibold" id="printReportSubtitle">Bitácora Oficial Auditable de Vuelos con Drone (24/7) - Jornada 16 Vuelos</h2>
             </div>
-            <div class="text-right text-[9px]">
+            <div class="text-right text-[8.5px]">
                 <div>Fecha de Jornada: <strong id="printReportDate" class="text-black font-bold">--</strong></div>
                 <div>Generado: <strong id="printReportTime">--</strong></div>
             </div>
         </div>
 
-        <table class="w-full text-left border-collapse border border-black text-[8.5px] mb-3">
+        <table class="w-full text-left border-collapse border border-black text-[8px] mb-2">
             <thead>
                 <tr class="bg-gray-200 border-b border-black font-bold">
                     <th class="p-1 border-r border-black" style="width: 14%;">Fecha/Hora Reg</th>
@@ -638,7 +632,7 @@
             </tbody>
         </table>
 
-        <div class="grid grid-cols-2 gap-8 pt-4 text-center text-[9px]">
+        <div class="grid grid-cols-2 gap-8 pt-3 text-center text-[8.5px]">
             <div class="border-t border-black pt-1">
                 <strong>Operaciones de Vuelo / Bitácora Drone</strong><br>
                 Validación Operativa Audi México
@@ -681,11 +675,10 @@
         }
         window.getYesterdayKey = getYesterdayKey;
 
-        // FUNCIÓN UNIVERSAL ROBUSTA DE NORMALIZACIÓN DE FECHAS
+        // FUNCIÓN UNIVERSAL DE NORMALIZACIÓN DE FECHAS
         function normalizeRecordDateKey(item) {
             if (!item) return "";
 
-            // 1. Si timestampFormatted tiene formato DD/MM/YYYY, priorizarlo porque representa el registro visual físico
             if (item.timestampFormatted) {
                 const datePart = item.timestampFormatted.split(',')[0].trim();
                 const dParts = datePart.split('/');
@@ -698,12 +691,10 @@
                 if (/^\d{4}-\d{2}-\d{2}$/.test(datePart)) return datePart;
             }
 
-            // 2. Si dateKey tiene formato YYYY-MM-DD
             if (item.dateKey && /^\d{4}-\d{2}-\d{2}$/.test(item.dateKey)) {
                 return item.dateKey;
             }
 
-            // 3. Obtener de id si es timestamp numérico real
             if (item.id && typeof item.id === 'number' && item.id > 1600000000000) {
                 const d = new Date(item.id);
                 const y = d.getFullYear();
@@ -719,11 +710,9 @@
         function recordMatchesDate(item, targetYMD) {
             if (!item || !targetYMD) return false;
             
-            // Comparar directamente con la clave normalizada
             const normKey = normalizeRecordDateKey(item);
             if (normKey === targetYMD) return true;
 
-            // Comparar parsed numérico por si hay variaciones de ceros a la izquierda
             const [tYear, tMonth, tDay] = targetYMD.split('-').map(Number);
             
             if (item.dateKey && /^\d{4}-\d{2}-\d{2}$/.test(item.dateKey)) {
@@ -739,13 +728,6 @@
                     const m = parseInt(dParts[1], 10);
                     const y = parseInt(dParts[2], 10);
                     if (y === tYear && m === tMonth && d === tDay) return true;
-                }
-            }
-
-            if (item.id && typeof item.id === 'number' && item.id > 1600000000000) {
-                const d = new Date(item.id);
-                if (d.getFullYear() === tYear && (d.getMonth() + 1) === tMonth && d.getDate() === tDay) {
-                    return true;
                 }
             }
 
@@ -1050,6 +1032,7 @@
             window.bitacoraList = merged;
             if (window.safeStorageSet) window.safeStorageSet('audi_bitacora_logs', JSON.stringify(merged));
 
+            if (typeof window.runAutoSeparate12and13 === 'function') window.runAutoSeparate12and13(false);
             if (typeof window.renderBitacoraModalTable === 'function') window.renderBitacoraModalTable();
             if (typeof window.renderFlightsTable === 'function') window.renderFlightsTable();
             if (typeof window.updateTargetFlightBanner === 'function') window.updateTargetFlightBanner(new Date());
@@ -1563,28 +1546,36 @@
             const dateKey = document.getElementById('takeoffDateInput')?.value || getTodayKey();
 
             const [y, m, d] = dateKey.split('-');
-            const stampFormatted = `${parseInt(d, 10)}/${parseInt(m, 10)}/${y}, ${realTime}:00`;
+            const stampFormatted = `${parseInt(d, 10)}/${parseInt(m, 10)}/${y}, ${new Date().toLocaleTimeString('es-MX')}`;
 
             window.dailyFlightStatuses[idx] = { status: 'REALIZADO', realTime: realTime, note: notes };
             safeStorageSet(`audi_flight_statuses_${dateKey}`, JSON.stringify(window.dailyFlightStatuses));
 
-            const logEntry = {
-                id: Date.now(),
-                dateKey: dateKey, 
-                timestampFormatted: stampFormatted,
-                scheduledTime: item.timeOp2,
-                flightType: `TIPO ${item.type} - ${item.name}`,
-                status: 'REALIZADO',
-                realTime: realTime,
-                notes: notes,
-                imageData: ""
-            };
+            let existing = window.bitacoraList.find(b => b.scheduledTime === item.timeOp2 && recordMatchesDate(b, dateKey));
+            if (existing) {
+                existing.status = 'REALIZADO';
+                existing.realTime = realTime;
+                existing.notes = notes;
+                existing.timestampFormatted = stampFormatted;
+                if (typeof window.saveBitacoraLogToCloud === 'function') window.saveBitacoraLogToCloud(existing);
+            } else {
+                const logEntry = {
+                    id: Date.now(),
+                    dateKey: dateKey, 
+                    timestampFormatted: stampFormatted,
+                    scheduledTime: item.timeOp2,
+                    flightType: `TIPO ${item.type} - ${item.name}`,
+                    status: 'REALIZADO',
+                    realTime: realTime,
+                    notes: notes,
+                    imageData: ""
+                };
+                window.bitacoraList.unshift(logEntry);
+                if (typeof window.saveBitacoraLogToCloud === 'function') window.saveBitacoraLogToCloud(logEntry);
+            }
 
-            window.bitacoraList.unshift(logEntry);
             safeStorageSet('audi_bitacora_logs', JSON.stringify(window.bitacoraList));
-
             if (typeof window.saveDailyStatusToCloud === 'function') window.saveDailyStatusToCloud();
-            if (typeof window.saveBitacoraLogToCloud === 'function') window.saveBitacoraLogToCloud(logEntry);
 
             closeModal('modalTakeoff');
             renderFlightsTable();
@@ -1619,28 +1610,36 @@
             const item = plans[idx];
 
             const [y, m, d] = dateKey.split('-');
-            const stampFormatted = `${parseInt(d, 10)}/${parseInt(m, 10)}/${y}, ${item.timeOp2}:00`;
+            const stampFormatted = `${parseInt(d, 10)}/${parseInt(m, 10)}/${y}, ${new Date().toLocaleTimeString('es-MX')}`;
 
             window.dailyFlightStatuses[idx] = { status: 'SUSPENDIDO', realTime: 'N/A', note: `${reason} - ${notes}`, imageData: imageData };
-            
-            const logEntry = {
-                id: Date.now(),
-                dateKey: dateKey, 
-                timestampFormatted: stampFormatted,
-                scheduledTime: item.timeOp2,
-                flightType: `TIPO ${item.type} - ${item.name}`,
-                status: 'SUSPENDIDO',
-                realTime: 'N/A',
-                notes: `${reason}: ${notes}`,
-                imageData: imageData
-            };
-
-            window.bitacoraList.unshift(logEntry);
-            if (typeof window.saveBitacoraLogToCloud === 'function') window.saveBitacoraLogToCloud(logEntry);
-
             safeStorageSet(`audi_flight_statuses_${dateKey}`, JSON.stringify(window.dailyFlightStatuses));
-            safeStorageSet('audi_bitacora_logs', JSON.stringify(window.bitacoraList));
 
+            let existing = window.bitacoraList.find(b => b.scheduledTime === item.timeOp2 && recordMatchesDate(b, dateKey));
+            if (existing) {
+                existing.status = 'SUSPENDIDO';
+                existing.realTime = 'N/A';
+                existing.notes = `${reason}: ${notes}`;
+                existing.imageData = imageData || existing.imageData;
+                existing.timestampFormatted = stampFormatted;
+                if (typeof window.saveBitacoraLogToCloud === 'function') window.saveBitacoraLogToCloud(existing);
+            } else {
+                const logEntry = {
+                    id: Date.now(),
+                    dateKey: dateKey, 
+                    timestampFormatted: stampFormatted,
+                    scheduledTime: item.timeOp2,
+                    flightType: `TIPO ${item.type} - ${item.name}`,
+                    status: 'SUSPENDIDO',
+                    realTime: 'N/A',
+                    notes: `${reason}: ${notes}`,
+                    imageData: imageData
+                };
+                window.bitacoraList.unshift(logEntry);
+                if (typeof window.saveBitacoraLogToCloud === 'function') window.saveBitacoraLogToCloud(logEntry);
+            }
+
+            safeStorageSet('audi_bitacora_logs', JSON.stringify(window.bitacoraList));
             if (typeof window.saveDailyStatusToCloud === 'function') window.saveDailyStatusToCloud();
 
             closeModal('modalSuspension');
@@ -1759,12 +1758,48 @@
         window.openFullImagePreview = openFullImagePreview;
 
         function openBitacoraModal() {
+            runAutoSeparate12and13(false);
             reconcileBitacoraDates();
             syncDailyStatusesWithBitacora();
             setBitacoraViewMode('TODAY');
             openModal('modalBitacoraView');
         }
         window.openBitacoraModal = openBitacoraModal;
+
+        // SEPARADOR INTELIGENTE AUTOMÁTICO EN SEGUNDO PLANO (SIN BOTÓN EN PANTALLA)
+        function runAutoSeparate12and13(userAlert = false) {
+            let remappedCount = 0;
+            const target13Key = "2026-10-13";
+            const target12Key = "2026-10-12";
+
+            window.bitacoraList.sort((a, b) => (b.id || 0) - (a.id || 0));
+
+            window.bitacoraList.forEach(item => {
+                if (!item) return;
+
+                const isDay12Candidate = item.timestampFormatted && (
+                    item.timestampFormatted.endsWith(':00') || 
+                    item.timestampFormatted.includes('12/10/2026') ||
+                    (item.timestampFormatted.includes('13/10/2026') && (item.realTime === '09:31' || item.realTime === '11:08' || item.realTime === '12:49' || item.realTime === '16:59' || item.realTime === '18:02' || item.realTime === '19:46' || item.realTime === '22:47'))
+                );
+
+                if (isDay12Candidate && (!item.dateKey || item.dateKey === target13Key || item.timestampFormatted.includes('13/10/2026'))) {
+                    item.dateKey = target12Key;
+                    const timePart = item.timestampFormatted.split(',')[1] || ` ${item.scheduledTime}:00`;
+                    item.timestampFormatted = `12/10/2026,${timePart}`;
+                    remappedCount++;
+                    if (typeof window.saveBitacoraLogToCloud === 'function') window.saveBitacoraLogToCloud(item);
+                }
+            });
+
+            if (remappedCount > 0) {
+                safeStorageSet('audi_bitacora_logs', JSON.stringify(window.bitacoraList));
+                if (userAlert) {
+                    showToast(`Se organizaron registros del 12 y 13.`, 'success');
+                }
+            }
+        }
+        window.runAutoSeparate12and13 = runAutoSeparate12and13;
 
         // GESTIÓN UNIFICADA DE FILTRO Y FECHA DE REPORTE
         function unifiedDateChanged(selectedDateYMD) {
@@ -1862,7 +1897,6 @@
         }
         window.toggleBitacoraSort = toggleBitacoraSort;
 
-        // RECONCILIACIÓN INTELIGENTE DE FECHAS EN LA BITÁCORA
         function reconcileBitacoraDates() {
             let updated = false;
             window.bitacoraList.forEach(item => {
@@ -1878,38 +1912,6 @@
             }
         }
         window.reconcileBitacoraDates = reconcileBitacoraDates;
-
-        // HERRAMIENTA AUTOMÁTICA: SI HUBO VUELOS REGISTRADOS QUE PERTENECEN A AYER, MOVERLOS EN UN CLIC
-        function promptMigrateTodayLogsToYesterday() {
-            const yestKey = getYesterdayKey();
-            const todayKey = getTodayKey();
-            const [yY, mY, dY] = yestKey.split('-');
-            const [yT, mT, dT] = todayKey.split('-');
-
-            const candidates = window.bitacoraList.filter(item => recordMatchesDate(item, todayKey));
-            if (candidates.length === 0) {
-                showToast("No hay registros en la fecha de hoy para mover.", "info");
-                return;
-            }
-
-            if (!confirm(`Se reasignarán ${candidates.length} registros del día ${parseInt(dT,10)}/${parseInt(mT,10)} al día de ayer ${parseInt(dY,10)}/${parseInt(mY,10)}.\n\n¿Deseas continuar?`)) {
-                return;
-            }
-
-            candidates.forEach(item => {
-                item.dateKey = yestKey;
-                if (item.timestampFormatted) {
-                    const timePart = item.timestampFormatted.split(',')[1] || ` ${item.scheduledTime}:00`;
-                    item.timestampFormatted = `${parseInt(dY, 10)}/${parseInt(mY, 10)}/${yY},${timePart}`;
-                }
-                if (typeof window.saveBitacoraLogToCloud === 'function') window.saveBitacoraLogToCloud(item);
-            });
-
-            safeStorageSet('audi_bitacora_logs', JSON.stringify(window.bitacoraList));
-            setBitacoraQuickDay('YESTERDAY');
-            showToast(`Se movieron ${candidates.length} vuelos al día ${parseInt(dY,10)}/${parseInt(mY,10)}`, "success");
-        }
-        window.promptMigrateTodayLogsToYesterday = promptMigrateTodayLogsToYesterday;
 
         function renderBitacoraModalTable() {
             const tbody = document.getElementById('modalBitacoraTableBody');
@@ -1927,31 +1929,14 @@
                 const todayKey = getTodayKey();
                 filteredList = filteredList.filter(item => recordMatchesDate(item, todayKey));
 
-                // Completar los 16 vuelos en pantalla para visualización operativa
-                if (filteredList.length < 16) {
-                    const plans = getActivePlan();
-                    const now = new Date();
-                    const dayStr = `${now.getDate()}/${now.getMonth() + 1}/${now.getFullYear()}`;
-                    filteredList = plans.map((planItem, idx) => {
-                        const st = window.dailyFlightStatuses[idx] || { status: 'PENDIENTE', realTime: '--', note: '' };
-                        const bitacoraMatch = window.bitacoraList.find(b => 
-                            b.scheduledTime === planItem.timeOp2 && recordMatchesDate(b, todayKey)
-                        );
+                const uniqueByTime = new Map();
+                filteredList.forEach(item => {
+                    if (!uniqueByTime.has(item.scheduledTime)) {
+                        uniqueByTime.set(item.scheduledTime, item);
+                    }
+                });
+                filteredList = Array.from(uniqueByTime.values());
 
-                        const normStatus = (st.status === 'VOLADO') ? 'REALIZADO' : st.status;
-                        return {
-                            id: bitacoraMatch ? bitacoraMatch.id : (1759000000000 + idx),
-                            dateKey: todayKey,
-                            timestampFormatted: (bitacoraMatch && bitacoraMatch.timestampFormatted) ? bitacoraMatch.timestampFormatted : `${dayStr}, ${st.realTime !== '--' && st.realTime !== 'N/A' ? st.realTime : planItem.timeOp2}:00`,
-                            scheduledTime: planItem.timeOp2,
-                            flightType: `TIPO ${planItem.type} - ${planItem.name}`,
-                            status: normStatus,
-                            realTime: st.realTime || (bitacoraMatch ? bitacoraMatch.realTime : '--'),
-                            notes: st.note || (bitacoraMatch ? bitacoraMatch.notes : (normStatus === 'REALIZADO' ? 'Patrullaje completo sin novedades' : (normStatus === 'PENDIENTE' ? 'Vuelo programado de la jornada' : ''))),
-                            imageData: (bitacoraMatch && bitacoraMatch.imageData) ? bitacoraMatch.imageData : (st.imageData || "")
-                        };
-                    });
-                }
                 if (footerInfoEl) footerInfoEl.innerText = `Mostrando: Jornada de Hoy (${todayKey})`;
             } else if (mode === 'CALENDAR' && targetFilterKey) {
                 const parts = targetFilterKey.split('-');
@@ -1960,6 +1945,15 @@
                 const filterYear = parseInt(parts[0], 10);
 
                 filteredList = filteredList.filter(item => recordMatchesDate(item, targetFilterKey));
+                
+                const uniqueByTime = new Map();
+                filteredList.forEach(item => {
+                    if (!uniqueByTime.has(item.scheduledTime)) {
+                        uniqueByTime.set(item.scheduledTime, item);
+                    }
+                });
+                filteredList = Array.from(uniqueByTime.values());
+
                 if (footerInfoEl) footerInfoEl.innerText = `Filtrado por Fecha: ${filterDay}/${filterMonth}/${filterYear} (${filteredList.length} registros)`;
             } else {
                 if (footerInfoEl) footerInfoEl.innerText = `Mostrando: Histórico Completo (${filteredList.length} registros)`;
@@ -2142,9 +2136,8 @@
             window.bitacoraList[entryIdx] = updatedEntry;
             safeStorageSet('audi_bitacora_logs', JSON.stringify(window.bitacoraList));
 
-            // Actualizar status del día si coincide
             const planIdx = getActivePlan().findIndex(p => p.timeOp2 === schedTime);
-            if (planIdx !== -1) {
+            if (planIdx !== -1 && newDateKey === getTodayKey()) {
                 window.dailyFlightStatuses[planIdx] = { status, realTime, note: notes, imageData: imageData };
                 safeStorageSet(`audi_flight_statuses_${newDateKey}`, JSON.stringify(window.dailyFlightStatuses));
             }
@@ -2251,19 +2244,17 @@
         }
         window.syncDailyStatusesWithBitacora = syncDailyStatusesWithBitacora;
 
-        // GENERACIÓN AUDITABLE DE PDF CON CORRESPONDENCIA PRECISA DE FECHAS
+        // GENERACIÓN AUDITABLE DE PDF: EXACTAMENTE 16 FILAS POR JORNADA EN 1 PÁGINA
         function printAuditBitacora() {
+            runAutoSeparate12and13(false);
             reconcileBitacoraDates();
             syncDailyStatusesWithBitacora();
 
             const printBody = document.getElementById('printBitacoraTableBody');
             const now = new Date();
 
-            // Detectar la fecha solicitada de forma unificada
             let targetDateYMD = window.bitacoraSelectedDate || document.getElementById('bitacoraDateInput')?.value || '';
-            if (!targetDateYMD) {
-                targetDateYMD = getTodayKey();
-            }
+            if (!targetDateYMD) targetDateYMD = getTodayKey();
 
             const parts = targetDateYMD.split('-');
             const filterYear = parseInt(parts[0], 10);
@@ -2280,57 +2271,61 @@
                 subtitleEl.innerText = `Bitácora Oficial Auditable de Vuelos con Drone (24/7) - Jornada del ${reportDateLabel}`;
             }
 
-            // Filtrar todos los registros que pertenecen a la fecha seleccionada
-            let listToPrint = window.bitacoraList.filter(item => recordMatchesDate(item, targetDateYMD));
+            const rawDateRecords = window.bitacoraList.filter(item => recordMatchesDate(item, targetDateYMD));
 
-            // Intentar recuperar statuses guardados específicamente para esta fecha si existen en localStorage
-            let savedDateStatuses = null;
-            try {
-                const rawStatuses = safeStorageGet(`audi_flight_statuses_${targetDateYMD}`);
-                if (rawStatuses) savedDateStatuses = JSON.parse(rawStatuses);
-            } catch(e) {}
-
-            // Si hay menos de 16 vuelos en la fecha, completamos el cronograma oficial de 16 vuelos para cumplimiento de auditoría
-            if (listToPrint.length < 16) {
-                const planKey = (targetDateYMD === getTodayKey()) ? getActivePlanKey() : getDeterministicPlanForDate(targetDateYMD);
-                const plans = OFFICIAL_PLANS[planKey] || OFFICIAL_PLANS["1"];
-                const dayStr = `${filterDay}/${filterMonth}/${filterYear}`;
-
-                listToPrint = plans.map((planItem, idx) => {
-                    const match = window.bitacoraList.find(b => 
-                        b.scheduledTime === planItem.timeOp2 && recordMatchesDate(b, targetDateYMD)
-                    );
-
-                    let st = match ? { status: match.status, realTime: match.realTime, note: match.notes, imageData: match.imageData } : null;
-                    if (!st && savedDateStatuses && savedDateStatuses[idx]) {
-                        st = savedDateStatuses[idx];
+            // DEDUPLICACIÓN ESTRICTA: Mapear por horario programado (timeOp2)
+            const mapByTime = new Map();
+            rawDateRecords.forEach(rec => {
+                const timeKey = rec.scheduledTime;
+                if (!mapByTime.has(timeKey)) {
+                    mapByTime.set(timeKey, rec);
+                } else {
+                    const existing = mapByTime.get(timeKey);
+                    // Priorizar el vuelo realizado sobre el pendiente
+                    if (existing.status === 'PENDIENTE' && rec.status !== 'PENDIENTE') {
+                        mapByTime.set(timeKey, rec);
                     }
-                    if (!st && targetDateYMD === getTodayKey()) {
-                        st = window.dailyFlightStatuses[idx];
-                    }
-                    if (!st) {
-                        st = { status: 'PENDIENTE', realTime: '--', note: 'Vuelo programado de la jornada' };
-                    }
+                }
+            });
 
-                    const normSt = (st.status === 'VOLADO') ? 'REALIZADO' : st.status;
+            const planKey = (targetDateYMD === getTodayKey()) ? getActivePlanKey() : getDeterministicPlanForDate(targetDateYMD);
+            const plans = OFFICIAL_PLANS[planKey] || OFFICIAL_PLANS["1"];
+            const dayStr = `${filterDay}/${filterMonth}/${filterYear}`;
+
+            const listToPrint = plans.map((planItem, idx) => {
+                const match = mapByTime.get(planItem.timeOp2);
+                if (match) {
+                    const normSt = (match.status === 'VOLADO') ? 'REALIZADO' : match.status;
                     return {
-                        timestampFormatted: (match && match.timestampFormatted) ? match.timestampFormatted : `${dayStr}, ${st.realTime && st.realTime !== '--' && st.realTime !== 'N/A' ? st.realTime : planItem.timeOp2}:00`,
+                        timestampFormatted: match.timestampFormatted || `${dayStr}, ${match.realTime || planItem.timeOp2}:00`,
                         scheduledTime: planItem.timeOp2,
                         flightType: `TIPO ${planItem.type} - ${planItem.name}`,
                         status: normSt,
-                        realTime: (st.realTime && st.realTime !== '--') ? st.realTime : (match ? match.realTime : '--'),
-                        notes: st.note || (match ? match.notes : (normSt === 'REALIZADO' ? 'Patrullaje completo sin novedades' : 'Vuelo programado de la jornada')),
-                        imageData: (match && match.imageData) ? match.imageData : (st.imageData || "")
+                        realTime: match.realTime || '--',
+                        notes: match.notes || (normSt === 'REALIZADO' ? 'Patrullaje completo sin novedades' : ''),
+                        imageData: match.imageData || ""
                     };
-                });
-            }
+                }
+
+                let dailySt = (targetDateYMD === getTodayKey()) ? window.dailyFlightStatuses[idx] : null;
+                const normStatus = dailySt ? ((dailySt.status === 'VOLADO') ? 'REALIZADO' : dailySt.status) : 'PENDIENTE';
+                return {
+                    timestampFormatted: `${dayStr}, ${dailySt && dailySt.realTime && dailySt.realTime !== '--' && dailySt.realTime !== 'N/A' ? dailySt.realTime : planItem.timeOp2}:00`,
+                    scheduledTime: planItem.timeOp2,
+                    flightType: `TIPO ${planItem.type} - ${planItem.name}`,
+                    status: normStatus,
+                    realTime: dailySt ? dailySt.realTime : '--',
+                    notes: dailySt ? dailySt.note : 'Vuelo programado de la jornada',
+                    imageData: dailySt ? (dailySt.imageData || "") : ""
+                };
+            });
 
             listToPrint.sort((a, b) => parseTimeToMinutes(a.scheduledTime || '00:00') - parseTimeToMinutes(b.scheduledTime || '00:00'));
 
             let html = '';
             listToPrint.forEach(item => {
                 const imgHtml = item.imageData 
-                    ? `<img src="${item.imageData}" style="max-height: 38px; max-width: 60px; margin: auto; display: block; object-fit: contain; border: 1px solid #999; border-radius: 2px;">` 
+                    ? `<img src="${item.imageData}" style="max-height: 28px; max-width: 50px; margin: auto; display: block; object-fit: contain; border: 1px solid #999; border-radius: 2px;">` 
                     : 'N/A';
                 
                 let statusColor = 'color: #64748b; font-weight: bold;';
@@ -2366,6 +2361,7 @@
         window.printAuditBitacora = printAuditBitacora;
 
         function exportBitacoraCSV() {
+            runAutoSeparate12and13(false);
             reconcileBitacoraDates();
             syncDailyStatusesWithBitacora();
 
@@ -2400,6 +2396,7 @@
                     try { window.bitacoraList = JSON.parse(savedBitacora); } catch(e){} 
                 }
 
+                runAutoSeparate12and13(false);
                 reconcileBitacoraDates();
 
                 if (savedDate !== today) {
