@@ -3,6 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
     <title>Audi México - Sistema Control de Vuelos & Bitácora Drone</title>
 
     <!-- Tailwind CSS & FontAwesome CDN -->
@@ -298,7 +301,7 @@
                 </button>
             </div>
 
-            <!-- BARRA DE FILTRO Y CALENDARIO DE LA BITÁCORA -->
+            <!-- BARRA DE FILTRO Y CALENDARIO UNIFICADA DE LA BITÁCORA -->
             <div class="flex items-center justify-between gap-2 flex-wrap bg-slate-950/90 p-2.5 rounded-xl border border-slate-800 text-xs shadow-inner">
                 
                 <div class="flex items-center gap-2 flex-wrap">
@@ -306,11 +309,11 @@
                         Registros: <strong id="bitacoraRecordCount" class="text-emerald-400 font-mono">0</strong>
                     </span>
 
-                    <!-- Selector de Fecha / Calendario Interactivo -->
+                    <!-- Selector Único de Fecha / Calendario Interactivo -->
                     <div class="flex items-center gap-1 bg-slate-900 px-2.5 py-1.5 rounded-lg border border-blue-500/50 shadow-sm cursor-pointer hover:border-blue-400 transition" onclick="triggerNativePicker('bitacoraDateInput')">
                         <i class="fa-solid fa-calendar-days text-amber-400 text-sm"></i>
-                        <label for="bitacoraDateInput" class="text-[10px] font-bold text-slate-300 cursor-pointer">Día:</label>
-                        <input type="date" id="bitacoraDateInput" onchange="filterBitacoraByCalendar(this.value)" class="bg-slate-950 text-white font-mono text-[11px] px-2 py-0.5 rounded border border-slate-700 focus:outline-none focus:border-blue-400 cursor-pointer">
+                        <label for="bitacoraDateInput" class="text-[10px] font-bold text-slate-300 cursor-pointer">Fecha:</label>
+                        <input type="date" id="bitacoraDateInput" onchange="unifiedDateChanged(this.value)" class="bg-slate-950 text-white font-mono text-[11px] px-2 py-0.5 rounded border border-slate-700 focus:outline-none focus:border-blue-400 cursor-pointer">
                     </div>
 
                     <!-- Botones Rápidos -->
@@ -337,25 +340,20 @@
                     <button onclick="triggerDeepRecoveryScan()" title="Buscar y recuperar vuelos históricos de la nube" class="px-2 py-1 bg-indigo-900/80 hover:bg-indigo-800 text-indigo-200 font-bold text-[10px] rounded-lg border border-indigo-700/50 transition flex items-center gap-1 cursor-pointer">
                         <i class="fa-solid fa-rotate text-amber-300"></i> Sincronizar
                     </button>
+
+                    <button onclick="promptMigrateTodayLogsToYesterday()" title="Si registraste vuelos ayer que por la medianoche quedaron con la fecha de hoy, pulsa aquí para moverlos al día anterior" class="px-2 py-1 bg-amber-950/80 hover:bg-amber-900 text-amber-300 font-bold text-[10px] rounded-lg border border-amber-700/50 transition flex items-center gap-1 cursor-pointer">
+                        <i class="fa-solid fa-calendar-arrow-down"></i> Mover Hoy a Ayer
+                    </button>
+
                     <button onclick="exportBitacoraCSV()" class="px-2 py-1 bg-emerald-700 hover:bg-emerald-600 text-white font-bold text-[10px] sm:text-xs rounded-lg transition flex items-center gap-1 cursor-pointer">
                         <i class="fa-solid fa-file-excel"></i> Excel
                     </button>
-                    
-                    <!-- SELECTOR CALENDARIO PARA PDF -->
-                    <div class="flex items-center gap-1 bg-slate-900 px-2 py-1 rounded-lg border border-amber-500/40 shadow-sm">
-                        <i class="fa-solid fa-calendar-check text-amber-400 text-xs"></i>
-                        <span class="text-[9.5px] font-bold text-slate-200">Fecha PDF:</span>
-                        <input type="date" id="pdfReportDateInput" onchange="syncPdfSelectedDate(this.value)" class="bg-slate-950 text-amber-300 font-mono text-[10px] px-1.5 py-0.5 rounded border border-slate-700 focus:outline-none focus:border-amber-400 cursor-pointer" title="Selecciona la fecha para generar el PDF">
-                        
-                        <button type="button" onclick="clearPdfCalendarFilter()" title="Limpiar fecha para usar vista actual" class="text-[9px] text-slate-400 hover:text-red-400 px-1">
-                            <i class="fa-solid fa-xmark"></i>
-                        </button>
-                    </div>
 
                     <button onclick="printAuditBitacora()" class="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white font-extrabold text-[11px] sm:text-xs rounded-lg transition flex items-center gap-1.5 cursor-pointer shadow-lg border border-blue-400/50">
                         <i class="fa-solid fa-file-pdf text-amber-300 text-sm"></i>
-                        <span>Generar PDF</span>
+                        <span id="lblPrintButton">Generar PDF</span>
                     </button>
+                    
                     <button onclick="confirmClearAllBitacoraModal()" class="px-2 py-1 bg-red-950/80 hover:bg-red-900 text-red-300 font-bold text-[10px] sm:text-xs rounded-lg transition flex items-center gap-1 cursor-pointer">
                         <i class="fa-solid fa-trash-can"></i> Vaciar
                     </button>
@@ -450,7 +448,7 @@
         </div>
     </div>
 
-    <!-- MODAL EDICIÓN DE REGISTRO -->
+    <!-- MODAL EDICIÓN DE REGISTRO CON SELECTOR DE FECHA AUDITABLE -->
     <div id="modalEditBitacoraEntry" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-3 hidden modal-backdrop">
         <div class="bg-slate-900 border border-blue-500/40 rounded-2xl max-w-md w-full p-4 shadow-2xl space-y-2.5 max-h-[90vh] overflow-y-auto">
             <div class="flex justify-between items-center border-b border-slate-800 pb-2">
@@ -463,6 +461,11 @@
             <input type="hidden" id="editBitacoraId">
 
             <div class="space-y-2 text-xs">
+                <!-- FECHA DEL REGISTRO PARA CORREGIR REGISTROS CRUZADOS O NOCTURNOS -->
+                <div>
+                    <label class="block text-amber-300 font-semibold mb-0.5">Fecha del Vuelo (Día/Mes/Año):</label>
+                    <input type="date" id="editBitacoraDateKey" class="w-full bg-slate-950 border border-amber-500/50 text-amber-300 font-mono px-2.5 py-1 rounded-lg focus:outline-none focus:border-amber-400">
+                </div>
                 <div>
                     <label class="block text-slate-400 font-semibold mb-0.5">Estado del Vuelo:</label>
                     <select id="editBitacoraStatus" class="w-full bg-slate-950 border border-slate-700 text-slate-200 px-2.5 py-1 rounded-lg font-bold">
@@ -514,6 +517,10 @@
                     <input type="text" id="takeoffFlightLabel" readonly class="w-full bg-slate-950 border border-slate-800 text-slate-200 px-2.5 py-1 rounded-lg font-bold">
                 </div>
                 <div>
+                    <label class="block text-slate-400 font-semibold mb-0.5">Fecha Operativa:</label>
+                    <input type="date" id="takeoffDateInput" class="w-full bg-slate-950 border border-slate-700 text-amber-300 font-mono text-xs font-bold px-2.5 py-1 rounded-lg">
+                </div>
+                <div>
                     <label class="block text-slate-400 font-semibold mb-0.5">Hora Real de Despegue:</label>
                     <input type="text" id="takeoffRealTime" class="w-full bg-slate-950 border border-slate-700 text-emerald-400 font-mono text-xs font-bold px-2.5 py-1 rounded-lg">
                 </div>
@@ -543,6 +550,10 @@
                 <div>
                     <label class="block text-slate-400 font-semibold mb-0.5">Vuelo / Horario:</label>
                     <input type="text" id="suspendFlightLabel" readonly class="w-full bg-slate-950 border border-slate-800 text-slate-200 px-2.5 py-1 rounded-lg font-bold">
+                </div>
+                <div>
+                    <label class="block text-slate-400 font-semibold mb-0.5">Fecha Operativa:</label>
+                    <input type="date" id="suspendDateInput" class="w-full bg-slate-950 border border-slate-700 text-amber-300 font-mono text-xs font-bold px-2.5 py-1 rounded-lg">
                 </div>
                 <div>
                     <label class="block text-slate-400 font-semibold mb-0.5">Causa de Suspensión:</label>
@@ -603,10 +614,10 @@
         <div class="border-b-2 border-black pb-1.5 mb-2 flex justify-between items-center">
             <div>
                 <h1 class="text-base font-bold uppercase tracking-wider">AUDI MÉXICO - PLANTA SAN JOSÉ CHIAPA</h1>
-                <h2 class="text-xs font-semibold">Bitácora Oficial Auditable de Vuelos con Drone (24/7) - Jornada 16 Vuelos</h2>
+                <h2 class="text-xs font-semibold" id="printReportSubtitle">Bitácora Oficial Auditable de Vuelos con Drone (24/7) - Jornada 16 Vuelos</h2>
             </div>
             <div class="text-right text-[9px]">
-                <div>Fecha de Reporte: <strong id="printReportDate">--</strong></div>
+                <div>Fecha de Jornada: <strong id="printReportDate" class="text-black font-bold">--</strong></div>
                 <div>Generado: <strong id="printReportTime">--</strong></div>
             </div>
         </div>
@@ -639,8 +650,8 @@
         </div>
     </section>
 
+    <!-- SCRIPT DE INICIALIZACIÓN, CATALOGO DE PLANES Y FECHAS -->
     <script>
-        /* STORAGE FALLBACK */
         const memoryStorageFallback = {};
         function safeStorageGet(key) {
             try { return localStorage.getItem(key); } catch (e) { return memoryStorageFallback[key] || null; }
@@ -653,18 +664,96 @@
 
         function getTodayKey() {
             const now = new Date();
-            return `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+            const y = now.getFullYear();
+            const m = String(now.getMonth() + 1).padStart(2, '0');
+            const d = String(now.getDate()).padStart(2, '0');
+            return `${y}-${m}-${d}`;
         }
         window.getTodayKey = getTodayKey;
 
         function getYesterdayKey() {
             const d = new Date();
             d.setDate(d.getDate() - 1);
-            return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+            const y = d.getFullYear();
+            const m = String(d.getMonth() + 1).padStart(2, '0');
+            const day = String(d.getDate()).padStart(2, '0');
+            return `${y}-${m}-${day}`;
         }
         window.getYesterdayKey = getYesterdayKey;
 
-        // CATÁLOGO INMUTABLE DE LOS 4 PLANES OFICIALES (RECORRIDOS ESTÁTICOS Y HOMOLOGADOS)
+        // FUNCIÓN UNIVERSAL ROBUSTA DE NORMALIZACIÓN DE FECHAS
+        function normalizeRecordDateKey(item) {
+            if (!item) return "";
+
+            // 1. Si timestampFormatted tiene formato DD/MM/YYYY, priorizarlo porque representa el registro visual físico
+            if (item.timestampFormatted) {
+                const datePart = item.timestampFormatted.split(',')[0].trim();
+                const dParts = datePart.split('/');
+                if (dParts.length === 3) {
+                    const pDay = String(parseInt(dParts[0], 10)).padStart(2, '0');
+                    const pMonth = String(parseInt(dParts[1], 10)).padStart(2, '0');
+                    const pYear = parseInt(dParts[2], 10);
+                    if (pYear > 2000) return `${pYear}-${pMonth}-${pDay}`;
+                }
+                if (/^\d{4}-\d{2}-\d{2}$/.test(datePart)) return datePart;
+            }
+
+            // 2. Si dateKey tiene formato YYYY-MM-DD
+            if (item.dateKey && /^\d{4}-\d{2}-\d{2}$/.test(item.dateKey)) {
+                return item.dateKey;
+            }
+
+            // 3. Obtener de id si es timestamp numérico real
+            if (item.id && typeof item.id === 'number' && item.id > 1600000000000) {
+                const d = new Date(item.id);
+                const y = d.getFullYear();
+                const m = String(d.getMonth() + 1).padStart(2, '0');
+                const day = String(d.getDate()).padStart(2, '0');
+                return `${y}-${m}-${day}`;
+            }
+
+            return item.dateKey || "";
+        }
+        window.normalizeRecordDateKey = normalizeRecordDateKey;
+
+        function recordMatchesDate(item, targetYMD) {
+            if (!item || !targetYMD) return false;
+            
+            // Comparar directamente con la clave normalizada
+            const normKey = normalizeRecordDateKey(item);
+            if (normKey === targetYMD) return true;
+
+            // Comparar parsed numérico por si hay variaciones de ceros a la izquierda
+            const [tYear, tMonth, tDay] = targetYMD.split('-').map(Number);
+            
+            if (item.dateKey && /^\d{4}-\d{2}-\d{2}$/.test(item.dateKey)) {
+                const [iY, iM, iD] = item.dateKey.split('-').map(Number);
+                if (iY === tYear && iM === tMonth && iD === tDay) return true;
+            }
+
+            if (item.timestampFormatted) {
+                const datePart = item.timestampFormatted.split(',')[0].trim();
+                const dParts = datePart.split('/');
+                if (dParts.length === 3) {
+                    const d = parseInt(dParts[0], 10);
+                    const m = parseInt(dParts[1], 10);
+                    const y = parseInt(dParts[2], 10);
+                    if (y === tYear && m === tMonth && d === tDay) return true;
+                }
+            }
+
+            if (item.id && typeof item.id === 'number' && item.id > 1600000000000) {
+                const d = new Date(item.id);
+                if (d.getFullYear() === tYear && (d.getMonth() + 1) === tMonth && d.getDate() === tDay) {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+        window.recordMatchesDate = recordMatchesDate;
+
+        // CATÁLOGO INMUTABLE DE LOS 4 PLANES OFICIALES
         const OFFICIAL_PLANS = Object.freeze({
             "1": Object.freeze([
                 { timeOp2: "00:30", type: "C", name: "Interior de planta", forced: false },
@@ -740,43 +829,33 @@
             ])
         });
 
-        // ALGORITMO DETERMINISTA POR FECHA:
-        // Todas las PCs, celulares y navegadores obtienen exactamente el mismo plan hoy sin re-sortear cada segundo.
         function getDeterministicPlanForDate(dateStr) {
-            let hash = 0;
+            let sum = 0;
             for (let i = 0; i < dateStr.length; i++) {
-                hash = ((hash << 5) - hash) + dateStr.charCodeAt(i);
-                hash |= 0;
+                sum += dateStr.charCodeAt(i) * (i + 1);
             }
-            const planNum = (Math.abs(hash) % 4) + 1;
-            return String(planNum);
+            return String((Math.abs(sum) % 4) + 1);
         }
 
         let memoryCachedPlanKey = null;
-        let memoryCachedPlanDate = "";
 
         function getActivePlanKey() {
-            const today = getTodayKey();
-
-            // 1. Si ya se fijó en memoria para la jornada de hoy, retornar de inmediato (sin parpadeos)
-            if (memoryCachedPlanKey && memoryCachedPlanDate === today) {
+            if (memoryCachedPlanKey && OFFICIAL_PLANS[memoryCachedPlanKey]) {
                 return memoryCachedPlanKey;
             }
 
-            // 2. Verificar si hay un plan guardado localmente o asignado manualmente por supervisor
-            let savedPlan = safeStorageGet(`audi_assigned_plan_${today}`);
+            const today = getTodayKey();
+            const savedPlan = safeStorageGet(`audi_assigned_plan_${today}`);
+
             if (savedPlan && OFFICIAL_PLANS[savedPlan]) {
                 memoryCachedPlanKey = savedPlan;
-                memoryCachedPlanDate = today;
                 return savedPlan;
             }
 
-            // 3. Asignar el plan matemático fijo del día (idéntico en cualquier dispositivo)
-            const deterministicPlan = getDeterministicPlanForDate(today);
-            memoryCachedPlanKey = deterministicPlan;
-            memoryCachedPlanDate = today;
-            safeStorageSet(`audi_assigned_plan_${today}`, deterministicPlan);
-            return deterministicPlan;
+            const assigned = getDeterministicPlanForDate(today);
+            memoryCachedPlanKey = assigned;
+            safeStorageSet(`audi_assigned_plan_${today}`, assigned);
+            return assigned;
         }
         window.getActivePlanKey = getActivePlanKey;
 
@@ -805,17 +884,16 @@
             const today = getTodayKey();
 
             memoryCachedPlanKey = nextPlan;
-            memoryCachedPlanDate = today;
             safeStorageSet(`audi_assigned_plan_${today}`, nextPlan);
 
             if (typeof window.saveDailyStatusToCloud === 'function') window.saveDailyStatusToCloud();
             if (typeof window.renderFlightsTable === 'function') window.renderFlightsTable();
             if (typeof window.updateTargetFlightBanner === 'function') window.updateTargetFlightBanner(new Date());
-            if (typeof window.showToast === 'function') window.showToast(`Plan asignado: Plan ${nextPlan}`, "success");
+            if (typeof window.showToast === 'function') window.showToast(`Plan asignado por supervisor: Plan ${nextPlan}`, "success");
         }
         window.executePlanRandomization = executePlanRandomization;
 
-        // ESTADO GLOBAL DE APLICACIÓN
+        // ESTADO GLOBAL DE LA APLICACIÓN
         window.dailyFlightStatuses = {};
         window.bitacoraList = [];
         window.activeModalIndex = 0;
@@ -830,6 +908,7 @@
         window.triggeredVoiceAlerts = new Set();
     </script>
 
+    <!-- FIREBASE MODULE (PERSISTENCIA Y SINCRONIZACIÓN NUBE) -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
@@ -897,44 +976,48 @@
 
                 try {
                     await signInAnonymously(auth);
-                } catch (authErr) {
-                    console.warn("Autenticación anónima omitida:", authErr);
-                }
+                } catch (authErr) {}
 
                 updateCloudUI(true, "Nube Live Sincronizada");
                 setupRealtimeListeners();
             } catch (err) {
-                console.warn("Firebase offline o inaccesible, modo local activado:", err);
                 updateCloudUI(false, "Modo Local");
             }
         }
 
         function setupRealtimeListeners() {
             if (!db) return;
-            const todayKey = window.getTodayKey ? window.getTodayKey() : '2026-10-10';
+            const todayKey = window.getTodayKey ? window.getTodayKey() : '2026-10-13';
 
             try {
                 const statusDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'daily_status', todayKey);
                 onSnapshot(statusDocRef, (docSnap) => {
                     if (docSnap.exists()) {
                         const data = docSnap.data();
+                        let needsTableRefresh = false;
+
                         if (data.statuses && Object.keys(data.statuses).length > 0) {
                             window.dailyFlightStatuses = data.statuses;
-                            if (window.safeStorageSet) window.safeStorageSet('audi_flight_statuses', JSON.stringify(data.statuses));
+                            if (window.safeStorageSet) window.safeStorageSet(`audi_flight_statuses_${todayKey}`, JSON.stringify(data.statuses));
+                            needsTableRefresh = true;
                         }
-                        if (data.assignedPlan && OFFICIAL_PLANS[data.assignedPlan]) {
-                            memoryCachedPlanKey = data.assignedPlan;
-                            memoryCachedPlanDate = todayKey;
+
+                        if (data.assignedPlan && window.getActivePlanKey && window.getActivePlanKey() !== data.assignedPlan) {
                             if (window.safeStorageSet) {
                                 window.safeStorageSet(`audi_assigned_plan_${todayKey}`, data.assignedPlan);
                             }
+                            needsTableRefresh = true;
                         }
-                        if (data.weatherSuspended !== undefined) {
+
+                        if (data.weatherSuspended !== undefined && window.systemWeatherSuspended !== data.weatherSuspended) {
                             window.systemWeatherSuspended = data.weatherSuspended;
-                            if (window.safeStorageSet) window.safeStorageSet('audi_weather_suspended', data.weatherSuspended ? 'true' : 'false');
+                            needsTableRefresh = true;
                         }
-                        if (typeof window.renderFlightsTable === 'function') window.renderFlightsTable();
-                        if (typeof window.updateTargetFlightBanner === 'function') window.updateTargetFlightBanner(new Date());
+
+                        if (needsTableRefresh) {
+                            if (typeof window.renderFlightsTable === 'function') window.renderFlightsTable();
+                            if (typeof window.updateTargetFlightBanner === 'function') window.updateTargetFlightBanner(new Date());
+                        }
                     }
                 }, () => {});
             } catch(e){}
@@ -1037,7 +1120,7 @@
             if (!input) return;
             const val = input.value.trim();
             if (!val) {
-                window.showToast("Ingresa un JSON válido de configuración.", "warning");
+                window.showToast("Ingresa un JSON válido.", "warning");
                 return;
             }
             try {
@@ -1059,10 +1142,11 @@
         initCloudPersistence();
     </script>
 
+    <!-- SCRIPT PRINCIPAL DE LA APLICACIÓN -->
     <script>
         const SUPERVISOR_PASSWORD = "audi";
 
-        /* GESTIÓN DE AUDIO Y CHIME */
+        // GESTIÓN DE AUDIO
         let audioCtxInstance = null;
         function getAudioContext() {
             if (!audioCtxInstance) {
@@ -1227,9 +1311,7 @@
 
                     updateShiftBadge(now.getHours());
                     updateTargetFlightBanner(now);
-                } catch(err) {
-                    console.error("Error en updateClock:", err);
-                }
+                } catch(err) {}
             }
             updateClock();
             setInterval(updateClock, 1000);
@@ -1286,7 +1368,6 @@
                     cdEl.innerText = "SUSPENDIDO";
                     cdEl.className = "text-2xl sm:text-4xl lg:text-5xl font-mono font-black text-amber-400 mt-0.5 animate-pulse";
                 }
-                renderFlightsTable();
                 return;
             }
 
@@ -1356,8 +1437,6 @@
                     }
                 }
             }
-
-            renderFlightsTable();
         }
         window.updateTargetFlightBanner = updateTargetFlightBanner;
 
@@ -1368,6 +1447,7 @@
             const plans = getActivePlan();
             let voladosCount = 0;
             let suspendidosCount = 0;
+            const todayKey = getTodayKey();
 
             let html = '';
             plans.forEach((item, idx) => {
@@ -1391,7 +1471,7 @@
                 }
 
                 const windowColText = isTypeB ? '<span class="text-amber-400 font-bold">Hora Exacta</span>' : '±30 min';
-                const bitacoraEntry = window.bitacoraList.find(b => b.scheduledTime === item.timeOp2 && b.status === 'SUSPENDIDO');
+                const bitacoraEntry = window.bitacoraList.find(b => b.scheduledTime === item.timeOp2 && recordMatchesDate(b, todayKey) && b.status === 'SUSPENDIDO');
                 const hasEvidence = (bitacoraEntry && bitacoraEntry.imageData) || statusObj.imageData;
 
                 html += `
@@ -1465,6 +1545,9 @@
 
             document.getElementById('takeoffFlightLabel').value = `Vuelo #${idx + 1} - ${item.timeOp2} hrs (TIPO ${item.type})`;
             document.getElementById('takeoffRealTime').value = timeNow;
+            const dateInput = document.getElementById('takeoffDateInput');
+            if (dateInput) dateInput.value = getTodayKey();
+
             openModal('modalTakeoff');
         }
         window.openTakeoffModalForIdx = openTakeoffModalForIdx;
@@ -1477,14 +1560,18 @@
             const item = getActivePlan()[idx];
             const realTime = document.getElementById('takeoffRealTime').value || '--';
             const notes = document.getElementById('takeoffNotes').value || 'Patrullaje completo sin novedades';
+            const dateKey = document.getElementById('takeoffDateInput')?.value || getTodayKey();
+
+            const [y, m, d] = dateKey.split('-');
+            const stampFormatted = `${parseInt(d, 10)}/${parseInt(m, 10)}/${y}, ${realTime}:00`;
 
             window.dailyFlightStatuses[idx] = { status: 'REALIZADO', realTime: realTime, note: notes };
-            safeStorageSet('audi_flight_statuses', JSON.stringify(window.dailyFlightStatuses));
+            safeStorageSet(`audi_flight_statuses_${dateKey}`, JSON.stringify(window.dailyFlightStatuses));
 
             const logEntry = {
                 id: Date.now(),
-                dateKey: getTodayKey(), 
-                timestampFormatted: new Date().toLocaleString('es-MX'),
+                dateKey: dateKey, 
+                timestampFormatted: stampFormatted,
                 scheduledTime: item.timeOp2,
                 flightType: `TIPO ${item.type} - ${item.name}`,
                 status: 'REALIZADO',
@@ -1513,6 +1600,8 @@
             const item = getActivePlan()[idx];
 
             document.getElementById('suspendFlightLabel').value = `Vuelo #${idx + 1} - ${item.timeOp2} hrs (TIPO ${item.type})`;
+            const dateInput = document.getElementById('suspendDateInput');
+            if (dateInput) dateInput.value = getTodayKey();
             document.getElementById('suspendImgPreview').src = "";
             document.getElementById('suspendImgPreviewContainer').classList.add('hidden');
 
@@ -1526,15 +1615,18 @@
             const notes = document.getElementById('suspendNotes').value;
             const imageData = window.tempCompressedImage || "";
             const plans = getActivePlan();
-            const todayKey = getTodayKey();
+            const dateKey = document.getElementById('suspendDateInput')?.value || getTodayKey();
             const item = plans[idx];
+
+            const [y, m, d] = dateKey.split('-');
+            const stampFormatted = `${parseInt(d, 10)}/${parseInt(m, 10)}/${y}, ${item.timeOp2}:00`;
 
             window.dailyFlightStatuses[idx] = { status: 'SUSPENDIDO', realTime: 'N/A', note: `${reason} - ${notes}`, imageData: imageData };
             
             const logEntry = {
                 id: Date.now(),
-                dateKey: todayKey, 
-                timestampFormatted: new Date().toLocaleString('es-MX'),
+                dateKey: dateKey, 
+                timestampFormatted: stampFormatted,
                 scheduledTime: item.timeOp2,
                 flightType: `TIPO ${item.type} - ${item.name}`,
                 status: 'SUSPENDIDO',
@@ -1546,7 +1638,7 @@
             window.bitacoraList.unshift(logEntry);
             if (typeof window.saveBitacoraLogToCloud === 'function') window.saveBitacoraLogToCloud(logEntry);
 
-            safeStorageSet('audi_flight_statuses', JSON.stringify(window.dailyFlightStatuses));
+            safeStorageSet(`audi_flight_statuses_${dateKey}`, JSON.stringify(window.dailyFlightStatuses));
             safeStorageSet('audi_bitacora_logs', JSON.stringify(window.bitacoraList));
 
             if (typeof window.saveDailyStatusToCloud === 'function') window.saveDailyStatusToCloud();
@@ -1619,6 +1711,7 @@
             const idx = parseInt(document.getElementById('evidenceFlightIndex').value, 10);
             const item = getActivePlan()[idx];
             const imageData = window.tempCompressedImage;
+            const todayKey = getTodayKey();
 
             if (!imageData) {
                 showToast("Por favor seleccione una imagen de evidencia.", "warning");
@@ -1627,17 +1720,18 @@
 
             if (window.dailyFlightStatuses[idx]) {
                 window.dailyFlightStatuses[idx].imageData = imageData;
-                safeStorageSet('audi_flight_statuses', JSON.stringify(window.dailyFlightStatuses));
+                safeStorageSet(`audi_flight_statuses_${todayKey}`, JSON.stringify(window.dailyFlightStatuses));
             }
 
-            let logEntry = window.bitacoraList.find(b => b.scheduledTime === item.timeOp2 && b.status === 'SUSPENDIDO');
+            let logEntry = window.bitacoraList.find(b => b.scheduledTime === item.timeOp2 && recordMatchesDate(b, todayKey) && b.status === 'SUSPENDIDO');
             if (logEntry) {
                 logEntry.imageData = imageData;
             } else {
+                const now = new Date();
                 logEntry = {
                     id: Date.now(),
-                    dateKey: getTodayKey(), 
-                    timestampFormatted: new Date().toLocaleString('es-MX'),
+                    dateKey: todayKey, 
+                    timestampFormatted: `${now.getDate()}/${now.getMonth() + 1}/${now.getFullYear()}, ${item.timeOp2}:00`,
                     scheduledTime: item.timeOp2,
                     flightType: `TIPO ${item.type} - ${item.name}`,
                     status: 'SUSPENDIDO',
@@ -1665,13 +1759,36 @@
         window.openFullImagePreview = openFullImagePreview;
 
         function openBitacoraModal() {
+            reconcileBitacoraDates();
             syncDailyStatusesWithBitacora();
-            const dateInput = document.getElementById('bitacoraDateInput');
-            if (dateInput) dateInput.value = '';
-            setBitacoraViewMode('ALL');
+            setBitacoraViewMode('TODAY');
             openModal('modalBitacoraView');
         }
         window.openBitacoraModal = openBitacoraModal;
+
+        // GESTIÓN UNIFICADA DE FILTRO Y FECHA DE REPORTE
+        function unifiedDateChanged(selectedDateYMD) {
+            if (!selectedDateYMD) {
+                setBitacoraViewMode('ALL');
+                return;
+            }
+            window.bitacoraFilterMode = 'CALENDAR';
+            window.bitacoraSelectedDate = selectedDateYMD;
+
+            const btnAll = document.getElementById('btnViewAll');
+            const btnToday = document.getElementById('btnViewToday');
+            const btnYesterday = document.getElementById('btnViewYesterday');
+            if (btnAll) btnAll.className = "px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-[10px] rounded-lg border border-slate-700 transition flex items-center gap-1 cursor-pointer";
+            if (btnToday) btnToday.className = "px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-[10px] rounded-lg border border-slate-700 transition flex items-center gap-1 cursor-pointer";
+            if (btnYesterday) btnYesterday.className = "px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-[10px] rounded-lg border border-slate-700 transition flex items-center gap-1 cursor-pointer";
+
+            const lblBtn = document.getElementById('lblPrintButton');
+            const [y, m, d] = selectedDateYMD.split('-');
+            if (lblBtn) lblBtn.innerText = `PDF (${parseInt(d,10)}/${parseInt(m,10)})`;
+
+            renderBitacoraModalTable();
+        }
+        window.unifiedDateChanged = unifiedDateChanged;
 
         function setBitacoraViewMode(mode) {
             window.bitacoraFilterMode = mode;
@@ -1680,18 +1797,19 @@
             const btnToday = document.getElementById('btnViewToday');
             const btnYesterday = document.getElementById('btnViewYesterday');
             const dateInput = document.getElementById('bitacoraDateInput');
-            const pdfDateInput = document.getElementById('pdfReportDateInput');
+            const lblBtn = document.getElementById('lblPrintButton');
 
             if (mode === 'ALL') {
                 if (dateInput) dateInput.value = "";
-                if (pdfDateInput) pdfDateInput.value = "";
+                if (lblBtn) lblBtn.innerText = "Generar PDF";
                 if (btnAll) btnAll.className = "px-2.5 py-1 bg-blue-600 text-white font-bold text-[10px] rounded-lg border border-blue-400/40 transition flex items-center gap-1 cursor-pointer";
                 if (btnToday) btnToday.className = "px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-[10px] rounded-lg border border-slate-700 transition flex items-center gap-1 cursor-pointer";
                 if (btnYesterday) btnYesterday.className = "px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-[10px] rounded-lg border border-slate-700 transition flex items-center gap-1 cursor-pointer";
             } else if (mode === 'TODAY') {
                 const todayKey = getTodayKey();
                 if (dateInput) dateInput.value = todayKey;
-                if (pdfDateInput) pdfDateInput.value = todayKey;
+                window.bitacoraSelectedDate = todayKey;
+                if (lblBtn) lblBtn.innerText = "PDF (Hoy)";
                 if (btnAll) btnAll.className = "px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-[10px] rounded-lg border border-slate-700 transition flex items-center gap-1 cursor-pointer";
                 if (btnToday) btnToday.className = "px-2.5 py-1 bg-emerald-600 text-white font-bold text-[10px] rounded-lg border border-emerald-400/40 transition flex items-center gap-1 cursor-pointer";
                 if (btnYesterday) btnYesterday.className = "px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-[10px] rounded-lg border border-slate-700 transition flex items-center gap-1 cursor-pointer";
@@ -1701,49 +1819,21 @@
         }
         window.setBitacoraViewMode = setBitacoraViewMode;
 
-        function filterBitacoraByCalendar(selectedDateYMD) {
-            if (!selectedDateYMD) return;
-            window.bitacoraFilterMode = 'CALENDAR';
-            window.bitacoraSelectedDate = selectedDateYMD;
-
-            const pdfDateInput = document.getElementById('pdfReportDateInput');
-            if (pdfDateInput) pdfDateInput.value = selectedDateYMD;
-
+        function setBitacoraQuickDay(target) {
+            let targetYMD = (target === 'YESTERDAY') ? getYesterdayKey() : target;
+            const dateInput = document.getElementById('bitacoraDateInput');
+            if (dateInput) dateInput.value = targetYMD;
+            
             const btnAll = document.getElementById('btnViewAll');
             const btnToday = document.getElementById('btnViewToday');
             const btnYesterday = document.getElementById('btnViewYesterday');
             if (btnAll) btnAll.className = "px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-[10px] rounded-lg border border-slate-700 transition flex items-center gap-1 cursor-pointer";
             if (btnToday) btnToday.className = "px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-[10px] rounded-lg border border-slate-700 transition flex items-center gap-1 cursor-pointer";
-            if (btnYesterday) btnYesterday.className = "px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-[10px] rounded-lg border border-slate-700 transition flex items-center gap-1 cursor-pointer";
+            if (btnYesterday) btnYesterday.className = "px-2.5 py-1 bg-amber-600 text-white font-bold text-[10px] rounded-lg border border-amber-400/40 transition flex items-center gap-1 cursor-pointer shadow";
 
-            renderBitacoraModalTable();
-        }
-        window.filterBitacoraByCalendar = filterBitacoraByCalendar;
-
-        function setBitacoraQuickDay(target) {
-            let targetYMD = (target === 'YESTERDAY') ? getYesterdayKey() : target;
-            const dateInput = document.getElementById('bitacoraDateInput');
-            const pdfDateInput = document.getElementById('pdfReportDateInput');
-            if (dateInput) dateInput.value = targetYMD;
-            if (pdfDateInput) pdfDateInput.value = targetYMD;
-            filterBitacoraByCalendar(targetYMD);
+            unifiedDateChanged(targetYMD);
         }
         window.setBitacoraQuickDay = setBitacoraQuickDay;
-
-        function syncPdfSelectedDate(selectedDateYMD) {
-            if (!selectedDateYMD) return;
-            const dateInput = document.getElementById('bitacoraDateInput');
-            if (dateInput) dateInput.value = selectedDateYMD;
-            filterBitacoraByCalendar(selectedDateYMD);
-        }
-        window.syncPdfSelectedDate = syncPdfSelectedDate;
-
-        function clearPdfCalendarFilter() {
-            const pdfDateInput = document.getElementById('pdfReportDateInput');
-            if (pdfDateInput) pdfDateInput.value = "";
-            setBitacoraViewMode('ALL');
-        }
-        window.clearPdfCalendarFilter = clearPdfCalendarFilter;
 
         function triggerNativePicker(inputId) {
             const input = document.getElementById(inputId);
@@ -1772,38 +1862,87 @@
         }
         window.toggleBitacoraSort = toggleBitacoraSort;
 
+        // RECONCILIACIÓN INTELIGENTE DE FECHAS EN LA BITÁCORA
+        function reconcileBitacoraDates() {
+            let updated = false;
+            window.bitacoraList.forEach(item => {
+                if (!item) return;
+                const correctKey = normalizeRecordDateKey(item);
+                if (correctKey && item.dateKey !== correctKey) {
+                    item.dateKey = correctKey;
+                    updated = true;
+                }
+            });
+            if (updated) {
+                safeStorageSet('audi_bitacora_logs', JSON.stringify(window.bitacoraList));
+            }
+        }
+        window.reconcileBitacoraDates = reconcileBitacoraDates;
+
+        // HERRAMIENTA AUTOMÁTICA: SI HUBO VUELOS REGISTRADOS QUE PERTENECEN A AYER, MOVERLOS EN UN CLIC
+        function promptMigrateTodayLogsToYesterday() {
+            const yestKey = getYesterdayKey();
+            const todayKey = getTodayKey();
+            const [yY, mY, dY] = yestKey.split('-');
+            const [yT, mT, dT] = todayKey.split('-');
+
+            const candidates = window.bitacoraList.filter(item => recordMatchesDate(item, todayKey));
+            if (candidates.length === 0) {
+                showToast("No hay registros en la fecha de hoy para mover.", "info");
+                return;
+            }
+
+            if (!confirm(`Se reasignarán ${candidates.length} registros del día ${parseInt(dT,10)}/${parseInt(mT,10)} al día de ayer ${parseInt(dY,10)}/${parseInt(mY,10)}.\n\n¿Deseas continuar?`)) {
+                return;
+            }
+
+            candidates.forEach(item => {
+                item.dateKey = yestKey;
+                if (item.timestampFormatted) {
+                    const timePart = item.timestampFormatted.split(',')[1] || ` ${item.scheduledTime}:00`;
+                    item.timestampFormatted = `${parseInt(dY, 10)}/${parseInt(mY, 10)}/${yY},${timePart}`;
+                }
+                if (typeof window.saveBitacoraLogToCloud === 'function') window.saveBitacoraLogToCloud(item);
+            });
+
+            safeStorageSet('audi_bitacora_logs', JSON.stringify(window.bitacoraList));
+            setBitacoraQuickDay('YESTERDAY');
+            showToast(`Se movieron ${candidates.length} vuelos al día ${parseInt(dY,10)}/${parseInt(mY,10)}`, "success");
+        }
+        window.promptMigrateTodayLogsToYesterday = promptMigrateTodayLogsToYesterday;
+
         function renderBitacoraModalTable() {
             const tbody = document.getElementById('modalBitacoraTableBody');
             const cntEl = document.getElementById('bitacoraRecordCount');
             const footerInfoEl = document.getElementById('bitacoraFooterFilterInfo');
             if (!tbody) return;
 
+            reconcileBitacoraDates();
+
             const mode = window.bitacoraFilterMode;
+            let targetFilterKey = window.bitacoraSelectedDate;
             let filteredList = [...window.bitacoraList];
 
-            if (mode === 'TODAY') {
-                const todayStr = new Date().toLocaleDateString('es-MX');
+            if (mode === 'TODAY' || (mode === 'CALENDAR' && targetFilterKey === getTodayKey())) {
                 const todayKey = getTodayKey();
-                
-                const loggedToday = filteredList.filter(item => {
-                    if (item.dateKey && item.dateKey === todayKey) return true;
-                    if (!item.timestampFormatted) return false;
-                    return item.timestampFormatted.includes(todayStr);
-                });
+                filteredList = filteredList.filter(item => recordMatchesDate(item, todayKey));
 
-                if (loggedToday.length < 16) {
+                // Completar los 16 vuelos en pantalla para visualización operativa
+                if (filteredList.length < 16) {
                     const plans = getActivePlan();
+                    const now = new Date();
+                    const dayStr = `${now.getDate()}/${now.getMonth() + 1}/${now.getFullYear()}`;
                     filteredList = plans.map((planItem, idx) => {
                         const st = window.dailyFlightStatuses[idx] || { status: 'PENDIENTE', realTime: '--', note: '' };
                         const bitacoraMatch = window.bitacoraList.find(b => 
-                            b.scheduledTime === planItem.timeOp2 && 
-                            (b.dateKey === todayKey || (b.timestampFormatted && b.timestampFormatted.includes(todayStr)))
+                            b.scheduledTime === planItem.timeOp2 && recordMatchesDate(b, todayKey)
                         );
 
                         const normStatus = (st.status === 'VOLADO') ? 'REALIZADO' : st.status;
                         return {
                             id: bitacoraMatch ? bitacoraMatch.id : (1759000000000 + idx),
-                            timestampFormatted: (bitacoraMatch && bitacoraMatch.timestampFormatted) ? bitacoraMatch.timestampFormatted : `${todayStr}, ${st.realTime !== '--' && st.realTime !== 'N/A' ? st.realTime : planItem.timeOp2}:00`,
+                            dateKey: todayKey,
+                            timestampFormatted: (bitacoraMatch && bitacoraMatch.timestampFormatted) ? bitacoraMatch.timestampFormatted : `${dayStr}, ${st.realTime !== '--' && st.realTime !== 'N/A' ? st.realTime : planItem.timeOp2}:00`,
                             scheduledTime: planItem.timeOp2,
                             flightType: `TIPO ${planItem.type} - ${planItem.name}`,
                             status: normStatus,
@@ -1812,28 +1951,16 @@
                             imageData: (bitacoraMatch && bitacoraMatch.imageData) ? bitacoraMatch.imageData : (st.imageData || "")
                         };
                     });
-                } else {
-                    filteredList = loggedToday;
                 }
-
-                if (footerInfoEl) footerInfoEl.innerText = `Mostrando: Jornada Completa de Hoy (16 Vuelos)`;
-            } else if (mode === 'CALENDAR' && window.bitacoraSelectedDate) {
-                const parts = window.bitacoraSelectedDate.split('-');
-                const filterYear = parseInt(parts[0], 10);
-                const filterMonth = parseInt(parts[1], 10);
+                if (footerInfoEl) footerInfoEl.innerText = `Mostrando: Jornada de Hoy (${todayKey})`;
+            } else if (mode === 'CALENDAR' && targetFilterKey) {
+                const parts = targetFilterKey.split('-');
                 const filterDay = parseInt(parts[2], 10);
+                const filterMonth = parseInt(parts[1], 10);
+                const filterYear = parseInt(parts[0], 10);
 
-                filteredList = filteredList.filter(item => {
-                    if (item.dateKey && item.dateKey === window.bitacoraSelectedDate) return true;
-                    if (!item.timestampFormatted) return false;
-                    const datePart = item.timestampFormatted.split(',')[0].trim();
-                    const dParts = datePart.split('/');
-                    if (dParts.length === 3) {
-                        return parseInt(dParts[0], 10) === filterDay && parseInt(dParts[1], 10) === filterMonth && parseInt(dParts[2], 10) === filterYear;
-                    }
-                    return item.timestampFormatted.includes(`${filterDay}/${filterMonth}/${filterYear}`);
-                });
-                if (footerInfoEl) footerInfoEl.innerText = `Filtrado por Calendario: ${filterDay}/${filterMonth}/${filterYear}`;
+                filteredList = filteredList.filter(item => recordMatchesDate(item, targetFilterKey));
+                if (footerInfoEl) footerInfoEl.innerText = `Filtrado por Fecha: ${filterDay}/${filterMonth}/${filterYear} (${filteredList.length} registros)`;
             } else {
                 if (footerInfoEl) footerInfoEl.innerText = `Mostrando: Histórico Completo (${filteredList.length} registros)`;
             }
@@ -1846,7 +1973,7 @@
                         <td colspan="8" class="p-6 text-center text-slate-400">
                             <div class="flex flex-col items-center justify-center gap-1.5">
                                 <i class="fa-solid fa-folder-open text-3xl text-slate-600"></i>
-                                <p class="italic text-xs text-slate-300">No hay registros para el filtro seleccionado.</p>
+                                <p class="italic text-xs text-slate-300">No hay registros para la fecha seleccionada.</p>
                                 <button onclick="setBitacoraViewMode('ALL')" class="px-2.5 py-1 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-bold mt-1 shadow">
                                     <i class="fa-solid fa-layer-group me-1"></i>Ver todos los registros
                                 </button>
@@ -1959,6 +2086,11 @@
             window.tempCompressedImage = entry.imageData || "";
             document.getElementById('editBitacoraId').value = entry.id;
             
+            const dateInput = document.getElementById('editBitacoraDateKey');
+            if (dateInput) {
+                dateInput.value = normalizeRecordDateKey(entry) || getTodayKey();
+            }
+
             let st = entry.status;
             if (st === 'VOLADO') st = 'REALIZADO';
             document.getElementById('editBitacoraStatus').value = st;
@@ -1985,14 +2117,21 @@
             const entryIdx = window.bitacoraList.findIndex(b => b.id === id);
             if (entryIdx === -1) return;
 
+            const newDateKey = document.getElementById('editBitacoraDateKey')?.value || getTodayKey();
             const status = document.getElementById('editBitacoraStatus').value;
             const schedTime = document.getElementById('editBitacoraSchedTime').value;
             const realTime = document.getElementById('editBitacoraRealTime').value;
             const notes = document.getElementById('editBitacoraNotes').value;
             const imageData = window.tempCompressedImage || "";
 
+            const [y, m, d] = newDateKey.split('-');
+            const timePart = (realTime && realTime !== '--' && realTime !== 'N/A') ? realTime : schedTime;
+            const newStampFormatted = `${parseInt(d, 10)}/${parseInt(m, 10)}/${y}, ${timePart}:00`;
+
             const updatedEntry = {
                 ...window.bitacoraList[entryIdx],
+                dateKey: newDateKey,
+                timestampFormatted: newStampFormatted,
                 status,
                 scheduledTime: schedTime,
                 realTime,
@@ -2003,10 +2142,11 @@
             window.bitacoraList[entryIdx] = updatedEntry;
             safeStorageSet('audi_bitacora_logs', JSON.stringify(window.bitacoraList));
 
+            // Actualizar status del día si coincide
             const planIdx = getActivePlan().findIndex(p => p.timeOp2 === schedTime);
             if (planIdx !== -1) {
                 window.dailyFlightStatuses[planIdx] = { status, realTime, note: notes, imageData: imageData };
-                safeStorageSet('audi_flight_statuses', JSON.stringify(window.dailyFlightStatuses));
+                safeStorageSet(`audi_flight_statuses_${newDateKey}`, JSON.stringify(window.dailyFlightStatuses));
             }
 
             if (typeof window.saveDailyStatusToCloud === 'function') window.saveDailyStatusToCloud();
@@ -2026,11 +2166,11 @@
                 "Para proteger los registros de auditoría de Audi México, introduce la contraseña de supervisor:",
                 () => {
                     const entry = window.bitacoraList.find(b => b.id === id);
-                    if (entry) {
+                    if (entry && entry.dateKey === getTodayKey()) {
                         const planIdx = getActivePlan().findIndex(p => p.timeOp2 === entry.scheduledTime);
                         if (planIdx !== -1) {
                             delete window.dailyFlightStatuses[planIdx];
-                            safeStorageSet('audi_flight_statuses', JSON.stringify(window.dailyFlightStatuses));
+                            safeStorageSet(`audi_flight_statuses_${getTodayKey()}`, JSON.stringify(window.dailyFlightStatuses));
                         }
                     }
 
@@ -2057,7 +2197,7 @@
                     window.bitacoraList = [];
                     window.dailyFlightStatuses = {};
                     safeStorageSet('audi_bitacora_logs', JSON.stringify([]));
-                    safeStorageSet('audi_flight_statuses', JSON.stringify({}));
+                    safeStorageSet(`audi_flight_statuses_${getTodayKey()}`, JSON.stringify({}));
 
                     if (typeof window.saveDailyStatusToCloud === 'function') window.saveDailyStatusToCloud();
 
@@ -2073,7 +2213,8 @@
         function syncDailyStatusesWithBitacora() {
             const plans = getActivePlan();
             const todayKey = getTodayKey();
-            const todayDateStr = new Date().toLocaleDateString('es-MX');
+            const now = new Date();
+            const dayStr = `${now.getDate()}/${now.getMonth() + 1}/${now.getFullYear()}`;
             let updated = false;
 
             plans.forEach((item, idx) => {
@@ -2082,15 +2223,14 @@
                     const normStatus = (dailySt.status === 'VOLADO') ? 'REALIZADO' : dailySt.status;
                     
                     let match = window.bitacoraList.find(b => 
-                        b.scheduledTime === item.timeOp2 && 
-                        (b.dateKey === todayKey || (b.timestampFormatted && b.timestampFormatted.includes(todayDateStr)))
+                        b.scheduledTime === item.timeOp2 && recordMatchesDate(b, todayKey)
                     );
 
                     if (!match) {
                         const newLog = {
                             id: Date.now() - (16 - idx) * 3000,
                             dateKey: todayKey,
-                            timestampFormatted: `${todayDateStr}, ${dailySt.realTime && dailySt.realTime !== '--' && dailySt.realTime !== 'N/A' ? dailySt.realTime : item.timeOp2}:00`,
+                            timestampFormatted: `${dayStr}, ${dailySt.realTime && dailySt.realTime !== '--' && dailySt.realTime !== 'N/A' ? dailySt.realTime : item.timeOp2}:00`,
                             scheduledTime: item.timeOp2,
                             flightType: `TIPO ${item.type} - ${item.name}`,
                             status: normStatus,
@@ -2111,21 +2251,18 @@
         }
         window.syncDailyStatusesWithBitacora = syncDailyStatusesWithBitacora;
 
+        // GENERACIÓN AUDITABLE DE PDF CON CORRESPONDENCIA PRECISA DE FECHAS
         function printAuditBitacora() {
+            reconcileBitacoraDates();
             syncDailyStatusesWithBitacora();
 
             const printBody = document.getElementById('printBitacoraTableBody');
             const now = new Date();
 
-            let targetDateYMD = document.getElementById('pdfReportDateInput') ? document.getElementById('pdfReportDateInput').value : '';
+            // Detectar la fecha solicitada de forma unificada
+            let targetDateYMD = window.bitacoraSelectedDate || document.getElementById('bitacoraDateInput')?.value || '';
             if (!targetDateYMD) {
-                if (window.bitacoraFilterMode === 'TODAY') {
-                    targetDateYMD = getTodayKey();
-                } else if (window.bitacoraFilterMode === 'CALENDAR' && window.bitacoraSelectedDate) {
-                    targetDateYMD = window.bitacoraSelectedDate;
-                } else {
-                    targetDateYMD = getTodayKey();
-                }
+                targetDateYMD = getTodayKey();
             }
 
             const parts = targetDateYMD.split('-');
@@ -2133,35 +2270,51 @@
             const filterMonth = parseInt(parts[1], 10);
             const filterDay = parseInt(parts[2], 10);
 
-            const reportDateLabel = `${filterDay}/${filterMonth}/${filterYear}`;
-            const fileDateSuffix = `${String(filterDay).padStart(2,'0')}-${String(filterMonth).padStart(2,'0')}-${filterYear}`;
+            const reportDateLabel = `${String(filterDay).padStart(2, '0')}/${String(filterMonth).padStart(2, '0')}/${filterYear}`;
+            const fileDateSuffix = `${String(filterDay).padStart(2, '0')}-${String(filterMonth).padStart(2, '0')}-${filterYear}`;
 
             document.getElementById('printReportDate').innerText = reportDateLabel;
             document.getElementById('printReportTime').innerText = now.toLocaleTimeString('es-MX');
+            const subtitleEl = document.getElementById('printReportSubtitle');
+            if (subtitleEl) {
+                subtitleEl.innerText = `Bitácora Oficial Auditable de Vuelos con Drone (24/7) - Jornada del ${reportDateLabel}`;
+            }
 
-            let listToPrint = window.bitacoraList.filter(item => {
-                if (item.dateKey && item.dateKey === targetDateYMD) return true;
-                if (!item.timestampFormatted) return false;
-                const datePart = item.timestampFormatted.split(',')[0].trim();
-                const dParts = datePart.split('/');
-                if (dParts.length === 3) {
-                    return parseInt(dParts[0], 10) === filterDay && parseInt(dParts[1], 10) === filterMonth && parseInt(dParts[2], 10) === filterYear;
-                }
-                return item.timestampFormatted.includes(`${filterDay}/${filterMonth}/${filterYear}`);
-            });
+            // Filtrar todos los registros que pertenecen a la fecha seleccionada
+            let listToPrint = window.bitacoraList.filter(item => recordMatchesDate(item, targetDateYMD));
 
-            if (targetDateYMD === getTodayKey() && listToPrint.length < 16) {
-                const plans = getActivePlan();
-                const todayStr = now.toLocaleDateString('es-MX');
+            // Intentar recuperar statuses guardados específicamente para esta fecha si existen en localStorage
+            let savedDateStatuses = null;
+            try {
+                const rawStatuses = safeStorageGet(`audi_flight_statuses_${targetDateYMD}`);
+                if (rawStatuses) savedDateStatuses = JSON.parse(rawStatuses);
+            } catch(e) {}
+
+            // Si hay menos de 16 vuelos en la fecha, completamos el cronograma oficial de 16 vuelos para cumplimiento de auditoría
+            if (listToPrint.length < 16) {
+                const planKey = (targetDateYMD === getTodayKey()) ? getActivePlanKey() : getDeterministicPlanForDate(targetDateYMD);
+                const plans = OFFICIAL_PLANS[planKey] || OFFICIAL_PLANS["1"];
+                const dayStr = `${filterDay}/${filterMonth}/${filterYear}`;
+
                 listToPrint = plans.map((planItem, idx) => {
-                    const st = window.dailyFlightStatuses[idx] || { status: 'PENDIENTE', realTime: '--', note: '' };
                     const match = window.bitacoraList.find(b => 
-                        b.scheduledTime === planItem.timeOp2 && 
-                        (b.dateKey === targetDateYMD || (b.timestampFormatted && b.timestampFormatted.includes(todayStr)))
+                        b.scheduledTime === planItem.timeOp2 && recordMatchesDate(b, targetDateYMD)
                     );
+
+                    let st = match ? { status: match.status, realTime: match.realTime, note: match.notes, imageData: match.imageData } : null;
+                    if (!st && savedDateStatuses && savedDateStatuses[idx]) {
+                        st = savedDateStatuses[idx];
+                    }
+                    if (!st && targetDateYMD === getTodayKey()) {
+                        st = window.dailyFlightStatuses[idx];
+                    }
+                    if (!st) {
+                        st = { status: 'PENDIENTE', realTime: '--', note: 'Vuelo programado de la jornada' };
+                    }
+
                     const normSt = (st.status === 'VOLADO') ? 'REALIZADO' : st.status;
                     return {
-                        timestampFormatted: (match && match.timestampFormatted) ? match.timestampFormatted : `${todayStr}, ${planItem.timeOp2}:00`,
+                        timestampFormatted: (match && match.timestampFormatted) ? match.timestampFormatted : `${dayStr}, ${st.realTime && st.realTime !== '--' && st.realTime !== 'N/A' ? st.realTime : planItem.timeOp2}:00`,
                         scheduledTime: planItem.timeOp2,
                         flightType: `TIPO ${planItem.type} - ${planItem.name}`,
                         status: normSt,
@@ -2213,6 +2366,7 @@
         window.printAuditBitacora = printAuditBitacora;
 
         function exportBitacoraCSV() {
+            reconcileBitacoraDates();
             syncDailyStatusesWithBitacora();
 
             if (!window.bitacoraList || window.bitacoraList.length === 0) {
@@ -2246,19 +2400,17 @@
                     try { window.bitacoraList = JSON.parse(savedBitacora); } catch(e){} 
                 }
 
+                reconcileBitacoraDates();
+
                 if (savedDate !== today) {
                     safeStorageSet('audi_flight_date', today);
                     window.dailyFlightStatuses = {};
                     window.systemWeatherSuspended = false;
-                    safeStorageSet('audi_flight_statuses', JSON.stringify({}));
-                    safeStorageSet('audi_weather_suspended', 'false');
                 } else {
-                    const savedStatuses = safeStorageGet('audi_flight_statuses');
+                    const savedStatuses = safeStorageGet(`audi_flight_statuses_${today}`) || safeStorageGet('audi_flight_statuses');
                     if (savedStatuses) { 
                         try { window.dailyFlightStatuses = JSON.parse(savedStatuses); } catch(e){} 
                     }
-                    const savedWeatherSuspended = safeStorageGet('audi_weather_suspended');
-                    window.systemWeatherSuspended = (savedWeatherSuspended === 'true');
                 }
 
                 syncDailyStatusesWithBitacora();
@@ -2270,7 +2422,6 @@
                 renderFlightsTable();
                 updateTargetFlightBanner(new Date());
             } catch (err) {
-                console.error("Error durante la inicialización de la app:", err);
                 startLiveClock();
                 renderFlightsTable();
             }
